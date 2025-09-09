@@ -1,0 +1,136 @@
+@import '@rainbow-me/rainbowkit/styles.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar with only thumb visible */
+.scrollbar-thumb-only::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+}
+
+.scrollbar-thumb-only::-webkit-scrollbar-track {
+    background: transparent;
+    /* Invisible track */
+    border-radius: 4px;
+}
+
+.scrollbar-thumb-only::-webkit-scrollbar-thumb {
+    background: #1273EB;
+    /* bg-secondary color */
+    border-radius: 4px;
+}
+
+.scrollbar-thumb-only::-webkit-scrollbar-thumb:hover {
+    background: #0f5bb8;
+    /* Slightly darker on hover */
+}
+
+/* Remove scrollbar arrow buttons */
+.scrollbar-thumb-only::-webkit-scrollbar-button {
+    display: none;
+}
+
+.scrollbar-thumb-only::-webkit-scrollbar-corner {
+    display: none;
+}
+
+/* Firefox scrollbar - only thumb */
+.scrollbar-thumb-only {
+    scrollbar-width: thin;
+    scrollbar-color: #1273EB transparent;
+    /* thumb blue, track transparent */
+}
+
+
+:root {
+    --font-poppins: 'Poppins', system-ui, sans-serif;
+    --font-roboto: 'Roboto', system-ui, sans-serif;
+    --font-inter: 'Inter', system-ui, sans-serif;
+
+    --color-primary: #FFF9E2;
+    --color-secondary: #1273EB;
+    --color-black: #000000;
+    --color-light-black: #101010;
+    --color-white: #FFFFFF;
+    --color-white-semi-transparent: rgba(255, 255, 255, 0.9);
+    --color-white-transparent: rgba(255, 255, 255, 0.7);
+    --color-forestgreen: #228B22;
+    --color-firebrick: #B22222;
+    --color-orange: #F3A108;
+    --color-orange-transparent: rgba(255, 165, 0, 0.1);
+    --color-hover-blue: #1273EB;
+    --color-hover-grey: #CCCCCC;
+}
+
+html,
+body {
+    font-family: var(--font-poppins);
+    background-color: var(--color-primary);
+    color: var(--color-black);
+}
+
+/* Beispiel für Utility-Klassen, falls du sie direkt nutzen willst */
+.bg-primary {
+    background-color: var(--color-primary);
+}
+
+.bg-secondary {
+    background-color: var(--color-secondary);
+}
+
+.bg-forestgreen {
+    background-color: var(--color-forestgreen);
+}
+
+.bg-firebrick {
+    background-color: var(--color-firebrick);
+}
+
+.bg-orange {
+    background-color: var(--color-orange);
+}
+
+.bg-orange-transparent {
+    background-color: var(--color-orange-transparent);
+}
+
+.bg-white-semi-transparent {
+    background-color: var(--color-white-semi-transparent);
+}
+
+.bg-white-transparent {
+    background-color: var(--color-white-transparent);
+}
+
+.text-secondary {
+    color: var(--color-secondary);
+}
+
+.text-forestgreen {
+    color: var(--color-forestgreen);
+}
+
+.text-firebrick {
+    color: var(--color-firebrick);
+}
+
+.text-orange {
+    color: var(--color-orange);
+}
+
+.text-light-black {
+    color: var(--color-light-black);
+}
+
+.font-primary {
+    font-family: var(--font-poppins);
+}
+
+.font-secondary {
+    font-family: var(--font-roboto);
+}
+
+.font-inter {
+    font-family: var(--font-inter);
+}

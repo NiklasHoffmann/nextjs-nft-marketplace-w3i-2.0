@@ -1,0 +1,554 @@
+[
+  // ============================
+  // Errors – IdeationMarketFacet
+  // ============================
+
+  // Revert wenn Marketplace keine Transfer-Berechtigung hat (ERC721: approve/setApprovalForAll; ERC1155: setApprovalForAll).
+  { "type": "error", "name": "IdeationMarket__NotApprovedForMarketplace", "inputs": [] },
+
+  // Re-Listing eines ERC721 (gleiche tokenAddress+tokenId) nicht erlaubt, solange aktive ListingId existiert.
+  { "type": "error", "name": "IdeationMarket__AlreadyListed", "inputs": [] },
+
+  // Beim Kaufcheck: Der hinterlegte Seller ist nicht (mehr) Owner des ERC721.
+  { "type": "error", "name": "IdeationMarket__SellerNotTokenOwner", "inputs": [{ "type": "uint128", "name": "listingId" }] },
+
+  // Aufrufer ist weder Owner noch autorisierter Operator (getApproved/isApprovedForAll).
+  { "type": "error", "name": "IdeationMarket__NotAuthorizedOperator", "inputs": [] },
+
+  // Anti-Frontrun: on-chain Terms unterscheiden sich von den expected*-Parametern.
+  { "type": "error", "name": "IdeationMarket__ListingTermsChanged", "inputs": [] },
+
+  // Listing ohne Preis (reiner Free-Listing) ist nicht erlaubt, wenn kein Swap-Ziel gesetzt wurde.
+  { "type": "error", "name": "IdeationMarket__FreeListingsNotSupported", "inputs": [] },
+
+  // Preis passt nicht (msg.value < required purchasePrice).
+  { "type": "error", "name": "IdeationMarket__PriceNotMet", "inputs": [
+    { "type": "uint128", "name": "listingId" },
+    { "type": "uint256", "name": "price" },
+    { "type": "uint256", "name": "value" }
+  ]},
+
+  // Keine Proceeds vorhanden beim Withdraw.
+  { "type": "error", "name": "IdeationMarket__NoProceeds", "inputs": [] },
+
+  // Seller darf sein eigenes Listing nicht kaufen.
+  { "type": "error", "name": "IdeationMarket__SameBuyerAsSeller", "inputs": [] },
+
+  // Swap gegen exakt dasselbe Token (address+id) ist unzulässig.
+  { "type": "error", "name": "IdeationMarket__NoSwapForSameToken", "inputs": [] },
+
+  // Desired-Token Standard passt nicht zur gewünschten Menge/Parametrisierung (ERC165 checks).
+  { "type": "error", "name": "IdeationMarket__NotSupportedTokenStandard", "inputs": [] },
+
+  // Listing existiert nicht (seller == address(0)).
+  { "type": "error", "name": "IdeationMarket__NotListed", "inputs": [] },
+
+  // Reentrancy-Guard hat ausgelöst.
+  { "type": "error", "name": "IdeationMarket__Reentrant", "inputs": [] },
+
+  // Collection ist (nicht mehr) auf der Whitelist.
+  { "type": "error", "name": "IdeationMarket__CollectionNotWhitelisted", "inputs": [{ "type": "address", "name": "tokenAddress" }] },
+
+  // Kauf ist whitelist-gated, Aufrufer ist nicht gelistet.
+  { "type": "error", "name": "IdeationMarket__BuyerNotWhitelisted", "inputs": [
+    { "type": "uint128", "name": "listingId" },
+    { "type": "address", "name": "buyer" }
+  ]},
+
+  // Bei Non-Swap müssen desired*-Parameter leer sein, sonst Fehler.
+  { "type": "error", "name": "IdeationMarket__InvalidNoSwapParameters", "inputs": [] },
+
+  // Seller-ERC1155-Balance reicht nicht aus.
+  { "type": "error", "name": "IdeationMarket__SellerInsufficientTokenBalance", "inputs": [
+    { "type": "uint256", "name": "required" },
+    { "type": "uint256", "name": "available" }
+  ]},
+
+  // ERC2981-Royalty > Seller-Proceeds → Abbruch.
+  { "type": "error", "name": "IdeationMarket__RoyaltyFeeExceedsProceeds", "inputs": [] },
+
+  // Nicht berechtigt, Listing zu canceln (weder Seller/Operator noch Diamond-Owner).
+  { "type": "error", "name": "IdeationMarket__NotAuthorizedToCancel", "inputs": [] },
+
+  // ETH-Transfer im Withdraw fehlgeschlagen.
+  { "type": "error", "name": "IdeationMarket__TransferFailed", "inputs": [] },
+
+  // Swap-ERC1155 des Käufers hat zu wenig Balance.
+  { "type": "error", "name": "IdeationMarket__InsufficientSwapTokenBalance", "inputs": [
+    { "type": "uint256", "name": "required" },
+    { "type": "uint256", "name": "available" }
+  ]},
+
+  // Whitelist wurde nicht aktiviert, aber Adressen übergeben.
+  { "type": "error", "name": "IdeationMarket__WhitelistDisabled", "inputs": [] },
+
+  // Beim Kauf eines Swap-ERC1155 muss der tatsächliche Holder korrekt übergeben werden.
+  { "type": "error", "name": "IdeationMarket__WrongErc1155HolderParameter", "inputs": [] },
+
+  // newErc1155Quantity vs. Token-Standard ist inkonsistent (0 für ERC721, >0 für ERC1155).
+  { "type": "error", "name": "IdeationMarket__WrongQuantityParameter", "inputs": [] },
+
+  // cleanListing geprüft: Listing ist weiterhin gültig (Approval/Balance OK) → nichts gelöscht.
+  { "type": "error", "name": "IdeationMarket__StillApproved", "inputs": [] },
+
+  // PartialBuy unzulässig (z.B. Menge <= 1 oder Swap-Listing).
+  { "type": "error", "name": "IdeationMarket__PartialBuyNotPossible", "inputs": [] },
+
+  // Falsche Kaufmenge (0/zu groß/inkonsistent mit partial-Buy-Flag).
+  { "type": "error", "name": "IdeationMarket__InvalidPurchaseQuantity", "inputs": [] },
+
+  // Preis muss bei Partial-Buy glatt durch Menge teilbar sein (unit price integer).
+  { "type": "error", "name": "IdeationMarket__InvalidUnitPrice", "inputs": [] },
+
+  // =======================
+  // Errors – GetterFacet
+  // =======================
+
+  // getListingByListingId: Listing existiert nicht (seller == 0).
+  { "type": "error", "name": "Getter__ListingNotFound", "inputs": [{ "type": "uint128", "name": "listingId" }] },
+
+  // getListingsByNFT: keine aktiven Listings gefunden.
+  { "type": "error", "name": "Getter__NoActiveListings", "inputs": [
+    { "type": "address", "name": "tokenAddress" },
+    { "type": "uint256", "name": "tokenId" }
+  ]},
+
+  // =============================
+  // Errors – BuyerWhitelistFacet
+  // =============================
+
+  // Listing existiert nicht.
+  { "type": "error", "name": "BuyerWhitelist__ListingDoesNotExist", "inputs": [] },
+
+  // Aufrufer nicht berechtigt (nicht Seller, nicht autorisierter Operator).
+  { "type": "error", "name": "BuyerWhitelist__NotAuthorizedOperator", "inputs": [] },
+
+  // Zu viele Adressen auf einmal (über Cap).
+  { "type": "error", "name": "BuyerWhitelist__ExceedsMaxBatchSize", "inputs": [] },
+
+  // Null-Adresse unzulässig.
+  { "type": "error", "name": "BuyerWhitelist__ZeroAddress", "inputs": [] },
+
+  // Leere Liste unzulässig.
+  { "type": "error", "name": "BuyerWhitelist__EmptyCalldata", "inputs": [] },
+
+  // ==================================
+  // Errors – CollectionWhitelistFacet
+  // ==================================
+
+  // Collection bereits whitelisted.
+  { "type": "error", "name": "CollectionWhitelist__AlreadyWhitelisted", "inputs": [] },
+
+  // Collection nicht (mehr) whitelisted.
+  { "type": "error", "name": "CollectionWhitelist__NotWhitelisted", "inputs": [] },
+
+  // Null-Adresse unzulässig.
+  { "type": "error", "name": "CollectionWhitelist__ZeroAddress", "inputs": [] },
+
+  // =======================
+  // Errors – OwnershipFacet
+  // =======================
+
+  // Nur pending owner darf acceptOwnership aufrufen.
+  { "type": "error", "name": "Ownership__CallerIsNotThePendingOwner", "inputs": [] },
+
+  // ===========================
+  // Events – IdeationMarketFacet
+  // ===========================
+
+  // Neues Listing angelegt. Beinhaltet ERC1155-Menge, Flags, Swap-Ziel & Fee-Rate (zum Zeitpunkt der Erstellung).
+  { "type": "event", "name": "ListingCreated", "anonymous": false, "inputs": [
+    { "indexed": true,  "name": "listingId", "type": "uint128" },
+    { "indexed": true,  "name": "tokenAddress", "type": "address" },
+    { "indexed": true,  "name": "tokenId", "type": "uint256" },
+    { "indexed": false, "name": "erc1155Quantity", "type": "uint256" },
+    { "indexed": false, "name": "price", "type": "uint256" },
+    { "indexed": false, "name": "feeRate", "type": "uint32" },
+    { "indexed": false, "name": "seller", "type": "address" },
+    { "indexed": false, "name": "buyerWhitelistEnabled", "type": "bool" },
+    { "indexed": false, "name": "partialBuyEnabled", "type": "bool" },
+    { "indexed": false, "name": "desiredTokenAddress", "type": "address" },
+    { "indexed": false, "name": "desiredTokenId", "type": "uint256" },
+    { "indexed": false, "name": "desiredErc1155Quantity", "type": "uint256" }
+  ]},
+
+  // Kauf erfolgt. Bei PartialBuy zeigt erc1155Quantity die gekaufte Teilmenge, price den gezahlten Teilpreis.
+  { "type": "event", "name": "ListingPurchased", "anonymous": false, "inputs": [
+    { "indexed": true,  "name": "listingId", "type": "uint128" },
+    { "indexed": true,  "name": "tokenAddress", "type": "address" },
+    { "indexed": true,  "name": "tokenId", "type": "uint256" },
+    { "indexed": false, "name": "erc1155Quantity", "type": "uint256" },
+    { "indexed": false, "name": "partialBuy", "type": "bool" },
+    { "indexed": false, "name": "price", "type": "uint256" },
+    { "indexed": false, "name": "feeRate", "type": "uint32" },
+    { "indexed": false, "name": "seller", "type": "address" },
+    { "indexed": false, "name": "buyer", "type": "address" },
+    { "indexed": false, "name": "desiredTokenAddress", "type": "address" },
+    { "indexed": false, "name": "desiredTokenId", "type": "uint256" },
+    { "indexed": false, "name": "desiredErc1155Quantity", "type": "uint256" }
+  ]},
+
+  // Listing wurde gelöscht (Seller/Operator/Admin).
+  { "type": "event", "name": "ListingCanceled", "anonymous": false, "inputs": [
+    { "indexed": true,  "name": "listingId", "type": "uint128" },
+    { "indexed": true,  "name": "tokenAddress", "type": "address" },
+    { "indexed": true,  "name": "tokenId", "type": "uint256" },
+    { "indexed": false, "name": "seller", "type": "address" },
+    { "indexed": false, "name": "triggeredBy", "type": "address" }
+  ]},
+
+  // Listing wurde aktualisiert (Preis, Menge, Flags, Swap-Parameter).
+  { "type": "event", "name": "ListingUpdated", "anonymous": false, "inputs": [
+    { "indexed": true,  "name": "listingId", "type": "uint128" },
+    { "indexed": true,  "name": "tokenAddress", "type": "address" },
+    { "indexed": true,  "name": "tokenId", "type": "uint256" },
+    { "indexed": false, "name": "erc1155Quantity", "type": "uint256" },
+    { "indexed": false, "name": "price", "type": "uint256" },
+    { "indexed": false, "name": "feeRate", "type": "uint32" },
+    { "indexed": false, "name": "seller", "type": "address" },
+    { "indexed": false, "name": "buyerWhitelistEnabled", "type": "bool" },
+    { "indexed": false, "name": "partialBuyEnabled", "type": "bool" },
+    { "indexed": false, "name": "desiredTokenAddress", "type": "address" },
+    { "indexed": false, "name": "desiredTokenId", "type": "uint256" },
+    { "indexed": false, "name": "desiredErc1155Quantity", "type": "uint256" }
+  ]},
+
+  // Withdraw von Proceeds (Seller, Royalty-Receiver, Käufer-Überzahlung).
+  { "type": "event", "name": "ProceedsWithdrawn", "anonymous": false, "inputs": [
+    { "indexed": true, "name": "withdrawer", "type": "address" },
+    { "indexed": false, "name": "amount", "type": "uint256" }
+  ]},
+
+  // Fee-Rate (Innovation Fee) geändert (Owner-only).
+  { "type": "event", "name": "InnovationFeeUpdated", "anonymous": false, "inputs": [
+    { "indexed": false, "name": "previousFee", "type": "uint32" },
+    { "indexed": false, "name": "newFee", "type": "uint32" }
+  ]},
+
+  // Listing wurde beim cleanListing automatisch entfernt (Approval/Balances/Whitelist ungültig).
+  { "type": "event", "name": "ListingCanceledDueToInvalidListing", "anonymous": false, "inputs": [
+    { "indexed": true,  "name": "listingId", "type": "uint128" },
+    { "indexed": true,  "name": "tokenAddress", "type": "address" },
+    { "indexed": true,  "name": "tokenId", "type": "uint256" },
+    { "indexed": false, "name": "seller", "type": "address" },
+    { "indexed": false, "name": "triggeredBy", "type": "address" }
+  ]},
+
+  // Ausbezahlte ERC2981-Royalties werden hier geloggt.
+  { "type": "event", "name": "RoyaltyPaid", "anonymous": false, "inputs": [
+    { "indexed": true,  "name": "listingId", "type": "uint128" },
+    { "indexed": true,  "name": "royaltyReceiver", "type": "address" },
+    { "indexed": true,  "name": "tokenAddress", "type": "address" },
+    { "indexed": false, "name": "tokenId", "type": "uint256" },
+    { "indexed": false, "name": "royaltyAmount", "type": "uint256" }
+  ]},
+
+  // Update hat eine Collection-De-Whitelist festgestellt und Cancel getriggert.
+  { "type": "event", "name": "CollectionWhitelistRevokedCancelTriggered", "anonymous": false, "inputs": [
+    { "indexed": true, "name": "listingId", "type": "uint128" },
+    { "indexed": true, "name": "tokenAddress", "type": "address" }
+  ]},
+
+  // ==================================
+  // Events – Buyer/CollectionWhitelist
+  // ==================================
+
+  // Käufer wurde für ein Listing whitelisted.
+  { "type": "event", "name": "BuyerWhitelisted", "anonymous": false, "inputs": [
+    { "indexed": true, "name": "listingId", "type": "uint128" },
+    { "indexed": true, "name": "buyer", "type": "address" }
+  ]},
+
+  // Käufer wurde von der Whitelist entfernt.
+  { "type": "event", "name": "BuyerRemovedFromWhitelist", "anonymous": false, "inputs": [
+    { "indexed": true, "name": "listingId", "type": "uint128" },
+    { "indexed": true, "name": "buyer", "type": "address" }
+  ]},
+
+  // Collection wurde in die Whitelist aufgenommen.
+  { "type": "event", "name": "CollectionAddedToWhitelist", "anonymous": false, "inputs": [
+    { "indexed": true, "name": "tokenAddress", "type": "address" }
+  ]},
+
+  // Collection wurde aus der Whitelist entfernt.
+  { "type": "event", "name": "CollectionRemovedFromWhitelist", "anonymous": false, "inputs": [
+    { "indexed": true, "name": "tokenAddress", "type": "address" }
+  ]},
+
+  // ==============================
+  // Events – Diamond/Ownership
+  // ==============================
+
+  // DiamondCut signalisiert ein Upgrade (Add/Replace/Remove von Facet-Selektoren).
+  { "type": "event", "name": "DiamondCut", "anonymous": false, "inputs": [
+    { "indexed": false, "name": "_diamondCut", "type": "tuple[]", "components": [
+      { "name": "facetAddress", "type": "address" },
+      { "name": "action", "type": "uint8" },
+      { "name": "functionSelectors", "type": "bytes4[]" }
+    ]},
+    { "indexed": false, "name": "_init", "type": "address" },
+    { "indexed": false, "name": "_calldata", "type": "bytes" }
+  ]},
+
+  // Zweistufiger Owner-Wechsel: Nominierung
+  { "type": "event", "name": "OwnershipTransferInitiated", "anonymous": false, "inputs": [
+    { "indexed": true, "name": "previousOwner", "type": "address" },
+    { "indexed": true, "name": "newOwner", "type": "address" }
+  ]},
+
+  // Zweistufiger Owner-Wechsel: Übergabe erfolgt
+  { "type": "event", "name": "OwnershipTransferred", "anonymous": false, "inputs": [
+    { "indexed": true, "name": "previousOwner", "type": "address" },
+    { "indexed": true, "name": "newOwner", "type": "address" }
+  ]},
+
+  // ==========================
+  // Writes – Market (Facet)
+  // ==========================
+
+  // NFT listen (ERC721 oder ERC1155), optional Swap-Target, optional Buyer-Whitelist, optional Partial-Buy (nur ERC1155, unit price muss integer sein).
+  { "type": "function", "name": "createListing", "stateMutability": "nonpayable", "inputs": [
+    { "type": "address", "name": "tokenAddress" },
+    { "type": "uint256", "name": "tokenId" },
+    { "type": "address", "name": "erc1155Holder" },            // Für ERC1155: tatsächlicher Holder (kann ≠ msg.sender sein, wenn Operator)
+    { "type": "uint256", "name": "price" },
+    { "type": "address", "name": "desiredTokenAddress" },      // Swap: 0x0 falls kein Swap
+    { "type": "uint256", "name": "desiredTokenId" },           // Swap: 0 bei Non-Swap
+    { "type": "uint256", "name": "desiredErc1155Quantity" },   // Swap-ERC1155-Menge (>0 für ERC1155-Swap, 0 sonst)
+    { "type": "uint256", "name": "erc1155Quantity" },          // Listing-Menge (>0 für ERC1155, 0 für ERC721)
+    { "type": "bool",   "name": "buyerWhitelistEnabled" },     // true → allowedBuyers initial setzen oder später via Facet
+    { "type": "bool",   "name": "partialBuyEnabled" },         // nur ERC1155 & price % qty == 0, kein Swap
+    { "type": "address[]", "name": "allowedBuyers" }           // initiale Whitelist (optional, wenn enabled)
+  ], "outputs": [] },
+
+  // Listing kaufen (ggf. Teilkauf bei ERC1155), alle expected*-Felder zum Frontrun-Schutz, bei ERC1155-Swap muss Holder angegeben werden.
+  { "type": "function", "name": "purchaseListing", "stateMutability": "payable", "inputs": [
+    { "type": "uint128", "name": "listingId" },
+    { "type": "uint256", "name": "expectedPrice" },
+    { "type": "uint256", "name": "expectedErc1155Quantity" },
+    { "type": "address", "name": "expectedDesiredTokenAddress" },
+    { "type": "uint256", "name": "expectedDesiredTokenId" },
+    { "type": "uint256", "name": "expectedDesiredErc1155Quantity" },
+    { "type": "uint256", "name": "erc1155PurchaseQuantity" },  // 0 für ERC721, >0 für ERC1155 (Teil-/Vollkauf)
+    { "type": "address", "name": "desiredErc1155Holder" }      // nur wenn Swap-ERC1155
+  ], "outputs": [] },
+
+  // Listing canceln (Seller/Operator/Admin).
+  { "type": "function", "name": "cancelListing", "stateMutability": "nonpayable", "inputs": [
+    { "type": "uint128", "name": "listingId" }
+  ], "outputs": [] },
+
+  // Listing updaten (Preis/Mengen/Flags/Swap-Params). Bei Aktivierung der Whitelist optional Batch-Adressen mitgeben.
+  { "type": "function", "name": "updateListing", "stateMutability": "nonpayable", "inputs": [
+    { "type": "uint128", "name": "listingId" },
+    { "type": "uint256", "name": "newPrice" },
+    { "type": "address", "name": "newDesiredTokenAddress" },
+    { "type": "uint256", "name": "newDesiredTokenId" },
+    { "type": "uint256", "name": "newDesiredErc1155Quantity" },
+    { "type": "uint256", "name": "newErc1155Quantity" },
+    { "type": "bool",   "name": "newBuyerWhitelistEnabled" },
+    { "type": "bool",   "name": "newPartialBuyEnabled" },
+    { "type": "address[]", "name": "newAllowedBuyers" }
+  ], "outputs": [] },
+
+  // Proceeds (Seller/Royalty/Buyer-Überzahlung) abziehen.
+  { "type": "function", "name": "withdrawProceeds", "stateMutability": "nonpayable", "inputs": [], "outputs": [] },
+
+  // Innovation-Fee (Marktplatz-Fee, 100000 Denominator) setzen (Owner).
+  { "type": "function", "name": "setInnovationFee", "stateMutability": "nonpayable", "inputs": [
+    { "type": "uint32", "name": "newFee" }
+  ], "outputs": [] },
+
+  // Admin/UX-Helfer: löscht ungültige Listings (keine Approval/Balances/De-Whitelisting).
+  { "type": "function", "name": "cleanListing", "stateMutability": "nonpayable", "inputs": [
+    { "type": "uint128", "name": "listingId" }
+  ], "outputs": [] },
+
+  // ==============================
+  // Writes – BuyerWhitelistFacet
+  // ==============================
+
+  // Käufer in Whitelist aufnehmen (Batch; Cap siehe Getter).
+  { "type": "function", "name": "addBuyerWhitelistAddresses", "stateMutability": "nonpayable", "inputs": [
+    { "type": "uint128", "name": "listingId" },
+    { "type": "address[]", "name": "allowedBuyers" }
+  ], "outputs": [] },
+
+  // Käufer aus Whitelist entfernen (Batch).
+  { "type": "function", "name": "removeBuyerWhitelistAddresses", "stateMutability": "nonpayable", "inputs": [
+    { "type": "uint128", "name": "listingId" },
+    { "type": "address[]", "name": "disallowedBuyers" }
+  ], "outputs": [] },
+
+  // ===================================
+  // Writes – CollectionWhitelistFacet
+  // ===================================
+
+  // Collection whitelisten (Owner).
+  { "type": "function", "name": "addWhitelistedCollection", "stateMutability": "nonpayable", "inputs": [
+    { "type": "address", "name": "tokenAddress" }
+  ], "outputs": [] },
+
+  // Collection de-whitelisten (Owner).
+  { "type": "function", "name": "removeWhitelistedCollection", "stateMutability": "nonpayable", "inputs": [
+    { "type": "address", "name": "tokenAddress" }
+  ], "outputs": [] },
+
+  // Batch-Whitelist Add (Owner).
+  { "type": "function", "name": "batchAddWhitelistedCollections", "stateMutability": "nonpayable", "inputs": [
+    { "type": "address[]", "name": "tokenAddresses" }
+  ], "outputs": [] },
+
+  // Batch-Whitelist Remove (Owner).
+  { "type": "function", "name": "batchRemoveWhitelistedCollections", "stateMutability": "nonpayable", "inputs": [
+    { "type": "address[]", "name": "tokenAddresses" }
+  ], "outputs": [] },
+
+  // ==========================
+  // Reads – GetterFacet
+  // ==========================
+
+  // Aktive Listings für ein NFT (tokenAddress+tokenId).
+  { "type": "function", "name": "getListingsByNFT", "stateMutability": "view", "inputs": [
+    { "type": "address", "name": "tokenAddress" },
+    { "type": "uint256", "name": "tokenId" }
+  ], "outputs": [
+    { "type": "tuple[]", "components": [
+      { "type": "uint128", "name": "listingId" },
+      { "type": "uint32",  "name": "feeRate" },
+      { "type": "bool",    "name": "buyerWhitelistEnabled" },
+      { "type": "bool",    "name": "partialBuyEnabled" },
+      { "type": "address", "name": "tokenAddress" },
+      { "type": "uint256", "name": "tokenId" },
+      { "type": "uint256", "name": "erc1155Quantity" },
+      { "type": "uint256", "name": "price" },
+      { "type": "address", "name": "seller" },
+      { "type": "address", "name": "desiredTokenAddress" },
+      { "type": "uint256", "name": "desiredTokenId" },
+      { "type": "uint256", "name": "desiredErc1155Quantity" }
+    ] }
+  ] },
+
+  // Einzelnes Listing per listingId.
+  { "type": "function", "name": "getListingByListingId", "stateMutability": "view", "inputs": [
+    { "type": "uint128", "name": "listingId" }
+  ], "outputs": [
+    { "type": "tuple", "components": [
+      { "type": "uint128", "name": "listingId" },
+      { "type": "uint32",  "name": "feeRate" },
+      { "type": "bool",    "name": "buyerWhitelistEnabled" },
+      { "type": "bool",    "name": "partialBuyEnabled" },
+      { "type": "address", "name": "tokenAddress" },
+      { "type": "uint256", "name": "tokenId" },
+      { "type": "uint256", "name": "erc1155Quantity" },
+      { "type": "uint256", "name": "price" },
+      { "type": "address", "name": "seller" },
+      { "type": "address", "name": "desiredTokenAddress" },
+      { "type": "uint256", "name": "desiredTokenId" },
+      { "type": "uint256", "name": "desiredErc1155Quantity" }
+    ] }
+  ] },
+
+  // Proceeds eines Accounts (Seller, Royalty, Buyer-Überzahlung).
+  { "type": "function", "name": "getProceeds", "stateMutability": "view", "inputs": [
+    { "type": "address", "name": "seller" }
+  ], "outputs": [{ "type": "uint256" }] },
+
+  // ETH-Balance des Diamond.
+  { "type": "function", "name": "getBalance", "stateMutability": "view", "inputs": [], "outputs": [{ "type": "uint256" }] },
+
+  // Aktuelle Innovation-Fee (Basis 100000).
+  { "type": "function", "name": "getInnovationFee", "stateMutability": "view", "inputs": [], "outputs": [
+    { "type": "uint32", "name": "innovationFee" }
+  ] },
+
+  // Nächste ListingId (Counter + 1).
+  { "type": "function", "name": "getNextListingId", "stateMutability": "view", "inputs": [], "outputs": [{ "type": "uint128" }] },
+
+  // Prüfen, ob Collection whitelisted ist.
+  { "type": "function", "name": "isCollectionWhitelisted", "stateMutability": "view", "inputs": [
+    { "type": "address", "name": "collection" }
+  ], "outputs": [{ "type": "bool" }] },
+
+  // Liste aller whitelisted Collections.
+  { "type": "function", "name": "getWhitelistedCollections", "stateMutability": "view", "inputs": [], "outputs": [
+    { "type": "address[]" }
+  ] },
+
+  // Diamond-Owner lesen.
+  { "type": "function", "name": "getContractOwner", "stateMutability": "view", "inputs": [], "outputs": [{ "type": "address" }] },
+
+  // Prüfen, ob Käufer für ein Listing whitelisted ist.
+  { "type": "function", "name": "isBuyerWhitelisted", "stateMutability": "view", "inputs": [
+    { "type": "uint128", "name": "listingId" },
+    { "type": "address", "name": "buyer" }
+  ], "outputs": [{ "type": "bool" }] },
+
+  // Maximale Batchgröße für Whitelist-Adds.
+  { "type": "function", "name": "getBuyerWhitelistMaxBatchSize", "stateMutability": "view", "inputs": [], "outputs": [
+    { "type": "uint16", "name": "maxBatchSize" }
+  ] },
+
+  // Für 2-Step-Ownership: pending Owner auslesen.
+  { "type": "function", "name": "getPendingOwner", "stateMutability": "view", "inputs": [], "outputs": [{ "type": "address" }] },
+
+  // ==========================
+  // Reads – DiamondLoupeFacet
+  // ==========================
+
+  // Übersicht aller Facets & deren Selektoren (EIP-2535).
+  { "type": "function", "name": "facets", "stateMutability": "view", "inputs": [], "outputs": [
+    { "type": "tuple[]", "components": [
+      { "name": "facetAddress", "type": "address" },
+      { "name": "functionSelectors", "type": "bytes4[]" }
+    ] }
+  ] },
+
+  // Selektoren eines bestimmten Facets.
+  { "type": "function", "name": "facetFunctionSelectors", "stateMutability": "view", "inputs": [
+    { "type": "address", "name": "_facet" }
+  ], "outputs": [{ "type": "bytes4[]" }] },
+
+  // Liste aller Facet-Adressen.
+  { "type": "function", "name": "facetAddresses", "stateMutability": "view", "inputs": [], "outputs": [{ "type": "address[]" }] },
+
+  // Facet-Adresse eines Funktions-Selectors.
+  { "type": "function", "name": "facetAddress", "stateMutability": "view", "inputs": [
+    { "type": "bytes4", "name": "_functionSelector" }
+  ], "outputs": [{ "type": "address", "name": "facetAddress_" }] },
+
+  // ERC165-Support-Abfrage.
+  { "type": "function", "name": "supportsInterface", "stateMutability": "view", "inputs": [
+    { "type": "bytes4", "name": "_interfaceId" }
+  ], "outputs": [{ "type": "bool" }] },
+
+  // ==========================
+  // Writes – DiamondCutFacet
+  // ==========================
+
+  // Facet-Funktionen hinzufügen/ersetzen/entfernen, optional init-call ausführen (Owner).
+  { "type": "function", "name": "diamondCut", "stateMutability": "nonpayable", "inputs": [
+    { "name": "_diamondCut", "type": "tuple[]", "components": [
+      { "name": "facetAddress", "type": "address" },
+      { "name": "action", "type": "uint8" },
+      { "name": "functionSelectors", "type": "bytes4[]" }
+    ] },
+    { "name": "_init", "type": "address" },
+    { "name": "_calldata", "type": "bytes" }
+  ], "outputs": [] },
+
+  // ==========================
+  // Ownership – OwnershipFacet
+  // ==========================
+
+  // Schritt 1: neuen Owner nominieren (setzt pending owner).
+  { "type": "function", "name": "transferOwnership", "stateMutability": "nonpayable", "inputs": [
+    { "type": "address", "name": "newOwner" }
+  ], "outputs": [] },
+
+  // Schritt 2: nominierter Owner übernimmt.
+  { "type": "function", "name": "acceptOwnership", "stateMutability": "nonpayable", "inputs": [], "outputs": [] },
+
+  // aktuellen Owner lesen (IERC173).
+  { "type": "function", "name": "owner", "stateMutability": "view", "inputs": [], "outputs": [{ "type": "address" }] }
+]
