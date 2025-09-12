@@ -2,16 +2,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LRUCache } from 'lru-cache';
 
-// Server-side cache für NFT Metadaten (LRU Cache mit TTL)
+// Enhanced server-side cache für NFT Metadaten mit größerem TTL und besserer Performance
 const metadataCache = new LRUCache<string, any>({
-    max: 1000, // Maximum 1000 NFT Metadaten im Cache
-    ttl: 1000 * 60 * 30, // 30 Minuten TTL
+    max: 2000, // Increased cache size
+    ttl: 1000 * 60 * 60 * 2, // 2 Stunden TTL für bessere Performance
+    maxSize: 50 * 1024 * 1024, // 50MB max memory
+    sizeCalculation: (value) => JSON.stringify(value).length,
 });
 
-// Image URL cache für optimierte Bildabrufe
+// Enhanced image URL cache
 const imageCache = new LRUCache<string, string>({
+    max: 1000,
+    ttl: 1000 * 60 * 60 * 6, // 6 Stunden TTL für Images
+});
+
+// Response cache with compression headers
+const responseCache = new LRUCache<string, Response>({
     max: 500,
-    ttl: 1000 * 60 * 60, // 1 Stunde TTL für Bilder
+    ttl: 1000 * 60 * 15, // 15 Minuten für Response Cache
 });
 
 export async function GET(request: NextRequest) {
@@ -32,11 +40,17 @@ export async function GET(request: NextRequest) {
         // Check cache first
         const cachedMetadata = metadataCache.get(cacheKey);
         if (cachedMetadata) {
-            return NextResponse.json({
+            // Return with optimized headers
+            const response = NextResponse.json({
                 metadata: cachedMetadata.metadata,
                 imageUrl: cachedMetadata.imageUrl,
                 cached: true
             });
+            
+            // Add cache headers for client-side caching
+            response.headers.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+            response.headers.set('CDN-Cache-Control', 'public, max-age=86400');
+            return response;
         }
 
         // Fetch tokenURI from blockchain (simulate for now)
@@ -127,12 +141,14 @@ async function processMetadata(tokenURI: string): Promise<{ metadata: any; image
         } else {
             // Fetch from HTTP/HTTPS with timeout
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
 
             const response = await fetch(metadataUri, {
                 signal: controller.signal,
                 headers: {
                     'User-Agent': 'NFT-Marketplace/1.0',
+                    'Cache-Control': 'public, max-age=3600',
+                    'Accept': 'application/json',
                 },
             });
 

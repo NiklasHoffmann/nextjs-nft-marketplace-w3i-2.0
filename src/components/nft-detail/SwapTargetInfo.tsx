@@ -1,7 +1,4 @@
-interface SwapTargetInfoProps {
-    desiredNftAddress: string;
-    desiredTokenId: string;
-}
+import { SwapTargetInfoProps } from '@/types/nft-detail';
 
 export default function SwapTargetInfo({ desiredNftAddress, desiredTokenId }: SwapTargetInfoProps) {
     if (desiredNftAddress === "0x0000000000000000000000000000000000000000") {

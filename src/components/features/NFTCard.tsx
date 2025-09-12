@@ -1,10 +1,11 @@
 // app/components/NFTCard.tsx
 "use client";
 import { formatEther } from "../../utils/formatters";
-import { useMemo, memo } from "react";
+import { useMemo, memo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import OptimizedNFTImage from "../OptimizedNFTImage";
 import { useETHPrice } from "@/contexts/CurrencyContext";
+import { useNFTPrefetch } from "@/hooks/useNFTPrefetch";
 
 interface NFTCardProps {
     listingId: string;
@@ -62,6 +63,7 @@ const NFTCard = memo(({
     priority = false,
 }: Omit<NFTCardProps, 'buyer'>) => {
     const router = useRouter();
+    const { prefetchOnHover } = useNFTPrefetch();
 
     // Normalize category to always be an array
     const categories = Array.isArray(category) ? category : [category];
@@ -75,12 +77,21 @@ const NFTCard = memo(({
         [imageUrl]
     );
 
-    const handleCardClick = () => {
+    const handleCardClick = useCallback(() => {
         router.push(`/nft/${nftAddress}/${tokenId}`);
-    };
+    }, [router, nftAddress, tokenId]);
+
+    const handleMouseEnter = useCallback(() => {
+        const cleanup = prefetchOnHover(nftAddress, tokenId);
+        return cleanup;
+    }, [prefetchOnHover, nftAddress, tokenId]);
 
     return (
-        <div className="group cursor-pointer transform-gpu" onClick={handleCardClick}>
+        <div 
+            className="group cursor-pointer transform-gpu" 
+            onClick={handleCardClick}
+            onMouseEnter={handleMouseEnter}
+        >
             <div className="hover:scale-102 hover:-translate-y-1 hover:z-50 transition-all duration-200 ease-out rounded-xl shadow-lg flex flex-col flex-end gap-2 w-80 h-96 relative will-change-transform origin-center overflow-hidden">
                 {/* Background Image with optimized loading */}
                 {imageUrl && (

@@ -10,6 +10,7 @@ export { default as SwapTargetInfo } from './SwapTargetInfo';
 export { default as CollectionItemsList } from './CollectionItemsList';
 export { default as LoadingSpinner } from './LoadingSpinner';
 export { default as ErrorDisplay } from './ErrorDisplay';
+export { default as NFTInsightsPanel } from './NFTInsightsPanel';
 
 // Tab components
 export { default as ProjectTab } from './tabs/ProjectTab';

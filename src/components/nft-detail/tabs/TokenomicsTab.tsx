@@ -1,21 +1,6 @@
 import { formatEther } from '@/utils/formatters';
-
-interface RoyaltyInfo {
-    percentage?: number | null;
-    receiver?: string;
-    amount?: string;
-}
-
-interface TokenomicsTabProps {
-    price: string;
-    totalSupply?: number | null;
-    rarityRank?: number | null;
-    supportsRoyalty: boolean;
-    royaltyInfo?: RoyaltyInfo | null;
-    tokenStandard: string;
-    blockchain: string;
-    currentOwner?: string | null;
-}
+import { TokenomicsTabProps } from '@/types/nft-detail';
+import { getCollectionSizeCategory, formatRoyaltyInfo } from '@/utils/nft-helpers';
 
 export default function TokenomicsTab({
     price,

@@ -1,51 +1,16 @@
+import { memo, useMemo } from 'react';
 import NFTTabNavigation from './NFTTabNavigation';
 import ProjectTab from './tabs/ProjectTab';
 import FunctionalitiesTab from './tabs/FunctionalitiesTab';
 import TokenomicsTab from './tabs/TokenomicsTab';
+import { NFTInfoTabsProps } from '@/types/nft-detail';
 
-type TabType = 'project' | 'functionalities' | 'tokenomics';
+// Memoized tab content components for better performance
+const MemoizedProjectTab = memo(ProjectTab);
+const MemoizedFunctionalitiesTab = memo(FunctionalitiesTab);
+const MemoizedTokenomicsTab = memo(TokenomicsTab);
 
-interface NFTAttribute {
-    trait_type: string;
-    value: string | number;
-    display_type?: string;
-    max_value?: number;
-}
-
-interface NFTDetails {
-    price: string;
-    seller: string;
-}
-
-interface RoyaltyInfo {
-    percentage?: number | null;
-    receiver?: string;
-    amount?: string;
-}
-
-interface NFTInfoTabsProps {
-    activeTab: TabType;
-    onTabChange: (tab: TabType) => void;
-    nftAddress: string;
-    tokenId: string;
-    contractName?: string | null;
-    collection?: string | null;
-    contractSymbol?: string | null;
-    tokenStandard: string;
-    blockchain: string;
-    totalSupply?: number | null;
-    currentOwner?: string | null;
-    creator?: string | null;
-    nftDetails: NFTDetails;
-    description?: string | null;
-    rarityRank?: number | null;
-    rarityScore?: number | null;
-    attributes?: NFTAttribute[] | null;
-    supportsRoyalty: boolean;
-    royaltyInfo?: RoyaltyInfo | null;
-}
-
-export default function NFTInfoTabs({
+function NFTInfoTabs({
     activeTab,
     onTabChange,
     nftAddress,
@@ -66,54 +31,74 @@ export default function NFTInfoTabs({
     supportsRoyalty,
     royaltyInfo
 }: NFTInfoTabsProps) {
+    // Memoize props objects to prevent unnecessary re-renders
+    const projectTabProps = useMemo(() => ({
+        nftAddress,
+        tokenId,
+        contractName,
+        collection,
+        contractSymbol,
+        tokenStandard,
+        blockchain,
+        totalSupply,
+        currentOwner,
+        creator,
+        seller: nftDetails.seller,
+        description,
+        rarityRank,
+        rarityScore,
+        attributes
+    }), [
+        nftAddress, tokenId, contractName, collection, contractSymbol,
+        tokenStandard, blockchain, totalSupply, currentOwner, creator,
+        nftDetails.seller, description, rarityRank, rarityScore, attributes
+    ]);
+
+    const functionalitiesTabProps = useMemo(() => ({
+        attributes,
+        blockchain,
+        tokenStandard,
+        supportsRoyalty,
+        royaltyInfo
+    }), [attributes, blockchain, tokenStandard, supportsRoyalty, royaltyInfo]);
+
+    const tokenomicsTabProps = useMemo(() => ({
+        price: nftDetails.price,
+        totalSupply,
+        rarityRank,
+        supportsRoyalty,
+        royaltyInfo,
+        tokenStandard,
+        blockchain,
+        currentOwner
+    }), [
+        nftDetails.price, totalSupply, rarityRank, supportsRoyalty,
+        royaltyInfo, tokenStandard, blockchain, currentOwner
+    ]);
+
+    // Render active tab content only for performance
+    const renderActiveTabContent = useMemo(() => {
+        switch (activeTab) {
+            case 'project':
+                return <MemoizedProjectTab {...projectTabProps} />;
+            case 'functionalities':
+                return <MemoizedFunctionalitiesTab {...functionalitiesTabProps} />;
+            case 'tokenomics':
+                return <MemoizedTokenomicsTab {...tokenomicsTabProps} />;
+            default:
+                return null;
+        }
+    }, [activeTab, projectTabProps, functionalitiesTabProps, tokenomicsTabProps]);
+
     return (
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
             <NFTTabNavigation activeTab={activeTab} onTabChange={onTabChange} />
-            
+
             <div className="p-6">
-                {activeTab === 'project' && (
-                    <ProjectTab
-                        nftAddress={nftAddress}
-                        tokenId={tokenId}
-                        contractName={contractName}
-                        collection={collection}
-                        contractSymbol={contractSymbol}
-                        tokenStandard={tokenStandard}
-                        blockchain={blockchain}
-                        totalSupply={totalSupply}
-                        currentOwner={currentOwner}
-                        creator={creator}
-                        seller={nftDetails.seller}
-                        description={description}
-                        rarityRank={rarityRank}
-                        rarityScore={rarityScore}
-                        attributes={attributes}
-                    />
-                )}
-
-                {activeTab === 'functionalities' && (
-                    <FunctionalitiesTab
-                        attributes={attributes}
-                        blockchain={blockchain}
-                        tokenStandard={tokenStandard}
-                        supportsRoyalty={supportsRoyalty}
-                        royaltyInfo={royaltyInfo}
-                    />
-                )}
-
-                {activeTab === 'tokenomics' && (
-                    <TokenomicsTab
-                        price={nftDetails.price}
-                        totalSupply={totalSupply}
-                        rarityRank={rarityRank}
-                        supportsRoyalty={supportsRoyalty}
-                        royaltyInfo={royaltyInfo}
-                        tokenStandard={tokenStandard}
-                        blockchain={blockchain}
-                        currentOwner={currentOwner}
-                    />
-                )}
+                {renderActiveTabContent}
             </div>
         </div>
     );
 }
+
+export default memo(NFTInfoTabs);

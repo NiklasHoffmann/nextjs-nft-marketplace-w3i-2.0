@@ -2,10 +2,8 @@
 'use client'
 import React from "react";
 import ActiveItemsList from "@/components/ActiveItemsList";
-import { useAccount } from "wagmi";
 
 export default function Home() {
-  const { isConnected } = useAccount();
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">

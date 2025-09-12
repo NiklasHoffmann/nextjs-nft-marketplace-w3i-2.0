@@ -1,18 +1,8 @@
 "use client";
 
 import { useRouter } from 'next/navigation';
-
-interface NFTDetailHeaderProps {
-    name?: string | null;
-    tokenId: string;
-    contractName?: string | null;
-    collection?: string | null;
-    contractSymbol?: string | null;
-    nftAddress: string;
-    isFavorited: boolean;
-    onToggleFavorite: () => void;
-    onShare: () => void;
-}
+import { NFTDetailHeaderProps } from '@/types/nft-detail';
+import { formatNFTDisplayName, formatCollectionDisplayName } from '@/utils/nft-helpers';
 
 export default function NFTDetailHeader({
     name,
@@ -47,11 +37,10 @@ export default function NFTDetailHeader({
                         </button>
                         <div>
                             <h1 className="text-lg font-semibold text-gray-900">
-                                {name || `NFT #${tokenId}`}
+                                {formatNFTDisplayName(name, tokenId)}
                             </h1>
                             <p className="text-sm text-gray-500">
-                                {contractName || collection || `${nftAddress.slice(0, 6)}...${nftAddress.slice(-4)}`}
-                                {contractSymbol && ` (${contractSymbol})`}
+                                {formatCollectionDisplayName(contractName, collection, contractSymbol, nftAddress)}
                             </p>
                         </div>
                     </div>

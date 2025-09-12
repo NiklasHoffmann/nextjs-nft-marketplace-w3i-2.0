@@ -1,0 +1,805 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NFT Comprehensive Data Schema",
+  "description": "Complete NFT data structure organized by data source",
+  "type": "object",
+  "properties": {
+    
+    "blockchain": {
+      "title": "Blockchain Data",
+      "description": "Data directly from blockchain smart contracts",
+      "type": "object",
+      "properties": {
+        "contract": {
+          "type": "object",
+          "properties": {
+            "address": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "Contract address"
+            },
+            "name": {
+              "type": "string",
+              "description": "Contract name from ERC721/ERC1155"
+            },
+            "symbol": {
+              "type": "string",
+              "description": "Contract symbol"
+            },
+            "tokenStandard": {
+              "type": "string",
+              "enum": ["ERC721", "ERC1155", "ERC998"],
+              "description": "Token standard"
+            },
+            "totalSupply": {
+              "type": "number",
+              "description": "Total supply of tokens"
+            },
+            "maxSupply": {
+              "type": "number",
+              "description": "Maximum possible supply"
+            },
+            "owner": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "Contract owner address"
+            },
+            "creator": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "Original contract creator"
+            }
+          },
+          "required": ["address", "tokenStandard"]
+        },
+        "token": {
+          "type": "object",
+          "properties": {
+            "tokenId": {
+              "type": "string",
+              "description": "Unique token ID"
+            },
+            "tokenURI": {
+              "type": "string",
+              "format": "uri",
+              "description": "Metadata URI from contract"
+            },
+            "currentOwner": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "Current token owner"
+            },
+            "mintedAt": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Mint timestamp"
+            },
+            "mintedBy": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "Minter address"
+            },
+            "blockNumber": {
+              "type": "number",
+              "description": "Block number of mint"
+            },
+            "transactionHash": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{64}$",
+              "description": "Mint transaction hash"
+            }
+          },
+          "required": ["tokenId", "currentOwner"]
+        },
+        "royalty": {
+          "type": "object",
+          "properties": {
+            "supportsRoyalty": {
+              "type": "boolean",
+              "description": "EIP-2981 support"
+            },
+            "percentage": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Royalty percentage"
+            },
+            "receiver": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "Royalty receiver address"
+            },
+            "amount": {
+              "type": "string",
+              "description": "Fixed royalty amount in wei"
+            }
+          }
+        }
+      },
+      "required": ["contract", "token"]
+    },
+
+    "metadata": {
+      "title": "NFT Metadata",
+      "description": "Data from tokenURI (IPFS, HTTP, etc.)",
+      "type": "object",
+      "properties": {
+        "core": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "NFT name"
+            },
+            "description": {
+              "type": "string",
+              "description": "NFT description"
+            },
+            "image": {
+              "type": "string",
+              "format": "uri",
+              "description": "Primary image URI"
+            },
+            "animation_url": {
+              "type": "string",
+              "format": "uri",
+              "description": "Animation/video URI"
+            },
+            "external_url": {
+              "type": "string",
+              "format": "uri",
+              "description": "External website"
+            },
+            "background_color": {
+              "type": "string",
+              "pattern": "^[0-9a-fA-F]{6}$",
+              "description": "Hex color without #"
+            },
+            "youtube_url": {
+              "type": "string",
+              "format": "uri",
+              "description": "YouTube video URL"
+            }
+          }
+        },
+        "attributes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "trait_type": {
+                "type": "string",
+                "description": "Attribute name"
+              },
+              "value": {
+                "oneOf": [
+                  {"type": "string"},
+                  {"type": "number"}
+                ],
+                "description": "Attribute value"
+              },
+              "display_type": {
+                "type": "string",
+                "enum": ["boost_number", "boost_percentage", "number", "date"],
+                "description": "How to display the attribute"
+              },
+              "max_value": {
+                "type": "number",
+                "description": "Maximum value for boost types"
+              }
+            },
+            "required": ["trait_type", "value"]
+          }
+        },
+        "media": {
+          "type": "object",
+          "properties": {
+            "imageUrl": {
+              "type": "string",
+              "format": "uri",
+              "description": "Processed image URL"
+            },
+            "animationUrl": {
+              "type": "string",
+              "format": "uri", 
+              "description": "Animation URL"
+            },
+            "videoUrl": {
+              "type": "string",
+              "format": "uri",
+              "description": "Video URL"
+            },
+            "audioUrl": {
+              "type": "string",
+              "format": "uri",
+              "description": "Audio URL"
+            },
+            "thumbnailUrl": {
+              "type": "string",
+              "format": "uri",
+              "description": "Thumbnail image"
+            },
+            "mediaType": {
+              "type": "string",
+              "enum": ["image", "video", "audio", "3d", "html", "text"],
+              "description": "Primary media type"
+            }
+          }
+        },
+        "extended": {
+          "type": "object",
+          "properties": {
+            "websiteUrl": {
+              "type": "string",
+              "format": "uri",
+              "description": "Project website"
+            },
+            "twitterUrl": {
+              "type": "string",
+              "format": "uri",
+              "description": "Twitter/X URL"
+            },
+            "discordUrl": {
+              "type": "string",
+              "format": "uri",
+              "description": "Discord server"
+            },
+            "telegramUrl": {
+              "type": "string",
+              "format": "uri",
+              "description": "Telegram group"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Additional metadata properties"
+            }
+          }
+        }
+      }
+    },
+
+    "marketplace": {
+      "title": "Marketplace Data",
+      "description": "Data from subgraph and marketplace contracts",
+      "type": "object",
+      "properties": {
+        "listing": {
+          "type": "object",
+          "properties": {
+            "listingId": {
+              "type": "string",
+              "description": "Unique listing identifier"
+            },
+            "isListed": {
+              "type": "boolean",
+              "description": "Current listing status"
+            },
+            "price": {
+              "type": "string",
+              "description": "Price in wei"
+            },
+            "currency": {
+              "type": "string",
+              "default": "ETH",
+              "description": "Price currency"
+            },
+            "seller": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "Seller address"
+            },
+            "buyer": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "Buyer address (if sold)"
+            },
+            "listedAt": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Listing timestamp"
+            },
+            "soldAt": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Sale timestamp"
+            },
+            "expiresAt": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Listing expiration"
+            }
+          }
+        },
+        "swap": {
+          "type": "object",
+          "properties": {
+            "isSwapListing": {
+              "type": "boolean",
+              "description": "Is this a swap vs sell"
+            },
+            "desiredNftAddress": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "Desired NFT contract for swap"
+            },
+            "desiredTokenId": {
+              "type": "string",
+              "description": "Desired token ID for swap"
+            }
+          }
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": ["mint", "transfer", "list", "sale", "cancel", "update"],
+                "description": "Event type"
+              },
+              "from": {
+                "type": "string",
+                "pattern": "^0x[a-fA-F0-9]{40}$",
+                "description": "From address"
+              },
+              "to": {
+                "type": "string", 
+                "pattern": "^0x[a-fA-F0-9]{40}$",
+                "description": "To address"
+              },
+              "price": {
+                "type": "string",
+                "description": "Transaction price in wei"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Event timestamp"
+              },
+              "transactionHash": {
+                "type": "string",
+                "pattern": "^0x[a-fA-F0-9]{64}$",
+                "description": "Transaction hash"
+              },
+              "blockNumber": {
+                "type": "number",
+                "description": "Block number"
+              }
+            },
+            "required": ["event", "timestamp", "transactionHash"]
+          }
+        }
+      }
+    },
+
+    "database": {
+      "title": "Database Stored Data", 
+      "description": "Additional data stored in MongoDB for enhanced functionality",
+      "type": "object",
+      "properties": {
+        "analytics": {
+          "type": "object",
+          "properties": {
+            "viewCount": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0,
+              "description": "Total page views"
+            },
+            "likeCount": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0,
+              "description": "Total likes"
+            },
+            "favoriteCount": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0,
+              "description": "Times added to favorites"
+            },
+            "shareCount": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0,
+              "description": "Total shares"
+            },
+            "uniqueVisitors": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0,
+              "description": "Unique visitor count"
+            },
+            "lastViewed": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Last view timestamp"
+            },
+            "dailyViews": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "views": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                }
+              },
+              "description": "Daily view statistics"
+            }
+          }
+        },
+        "categorization": {
+          "type": "object",
+          "properties": {
+            "categories": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Art", "Photography", "Music", "Video", "Gaming", "Sports",
+                  "Collectibles", "Trading Cards", "Utility", "Membership",
+                  "Virtual Real Estate", "Domain Names", "Metaverse",
+                  "Profile Pictures", "Avatars", "Fashion", "Wearables",
+                  "Education", "Books", "Comics", "Memes", "AI Generated",
+                  "Generative Art", "Pixel Art", "3D Art", "Animation",
+                  "DeFi", "DAO", "Governance", "Access Tokens", "Certificates"
+                ]
+              },
+              "description": "NFT categories"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Custom tags"
+            },
+            "verified": {
+              "type": "boolean",
+              "default": false,
+              "description": "Verified collection status"
+            },
+            "featured": {
+              "type": "boolean", 
+              "default": false,
+              "description": "Featured on platform"
+            },
+            "trending": {
+              "type": "boolean",
+              "default": false,
+              "description": "Currently trending"
+            }
+          }
+        },
+        "rarity": {
+          "type": "object",
+          "properties": {
+            "rarityRank": {
+              "type": "number",
+              "minimum": 1,
+              "description": "Rarity rank within collection"
+            },
+            "rarityScore": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Calculated rarity score"
+            },
+            "traitRarity": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "oneOf": [
+                      {"type": "string"},
+                      {"type": "number"}
+                    ]
+                  },
+                  "count": {
+                    "type": "number",
+                    "description": "How many items have this trait value"
+                  },
+                  "percentage": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Percentage of collection with this trait"
+                  }
+                }
+              },
+              "description": "Rarity data for each trait"
+            }
+          }
+        },
+        "utility": {
+          "type": "object",
+          "properties": {
+            "utilities": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "access", "discount", "staking", "gaming", "governance",
+                      "breeding", "upgrade", "rewards", "membership", "license"
+                    ],
+                    "description": "Utility type"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Utility description"
+                  },
+                  "active": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Is utility currently active"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Utility expiration"
+                  }
+                }
+              },
+              "description": "NFT utilities"
+            },
+            "stakingRewards": {
+              "type": "object",
+              "properties": {
+                "isStakable": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "rewardRate": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Rewards per period"
+                },
+                "rewardToken": {
+                  "type": "string",
+                  "description": "Reward token symbol"
+                }
+              }
+            }
+          }
+        },
+        "social": {
+          "type": "object",
+          "properties": {
+            "comments": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Comment ID"
+                  },
+                  "author": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "Comment author address"
+                  },
+                  "content": {
+                    "type": "string",
+                    "maxLength": 1000,
+                    "description": "Comment text"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "likes": {
+                    "type": "number",
+                    "minimum": 0,
+                    "default": 0
+                  },
+                  "replies": {
+                    "type": "array",
+                    "items": {"$ref": "#"}
+                  }
+                }
+              },
+              "description": "User comments"
+            },
+            "reviews": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "reviewer": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$"
+                  },
+                  "rating": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 5
+                  },
+                  "review": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              },
+              "description": "User reviews and ratings"
+            }
+          }
+        },
+        "pricing": {
+          "type": "object",
+          "properties": {
+            "floorPrice": {
+              "type": "string",
+              "description": "Collection floor price in wei"
+            },
+            "averagePrice": {
+              "type": "string",
+              "description": "Collection average price in wei"
+            },
+            "priceHistory": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "price": {
+                    "type": "string",
+                    "description": "Price in wei"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "event": {
+                    "type": "string",
+                    "enum": ["sale", "listing", "offer"]
+                  }
+                }
+              },
+              "description": "Historical pricing data"
+            },
+            "offers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "offerer": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$"
+                  },
+                  "amount": {
+                    "type": "string",
+                    "description": "Offer amount in wei"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["active", "accepted", "rejected", "expired"]
+                  }
+                }
+              },
+              "description": "Current and historical offers"
+            }
+          }
+        },
+        "metadata_tracking": {
+          "type": "object",
+          "properties": {
+            "lastUpdated": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Last metadata update"
+            },
+            "updateCount": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0,
+              "description": "Number of metadata updates"
+            },
+            "metadataHash": {
+              "type": "string",
+              "description": "Hash of current metadata"
+            },
+            "cacheStatus": {
+              "type": "string",
+              "enum": ["fresh", "stale", "updating", "failed"],
+              "description": "Metadata cache status"
+            }
+          }
+        }
+      }
+    },
+
+    "computed": {
+      "title": "Computed/Derived Data",
+      "description": "Data calculated from other sources",
+      "type": "object",
+      "properties": {
+        "priceConversions": {
+          "type": "object",
+          "properties": {
+            "usd": {
+              "type": "number",
+              "description": "Price in USD"
+            },
+            "eur": {
+              "type": "number", 
+              "description": "Price in EUR"
+            },
+            "btc": {
+              "type": "number",
+              "description": "Price in BTC"
+            }
+          }
+        },
+        "popularity": {
+          "type": "object",
+          "properties": {
+            "popularityScore": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Calculated popularity score"
+            },
+            "trendingScore": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Trending algorithm score"
+            },
+            "rank": {
+              "type": "number",
+              "minimum": 1,
+              "description": "Current ranking in category"
+            }
+          }
+        },
+        "recommendations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "nftAddress": {
+                "type": "string",
+                "pattern": "^0x[a-fA-F0-9]{40}$"
+              },
+              "tokenId": {
+                "type": "string"
+              },
+              "similarity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Similarity score"
+              },
+              "reason": {
+                "type": "string",
+                "description": "Recommendation reason"
+              }
+            }
+          },
+          "description": "Similar/recommended NFTs"
+        }
+      }
+    }
+  },
+  
+  "required": ["blockchain"],
+  "additionalProperties": false
+}

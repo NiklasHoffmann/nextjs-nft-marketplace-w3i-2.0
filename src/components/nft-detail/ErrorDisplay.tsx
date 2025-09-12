@@ -1,7 +1,4 @@
-interface ErrorDisplayProps {
-    error: string;
-    onBack: () => void;
-}
+import { ErrorDisplayProps } from '@/types/nft-detail';
 
 export default function ErrorDisplay({ error, onBack }: ErrorDisplayProps) {
     return (

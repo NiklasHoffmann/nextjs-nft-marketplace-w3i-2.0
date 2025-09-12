@@ -4,9 +4,9 @@ import { ConnectButton as RBConnect } from '@rainbow-me/rainbowkit'
 
 export function Web3ConnectButton() {
     return (
-        <div className="flex items-center">
+        <div className="flex items-center w-full">
             <RBConnect
-                showBalance={{ smallScreen: false, largeScreen: true }}
+                showBalance={false}
                 accountStatus={{ smallScreen: 'avatar', largeScreen: 'full' }}
             />
         </div>

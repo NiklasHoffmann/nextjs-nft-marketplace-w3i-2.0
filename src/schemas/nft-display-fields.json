@@ -1,0 +1,193 @@
+{
+  "title": "NFT Display Fields - Simple Overview",
+  "description": "Flat list of all possible values that can be displayed for an NFT",
+  
+  "basic_info": {
+    "nftAddress": "Contract address",
+    "tokenId": "Token ID", 
+    "name": "NFT name",
+    "description": "NFT description",
+    "contractName": "Contract name",
+    "contractSymbol": "Contract symbol",
+    "tokenStandard": "ERC721/ERC1155",
+    "blockchain": "Ethereum/Polygon/etc",
+    "currentOwner": "Current owner address",
+    "creator": "Creator address",
+    "mintedAt": "Mint timestamp",
+    "mintedBy": "Minter address"
+  },
+
+  "media": {
+    "imageUrl": "Main image",
+    "thumbnailUrl": "Thumbnail image", 
+    "animationUrl": "Animation/GIF",
+    "videoUrl": "Video file",
+    "audioUrl": "Audio file",
+    "youtubeUrl": "YouTube link",
+    "mediaType": "image/video/audio/3d",
+    "backgroundColor": "Background color hex"
+  },
+
+  "marketplace": {
+    "isListed": "Currently listed",
+    "price": "Price in ETH",
+    "priceUSD": "Price in USD",
+    "priceEUR": "Price in EUR",
+    "seller": "Seller address",
+    "buyer": "Buyer address (if sold)",
+    "listingId": "Marketplace listing ID",
+    "listedAt": "Listing timestamp",
+    "soldAt": "Sale timestamp",
+    "isSwapListing": "Is swap vs sell",
+    "desiredNftAddress": "Wanted NFT for swap",
+    "desiredTokenId": "Wanted token ID for swap"
+  },
+
+  "pricing": {
+    "floorPrice": "Collection floor price",
+    "averagePrice": "Collection average price",
+    "lastSalePrice": "Last sale price",
+    "highestSalePrice": "Highest sale price ever",
+    "lowestSalePrice": "Lowest sale price ever",
+    "priceChange24h": "Price change 24h %",
+    "priceChange7d": "Price change 7d %"
+  },
+
+  "rarity": {
+    "rarityRank": "Rarity rank #1-10000",
+    "rarityScore": "Rarity score 0-100",
+    "rarityTier": "Common/Rare/Epic/Legendary",
+    "traitCount": "Number of traits",
+    "uniqueTraitCount": "Number of unique traits"
+  },
+
+  "attributes": {
+    "trait_type": "Attribute name (Background, Eyes, etc)",
+    "value": "Attribute value (Blue, Red, etc)",
+    "display_type": "How to display (number, date, etc)",
+    "rarity_percentage": "How rare this trait is %"
+  },
+
+  "collection": {
+    "collectionName": "Collection name",
+    "collectionSize": "Total supply",
+    "collectionDescription": "Collection description",
+    "collectionWebsite": "Project website",
+    "collectionTwitter": "Twitter handle",
+    "collectionDiscord": "Discord server",
+    "verified": "Verified collection",
+    "featured": "Featured collection"
+  },
+
+  "analytics": {
+    "viewCount": "Total page views",
+    "likeCount": "Total likes",
+    "favoriteCount": "Times favorited",
+    "shareCount": "Times shared",
+    "commentCount": "Number of comments",
+    "uniqueVisitors": "Unique visitors",
+    "lastViewed": "Last view timestamp",
+    "viewsToday": "Views today",
+    "viewsWeek": "Views this week",
+    "trending": "Is trending"
+  },
+
+  "social": {
+    "likes": "User likes",
+    "favorites": "User favorites",
+    "comments": "User comments",
+    "ratings": "User ratings 1-5 stars",
+    "averageRating": "Average rating",
+    "reviewCount": "Number of reviews"
+  },
+
+  "utility": {
+    "hasUtility": "Has utility features",
+    "utilityTypes": "access/staking/gaming/etc",
+    "stakingRewards": "Staking reward rate",
+    "stakingActive": "Currently staked",
+    "gameStats": "Gaming statistics",
+    "accessLevel": "Access tier/level",
+    "membershipBenefits": "Membership benefits"
+  },
+
+  "royalty": {
+    "hasRoyalty": "Supports royalties",
+    "royaltyPercentage": "Royalty % (2.5%)",
+    "royaltyReceiver": "Royalty receiver address"
+  },
+
+  "transaction_history": {
+    "transferCount": "Total transfers",
+    "saleCount": "Total sales", 
+    "lastTransferDate": "Last transfer",
+    "transactionHistory": "Array of all transactions",
+    "firstSaleDate": "First sale date",
+    "holdingPeriod": "How long current owner held"
+  },
+
+  "market_data": {
+    "volume24h": "24h trading volume",
+    "volume7d": "7d trading volume",
+    "volumeTotal": "All-time volume",
+    "sales24h": "Sales in 24h",
+    "sales7d": "Sales in 7d",
+    "salesTotal": "Total sales ever",
+    "averageHoldingTime": "Average holding time",
+    "priceVolatility": "Price volatility %"
+  },
+
+  "offers": {
+    "hasOffers": "Has active offers",
+    "offerCount": "Number of offers",
+    "highestOffer": "Highest offer amount",
+    "latestOffer": "Most recent offer",
+    "offerHistory": "Array of all offers"
+  },
+
+  "technical": {
+    "tokenURI": "Metadata URI",
+    "metadataHash": "Metadata hash",
+    "blockNumber": "Mint block number",
+    "transactionHash": "Mint transaction hash",
+    "gasUsed": "Gas used for mint",
+    "contractVersion": "Contract version",
+    "interfaceSupported": "Supported interfaces"
+  },
+
+  "status": {
+    "isLoading": "Data loading state",
+    "hasError": "Has error state", 
+    "errorMessage": "Error message",
+    "lastUpdated": "Data last updated",
+    "cacheStatus": "fresh/stale/updating",
+    "dataSource": "blockchain/cache/api"
+  },
+
+  "computed": {
+    "popularityScore": "0-100 popularity",
+    "trendingScore": "Trending algorithm score",
+    "investmentScore": "Investment potential 0-100",
+    "liquidityScore": "How easy to sell 0-100",
+    "ageInDays": "Days since mint",
+    "pricePerformance": "Price performance vs floor"
+  },
+
+  "categories": {
+    "primaryCategory": "Art/Gaming/Music/etc",
+    "secondaryCategories": "Additional categories",
+    "tags": "Custom tags array",
+    "nsfw": "Contains adult content",
+    "aiGenerated": "AI generated content"
+  },
+
+  "external_links": {
+    "website": "Project website",
+    "twitter": "Twitter URL",
+    "discord": "Discord URL", 
+    "telegram": "Telegram URL",
+    "opensea": "OpenSea URL",
+    "looksrare": "LooksRare URL",
+    "etherscan": "Etherscan URL"
+  }
+}

@@ -1,0 +1,472 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MongoDB Collections Schema for NFT Marketplace",
+  "description": "Database schema definitions for MongoDB collections",
+  
+  "definitions": {
+    "objectId": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{24}$",
+      "description": "MongoDB ObjectId"
+    },
+    "ethereumAddress": {
+      "type": "string", 
+      "pattern": "^0x[a-fA-F0-9]{40}$",
+      "description": "Ethereum address"
+    },
+    "transactionHash": {
+      "type": "string",
+      "pattern": "^0x[a-fA-F0-9]{64}$", 
+      "description": "Ethereum transaction hash"
+    }
+  },
+
+  "collections": {
+    
+    "nft_analytics": {
+      "description": "NFT view counts, likes, and interaction analytics",
+      "indexes": [
+        {"keys": {"nftAddress": 1, "tokenId": 1}, "unique": true},
+        {"keys": {"viewCount": -1}},
+        {"keys": {"likeCount": -1}},
+        {"keys": {"lastViewed": -1}},
+        {"keys": {"trending": -1, "viewCount": -1}}
+      ],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "_id": {"$ref": "#/definitions/objectId"},
+          "nftAddress": {"$ref": "#/definitions/ethereumAddress"},
+          "tokenId": {"type": "string"},
+          "viewCount": {"type": "number", "minimum": 0, "default": 0},
+          "likeCount": {"type": "number", "minimum": 0, "default": 0},
+          "favoriteCount": {"type": "number", "minimum": 0, "default": 0},
+          "shareCount": {"type": "number", "minimum": 0, "default": 0},
+          "uniqueVisitors": {"type": "number", "minimum": 0, "default": 0},
+          "lastViewed": {"type": "string", "format": "date-time"},
+          "firstViewed": {"type": "string", "format": "date-time"},
+          "dailyViews": {
+            "type": "array",
+            "items": {
+              "type": "object", 
+              "properties": {
+                "date": {"type": "string", "format": "date"},
+                "views": {"type": "number", "minimum": 0},
+                "uniqueViews": {"type": "number", "minimum": 0}
+              }
+            }
+          },
+          "weeklyStats": {
+            "type": "object",
+            "properties": {
+              "views": {"type": "number", "minimum": 0},
+              "likes": {"type": "number", "minimum": 0},
+              "shares": {"type": "number", "minimum": 0}
+            }
+          },
+          "trending": {"type": "boolean", "default": false},
+          "trendingScore": {"type": "number", "minimum": 0},
+          "createdAt": {"type": "string", "format": "date-time"},
+          "updatedAt": {"type": "string", "format": "date-time"}
+        },
+        "required": ["nftAddress", "tokenId"]
+      }
+    },
+
+    "nft_categories": {
+      "description": "NFT categorization and tagging system", 
+      "indexes": [
+        {"keys": {"nftAddress": 1, "tokenId": 1}, "unique": true},
+        {"keys": {"categories": 1}},
+        {"keys": {"tags": 1}},
+        {"keys": {"verified": 1}},
+        {"keys": {"featured": 1}}
+      ],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "_id": {"$ref": "#/definitions/objectId"},
+          "nftAddress": {"$ref": "#/definitions/ethereumAddress"},
+          "tokenId": {"type": "string"},
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Art", "Photography", "Music", "Video", "Gaming", "Sports",
+                "Collectibles", "Trading Cards", "Utility", "Membership", 
+                "Virtual Real Estate", "Domain Names", "Metaverse",
+                "Profile Pictures", "Avatars", "Fashion", "Wearables",
+                "Education", "Books", "Comics", "Memes", "AI Generated",
+                "Generative Art", "Pixel Art", "3D Art", "Animation",
+                "DeFi", "DAO", "Governance", "Access Tokens", "Certificates"
+              ]
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {"type": "string", "maxLength": 50}
+          },
+          "verified": {"type": "boolean", "default": false},
+          "featured": {"type": "boolean", "default": false},
+          "adminNotes": {"type": "string", "maxLength": 500},
+          "submittedBy": {"$ref": "#/definitions/ethereumAddress"},
+          "verifiedBy": {"$ref": "#/definitions/ethereumAddress"},
+          "verifiedAt": {"type": "string", "format": "date-time"},
+          "createdAt": {"type": "string", "format": "date-time"},
+          "updatedAt": {"type": "string", "format": "date-time"}
+        },
+        "required": ["nftAddress", "tokenId"]
+      }
+    },
+
+    "nft_rarity": {
+      "description": "NFT rarity rankings and trait analysis",
+      "indexes": [
+        {"keys": {"nftAddress": 1, "tokenId": 1}, "unique": true},
+        {"keys": {"nftAddress": 1, "rarityRank": 1}},
+        {"keys": {"rarityScore": -1}},
+        {"keys": {"calculatedAt": -1}}
+      ],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "_id": {"$ref": "#/definitions/objectId"},
+          "nftAddress": {"$ref": "#/definitions/ethereumAddress"},
+          "tokenId": {"type": "string"},
+          "rarityRank": {"type": "number", "minimum": 1},
+          "rarityScore": {"type": "number", "minimum": 0},
+          "totalSupply": {"type": "number", "minimum": 1},
+          "traitRarity": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "value": {"oneOf": [{"type": "string"}, {"type": "number"}]},
+                "count": {"type": "number", "minimum": 1},
+                "percentage": {"type": "number", "minimum": 0, "maximum": 100},
+                "rarity": {"type": "string", "enum": ["common", "uncommon", "rare", "epic", "legendary"]}
+              }
+            }
+          },
+          "calculatedAt": {"type": "string", "format": "date-time"},
+          "calculationVersion": {"type": "string", "description": "Version of rarity calculation algorithm"},
+          "createdAt": {"type": "string", "format": "date-time"},
+          "updatedAt": {"type": "string", "format": "date-time"}
+        },
+        "required": ["nftAddress", "tokenId", "rarityRank", "rarityScore"]
+      }
+    },
+
+    "nft_utilities": {
+      "description": "NFT utility features and access rights",
+      "indexes": [
+        {"keys": {"nftAddress": 1, "tokenId": 1}},
+        {"keys": {"utilities.type": 1}},
+        {"keys": {"utilities.active": 1}},
+        {"keys": {"stakingRewards.isStakable": 1}}
+      ],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "_id": {"$ref": "#/definitions/objectId"},
+          "nftAddress": {"$ref": "#/definitions/ethereumAddress"},
+          "tokenId": {"type": "string"},
+          "utilities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {"type": "string"},
+                "type": {
+                  "type": "string",
+                  "enum": ["access", "discount", "staking", "gaming", "governance", "breeding", "upgrade", "rewards", "membership", "license"]
+                },
+                "name": {"type": "string", "maxLength": 100},
+                "description": {"type": "string", "maxLength": 500},
+                "active": {"type": "boolean", "default": true},
+                "activatedAt": {"type": "string", "format": "date-time"},
+                "expiresAt": {"type": "string", "format": "date-time"},
+                "usageCount": {"type": "number", "minimum": 0, "default": 0},
+                "maxUsage": {"type": "number", "minimum": 0},
+                "metadata": {"type": "object", "additionalProperties": true}
+              },
+              "required": ["type", "name", "description"]
+            }
+          },
+          "stakingRewards": {
+            "type": "object",
+            "properties": {
+              "isStakable": {"type": "boolean", "default": false},
+              "rewardRate": {"type": "number", "minimum": 0},
+              "rewardToken": {"type": "string"},
+              "rewardTokenAddress": {"$ref": "#/definitions/ethereumAddress"},
+              "stakingContractAddress": {"$ref": "#/definitions/ethereumAddress"},
+              "currentlyStaked": {"type": "boolean", "default": false},
+              "stakedAt": {"type": "string", "format": "date-time"},
+              "totalRewardsEarned": {"type": "string", "description": "Total rewards in wei"}
+            }
+          },
+          "createdAt": {"type": "string", "format": "date-time"},
+          "updatedAt": {"type": "string", "format": "date-time"}
+        },
+        "required": ["nftAddress", "tokenId"]
+      }
+    },
+
+    "user_interactions": {
+      "description": "User interactions with NFTs (likes, favorites, comments)",
+      "indexes": [
+        {"keys": {"userAddress": 1, "nftAddress": 1, "tokenId": 1}, "unique": true},
+        {"keys": {"userAddress": 1, "interactionType": 1}},
+        {"keys": {"nftAddress": 1, "tokenId": 1, "interactionType": 1}},
+        {"keys": {"timestamp": -1}}
+      ],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "_id": {"$ref": "#/definitions/objectId"},
+          "userAddress": {"$ref": "#/definitions/ethereumAddress"},
+          "nftAddress": {"$ref": "#/definitions/ethereumAddress"},
+          "tokenId": {"type": "string"},
+          "interactionType": {
+            "type": "string",
+            "enum": ["like", "favorite", "view", "share", "comment", "offer"]
+          },
+          "active": {"type": "boolean", "default": true},
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "comment": {"type": "string", "maxLength": 1000},
+              "rating": {"type": "number", "minimum": 1, "maximum": 5},
+              "offerAmount": {"type": "string", "description": "Offer amount in wei"},
+              "sharedTo": {"type": "string", "enum": ["twitter", "discord", "telegram", "email", "link"]}
+            }
+          },
+          "timestamp": {"type": "string", "format": "date-time"},
+          "createdAt": {"type": "string", "format": "date-time"},
+          "updatedAt": {"type": "string", "format": "date-time"}
+        },
+        "required": ["userAddress", "nftAddress", "tokenId", "interactionType"]
+      }
+    },
+
+    "nft_pricing": {
+      "description": "Historical pricing data and market analysis",
+      "indexes": [
+        {"keys": {"nftAddress": 1, "tokenId": 1}},
+        {"keys": {"nftAddress": 1}},
+        {"keys": {"timestamp": -1}},
+        {"keys": {"eventType": 1, "timestamp": -1}}
+      ],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "_id": {"$ref": "#/definitions/objectId"},
+          "nftAddress": {"$ref": "#/definitions/ethereumAddress"},
+          "tokenId": {"type": "string"},
+          "eventType": {
+            "type": "string",
+            "enum": ["listing", "sale", "offer", "bid", "cancel", "update", "transfer"]
+          },
+          "price": {"type": "string", "description": "Price in wei"},
+          "currency": {"type": "string", "default": "ETH"},
+          "usdPrice": {"type": "number", "minimum": 0},
+          "from": {"$ref": "#/definitions/ethereumAddress"},
+          "to": {"$ref": "#/definitions/ethereumAddress"},
+          "transactionHash": {"$ref": "#/definitions/transactionHash"},
+          "blockNumber": {"type": "number", "minimum": 0},
+          "gasUsed": {"type": "string"},
+          "gasPrice": {"type": "string"},
+          "marketplace": {"type": "string", "description": "Marketplace where transaction occurred"},
+          "timestamp": {"type": "string", "format": "date-time"},
+          "createdAt": {"type": "string", "format": "date-time"}
+        },
+        "required": ["nftAddress", "tokenId", "eventType", "timestamp"]
+      }
+    },
+
+    "collection_stats": {
+      "description": "Collection-level statistics and metadata",
+      "indexes": [
+        {"keys": {"nftAddress": 1}, "unique": true},
+        {"keys": {"floorPrice": 1}},
+        {"keys": {"volume24h": -1}},
+        {"keys": {"marketCap": -1}},
+        {"keys": {"trending": -1}}
+      ],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "_id": {"$ref": "#/definitions/objectId"},
+          "nftAddress": {"$ref": "#/definitions/ethereumAddress"},
+          "name": {"type": "string"},
+          "symbol": {"type": "string"},
+          "totalSupply": {"type": "number", "minimum": 1},
+          "ownersCount": {"type": "number", "minimum": 0},
+          "listedCount": {"type": "number", "minimum": 0},
+          "floorPrice": {"type": "string", "description": "Floor price in wei"},
+          "floorPriceUSD": {"type": "number", "minimum": 0},
+          "volume24h": {"type": "string", "description": "24h volume in wei"},
+          "volume7d": {"type": "string", "description": "7d volume in wei"},
+          "volumeTotal": {"type": "string", "description": "Total volume in wei"},
+          "marketCap": {"type": "number", "minimum": 0},
+          "averagePrice": {"type": "string", "description": "Average price in wei"},
+          "sales24h": {"type": "number", "minimum": 0},
+          "sales7d": {"type": "number", "minimum": 0},
+          "salesTotal": {"type": "number", "minimum": 0},
+          "trending": {"type": "boolean", "default": false},
+          "trendingRank": {"type": "number", "minimum": 1},
+          "verified": {"type": "boolean", "default": false},
+          "featured": {"type": "boolean", "default": false},
+          "description": {"type": "string", "maxLength": 1000},
+          "website": {"type": "string", "format": "uri"},
+          "twitter": {"type": "string", "format": "uri"},
+          "discord": {"type": "string", "format": "uri"},
+          "royalty": {
+            "type": "object",
+            "properties": {
+              "percentage": {"type": "number", "minimum": 0, "maximum": 100},
+              "receiver": {"$ref": "#/definitions/ethereumAddress"}
+            }
+          },
+          "lastCalculated": {"type": "string", "format": "date-time"},
+          "createdAt": {"type": "string", "format": "date-time"},
+          "updatedAt": {"type": "string", "format": "date-time"}
+        },
+        "required": ["nftAddress", "totalSupply"]
+      }
+    },
+
+    "user_profiles": {
+      "description": "User profiles and preferences",
+      "indexes": [
+        {"keys": {"userAddress": 1}, "unique": true},
+        {"keys": {"username": 1}},
+        {"keys": {"verified": 1}},
+        {"keys": {"lastActive": -1}}
+      ],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "_id": {"$ref": "#/definitions/objectId"},
+          "userAddress": {"$ref": "#/definitions/ethereumAddress"},
+          "username": {"type": "string", "maxLength": 50},
+          "displayName": {"type": "string", "maxLength": 100},
+          "bio": {"type": "string", "maxLength": 500},
+          "avatar": {"type": "string", "format": "uri"},
+          "banner": {"type": "string", "format": "uri"},
+          "verified": {"type": "boolean", "default": false},
+          "social": {
+            "type": "object",
+            "properties": {
+              "twitter": {"type": "string"},
+              "discord": {"type": "string"},
+              "website": {"type": "string", "format": "uri"},
+              "telegram": {"type": "string"}
+            }
+          },
+          "preferences": {
+            "type": "object",
+            "properties": {
+              "currency": {"type": "string", "default": "USD"},
+              "notifications": {
+                "type": "object",
+                "properties": {
+                  "email": {"type": "boolean", "default": true},
+                  "push": {"type": "boolean", "default": true},
+                  "bidReceived": {"type": "boolean", "default": true},
+                  "itemSold": {"type": "boolean", "default": true},
+                  "priceChanges": {"type": "boolean", "default": false}
+                }
+              }
+            }
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "nftsOwned": {"type": "number", "minimum": 0, "default": 0},
+              "nftsListed": {"type": "number", "minimum": 0, "default": 0},
+              "nftsSold": {"type": "number", "minimum": 0, "default": 0},
+              "totalVolume": {"type": "string", "description": "Total trading volume in wei", "default": "0"},
+              "joinDate": {"type": "string", "format": "date-time"}
+            }
+          },
+          "lastActive": {"type": "string", "format": "date-time"},
+          "createdAt": {"type": "string", "format": "date-time"},
+          "updatedAt": {"type": "string", "format": "date-time"}
+        },
+        "required": ["userAddress"]
+      }
+    },
+
+    "marketplace_offers": {
+      "description": "Current and historical offers on NFTs",
+      "indexes": [
+        {"keys": {"nftAddress": 1, "tokenId": 1, "status": 1}},
+        {"keys": {"offerer": 1, "status": 1}},
+        {"keys": {"expiresAt": 1}},
+        {"keys": {"amount": -1}}
+      ],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "_id": {"$ref": "#/definitions/objectId"},
+          "nftAddress": {"$ref": "#/definitions/ethereumAddress"},
+          "tokenId": {"type": "string"},
+          "offerer": {"$ref": "#/definitions/ethereumAddress"},
+          "amount": {"type": "string", "description": "Offer amount in wei"},
+          "currency": {"type": "string", "default": "ETH"},
+          "status": {
+            "type": "string",
+            "enum": ["active", "accepted", "rejected", "expired", "cancelled"]
+          },
+          "expiresAt": {"type": "string", "format": "date-time"},
+          "message": {"type": "string", "maxLength": 500},
+          "acceptedAt": {"type": "string", "format": "date-time"},
+          "acceptedBy": {"$ref": "#/definitions/ethereumAddress"},
+          "rejectedAt": {"type": "string", "format": "date-time"},
+          "rejectedBy": {"$ref": "#/definitions/ethereumAddress"},
+          "transactionHash": {"$ref": "#/definitions/transactionHash"},
+          "createdAt": {"type": "string", "format": "date-time"},
+          "updatedAt": {"type": "string", "format": "date-time"}
+        },
+        "required": ["nftAddress", "tokenId", "offerer", "amount", "status"]
+      }
+    },
+
+    "metadata_cache": {
+      "description": "Cached NFT metadata with versioning",
+      "indexes": [
+        {"keys": {"nftAddress": 1, "tokenId": 1}, "unique": true},
+        {"keys": {"lastUpdated": -1}},
+        {"keys": {"cacheStatus": 1}},
+        {"keys": {"metadataHash": 1}}
+      ],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "_id": {"$ref": "#/definitions/objectId"},
+          "nftAddress": {"$ref": "#/definitions/ethereumAddress"},
+          "tokenId": {"type": "string"},
+          "metadata": {"type": "object", "additionalProperties": true},
+          "imageUrl": {"type": "string", "format": "uri"},
+          "animationUrl": {"type": "string", "format": "uri"},
+          "metadataHash": {"type": "string"},
+          "lastUpdated": {"type": "string", "format": "date-time"},
+          "updateCount": {"type": "number", "minimum": 0, "default": 0},
+          "cacheStatus": {
+            "type": "string",
+            "enum": ["fresh", "stale", "updating", "failed"],
+            "default": "fresh"
+          },
+          "errorMessage": {"type": "string"},
+          "retryCount": {"type": "number", "minimum": 0, "default": 0},
+          "nextRetryAt": {"type": "string", "format": "date-time"},
+          "createdAt": {"type": "string", "format": "date-time"}
+        },
+        "required": ["nftAddress", "tokenId", "lastUpdated"]
+      }
+    }
+  }
+}

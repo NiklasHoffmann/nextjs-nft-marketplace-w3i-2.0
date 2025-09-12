@@ -1,16 +1,5 @@
-interface RoyaltyInfo {
-    percentage?: number | null;
-    receiver?: string;
-    amount?: string;
-}
-
-interface FunctionalitiesTabProps {
-    attributes?: any[] | null;
-    blockchain: string;
-    tokenStandard: string;
-    supportsRoyalty: boolean;
-    royaltyInfo?: RoyaltyInfo | null;
-}
+import { FunctionalitiesTabProps } from '@/types/nft-detail';
+import { formatRoyaltyInfo } from '@/utils/nft-helpers';
 
 export default function FunctionalitiesTab({
     attributes,

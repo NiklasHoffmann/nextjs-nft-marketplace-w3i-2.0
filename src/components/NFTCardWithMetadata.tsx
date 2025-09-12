@@ -2,7 +2,7 @@
 "use client";
 
 import NFTCard from "./NFTCard";
-import { useNFTMetadataOptimized } from "../hooks/useNFTMetadataOptimized";
+import { useNFT } from "../hooks/useNFT";
 
 interface NFTCardWithMetadataProps {
     listingId: string;
@@ -14,29 +14,18 @@ interface NFTCardWithMetadataProps {
     desiredNftAddress: string;
     desiredTokenId: string;
     priority?: boolean;
+    enableInsights?: boolean; // New prop for insights integration
 }
 
 export default function NFTCardWithMetadata(props: NFTCardWithMetadataProps) {
-    const { imageUrl, loading, error, cached, stale } = useNFTMetadataOptimized(props.nftAddress, props.tokenId);
-
-    // Show loading state if needed (optional)
-    // if (loading) {
-    //     return <NFTCardSkeleton />;
-    // }
+    const { imageUrl, loading, error } = useNFT(props.nftAddress, props.tokenId);
 
     return (
-        <>
-            <NFTCard
-                {...props}
-                imageUrl={imageUrl || undefined}
-                priority={props.priority}
-            />
-            {/* Debug info for development (remove in production) */}
-            {process.env.NODE_ENV === 'development' && (
-                <div className="absolute top-0 right-0 text-xs bg-black/50 text-white px-1">
-                    {cached ? '📦' : '🌐'} {stale ? '⏰' : '✅'}
-                </div>
-            )}
-        </>
+        <NFTCard
+            {...props}
+            imageUrl={imageUrl || undefined}
+            priority={props.priority}
+            enableInsights={props.enableInsights}
+        />
     );
 }

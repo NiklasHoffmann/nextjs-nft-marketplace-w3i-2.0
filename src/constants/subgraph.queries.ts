@@ -1,5 +1,40 @@
 import { gql } from "@apollo/client"
 
+// Real-time subscription for active items updates
+export const ITEMS_UPDATED_SUBSCRIPTION = gql`
+    subscription ItemsUpdated {
+        items(first: 1000, where: { isListed: true }, orderBy: listingId, orderDirection: desc) {
+            listingId
+            nftAddress
+            tokenId
+            isListed
+            price
+            seller
+            buyer
+            desiredNftAddress
+            desiredTokenId
+        }
+    }
+`
+
+// Subscription for specific NFT updates
+export const NFT_UPDATED_SUBSCRIPTION = gql`
+    subscription NFTUpdated($nftAddress: Bytes!, $tokenId: BigInt!) {
+        items(where: { nftAddress: $nftAddress, tokenId: $tokenId }) {
+            nftAddress
+            buyer
+            desiredNftAddress
+            desiredTokenId
+            id
+            isListed
+            listingId
+            price
+            seller
+            tokenId
+        }
+    }
+`
+
 // This gives all the Items which are currently listed
 export const GET_ACTIVE_ITEMS = gql`
     {

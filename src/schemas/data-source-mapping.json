@@ -1,0 +1,450 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NFT Data Source Mapping",
+  "description": "Complete mapping of NFT data organized by source with implementation guides",
+  
+  "dataSources": {
+    
+    "blockchain": {
+      "title": "Blockchain Data Sources",
+      "description": "Data retrieved directly from Ethereum blockchain",
+      "sources": {
+        "smart_contract": {
+          "description": "Direct smart contract calls",
+          "methods": {
+            "web3": "Direct Web3/Ethers.js calls",
+            "rpc": "JSON-RPC provider calls", 
+            "multicall": "Batched contract calls"
+          },
+          "data_points": [
+            {
+              "field": "contract.address",
+              "method": "Contract deployment address",
+              "cost": "free",
+              "reliability": "100%"
+            },
+            {
+              "field": "contract.name",
+              "method": "name() function call",
+              "cost": "low",
+              "reliability": "99%"
+            },
+            {
+              "field": "contract.symbol", 
+              "method": "symbol() function call",
+              "cost": "low",
+              "reliability": "99%"
+            },
+            {
+              "field": "token.tokenURI",
+              "method": "tokenURI(tokenId) function call",
+              "cost": "low",
+              "reliability": "95%"
+            },
+            {
+              "field": "token.currentOwner",
+              "method": "ownerOf(tokenId) function call", 
+              "cost": "low",
+              "reliability": "100%"
+            },
+            {
+              "field": "contract.totalSupply",
+              "method": "totalSupply() function call",
+              "cost": "low",
+              "reliability": "99%"
+            },
+            {
+              "field": "royalty.percentage",
+              "method": "royaltyInfo(tokenId, salePrice) EIP-2981",
+              "cost": "low",
+              "reliability": "80%"
+            }
+          ],
+          "implementation": {
+            "current_files": [
+              "src/app/api/web3/tokenURI/route.ts"
+            ],
+            "suggested_additions": [
+              "src/utils/web3/contract-calls.ts",
+              "src/utils/web3/multicall.ts"
+            ]
+          }
+        },
+        "event_logs": {
+          "description": "Historical blockchain event analysis",
+          "methods": {
+            "filter_logs": "Filter contract events by topic",
+            "get_logs": "Retrieve specific event logs",
+            "subscription": "Real-time event monitoring"
+          },
+          "data_points": [
+            {
+              "field": "token.mintedAt",
+              "event": "Transfer(address(0), to, tokenId)",
+              "cost": "medium",
+              "reliability": "100%"
+            },
+            {
+              "field": "marketplace.history",
+              "event": "ItemListed, ItemSold, ItemCanceled",
+              "cost": "medium", 
+              "reliability": "100%"
+            },
+            {
+              "field": "token.transfers",
+              "event": "Transfer events",
+              "cost": "high",
+              "reliability": "100%"
+            }
+          ]
+        }
+      }
+    },
+
+    "subgraph": {
+      "title": "The Graph Protocol Subgraph",
+      "description": "Indexed blockchain data via GraphQL",
+      "sources": {
+        "marketplace_subgraph": {
+          "description": "Your custom marketplace subgraph",
+          "endpoint": "Subgraph GraphQL endpoint",
+          "data_points": [
+            {
+              "field": "marketplace.listing",
+              "query": "GET_ACTIVE_ITEMS",
+              "cost": "free",
+              "reliability": "95%"
+            },
+            {
+              "field": "marketplace.history",
+              "query": "GET_INACTIVE_ITEMS", 
+              "cost": "free",
+              "reliability": "95%"
+            },
+            {
+              "field": "collection.items",
+              "query": "GET_NFTS_BY_COLLECTION",
+              "cost": "free",
+              "reliability": "95%"
+            }
+          ],
+          "implementation": {
+            "current_files": [
+              "src/constants/subgraph.queries.ts"
+            ],
+            "suggested_additions": [
+              "src/utils/subgraph/advanced-queries.ts",
+              "src/utils/subgraph/real-time-subscriptions.ts"
+            ]
+          }
+        }
+      }
+    },
+
+    "metadata": {
+      "title": "NFT Metadata Sources",
+      "description": "Data from tokenURI and external metadata services",
+      "sources": {
+        "ipfs": {
+          "description": "IPFS-hosted metadata and media",
+          "gateways": [
+            "https://cloudflare-ipfs.com/ipfs/",
+            "https://gateway.pinata.cloud/ipfs/", 
+            "https://dweb.link/ipfs/",
+            "https://ipfs.io/ipfs/"
+          ],
+          "data_points": [
+            {
+              "field": "metadata.core.*",
+              "source": "JSON metadata file",
+              "cost": "low",
+              "reliability": "90%"
+            },
+            {
+              "field": "metadata.media.imageUrl",
+              "source": "Image file via IPFS",
+              "cost": "low",
+              "reliability": "85%"
+            },
+            {
+              "field": "metadata.media.animationUrl", 
+              "source": "Animation/video via IPFS",
+              "cost": "medium",
+              "reliability": "85%"
+            }
+          ]
+        },
+        "http_metadata": {
+          "description": "Centralized metadata servers",
+          "data_points": [
+            {
+              "field": "metadata.core.*",
+              "source": "HTTP/HTTPS JSON endpoints",
+              "cost": "low",
+              "reliability": "95%"
+            }
+          ]
+        },
+        "data_uri": {
+          "description": "Base64-encoded on-chain metadata",
+          "data_points": [
+            {
+              "field": "metadata.core.*", 
+              "source": "data:application/json;base64,*",
+              "cost": "free",
+              "reliability": "100%"
+            }
+          ],
+          "implementation": {
+            "current_files": [
+              "src/app/api/nft-metadata/route.ts",
+              "src/hooks/useNFTMetadataOptimized.ts"
+            ]
+          }
+        }
+      }
+    },
+
+    "third_party_apis": {
+      "title": "External API Services",
+      "description": "Third-party NFT data providers",
+      "sources": {
+        "opensea_api": {
+          "description": "OpenSea API for market data",
+          "endpoint": "https://api.opensea.io/api/v1/",
+          "rate_limit": "4 requests/second",
+          "data_points": [
+            {
+              "field": "database.pricing.floorPrice",
+              "endpoint": "/collection/{slug}/stats",
+              "cost": "free",
+              "reliability": "95%"
+            },
+            {
+              "field": "database.rarity.rarityRank",
+              "endpoint": "/asset/{contract_address}/{token_id}/",
+              "cost": "free",
+              "reliability": "90%"
+            }
+          ]
+        },
+        "alchemy_nft_api": {
+          "description": "Alchemy NFT API",
+          "endpoint": "https://{network}.g.alchemy.com/nft/v2/",
+          "data_points": [
+            {
+              "field": "metadata.*",
+              "endpoint": "/getNFTMetadata",
+              "cost": "paid",
+              "reliability": "99%"
+            },
+            {
+              "field": "blockchain.contract.*",
+              "endpoint": "/getContractMetadata",
+              "cost": "paid", 
+              "reliability": "99%"
+            }
+          ]
+        },
+        "moralis_api": {
+          "description": "Moralis Web3 API",
+          "endpoint": "https://deep-index.moralis.io/api/v2/",
+          "data_points": [
+            {
+              "field": "marketplace.history",
+              "endpoint": "/nft/{address}/{token_id}/transfers",
+              "cost": "paid",
+              "reliability": "95%"
+            }
+          ]
+        },
+        "coingecko_api": {
+          "description": "Price conversion data",
+          "endpoint": "https://api.coingecko.com/api/v3/",
+          "data_points": [
+            {
+              "field": "computed.priceConversions.*",
+              "endpoint": "/simple/price",
+              "cost": "free",
+              "reliability": "99%"
+            }
+          ],
+          "implementation": {
+            "current_files": [
+              "src/contexts/CurrencyContext.tsx"
+            ]
+          }
+        }
+      }
+    },
+
+    "database": {
+      "title": "MongoDB Database",
+      "description": "Application-specific stored data",
+      "collections": {
+        "nft_analytics": {
+          "description": "View counts, likes, engagement metrics",
+          "data_points": [
+            "database.analytics.viewCount",
+            "database.analytics.likeCount", 
+            "database.analytics.shareCount",
+            "database.analytics.dailyViews"
+          ],
+          "update_frequency": "real-time",
+          "triggers": ["page_view", "user_interaction"]
+        },
+        "nft_categories": {
+          "description": "Manual categorization and tagging",
+          "data_points": [
+            "database.categorization.categories",
+            "database.categorization.tags",
+            "database.categorization.verified"
+          ],
+          "update_frequency": "manual",
+          "triggers": ["admin_action", "user_submission"]
+        },
+        "nft_rarity": {
+          "description": "Calculated rarity scores and rankings",
+          "data_points": [
+            "database.rarity.rarityRank",
+            "database.rarity.rarityScore",
+            "database.rarity.traitRarity"
+          ],
+          "update_frequency": "batch",
+          "triggers": ["collection_analysis", "new_mint"]
+        },
+        "user_interactions": {
+          "description": "User-specific interactions",
+          "data_points": [
+            "database.social.comments",
+            "database.social.reviews"
+          ],
+          "update_frequency": "real-time",
+          "triggers": ["user_action"]
+        }
+      },
+      "implementation": {
+        "suggested_files": [
+          "src/lib/mongodb/connection.ts",
+          "src/lib/mongodb/models/",
+          "src/utils/analytics/track-views.ts",
+          "src/utils/rarity/calculate-rarity.ts"
+        ]
+      }
+    }
+  },
+
+  "data_flow": {
+    "description": "How data flows through the system",
+    "stages": [
+      {
+        "stage": "initial_load",
+        "description": "First time loading an NFT",
+        "sources": ["blockchain", "subgraph"],
+        "fallbacks": ["third_party_apis"],
+        "cache": ["database.metadata_cache"]
+      },
+      {
+        "stage": "metadata_enrichment", 
+        "description": "Fetch and process metadata",
+        "sources": ["ipfs", "http_metadata"],
+        "fallbacks": ["data_uri"],
+        "cache": ["database.metadata_cache"]
+      },
+      {
+        "stage": "analytics_tracking",
+        "description": "Track user interactions",
+        "sources": ["user_events"],
+        "storage": ["database.nft_analytics", "database.user_interactions"]
+      },
+      {
+        "stage": "price_calculation",
+        "description": "Calculate USD/EUR prices",
+        "sources": ["coingecko_api"],
+        "cache": ["computed.priceConversions"]
+      }
+    ]
+  },
+
+  "implementation_priorities": {
+    "phase_1_basic": {
+      "description": "Essential functionality",
+      "items": [
+        "Enhanced blockchain calls (multicall)",
+        "MongoDB analytics collection",
+        "Category system",
+        "Basic rarity calculation"
+      ]
+    },
+    "phase_2_enhanced": {
+      "description": "User experience improvements", 
+      "items": [
+        "Real-time price updates",
+        "Advanced analytics dashboard",
+        "User profiles and preferences",
+        "Social features (comments, likes)"
+      ]
+    },
+    "phase_3_advanced": {
+      "description": "Platform scaling",
+      "items": [
+        "Third-party API integration",
+        "Advanced rarity algorithms",
+        "Recommendation engine",
+        "Real-time notifications"
+      ]
+    }
+  },
+
+  "caching_strategy": {
+    "levels": [
+      {
+        "level": "browser",
+        "description": "Next.js Image optimization + browser cache",
+        "duration": "7 days",
+        "data": ["images", "static_metadata"]
+      },
+      {
+        "level": "application",
+        "description": "React Query + LRU Cache",
+        "duration": "30 minutes",
+        "data": ["api_responses", "metadata"]
+      },
+      {
+        "level": "database", 
+        "description": "MongoDB metadata cache collection",
+        "duration": "24 hours",
+        "data": ["processed_metadata", "enriched_data"]
+      },
+      {
+        "level": "cdn",
+        "description": "CDN for images and static assets",
+        "duration": "30 days", 
+        "data": ["optimized_images", "static_files"]
+      }
+    ]
+  },
+
+  "error_handling": {
+    "strategies": [
+      {
+        "error_type": "network_timeout",
+        "sources": ["ipfs", "http_metadata"],
+        "fallbacks": ["alternative_gateways", "cached_data"],
+        "retry_strategy": "exponential_backoff"
+      },
+      {
+        "error_type": "rpc_failure",
+        "sources": ["blockchain"],
+        "fallbacks": ["alternative_providers", "subgraph"],
+        "retry_strategy": "immediate_fallback"
+      },
+      {
+        "error_type": "rate_limit",
+        "sources": ["third_party_apis"],
+        "fallbacks": ["cached_data", "reduced_functionality"],
+        "retry_strategy": "backoff_with_jitter"
+      }
+    ]
+  }
+}

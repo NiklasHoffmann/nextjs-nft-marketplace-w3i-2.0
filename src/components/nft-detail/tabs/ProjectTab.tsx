@@ -1,27 +1,5 @@
-interface NFTAttribute {
-    trait_type: string;
-    value: string | number;
-    display_type?: string;
-    max_value?: number;
-}
-
-interface ProjectTabProps {
-    nftAddress: string;
-    tokenId: string;
-    contractName?: string | null;
-    collection?: string | null;
-    contractSymbol?: string | null;
-    tokenStandard: string;
-    blockchain: string;
-    totalSupply?: number | null;
-    currentOwner?: string | null;
-    creator?: string | null;
-    seller: string;
-    description?: string | null;
-    rarityRank?: number | null;
-    rarityScore?: number | null;
-    attributes?: NFTAttribute[] | null;
-}
+import { ProjectTabProps } from '@/types/nft-detail';
+import { truncateAddress, formatRarityInfo } from '@/utils/nft-helpers';
 
 export default function ProjectTab({
     nftAddress,
@@ -81,9 +59,9 @@ export default function ProjectTab({
                 </div>
 
                 <div>
-                    <label className="text-sm font-medium text-gray-500">Current Owner</label>
+                    <label className="text-sm font-medium text-gray-500">Current Owner and Seller</label>
                     <p className="text-sm font-mono text-gray-900 break-all">
-                        {currentOwner ? `${currentOwner.slice(0, 6)}...${currentOwner.slice(-4)}` : 'Loading...'}
+                        {currentOwner ? truncateAddress(currentOwner) : 'Loading...'}
                     </p>
                 </div>
 
@@ -95,7 +73,7 @@ export default function ProjectTab({
                 )}
 
                 <div className="md:col-span-2">
-                    <label className="text-sm font-medium text-gray-500">Listed By</label>
+                    <label className="text-sm font-medium text-gray-500">Preowned By</label>
                     <p className="text-sm font-mono text-gray-900 break-all">{seller}</p>
                 </div>
             </div>
@@ -144,11 +122,6 @@ export default function ProjectTab({
                                 {attr.display_type && (
                                     <div className="text-xs text-gray-400 mt-1">
                                         {attr.display_type}
-                                    </div>
-                                )}
-                                {attr.max_value && (
-                                    <div className="text-xs text-gray-400">
-                                        Max: {attr.max_value}
                                     </div>
                                 )}
                             </div>

@@ -1,9 +1,8 @@
 "use client";
-import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { formatEther } from '@/utils/formatters';
-import { useETHPrice, useCurrency } from '@/contexts/CurrencyContext';
-import { useNFTMetadata } from '@/hooks/useNFTMetadata';
+
+import React, { useEffect, memo, useMemo } from 'react';
+import { useNFTDetailLogic } from '@/hooks/useNFTDetailLogic';
+import { useNFTPriceData } from '@/hooks/useNFTPriceData';
 import {
     NFTDetailHeader,
     CategoryPills,
@@ -14,235 +13,210 @@ import {
     SwapTargetInfo,
     CollectionItemsList,
     LoadingSpinner,
-    ErrorDisplay
+    ErrorDisplay,
+    NFTInsightsPanel
 } from '@/components/nft-detail';
+import ManualRefreshControls from '@/components/ManualRefreshControls';
 
-interface NFTMetadata {
-    name: string;
-    description: string;
-    image: string;
-    attributes?: Array<{
-        trait_type: string;
-        value: string | number;
-    }>;
-}
+// Memoized layout components
+const MemoizedNFTDetailHeader = memo(NFTDetailHeader);
+const MemoizedCategoryPills = memo(CategoryPills);
+const MemoizedNFTMediaSection = memo(NFTMediaSection);
+const MemoizedNFTPriceCard = memo(NFTPriceCard);
+const MemoizedNFTInfoTabs = memo(NFTInfoTabs);
+const MemoizedPropertiesDisplay = memo(PropertiesDisplay);
+const MemoizedSwapTargetInfo = memo(SwapTargetInfo);
+const MemoizedCollectionItemsList = memo(CollectionItemsList);
 
-interface NFTDetails {
-    listingId: string;
-    nftAddress: string;
-    tokenId: string;
-    isListed: boolean;
-    price: string;
-    seller: string;
-    buyer?: string;
-    desiredNftAddress: string;
-    desiredTokenId: string;
-    metadata?: NFTMetadata;
-}
-
-export default function NFTDetailPage() {
-    const params = useParams();
-    const router = useRouter();
-    const { selectedCurrency } = useCurrency();
-
-    const [nftDetails, setNftDetails] = useState<NFTDetails | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [isFavorited, setIsFavorited] = useState(false);
-    const [activeTab, setActiveTab] = useState<'project' | 'functionalities' | 'tokenomics'>('project');
-
-    const nftAddress = params.nftAddress as string;
-    const tokenId = params.tokenId as string;
-
-    // Use the extended NFT metadata hook
+function NFTDetailPage() {
+    // Use custom hook for all NFT detail logic
     const {
-        data: extendedData,
-        name,
-        description,
-        imageUrl,
-        attributes,
-        categories,
-        tags,
-        animationUrl,
-        audioUrl,
-        videoUrl,
-        externalUrl,
-        websiteUrl,
-        twitterUrl,
-        creator,
-        collection,
-        rarityRank,
-        rarityScore,
-        contractAddress,
-        tokenStandard,
-        blockchain,
-        loading: metadataLoading,
-        error: metadataError,
-        // New contract-specific data
-        contractName,
-        contractSymbol,
-        currentOwner,
-        totalSupply,
-        supportsRoyalty,
-        royaltyInfo
-    } = useNFTMetadata(nftAddress, tokenId);
+        nftDetails,
+        nftData,
+        activeTab,
+        isFavorited,
+        isLoading,
+        error,
+        hasValidData,
+        nftAddress,
+        tokenId,
+        insights,
+        insightsLoading,
+        handleBack,
+        handleShare,
+        toggleFavorite,
+        handleTabChange,
+        fetchListingData
+    } = useNFTDetailLogic();
 
-    // Get converted price
-    const ethPrice = nftDetails ? parseFloat(formatEther(nftDetails.price)) : 0;
-    const { convertedPrice, loading: priceLoading } = useETHPrice(ethPrice);
+    // Use custom hook for price data
+    const priceData = useNFTPriceData(nftDetails?.price || null);
 
+    // Effect to fetch listing data
     useEffect(() => {
-        const fetchListingData = async () => {
-            if (!nftAddress || !tokenId) return;
-
-            try {
-                setLoading(true);
-
-                // For now, create mock listing data
-                // In a real app, you'd fetch this from your marketplace contract
-                const mockNFTDetails: NFTDetails = {
-                    listingId: `${nftAddress}-${tokenId}`,
-                    nftAddress,
-                    tokenId,
-                    isListed: true,
-                    price: "50000000000000000", // 0.05 ETH in Wei
-                    seller: "0x742d35Cc6634C0532925a3b8D0C1C4C9C68F82D4",
-                    desiredNftAddress: "0x0000000000000000000000000000000000000000",
-                    desiredTokenId: "0"
-                };
-
-                setNftDetails(mockNFTDetails);
-            } catch (err) {
-                setError(err instanceof Error ? err.message : 'Failed to load NFT details');
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchListingData();
-    }, [nftAddress, tokenId]);
+    }, [fetchListingData]);
 
-    const handleBack = () => {
-        router.back();
-    };
+    // Memoize header props to prevent unnecessary re-renders
+    const headerProps = useMemo(() => ({
+        name: nftData.name,
+        tokenId,
+        contractName: nftData.contractName,
+        collection: nftData.contractName, // Using contractName as collection fallback
+        contractSymbol: nftData.contractSymbol,
+        nftAddress,
+        isFavorited,
+        onToggleFavorite: toggleFavorite,
+        onShare: handleShare
+    }), [
+        nftData.name, tokenId, nftData.contractName,
+        nftData.contractSymbol, nftAddress, isFavorited, toggleFavorite, handleShare
+    ]);
 
-    const handleShare = async () => {
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: name || 'NFT',
-                    text: description || 'Check out this NFT',
-                    url: window.location.href,
-                });
-            } catch (err) {
-                console.log('Error sharing:', err);
-            }
-        } else {
-            navigator.clipboard.writeText(window.location.href);
-            alert('Link copied to clipboard!');
-        }
-    };
+    // Memoize category pills props (simplified)
+    const categoryPillsProps = useMemo(() => ({
+        categories: [], // Simplified - remove complex category logic
+        tags: [],
+        externalUrl: nftData.metadata?.external_url,
+        websiteUrl: null, // Simplified
+        twitterUrl: null, // Simplified
+        insights,
+        insightsLoading,
+        contractAddress: nftAddress,
+        tokenId
+    }), [
+        nftData.metadata?.external_url, insights, insightsLoading, nftAddress, tokenId
+    ]);
 
-    const toggleFavorite = () => {
-        setIsFavorited(!isFavorited);
-    };
+    // Memoize media section props
+    const mediaSectionProps = useMemo(() => ({
+        imageUrl: nftData.imageUrl,
+        animationUrl: nftData.metadata?.animation_url,
+        videoUrl: null, // Simplified
+        audioUrl: null, // Simplified  
+        name: nftData.name,
+        tokenId
+    }), [
+        nftData.imageUrl, nftData.metadata?.animation_url, nftData.name, tokenId
+    ]);
 
-    if (loading || metadataLoading) {
+    // Memoize price card props
+    const priceCardProps = useMemo(() => ({
+        price: nftDetails?.price || "0",
+        isListed: nftDetails?.isListed || false,
+        convertedPrice: priceData.convertedPrice,
+        priceLoading: priceData.priceLoading,
+        selectedCurrencySymbol: priceData.selectedCurrencySymbol
+    }), [
+        nftDetails?.price, nftDetails?.isListed, priceData.convertedPrice,
+        priceData.priceLoading, priceData.selectedCurrencySymbol
+    ]);
+
+    // Memoize info tabs props
+    const infoTabsProps = useMemo(() => {
+        if (!nftDetails) return null;
+
+        return {
+            activeTab,
+            onTabChange: handleTabChange,
+            nftAddress,
+            tokenId,
+            contractName: nftData.contractName,
+            collection: nftData.contractName, // Simplified
+            contractSymbol: nftData.contractSymbol,
+            tokenStandard: 'ERC721', // Simplified
+            blockchain: 'Ethereum', // Simplified  
+            totalSupply: null, // Simplified
+            currentOwner: nftData.owner,
+            creator: null, // Simplified
+            nftDetails,
+            description: nftData.description,
+            rarityRank: null, // Simplified
+            rarityScore: null, // Simplified  
+            attributes: nftData.attributes as any,
+            supportsRoyalty: false, // Simplified
+            royaltyInfo: null // Simplified
+        };
+    }, [
+        activeTab, handleTabChange, nftAddress, tokenId, nftData, nftDetails
+    ]);
+
+    // Memoize conditional renders (simplified)
+    const hasProperties = useMemo(() => {
+        return nftData.attributes && nftData.attributes.length > 0;
+    }, [nftData.attributes]);
+
+    const swapTargetProps = useMemo(() => ({
+        desiredNftAddress: nftDetails?.desiredNftAddress || "",
+        desiredTokenId: nftDetails?.desiredTokenId || ""
+    }), [nftDetails?.desiredNftAddress, nftDetails?.desiredTokenId]);
+
+    const collectionItemsProps = useMemo(() => ({
+        collection: nftData.contractName,
+        nftAddress,
+        tokenId,
+        name: nftData.name,
+        price: nftDetails?.price || "0"
+    }), [nftData.contractName, nftAddress, tokenId, nftData.name, nftDetails?.price]);
+
+    // Early returns for loading and error states
+    if (isLoading) {
         return <LoadingSpinner />;
     }
 
-    if (error || metadataError || !nftDetails) {
-        return <ErrorDisplay error={error || metadataError || 'NFT not found'} onBack={handleBack} />;
+    if (error || !hasValidData) {
+        return <ErrorDisplay error={error || 'NFT not found'} onBack={handleBack} />;
     }
 
     return (
         <div className="min-h-screen bg-gray-50 pt-32">
-            <NFTDetailHeader
-                name={name}
-                tokenId={tokenId}
-                contractName={contractName}
-                collection={collection}
-                contractSymbol={contractSymbol}
-                nftAddress={nftAddress}
-                isFavorited={isFavorited}
-                onToggleFavorite={toggleFavorite}
-                onShare={handleShare}
-            />
+            <MemoizedNFTDetailHeader {...headerProps} />
 
-            <CategoryPills
-                categories={categories}
-                tags={tags}
-                externalUrl={externalUrl}
-                websiteUrl={websiteUrl}
-                twitterUrl={twitterUrl}
-            />
+            <MemoizedCategoryPills {...categoryPillsProps} />
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-4">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Left Side - NFT Information & Details (2/3 width) */}
                     <div className="lg:col-span-2 space-y-6">
-                        <NFTInfoTabs
-                            activeTab={activeTab}
-                            onTabChange={setActiveTab}
-                            nftAddress={nftAddress}
-                            tokenId={tokenId}
-                            contractName={contractName}
-                            collection={collection}
-                            contractSymbol={contractSymbol}
-                            tokenStandard={tokenStandard}
-                            blockchain={blockchain}
-                            totalSupply={totalSupply}
-                            currentOwner={currentOwner}
-                            creator={creator}
-                            nftDetails={nftDetails}
-                            description={description}
-                            rarityRank={rarityRank}
-                            rarityScore={rarityScore}
-                            attributes={attributes}
-                            supportsRoyalty={supportsRoyalty}
-                            royaltyInfo={royaltyInfo}
-                        />
-
-
-                        {extendedData?.properties && Object.keys(extendedData.properties).length > 0 && (
-                            <PropertiesDisplay properties={extendedData.properties} />
+                        {infoTabsProps && (
+                            <MemoizedNFTInfoTabs {...infoTabsProps} />
                         )}
 
-                        <SwapTargetInfo
-                            desiredNftAddress={nftDetails.desiredNftAddress}
-                            desiredTokenId={nftDetails.desiredTokenId}
-                        />
+                        {hasProperties && (
+                            <MemoizedPropertiesDisplay properties={nftData.metadata || {}} />
+                        )}
 
-                        <CollectionItemsList
-                            collection={collection}
-                            nftAddress={nftAddress}
-                            tokenId={tokenId}
-                            name={name}
-                            price={nftDetails.price}
-                        />
+                        <MemoizedSwapTargetInfo {...swapTargetProps} />
+
+                        <MemoizedCollectionItemsList {...collectionItemsProps} />
                     </div>
 
                     {/* Right Side - Media & Price (1/3 width) */}
                     <div className="lg:col-span-1 space-y-6">
-                        <NFTMediaSection
-                            imageUrl={imageUrl}
-                            animationUrl={animationUrl}
-                            videoUrl={videoUrl}
-                            audioUrl={audioUrl}
-                            name={name}
+                        <MemoizedNFTMediaSection {...mediaSectionProps} />
+
+                        <MemoizedNFTPriceCard {...priceCardProps} />
+
+                        {/* NFT Insights Panel */}
+                        <NFTInsightsPanel
+                            contractAddress={nftAddress}
                             tokenId={tokenId}
                         />
-
-                        <NFTPriceCard
-                            price={nftDetails.price}
-                            isListed={nftDetails.isListed}
-                            convertedPrice={convertedPrice}
-                            priceLoading={priceLoading}
-                            selectedCurrencySymbol={selectedCurrency.symbol}
-                        />
+                        
+                        {/* Manual Refresh Controls - Show in development or for admin users */}
+                        {process.env.NODE_ENV === 'development' && (
+                            <ManualRefreshControls 
+                                contractAddress={nftAddress}
+                                tokenId={tokenId}
+                                showCacheStats={true}
+                                className="mt-6"
+                            />
+                        )}
                     </div>
                 </div>
             </div>
         </div>
     );
 }
+
+export default memo(NFTDetailPage);

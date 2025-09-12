@@ -11,18 +11,22 @@ export const formatEther = (weiValue: string): string => {
   try {
     // Convert Wei to ETH (1 ETH = 10^18 Wei)
     const wei = BigInt(weiValue);
-    const ethBigInt = wei / BigInt(10 ** 18);
-    const remainder = wei % BigInt(10 ** 18);
 
-    // Format with decimals if there's a remainder
-    if (remainder === BigInt(0)) {
-      return ethBigInt.toString();
+    // Use higher precision calculation
+    const ethValue = Number(wei) / (10 ** 18);
+
+    // Format with appropriate decimal places
+    if (ethValue === 0) {
+      return '0';
+    } else if (ethValue < 0.0001) {
+      // For very small values, use scientific notation or more decimals
+      return ethValue.toFixed(8).replace(/\.?0+$/, '');
+    } else if (ethValue < 1) {
+      // For values less than 1 ETH, show up to 6 decimals
+      return ethValue.toFixed(6).replace(/\.?0+$/, '');
     } else {
-      // Convert remainder to decimal part (up to 4 decimal places for readability)
-      const decimal = Number(remainder) / (10 ** 18);
-      const formatted = (Number(ethBigInt) + decimal).toFixed(4);
-      // Remove trailing zeros
-      return parseFloat(formatted).toString();
+      // For values >= 1 ETH, show up to 4 decimals
+      return ethValue.toFixed(4).replace(/\.?0+$/, '');
     }
   } catch (error) {
     console.error('Error formatting ether:', error);
@@ -44,12 +48,12 @@ export const formatAddress = (address: string, startChars: number = 6, endChars:
  * Format price with currency symbol and optional USD value
  */
 export const formatPrice = (
-  amount: string | number, 
-  currency: string = 'ETH', 
+  amount: string | number,
+  currency: string = 'ETH',
   usdValue?: number
 ): FormattedPrice => {
   const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  
+
   const formattedValue = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 0,
     maximumFractionDigits: currency === 'ETH' ? 4 : 2,

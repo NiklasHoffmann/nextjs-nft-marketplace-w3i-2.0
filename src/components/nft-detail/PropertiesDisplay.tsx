@@ -1,6 +1,4 @@
-interface PropertiesDisplayProps {
-    properties: Record<string, any>;
-}
+import { PropertiesDisplayProps } from '@/types/nft-detail';
 
 export default function PropertiesDisplay({ properties }: PropertiesDisplayProps) {
     if (!properties || Object.keys(properties).length === 0) {
