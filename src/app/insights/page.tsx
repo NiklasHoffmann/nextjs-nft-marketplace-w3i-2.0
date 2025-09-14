@@ -1,18 +1,32 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { AdminNFTInsight, AdminCollectionInsight } from '@/types';
 import {
-    CreateNFTInsightsRequest,
-    UpdateNFTInsightsRequest
-} from '@/types/insights';
-import { useNFTInsights } from '@/hooks/useNFTInsights';
+    useNFTInsights,
+    useCollectionInsights,
+    useAdminNFTInsights,
+    useAdminCollectionInsights
+} from '@/hooks/nfts/04-detail-useNFTInsights';
 import { canEditInsights, getInsightsAccessMessage, getAdminAddressesList } from '@/utils/insights-access';
 
 // Force dynamic rendering to prevent SSG issues
 export const dynamic = 'force-dynamic';
+
+// Predefined options (moved outside component to avoid re-creation)
+const CATEGORIES = [
+    'Art', 'Gaming', 'Music', 'Sports', 'Collectibles',
+    'Photography', 'Utility', 'Metaverse', 'PFP', 'Other'
+];
+
+const COMMON_TAGS = [
+    'Blue Chip', 'Emerging', 'Utility Token', 'Gaming', 'Metaverse',
+    'Art', 'Music', 'Sports', 'Limited Edition', 'Collaboration',
+    'Animated', 'High Quality', 'Community Driven', 'Roadmap Strong'
+];
 
 interface FormData {
     // NFT Identification
@@ -22,7 +36,17 @@ interface FormData {
     // Basic Information
     title: string;
     description: string;
-    customName: string;
+
+    // Project/Product Information  
+    projectName: string;
+    projectDescription: string;
+    projectWebsite: string;
+    projectTwitter: string;
+    projectDiscord: string;
+
+    // Partnerships
+    partnerships: string[];
+    partnershipDetails: string;
 
     // Classification
     category: string;
@@ -30,25 +54,6 @@ interface FormData {
 
     // Ratings
     rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | '';
-    quality: number;
-    personalRating: number;
-
-    // Investment Data
-    purchasePrice: string;
-    purchaseDate: string;
-    targetSellPrice: string;
-    marketAnalysis: string;
-
-    // Flags
-    isWatchlisted: boolean;
-    isFavorite: boolean;
-    isForSale: boolean;
-    isPrivate: boolean;
-
-    // Strategy
-    strategy: 'hold' | 'flip' | 'trade' | 'collect' | '';
-    investmentGoal: string;
-    riskLevel: 'low' | 'medium' | 'high' | '';
 }
 
 export default function InsightsPage() {
@@ -85,7 +90,6 @@ function InsightsPageContent() {
 
     // Check access permissions
     const canEdit = canEditInsights(address);
-    // const canView = canViewInsights(address);
     const accessMessage = getInsightsAccessMessage(address);
     const adminAddresses = getAdminAddressesList();
 
@@ -94,43 +98,45 @@ function InsightsPageContent() {
         tokenId: '',
         title: '',
         description: '',
-        customName: '',
+        projectName: '',
+        projectDescription: '',
+        projectWebsite: '',
+        projectTwitter: '',
+        projectDiscord: '',
+        partnerships: [],
+        partnershipDetails: '',
         category: '',
         tags: [],
-        rarity: '',
-        quality: 5,
-        personalRating: 3,
-        purchasePrice: '',
-        purchaseDate: '',
-        targetSellPrice: '',
-        marketAnalysis: '',
-        isWatchlisted: false,
-        isFavorite: false,
-        isForSale: false,
-        isPrivate: false,
-        strategy: '',
-        investmentGoal: '',
-        riskLevel: ''
+        rarity: ''
     });
 
-    // Load existing insights when contractAddress and tokenId are available
-    const { insights, loading: insightsLoading, update } = useNFTInsights({
-        contractAddress: formData.contractAddress || undefined,
-        tokenId: formData.tokenId || undefined,
-        autoFetch: !!(formData.contractAddress && formData.tokenId)
+    // Use hooks for insights data and admin operations
+    const {
+        insights: nftInsights,
+        loading: nftLoading,
+        refetch: refetchNftInsights
+    } = useNFTInsights({
+        contractAddress: formData.contractAddress,
+        tokenId: formData.tokenId,
+        autoFetch: activeTab === 'nft' && !!formData.contractAddress && !!formData.tokenId
     });
 
-    // Predefined options
-    const categories = [
-        'Art', 'Gaming', 'Music', 'Sports', 'Collectibles',
-        'Photography', 'Utility', 'Metaverse', 'PFP', 'Other'
-    ];
+    const {
+        insights: collectionInsights,
+        loading: collectionLoading,
+        refetch: refetchCollectionInsights
+    } = useCollectionInsights({
+        contractAddress: formData.contractAddress,
+        autoFetch: activeTab === 'collection' && !!formData.contractAddress
+    });
 
-    const commonTags = [
-        'Blue Chip', 'Emerging', 'Utility Token', 'Gaming', 'Metaverse',
-        'Art', 'Music', 'Sports', 'Limited Edition', 'Collaboration',
-        'Animated', 'High Quality', 'Community Driven', 'Roadmap Strong'
-    ];
+    // Admin operations hooks
+    const { create: createNFTInsights, update: updateNFTInsights } = useAdminNFTInsights();
+    const { create: createCollectionInsights, update: updateCollectionInsights } = useAdminCollectionInsights();
+
+    // Combine loading states and insights
+    const insightsLoading = activeTab === 'nft' ? nftLoading : collectionLoading;
+    const adminInsights = activeTab === 'nft' ? nftInsights : collectionInsights;
 
     // Pre-fill form from URL parameters
     useEffect(() => {
@@ -149,43 +155,41 @@ function InsightsPageContent() {
         }
     }, []);
 
-    // Load existing insights into form when insights are fetched
+    // Load existing admin insights into form when insights are fetched
     useEffect(() => {
-        if (insights && !insightsLoading) {
+        if (adminInsights && !insightsLoading) {
             setIsEditMode(true);
-            setInsightsId(insights._id?.toString() || null);
+            setInsightsId(adminInsights._id?.toString() || null);
 
             setFormData(prev => ({
                 ...prev,
-                title: insights.title || '',
-                description: insights.description || '',
-                customName: insights.customName || '',
-                category: insights.category || '',
-                tags: insights.tags || [],
-                rarity: insights.rarity || '',
-                quality: insights.quality || 5,
-                personalRating: insights.personalRating || 3,
-                purchasePrice: insights.purchasePrice?.toString() || '',
-                purchaseDate: insights.purchaseDate ? new Date(insights.purchaseDate).toISOString().split('T')[0] : '',
-                targetSellPrice: insights.targetSellPrice?.toString() || '',
-                marketAnalysis: insights.marketAnalysis || '',
-                isWatchlisted: insights.isWatchlisted || false,
-                isFavorite: insights.isFavorite || false,
-                isForSale: insights.isForSale || false,
-                isPrivate: insights.isPrivate || false,
-                strategy: insights.strategy || '',
-                investmentGoal: insights.investmentGoal || '',
-                riskLevel: insights.riskLevel || ''
+                title: adminInsights.title || '',
+                description: adminInsights.description || '',
+                category: adminInsights.category || '',
+                tags: adminInsights.tags || [],
+                rarity: adminInsights.rarity || '',
+                // Project/Product Information
+                projectName: adminInsights.projectName || '',
+                projectDescription: adminInsights.projectDescription || '',
+                projectWebsite: adminInsights.projectWebsite || '',
+                projectTwitter: adminInsights.projectTwitter || '',
+                projectDiscord: adminInsights.projectDiscord || '',
+                // Partnerships
+                partnerships: adminInsights.partnerships || [],
+                partnershipDetails: adminInsights.partnershipDetails || ''
             }));
 
             setSuccessMessage('');
             setErrorMessage('');
-        } else if (!insightsLoading && formData.contractAddress && formData.tokenId) {
-            // No existing insights found, ensure we're in create mode
+        } else if (!insightsLoading && formData.contractAddress && (activeTab === 'collection' || formData.tokenId)) {
+            // No existing admin insights found, ensure we're in create mode
             setIsEditMode(false);
             setInsightsId(null);
         }
-    }, [insights, insightsLoading, formData.contractAddress, formData.tokenId]);
+    }, [adminInsights, insightsLoading, formData.contractAddress, formData.tokenId]);
+
+    // No need for manual fetch useEffect since hooks handle auto-fetch
+    // The hooks will automatically refetch when contractAddress/tokenId change
 
     useEffect(() => {
         if (!isConnected) {
@@ -209,6 +213,15 @@ function InsightsPageContent() {
         }));
     };
 
+    const handlePartnershipToggle = (partnership: string) => {
+        setFormData(prev => ({
+            ...prev,
+            partnerships: prev.partnerships.includes(partnership)
+                ? prev.partnerships.filter(p => p !== partnership)
+                : [...prev.partnerships, partnership]
+        }));
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -222,103 +235,123 @@ function InsightsPageContent() {
                 }
 
                 if (isEditMode && insightsId) {
-                    // Update existing insights
-                    const updateData: UpdateNFTInsightsRequest = {
-                        _id: insightsId,
-                        title: formData.title || undefined,
-                        description: formData.description || undefined,
-                        customName: formData.customName || undefined,
-                        category: formData.category || undefined,
-                        tags: formData.tags,
-                        rarity: formData.rarity || undefined,
-                        quality: formData.quality,
-                        personalRating: formData.personalRating,
-                        purchasePrice: formData.purchasePrice ? parseFloat(formData.purchasePrice) : undefined,
-                        purchaseDate: formData.purchaseDate ? new Date(formData.purchaseDate) : undefined,
-                        targetSellPrice: formData.targetSellPrice ? parseFloat(formData.targetSellPrice) : undefined,
-                        marketAnalysis: formData.marketAnalysis || undefined,
-                        isWatchlisted: formData.isWatchlisted,
-                        isFavorite: formData.isFavorite,
-                        isForSale: formData.isForSale,
-                        isPrivate: formData.isPrivate,
-                        strategy: formData.strategy || undefined,
-                        investmentGoal: formData.investmentGoal || undefined,
-                        riskLevel: formData.riskLevel || undefined,
-                        updatedBy: address
-                    };
-
-                    // Use the update function from the hook
-                    await update(updateData);
-                    setSuccessMessage('NFT insights updated successfully!');
-
-                } else {
-                    // Create new insights
-                    const requestData: CreateNFTInsightsRequest = {
+                    // Update existing insights using hook
+                    const updateData = {
                         contractAddress: formData.contractAddress,
                         tokenId: formData.tokenId,
                         title: formData.title || undefined,
                         description: formData.description || undefined,
-                        customName: formData.customName || undefined,
                         category: formData.category || undefined,
                         tags: formData.tags,
                         rarity: formData.rarity || undefined,
-                        quality: formData.quality,
-                        personalRating: formData.personalRating,
-                        purchasePrice: formData.purchasePrice ? parseFloat(formData.purchasePrice) : undefined,
-                        purchaseDate: formData.purchaseDate ? new Date(formData.purchaseDate) : undefined,
-                        targetSellPrice: formData.targetSellPrice ? parseFloat(formData.targetSellPrice) : undefined,
-                        marketAnalysis: formData.marketAnalysis || undefined,
-                        isWatchlisted: formData.isWatchlisted,
-                        isFavorite: formData.isFavorite,
-                        isForSale: formData.isForSale,
-                        isPrivate: formData.isPrivate,
-                        strategy: formData.strategy || undefined,
-                        investmentGoal: formData.investmentGoal || undefined,
-                        riskLevel: formData.riskLevel || undefined,
-                        createdBy: address
+                        projectName: formData.projectName || undefined,
+                        projectDescription: formData.projectDescription || undefined,
+                        projectWebsite: formData.projectWebsite || undefined,
+                        projectTwitter: formData.projectTwitter || undefined,
+                        projectDiscord: formData.projectDiscord || undefined,
+                        partnerships: formData.partnerships,
+                        partnershipDetails: formData.partnershipDetails || undefined
                     };
 
-                    const response = await fetch('/api/insights/nft', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(requestData)
-                    });
+                    await updateNFTInsights(updateData);
+                    setSuccessMessage('Admin NFT insights updated successfully!');
 
-                    const result = await response.json();
+                } else {
+                    // Create new insights using hook
+                    const requestData = {
+                        contractAddress: formData.contractAddress.toLowerCase(),
+                        tokenId: formData.tokenId,
+                        title: formData.title || '',
+                        description: formData.description || '',
+                        category: formData.category || undefined,
+                        tags: formData.tags,
+                        rarity: formData.rarity || undefined,
+                        projectName: formData.projectName || undefined,
+                        projectDescription: formData.projectDescription || undefined,
+                        projectWebsite: formData.projectWebsite || undefined,
+                        projectTwitter: formData.projectTwitter || undefined,
+                        projectDiscord: formData.projectDiscord || undefined,
+                        partnerships: formData.partnerships,
+                        partnershipDetails: formData.partnershipDetails || undefined,
+                        createdBy: address || ''
+                    };
 
-                    if (!result.success) {
-                        throw new Error(result.error || 'Failed to save insights');
-                    }
-
-                    setSuccessMessage('NFT insights created successfully!');
+                    await createNFTInsights(requestData);
+                    setSuccessMessage('Admin NFT insights created successfully!');
+                }
+            } else if (activeTab === 'collection') {
+                // Collection insights logic using hooks
+                if (!formData.contractAddress) {
+                    throw new Error('Contract address is required for collection insights');
                 }
 
-                // Reset form
+                if (isEditMode && insightsId) {
+                    // Update existing collection insights using hook
+                    const updateData = {
+                        contractAddress: formData.contractAddress,
+                        title: formData.title || undefined,
+                        description: formData.description || undefined,
+                        category: formData.category || undefined,
+                        tags: formData.tags,
+                        rarity: formData.rarity || undefined,
+                        projectName: formData.projectName || undefined,
+                        projectDescription: formData.projectDescription || undefined,
+                        projectWebsite: formData.projectWebsite || undefined,
+                        projectTwitter: formData.projectTwitter || undefined,
+                        projectDiscord: formData.projectDiscord || undefined,
+                        partnerships: formData.partnerships,
+                        partnershipDetails: formData.partnershipDetails || undefined
+                    };
+
+                    await updateCollectionInsights(updateData);
+                    setSuccessMessage('Collection insights updated successfully!');
+
+                } else {
+                    // Create new collection insights using hook
+                    const requestData = {
+                        contractAddress: formData.contractAddress.toLowerCase(),
+                        title: formData.title || undefined,
+                        description: formData.description || undefined,
+                        category: formData.category || undefined,
+                        tags: formData.tags,
+                        rarity: formData.rarity || undefined,
+                        projectName: formData.projectName || undefined,
+                        projectDescription: formData.projectDescription || undefined,
+                        projectWebsite: formData.projectWebsite || undefined,
+                        projectTwitter: formData.projectTwitter || undefined,
+                        projectDiscord: formData.projectDiscord || undefined,
+                        partnerships: formData.partnerships,
+                        partnershipDetails: formData.partnershipDetails || undefined,
+                        createdBy: address || ''
+                    };
+
+                    await createCollectionInsights(requestData);
+                    setSuccessMessage('Collection insights created successfully!');
+                }
+            }
+
+            // Only reset form after successful creation, not after update
+            if (!isEditMode) {
                 setFormData({
                     contractAddress: '',
                     tokenId: '',
                     title: '',
                     description: '',
-                    customName: '',
+                    projectName: '',
+                    projectDescription: '',
+                    projectWebsite: '',
+                    projectTwitter: '',
+                    projectDiscord: '',
+                    partnerships: [],
+                    partnershipDetails: '',
                     category: '',
                     tags: [],
-                    rarity: '',
-                    quality: 5,
-                    personalRating: 3,
-                    purchasePrice: '',
-                    purchaseDate: '',
-                    targetSellPrice: '',
-                    marketAnalysis: '',
-                    isWatchlisted: false,
-                    isFavorite: false,
-                    isForSale: false,
-                    isPrivate: false,
-                    strategy: '',
-                    investmentGoal: '',
-                    riskLevel: ''
+                    rarity: ''
                 });
+                setIsEditMode(false);
+                setInsightsId(null);
+                // Clear data by re-triggering hooks with empty contract address
+                // The hooks will automatically clear their state when the contractAddress changes
             }
 
         } catch (error) {
@@ -424,7 +457,12 @@ function InsightsPageContent() {
                 {/* Tab Navigation */}
                 <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-8">
                     <button
-                        onClick={() => setActiveTab('nft')}
+                        onClick={() => {
+                            setActiveTab('nft');
+                            // Clear form when switching modes
+                            setFormData(prev => ({ ...prev, tokenId: '' }));
+                            // Hooks will automatically refetch data when needed
+                        }}
                         className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === 'nft'
                             ? 'bg-white text-blue-600 shadow-sm'
                             : 'text-gray-600 hover:text-gray-900'
@@ -433,7 +471,12 @@ function InsightsPageContent() {
                         NFT Insights
                     </button>
                     <button
-                        onClick={() => setActiveTab('collection')}
+                        onClick={() => {
+                            setActiveTab('collection');
+                            // Clear form when switching modes
+                            setFormData(prev => ({ ...prev, tokenId: '' }));
+                            // Hooks will automatically refetch data when needed
+                        }}
                         className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === 'collection'
                             ? 'bg-white text-blue-600 shadow-sm'
                             : 'text-gray-600 hover:text-gray-900'
@@ -468,10 +511,61 @@ function InsightsPageContent() {
 
                 {/* Form */}
                 <div className="bg-white rounded-2xl shadow-lg">
+                    {/* Form Header with Action Buttons */}
+                    <div className="p-6 border-b border-gray-200">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-semibold text-gray-900">
+                                    {isEditMode ? `Edit ${activeTab === 'nft' ? 'NFT' : 'Collection'} Insights` : `Add New ${activeTab === 'nft' ? 'NFT' : 'Collection'} Insights`}
+                                </h2>
+                                {isEditMode && (
+                                    <p className="text-sm text-gray-600 mt-1">
+                                        Editing existing insights for {formData.contractAddress}
+                                        {activeTab === 'nft' && formData.tokenId && ` - Token #${formData.tokenId}`}
+                                    </p>
+                                )}
+                            </div>
+                            {isEditMode && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        // Reset to create new mode
+                                        setFormData({
+                                            contractAddress: '',
+                                            tokenId: '',
+                                            title: '',
+                                            description: '',
+                                            projectName: '',
+                                            projectDescription: '',
+                                            projectWebsite: '',
+                                            projectTwitter: '',
+                                            projectDiscord: '',
+                                            partnerships: [],
+                                            partnershipDetails: '',
+                                            category: '',
+                                            tags: [],
+                                            rarity: ''
+                                        });
+                                        setIsEditMode(false);
+                                        setInsightsId(null);
+                                        // Hooks will automatically handle data refresh
+                                        setSuccessMessage('');
+                                        setErrorMessage('');
+                                    }}
+                                    className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                                >
+                                    Create New Entry
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
                     <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                        {/* NFT Identification */}
+                        {/* NFT/Collection Identification */}
                         <div className="border-b border-gray-200 pb-6">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4">NFT Identification</h3>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                                {activeTab === 'nft' ? 'NFT Identification' : 'Collection Identification'}
+                            </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -486,20 +580,27 @@ function InsightsPageContent() {
                                         required
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Token ID *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.tokenId}
-                                        onChange={(e) => handleInputChange('tokenId', e.target.value)}
-                                        placeholder="123"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        required
-                                    />
-                                </div>
+                                {activeTab === 'nft' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Token ID *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData.tokenId}
+                                            onChange={(e) => handleInputChange('tokenId', e.target.value)}
+                                            placeholder="123"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            required
+                                        />
+                                    </div>
+                                )}
                             </div>
+                            {activeTab === 'collection' && (
+                                <p className="mt-2 text-sm text-gray-500">
+                                    Collection insights apply to all NFTs in this collection
+                                </p>
+                            )}
                         </div>
 
                         {/* Basic Information */}
@@ -508,25 +609,13 @@ function InsightsPageContent() {
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Custom Title
+                                        Title
                                     </label>
                                     <input
                                         type="text"
                                         value={formData.title}
                                         onChange={(e) => handleInputChange('title', e.target.value)}
-                                        placeholder="Your custom title for this NFT"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Custom Name
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.customName}
-                                        onChange={(e) => handleInputChange('customName', e.target.value)}
-                                        placeholder="Alternative name for this NFT"
+                                        placeholder="Admin title for this NFT"
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     />
                                 </div>
@@ -537,7 +626,113 @@ function InsightsPageContent() {
                                     <textarea
                                         value={formData.description}
                                         onChange={(e) => handleInputChange('description', e.target.value)}
-                                        placeholder="Your personal notes about this NFT..."
+                                        placeholder="Admin description about this NFT..."
+                                        rows={3}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Project/Product Information */}
+                        <div className="border-b border-gray-200 pb-6">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">🚀 Projekt & Produkt</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Projektname
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.projectName}
+                                        onChange={(e) => handleInputChange('projectName', e.target.value)}
+                                        placeholder="Name des Projekts oder Produkts"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Projekt Beschreibung
+                                    </label>
+                                    <textarea
+                                        value={formData.projectDescription}
+                                        onChange={(e) => handleInputChange('projectDescription', e.target.value)}
+                                        placeholder="Detaillierte Beschreibung des Projekts..."
+                                        rows={3}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Website
+                                        </label>
+                                        <input
+                                            type="url"
+                                            value={formData.projectWebsite}
+                                            onChange={(e) => handleInputChange('projectWebsite', e.target.value)}
+                                            placeholder="https://example.com"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Twitter
+                                        </label>
+                                        <input
+                                            type="url"
+                                            value={formData.projectTwitter}
+                                            onChange={(e) => handleInputChange('projectTwitter', e.target.value)}
+                                            placeholder="https://twitter.com/username"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Discord
+                                        </label>
+                                        <input
+                                            type="url"
+                                            value={formData.projectDiscord}
+                                            onChange={(e) => handleInputChange('projectDiscord', e.target.value)}
+                                            placeholder="https://discord.gg/invite"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Partnerships */}
+                        <div className="border-b border-gray-200 pb-6">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">🤝 Partnerschaften</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Partner
+                                    </label>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                                        {['OpenSea', 'Coinbase', 'Binance', 'FTX', 'Rarible', 'SuperRare', 'Foundation', 'LooksRare', 'Magic Eden', 'Blur', 'Nike', 'Adidas', 'Puma', 'Louis Vuitton', 'Gucci', 'Disney', 'Warner Bros', 'Universal', 'Sony', 'Microsoft', 'Meta', 'Google', 'Apple', 'Other'].map(partner => (
+                                            <label key={partner} className="flex items-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={formData.partnerships.includes(partner)}
+                                                    onChange={() => handlePartnershipToggle(partner)}
+                                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-2"
+                                                />
+                                                <span className="text-sm text-gray-700">{partner}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Partnership Details
+                                    </label>
+                                    <textarea
+                                        value={formData.partnershipDetails}
+                                        onChange={(e) => handleInputChange('partnershipDetails', e.target.value)}
+                                        placeholder="Details zu den Partnerschaften und Kooperationen..."
                                         rows={3}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     />
@@ -559,7 +754,7 @@ function InsightsPageContent() {
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     >
                                         <option value="">Select a category</option>
-                                        {categories.map(category => (
+                                        {CATEGORIES.map((category: string) => (
                                             <option key={category} value={category}>{category}</option>
                                         ))}
                                     </select>
@@ -569,7 +764,7 @@ function InsightsPageContent() {
                                         Tags
                                     </label>
                                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                                        {commonTags.map(tag => (
+                                        {COMMON_TAGS.map((tag: string) => (
                                             <label key={tag} className="flex items-center">
                                                 <input
                                                     type="checkbox"
@@ -588,7 +783,7 @@ function InsightsPageContent() {
                         {/* Ratings and Assessment */}
                         <div className="border-b border-gray-200 pb-6">
                             <h3 className="text-lg font-semibold text-gray-900 mb-4">Ratings & Assessment</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Rarity
@@ -606,199 +801,15 @@ function InsightsPageContent() {
                                         <option value="legendary">Legendary</option>
                                     </select>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Quality (1-10)
-                                    </label>
-                                    <input
-                                        type="range"
-                                        min="1"
-                                        max="10"
-                                        value={formData.quality}
-                                        onChange={(e) => handleInputChange('quality', parseInt(e.target.value))}
-                                        className="w-full"
-                                    />
-                                    <div className="text-center text-sm text-gray-600 mt-1">
-                                        {formData.quality}/10
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Personal Rating (1-5)
-                                    </label>
-                                    <div className="flex space-x-1">
-                                        {[1, 2, 3, 4, 5].map(rating => (
-                                            <button
-                                                key={rating}
-                                                type="button"
-                                                onClick={() => handleInputChange('personalRating', rating)}
-                                                className={`text-2xl ${rating <= formData.personalRating
-                                                    ? 'text-yellow-400'
-                                                    : 'text-gray-300'
-                                                    }`}
-                                            >
-                                                ★
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
                             </div>
                         </div>
 
-                        {/* Investment Data */}
-                        <div className="border-b border-gray-200 pb-6">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Investment Data</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Purchase Price (ETH)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        step="0.001"
-                                        value={formData.purchasePrice}
-                                        onChange={(e) => handleInputChange('purchasePrice', e.target.value)}
-                                        placeholder="0.05"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Purchase Date
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={formData.purchaseDate}
-                                        onChange={(e) => handleInputChange('purchaseDate', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Target Sell Price (ETH)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        step="0.001"
-                                        value={formData.targetSellPrice}
-                                        onChange={(e) => handleInputChange('targetSellPrice', e.target.value)}
-                                        placeholder="0.1"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Strategy
-                                    </label>
-                                    <select
-                                        value={formData.strategy}
-                                        onChange={(e) => handleInputChange('strategy', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    >
-                                        <option value="">Select strategy</option>
-                                        <option value="hold">Hold Long-term</option>
-                                        <option value="flip">Quick Flip</option>
-                                        <option value="trade">Active Trading</option>
-                                        <option value="collect">Collection Building</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="mt-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Market Analysis
-                                </label>
-                                <textarea
-                                    value={formData.marketAnalysis}
-                                    onChange={(e) => handleInputChange('marketAnalysis', e.target.value)}
-                                    placeholder="Your market analysis and investment thesis..."
-                                    rows={3}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Flags and Settings */}
-                        <div className="border-b border-gray-200 pb-6">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Flags & Settings</h3>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <label className="flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.isWatchlisted}
-                                        onChange={(e) => handleInputChange('isWatchlisted', e.target.checked)}
-                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-3"
-                                    />
-                                    <span className="text-sm text-gray-700">Watchlisted</span>
-                                </label>
-                                <label className="flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.isFavorite}
-                                        onChange={(e) => handleInputChange('isFavorite', e.target.checked)}
-                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-3"
-                                    />
-                                    <span className="text-sm text-gray-700">Favorite</span>
-                                </label>
-                                <label className="flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.isForSale}
-                                        onChange={(e) => handleInputChange('isForSale', e.target.checked)}
-                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-3"
-                                    />
-                                    <span className="text-sm text-gray-700">For Sale</span>
-                                </label>
-                                <label className="flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.isPrivate}
-                                        onChange={(e) => handleInputChange('isPrivate', e.target.checked)}
-                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-3"
-                                    />
-                                    <span className="text-sm text-gray-700">Private</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* Investment Goal */}
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Investment Goal</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Investment Goal
-                                    </label>
-                                    <textarea
-                                        value={formData.investmentGoal}
-                                        onChange={(e) => handleInputChange('investmentGoal', e.target.value)}
-                                        placeholder="Your investment goal for this NFT..."
-                                        rows={2}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Risk Level
-                                    </label>
-                                    <select
-                                        value={formData.riskLevel}
-                                        onChange={(e) => handleInputChange('riskLevel', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    >
-                                        <option value="">Select risk level</option>
-                                        <option value="low">Low Risk</option>
-                                        <option value="medium">Medium Risk</option>
-                                        <option value="high">High Risk</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
 
                         {/* Submit Button */}
                         <div className="pt-6">
                             <button
                                 type="submit"
-                                disabled={isSubmitting || !formData.contractAddress || !formData.tokenId}
+                                disabled={isSubmitting || !formData.contractAddress || (activeTab === 'nft' && !formData.tokenId)}
                                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
                             >
                                 {isSubmitting ? (
@@ -806,10 +817,10 @@ function InsightsPageContent() {
                                         <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                         </svg>
-                                        Saving Insights...
+                                        {activeTab === 'nft' ? 'Saving NFT Insights...' : 'Saving Collection Insights...'}
                                     </>
                                 ) : (
-                                    'Save NFT Insights'
+                                    activeTab === 'nft' ? 'Save NFT Insights' : 'Save Collection Insights'
                                 )}
                             </button>
                         </div>

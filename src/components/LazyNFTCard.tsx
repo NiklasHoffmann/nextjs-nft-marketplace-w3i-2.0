@@ -3,7 +3,7 @@
 import { lazy, Suspense, memo } from 'react';
 
 // Lazy load NFTCard component for better code splitting
-const NFTCard = lazy(() => import('./NFTCard'));
+const NFTCard = lazy(() => import('./02-nft/01-core-NFTCard'));
 
 // Simple loading skeleton that matches NFTCard dimensions
 const NFTCardSkeleton = memo(() => (

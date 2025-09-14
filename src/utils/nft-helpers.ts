@@ -2,8 +2,7 @@
  * NFT-specific utility functions
  */
 
-import { RoyaltyInfo } from '@/types/nft-detail';
-import { NFTAttribute } from '@/types/nft';
+import { RoyaltyInfo, NFTAttribute } from '@/types';
 
 /**
  * Truncates an address for display
@@ -19,8 +18,8 @@ export const truncateAddress = (address: string, startLength: number = 6, endLen
  * Formats the display name for an NFT
  */
 export const formatNFTDisplayName = (
-  name?: string | null, 
-  tokenId?: string, 
+  name?: string | null,
+  tokenId?: string,
   fallback: string = 'Unknown NFT'
 ): string => {
   if (name) return name;
@@ -70,7 +69,7 @@ export const formatRarityInfo = (
   const hasRarity = Boolean(rarityRank || rarityScore);
   const rankDisplay = rarityRank ? `#${rarityRank}` : 'N/A';
   const scoreDisplay = rarityScore ? String(rarityScore) : 'N/A';
-  
+
   return { hasRarity, rankDisplay, scoreDisplay };
 };
 
@@ -85,7 +84,7 @@ export const formatRoyaltyInfo = (royaltyInfo?: RoyaltyInfo | null): {
   const hasRoyalty = Boolean(royaltyInfo?.percentage || royaltyInfo?.receiver);
   const percentageDisplay = royaltyInfo?.percentage ? `${royaltyInfo.percentage.toFixed(2)}%` : '0%';
   const receiverDisplay = royaltyInfo?.receiver ? truncateAddress(royaltyInfo.receiver) : '';
-  
+
   return { hasRoyalty, percentageDisplay, receiverDisplay };
 };
 
@@ -94,7 +93,7 @@ export const formatRoyaltyInfo = (royaltyInfo?: RoyaltyInfo | null): {
  */
 export const groupAttributesByType = (attributes?: NFTAttribute[] | null): Record<string, NFTAttribute[]> => {
   if (!attributes) return {};
-  
+
   return attributes.reduce((groups, attr) => {
     const type = attr.trait_type || 'Other';
     if (!groups[type]) groups[type] = [];
@@ -111,7 +110,7 @@ export const getCollectionSizeCategory = (totalSupply?: number | null): {
   description: string;
 } => {
   if (!totalSupply) return { category: 'unknown', description: 'Unknown collection size' };
-  
+
   if (totalSupply <= 100) {
     return { category: 'tiny', description: `Exclusive collection of ${totalSupply.toLocaleString()} items` };
   } else if (totalSupply <= 1000) {
@@ -157,13 +156,13 @@ export const generateMockCollectionItems = (
 ) => {
   const items = [];
   const baseId = parseInt(baseTokenId);
-  
+
   for (let i = 0; i < count; i++) {
     const tokenId = (baseId + i + 1).toString();
     const priceModifier = i * 0.01;
     const status = i % 3 === 0 ? 'Listed' : i % 3 === 1 ? 'Auction' : 'Not Listed';
     const statusColor = i % 3 === 0 ? 'green' : i % 3 === 1 ? 'blue' : 'gray';
-    
+
     items.push({
       tokenId,
       priceModifier,
@@ -171,6 +170,6 @@ export const generateMockCollectionItems = (
       statusColor
     });
   }
-  
+
   return items;
 };

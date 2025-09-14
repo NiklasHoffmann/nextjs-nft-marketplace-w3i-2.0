@@ -8,7 +8,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useETHPrice } from '@/contexts/CurrencyContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { useMarketplaceUser } from '@/hooks/marketplace/useMarketplaceUser';
+import { useMarketplaceUser } from '@/hooks/marketplace/05-user-useMarketplaceUser';
 import { getMarketplaceAddress } from '@/utils/contracts';
 
 // Force dynamic rendering for this page to prevent SSG issues

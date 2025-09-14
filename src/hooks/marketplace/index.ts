@@ -1,39 +1,8 @@
-/**
- * Marketplace Hooks - Centralized Export
- * 
- * Usage Examples:
- * 
- * // For listing operations
- * const { createListing, updateListing, cancelListing } = useMarketplaceListing(MARKETPLACE_ADDRESS);
- * 
- * // For purchasing
- * const { purchaseListing } = useMarketplacePurchase(MARKETPLACE_ADDRESS);
- * 
- * // For reading data
- * const { useListingById, useListingsByNFT } = useMarketplaceData(MARKETPLACE_ADDRESS);
- * 
- * // For user functions (including proceeds)
- * const { withdrawProceeds, proceeds, proceedsWei } = useMarketplaceUser(MARKETPLACE_ADDRESS);
- * 
- * // For admin functions
- * const { setInnovationFee } = useMarketplaceAdmin(MARKETPLACE_ADDRESS);
- */
-
-export { useMarketplaceListing } from './useMarketplaceListing';
-export { useMarketplacePurchase } from './useMarketplacePurchase';
-export { useMarketplaceData } from './useMarketplaceData';
-export { useMarketplaceUser } from './useMarketplaceUser';
-export { useMarketplaceAdmin } from './useMarketplaceAdmin';
-
-// Re-export types for convenience
-//export type { 
-//  CreateListingParams,
-//  UpdateListingParams 
-//} from './useMarketplaceListing';
-//
-//export type {
-//  PurchaseListingParams
-//} from './useMarketplacePurchase';
+export { useMarketplaceAdmin } from './04-admin-useMarketplaceAdmin';
+export { useMarketplaceData } from './01-core-useMarketplaceData';
+export { useMarketplaceListing } from './02-core-useMarketplaceListing';
+export { useMarketplacePurchase } from './03-core-useMarketplacePurchase';
+export { useMarketplaceUser } from './05-user-useMarketplaceUser';
 
 // Marketplace configuration
 export const MARKETPLACE_CONFIG = {

@@ -71,22 +71,22 @@ export class CacheInvalidationManager {
     tokenId?: string
   ): void {
     // NFT metadata: invalidate every 50 blocks (~10 minutes)
-    if (blockNumber % 50n === 0n) {
+    if (blockNumber % BigInt(50) === BigInt(0)) {
       this.invalidateNFTMetadata(contractAddress, tokenId);
     }
     
     // Contract data: invalidate every 100 blocks (~20 minutes)
-    if (blockNumber % 100n === 0n) {
+    if (blockNumber % BigInt(100) === BigInt(0)) {
       this.invalidateContractData(contractAddress);
     }
     
     // Market data: invalidate every 25 blocks (~5 minutes)
-    if (blockNumber % 25n === 0n) {
+    if (blockNumber % BigInt(25) === BigInt(0)) {
       this.invalidateMarketData(contractAddress);
     }
     
     // Insights data: invalidate every 200 blocks (~40 minutes)
-    if (blockNumber % 200n === 0n) {
+    if (blockNumber % BigInt(200) === BigInt(0)) {
       this.invalidateInsightsData(contractAddress, tokenId);
     }
   }
@@ -240,7 +240,7 @@ export class CacheInvalidationManager {
     return {
       totalQueries: queries.length,
       staleQueries: queries.filter(q => q.isStale()).length,
-      fetchingQueries: queries.filter(q => q.isFetching()).length,
+      fetchingQueries: queries.filter(q => q.state.fetchStatus === 'fetching').length,
       queuedInvalidations: this.invalidationQueue.size
     };
   }

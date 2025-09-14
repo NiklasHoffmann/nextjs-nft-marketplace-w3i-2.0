@@ -1,7 +1,7 @@
 // app/page.tsx
 'use client'
 import React from "react";
-import ActiveItemsList from "@/components/ActiveItemsList";
+import { ActiveItemsList } from "@/components";
 
 export default function Home() {
 

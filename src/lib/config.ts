@@ -2,7 +2,7 @@
  * Application configuration and constants
  */
 
-import { Currency } from '@/types/currency';
+import { Currency } from '@/types';
 
 // App metadata
 export const APP_CONFIG = {

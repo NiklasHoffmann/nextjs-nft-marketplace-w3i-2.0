@@ -10,7 +10,7 @@ import { ApolloProvider } from "@apollo/client/react";
 import apolloClient from "../config/apolloClient";
 import { wagmiConfig } from "@/config/wagmi";
 import "@/utils/bigint"; // Import BigInt serialization support
-import Navbar from "@/components/Navbar";
+import { Navbar } from "@/components";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 
 // --- Simple global fallback UI for render errors ---
