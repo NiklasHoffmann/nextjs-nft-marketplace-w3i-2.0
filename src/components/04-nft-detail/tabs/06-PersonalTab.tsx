@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { CombinedUserInteractionData } from '@/types';
 
@@ -43,7 +44,7 @@ export default function PersonalTab({
     const notesButtonState = useMemo(() => {
         const hasChanges = personalNotes.trim() !== lastSavedNotes.trim();
         const isEmpty = personalNotes.trim() === '';
-        
+
         if (isUpdatingNotes) {
             return {
                 disabled: true,
@@ -51,7 +52,7 @@ export default function PersonalTab({
                 className: 'bg-blue-600 text-white opacity-75 cursor-not-allowed'
             };
         }
-        
+
         if (!hasChanges || isEmpty) {
             return {
                 disabled: true,
@@ -59,7 +60,7 @@ export default function PersonalTab({
                 className: 'bg-gray-100 text-gray-400 cursor-not-allowed'
             };
         }
-        
+
         return {
             disabled: false,
             text: 'Save',

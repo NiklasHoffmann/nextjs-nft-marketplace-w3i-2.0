@@ -9,7 +9,7 @@ export const APP_CONFIG = {
   name: 'NFT Marketplace',
   description: 'A modern NFT marketplace built with Next.js and Web3',
   version: '2.0.0',
-  author: 'Web3 Innovation',
+  author: 'Web3 InnovationLab',
   url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
 } as const;
 

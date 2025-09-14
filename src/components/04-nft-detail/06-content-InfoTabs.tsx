@@ -31,6 +31,7 @@ interface NewNFTInfoTabsProps extends NFTInfoTabsProps {
     publicInsights?: PublicNFTInsights | null;
     userInteractions?: UserNFTInteractions | null;
     userWalletAddress?: string;
+    isWalletConnected?: boolean; // Add wallet connection state
     insightsLoading?: boolean;
     onUpdateUserInteraction?: (data: Partial<UserNFTInteractions>) => Promise<void>;
 
@@ -72,6 +73,7 @@ function NewNFTInfoTabs({
     publicInsights,
     userInteractions,
     userWalletAddress,
+    isWalletConnected = false, // Default to false if not provided
     insightsLoading,
     onUpdateUserInteraction,
     // User action handlers
@@ -142,14 +144,22 @@ function NewNFTInfoTabs({
                     />
                 );
             case 'personal':
-                console.log('🐛 InfoTabs: Rendering Personal Tab with props:', {
-                    userInteractions,
-                    userWalletAddress,
-                    hasOnToggleFavorite: !!onToggleFavorite,
-                    hasOnToggleWatchlist: !!onToggleWatchlist,
-                    hasOnSetRating: !!onSetRating,
-                    hasOnUpdateInteraction: !!onUpdateUserInteraction
-                });
+                // Only render personal tab if wallet is connected
+                if (!isWalletConnected) {
+                    return (
+                        <div className="flex items-center justify-center py-12">
+                            <div className="text-center">
+                                <div className="text-gray-400 mb-4">
+                                    <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-lg font-semibold text-gray-600 mb-2">Wallet Connection Required</h3>
+                                <p className="text-gray-500">Please connect your wallet to access personal features.</p>
+                            </div>
+                        </div>
+                    );
+                }
                 return (
                     <MemoizedPersonalTab
                         contractAddress={nftAddress}
@@ -261,6 +271,7 @@ function NewNFTInfoTabs({
             <TabNavigation
                 activeTab={activeTab}
                 onTabChange={onTabChange}
+                isWalletConnected={isWalletConnected}
             />
 
             {/* Tab Content */}

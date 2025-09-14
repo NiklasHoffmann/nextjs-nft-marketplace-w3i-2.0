@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useReadContract, useBlockNumber } from 'wagmi';
 import { erc721Abi } from 'viem';
 import { useEffect } from 'react';
-import { createCacheInvalidationManager } from '@/utils/cache-invalidation';
+import { createCacheInvalidationManager } from '@/utils';
 
 // Hook for fetching and managing NFT data
 // PURPOSE: Simplified and unified NFT data hook

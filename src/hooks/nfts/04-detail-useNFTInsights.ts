@@ -119,11 +119,10 @@ interface AdminNFTInsightCreateRequest {
     tokenId: string;
     title?: string;
     description?: string;
+    descriptions?: string[];  // ✨ Neu: Array für mehrere Descriptions
     category?: string;
     tags?: string[];
     rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-    projectName?: string;
-    projectDescription?: string;
     projectWebsite?: string;
     projectTwitter?: string;
     projectDiscord?: string;
@@ -415,8 +414,6 @@ interface AdminCollectionInsightCreateRequest {
     category?: string;
     tags?: string[];
     rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-    projectName?: string;
-    projectDescription?: string;
     projectWebsite?: string;
     projectTwitter?: string;
     projectDiscord?: string;

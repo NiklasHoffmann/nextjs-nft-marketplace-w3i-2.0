@@ -214,6 +214,63 @@
       }
     },
 
+    "user_personal_notes": {
+      "description": "Private personal notes and data for NFTs - separate from public ratings",
+      "indexes": [
+        {"keys": {"userId": 1, "contractAddress": 1, "tokenId": 1}, "unique": true},
+        {"keys": {"userId": 1}},
+        {"keys": {"lastUpdated": -1}}
+      ],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "_id": {"$ref": "#/definitions/objectId"},
+          "userId": {"$ref": "#/definitions/ethereumAddress"},
+          "contractAddress": {"$ref": "#/definitions/ethereumAddress"},
+          "tokenId": {"type": "string"},
+          "personalNotes": {"type": "string", "maxLength": 2000},
+          "strategy": {"type": "string", "maxLength": 500},
+          "investmentGoal": {"type": "string", "maxLength": 500},
+          "riskLevel": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "very-high"]
+          },
+          "tags": {
+            "type": "array",
+            "items": {"type": "string", "maxLength": 50},
+            "maxItems": 20
+          },
+          "lastUpdated": {"type": "string", "format": "date-time"},
+          "createdAt": {"type": "string", "format": "date-time"}
+        },
+        "required": ["userId", "contractAddress", "tokenId"]
+      }
+    },
+
+    "user_ratings": {
+      "description": "Public user ratings for NFTs - used for average calculations",
+      "indexes": [
+        {"keys": {"userId": 1, "contractAddress": 1, "tokenId": 1}, "unique": true},
+        {"keys": {"contractAddress": 1, "tokenId": 1}},
+        {"keys": {"rating": -1}},
+        {"keys": {"ratedAt": -1}}
+      ],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "_id": {"$ref": "#/definitions/objectId"},
+          "userId": {"$ref": "#/definitions/ethereumAddress"},
+          "contractAddress": {"$ref": "#/definitions/ethereumAddress"},
+          "tokenId": {"type": "string"},
+          "rating": {"type": "number", "minimum": 1, "maximum": 5},
+          "isPublic": {"type": "boolean", "default": true},
+          "ratedAt": {"type": "string", "format": "date-time"},
+          "createdAt": {"type": "string", "format": "date-time"}
+        },
+        "required": ["userId", "contractAddress", "tokenId", "rating"]
+      }
+    },
+
     "user_interactions": {
       "description": "User interactions with NFTs (likes, favorites, comments)",
       "indexes": [
@@ -238,7 +295,6 @@
             "type": "object",
             "properties": {
               "comment": {"type": "string", "maxLength": 1000},
-              "rating": {"type": "number", "minimum": 1, "maximum": 5},
               "offerAmount": {"type": "string", "description": "Offer amount in wei"},
               "sharedTo": {"type": "string", "enum": ["twitter", "discord", "telegram", "email", "link"]}
             }

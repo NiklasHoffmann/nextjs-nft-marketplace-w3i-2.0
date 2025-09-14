@@ -7,7 +7,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useSubscription, useApolloClient } from "@apollo/client";
 import { useAccount } from "wagmi";
-import { getAdminAddressesList } from '@/utils/insights-access';
+import { getAdminAddressesList } from '@/utils';
 import { GET_ACTIVE_ITEMS, ITEMS_UPDATED_SUBSCRIPTION } from "../../constants/subgraph.queries";
 import { NFTCardWithMetadata, ImagePreloader } from "@/components";
 
@@ -15,7 +15,6 @@ export default function ActiveItemsList() {
     const apolloClient = useApolloClient();
     const { address } = useAccount();
     const [isClient, setIsClient] = useState(false);
-    const [visibleRange, setVisibleRange] = useState({ start: 0, end: 10 });
     const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
     const [isManualRefreshing, setIsManualRefreshing] = useState(false);
     const [subscriptionTimedOut, setSubscriptionTimedOut] = useState(false);
@@ -93,18 +92,8 @@ export default function ActiveItemsList() {
         }).flat();
     }, [items]);
 
-    // Optimized scroll handler with throttling
-    const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-        const container = e.currentTarget;
-        const scrollLeft = container.scrollLeft;
-        const containerWidth = container.clientWidth;
-        const cardWidth = 336; // 320px + 16px gap
-
-        const start = Math.max(0, Math.floor(scrollLeft / cardWidth) - 2);
-        const end = Math.min(items.length, Math.ceil((scrollLeft + containerWidth) / cardWidth) + 2);
-
-        setVisibleRange({ start, end });
-    }, [items.length]);
+    // Optimized scroll handler is no longer needed since we removed virtual scrolling
+    // All NFT cards are now always rendered for better image caching
 
     // Enhanced manual refresh handler
     const handleManualRefresh = useCallback(async () => {
@@ -207,23 +196,11 @@ export default function ActiveItemsList() {
             </div>
             <div
                 className="flex gap-4 overflow-x-auto pb-4 pt-2 scrollbar-thumb-only scroll-smooth"
-                onScroll={handleScroll}
                 style={{ scrollBehavior: 'smooth' }}
             >
                 {items.map((item: any, index: number) => {
-                    // Render placeholder for items outside visible range to maintain scroll position
-                    const isVisible = index >= visibleRange.start && index <= visibleRange.end;
-
-                    if (!isVisible && items.length > 20) {
-                        return (
-                            <div
-                                key={`placeholder-${item.listingId}`}
-                                className="flex-shrink-0 w-80 h-96 bg-gray-100 rounded-xl animate-pulse"
-                                style={{ minWidth: '320px' }}
-                            />
-                        );
-                    }
-
+                    // Always render the actual NFT card, no placeholders
+                    // This prevents image loading issues when scrolling back
                     return (
                         <div key={item.listingId} className="flex-shrink-0">
                             <NFTCardWithMetadata
@@ -236,7 +213,7 @@ export default function ActiveItemsList() {
                                 desiredNftAddress={item.desiredNftAddress || "0x0000000000000000000000000000000000000000"}
                                 desiredTokenId={item.desiredTokenId || "0"}
                                 priority={index < 6}
-                                enableInsights={index < 10} // Only enable insights for first 10 items for performance
+                                enableInsights={index < 20} // Enable insights for more items since we removed placeholders
                             />
                         </div>
                     );

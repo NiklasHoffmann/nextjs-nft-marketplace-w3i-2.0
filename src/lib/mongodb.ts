@@ -35,7 +35,8 @@ export default clientPromise;
 // Helper function to get database
 export async function getDatabase(): Promise<Db> {
     const client = await clientPromise;
-    return client.db('Ideationmarket'); // Use the database name from your URI
+    // Use the database name from the URI instead of hardcoding it
+    return client.db(); // This will use the database name from the connection string
 }
 
 // Helper function to get collection

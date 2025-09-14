@@ -1,4 +1,4 @@
-import { truncateAddress } from '@/utils/nft-helpers';
+import { truncateAddress } from '@/utils';
 import { NFTAttribute } from '@/types';
 import { RoyaltyInfo } from '@/types';
 

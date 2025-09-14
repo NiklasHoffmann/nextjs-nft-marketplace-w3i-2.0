@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react';
 import Image from 'next/image';
 import { NFTMediaSectionProps } from '@/types';
-import { formatNFTDisplayName } from '@/utils/nft-helpers';
+import { formatNFTDisplayName } from '@/utils';
 
 function NFTMediaSection({
     imageUrl,

@@ -1,5 +1,5 @@
 import { memo, useMemo, useCallback } from 'react';
-import { formatEther } from '@/utils/formatters';
+import { formatEther } from '@/utils';
 import { NFTPriceCardProps } from '@/types';
 
 function NFTPriceCard({

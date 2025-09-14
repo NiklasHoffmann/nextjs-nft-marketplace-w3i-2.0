@@ -9,3 +9,6 @@ export * from './marketplace';
 
 // Re-export all Interaction hooks
 export * from './interactions';
+
+// Re-export all Performance hooks
+export * from './performance';

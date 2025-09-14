@@ -6,7 +6,7 @@ interface UserInteractionData {
     isFavorite: boolean;
     favoriteAddedAt?: string;
 
-    // Ratings
+    // Public Ratings (for community averages)
     rating?: number;
     ratedAt?: string;
 
@@ -14,9 +14,8 @@ interface UserInteractionData {
     isWatchlisted: boolean;
     watchlistAddedAt?: string;
 
-    // Personal Data
+    // Private Personal Data (separate from public ratings)
     personalNotes?: string;
-    personalRating?: number;
     strategy?: string;
     investmentGoal?: string;
     riskLevel?: string;
@@ -52,17 +51,18 @@ export async function GET(request: NextRequest) {
         console.log('🔍 GET /api/user/interactions called with:', { userId, contractAddress, tokenId });
 
         // Fetch from all user collections
-        const [favoritesCollection, ratingsCollection, watchlistCollection] = await Promise.all([
+        const [favoritesCollection, ratingsCollection, watchlistCollection, personalNotesCollection] = await Promise.all([
             getCollection('user_favorites'),
             getCollection('user_ratings'),
             getCollection('user_watchlist'),
+            getCollection('user_personal_notes'),
         ]);
 
         const lowerUserId = userId.toLowerCase();
         const lowerContractAddress = contractAddress.toLowerCase();
 
         // Query all collections in parallel
-        const [favoriteDoc, ratingDoc, watchlistDoc] = await Promise.all([
+        const [favoriteDoc, ratingDoc, watchlistDoc, personalNotesDoc] = await Promise.all([
             favoritesCollection.findOne({
                 userId: lowerUserId,
                 contractAddress: lowerContractAddress,
@@ -74,6 +74,11 @@ export async function GET(request: NextRequest) {
                 tokenId: tokenId
             }),
             watchlistCollection.findOne({
+                userId: lowerUserId,
+                contractAddress: lowerContractAddress,
+                tokenId: tokenId
+            }),
+            personalNotesCollection.findOne({
                 userId: lowerUserId,
                 contractAddress: lowerContractAddress,
                 tokenId: tokenId
@@ -90,7 +95,7 @@ export async function GET(request: NextRequest) {
             isFavorite: !!favoriteDoc,
             favoriteAddedAt: favoriteDoc?.addedAt,
 
-            // Ratings
+            // Public Ratings (for community averages)
             rating: ratingDoc?.rating,
             ratedAt: ratingDoc?.ratedAt,
 
@@ -98,12 +103,11 @@ export async function GET(request: NextRequest) {
             isWatchlisted: !!watchlistDoc,
             watchlistAddedAt: watchlistDoc?.addedAt,
 
-            // Personal data (can be extended later)
-            personalNotes: ratingDoc?.notes || '', // If you add notes to ratings
-            personalRating: ratingDoc?.rating, // Alias for rating
-            strategy: undefined, // Can be added later
-            investmentGoal: undefined, // Can be added later
-            riskLevel: undefined, // Can be added later
+            // Private Personal Data (separate from public ratings)
+            personalNotes: personalNotesDoc?.personalNotes || '',
+            strategy: personalNotesDoc?.strategy,
+            investmentGoal: personalNotesDoc?.investmentGoal,
+            riskLevel: personalNotesDoc?.riskLevel,
 
             lastUpdated: new Date().toISOString()
         };
@@ -146,10 +150,11 @@ export async function POST(request: NextRequest) {
         const timestamp = new Date().toISOString();
 
         // Get collections
-        const [favoritesCollection, ratingsCollection, watchlistCollection] = await Promise.all([
+        const [favoritesCollection, ratingsCollection, watchlistCollection, personalNotesCollection] = await Promise.all([
             getCollection('user_favorites'),
             getCollection('user_ratings'),
             getCollection('user_watchlist'),
+            getCollection('user_personal_notes'),
         ]);
 
         const results = [];
@@ -180,7 +185,7 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Update rating if specified
+        // Update rating if specified (PUBLIC ratings only)
         if (typeof updates.rating === 'number' && updates.rating >= 1 && updates.rating <= 5) {
             const result = await ratingsCollection.updateOne(
                 { userId: lowerUserId, contractAddress: lowerContractAddress, tokenId },
@@ -190,7 +195,7 @@ export async function POST(request: NextRequest) {
                         contractAddress: lowerContractAddress,
                         tokenId,
                         rating: updates.rating,
-                        notes: updates.personalNotes || '',
+                        isPublic: true, // All ratings are public for community averages
                         ratedAt: timestamp
                     }
                 },
@@ -199,25 +204,43 @@ export async function POST(request: NextRequest) {
             results.push({ type: 'rating', action: 'updated', result });
         }
 
-        // Update personal notes independently (if only notes are provided without rating)
-        if (typeof updates.personalNotes === 'string' && typeof updates.rating !== 'number') {
-            const result = await ratingsCollection.updateOne(
+        // Update personal notes independently (PRIVATE data)
+        if (typeof updates.personalNotes === 'string' ||
+            typeof updates.strategy === 'string' ||
+            typeof updates.investmentGoal === 'string' ||
+            typeof updates.riskLevel === 'string') {
+
+            const personalDataUpdate: any = {
+                userId: lowerUserId,
+                contractAddress: lowerContractAddress,
+                tokenId,
+                lastUpdated: timestamp
+            };
+
+            if (typeof updates.personalNotes === 'string') {
+                personalDataUpdate.personalNotes = updates.personalNotes;
+            }
+            if (typeof updates.strategy === 'string') {
+                personalDataUpdate.strategy = updates.strategy;
+            }
+            if (typeof updates.investmentGoal === 'string') {
+                personalDataUpdate.investmentGoal = updates.investmentGoal;
+            }
+            if (typeof updates.riskLevel === 'string') {
+                personalDataUpdate.riskLevel = updates.riskLevel;
+            }
+
+            const result = await personalNotesCollection.updateOne(
                 { userId: lowerUserId, contractAddress: lowerContractAddress, tokenId },
                 {
-                    $set: {
-                        userId: lowerUserId,
-                        contractAddress: lowerContractAddress,
-                        tokenId,
-                        notes: updates.personalNotes
-                    },
+                    $set: personalDataUpdate,
                     $setOnInsert: {
-                        rating: 0,
-                        ratedAt: timestamp
+                        createdAt: timestamp
                     }
                 },
                 { upsert: true }
             );
-            results.push({ type: 'notes', action: 'updated', result });
+            results.push({ type: 'personal_notes', action: 'updated', result });
         }
 
         // Update watchlist if specified
@@ -249,7 +272,7 @@ export async function POST(request: NextRequest) {
         console.log('✅ Batch update results:', results);
 
         // Fetch updated data to return to client
-        const [favoriteDoc, ratingDoc, watchlistDoc] = await Promise.all([
+        const [favoriteDoc, ratingDoc, watchlistDoc, personalNotesDoc] = await Promise.all([
             favoritesCollection.findOne({
                 userId: lowerUserId,
                 contractAddress: lowerContractAddress,
@@ -261,6 +284,11 @@ export async function POST(request: NextRequest) {
                 tokenId: tokenId
             }),
             watchlistCollection.findOne({
+                userId: lowerUserId,
+                contractAddress: lowerContractAddress,
+                tokenId: tokenId
+            }),
+            personalNotesCollection.findOne({
                 userId: lowerUserId,
                 contractAddress: lowerContractAddress,
                 tokenId: tokenId
@@ -277,7 +305,7 @@ export async function POST(request: NextRequest) {
             isFavorite: !!favoriteDoc,
             favoriteAddedAt: favoriteDoc?.addedAt,
 
-            // Ratings
+            // Public Ratings (for community averages)
             rating: ratingDoc?.rating,
             ratedAt: ratingDoc?.ratedAt,
 
@@ -285,12 +313,11 @@ export async function POST(request: NextRequest) {
             isWatchlisted: !!watchlistDoc,
             watchlistAddedAt: watchlistDoc?.addedAt,
 
-            // Personal data (can be extended later)
-            personalNotes: ratingDoc?.notes || '',
-            personalRating: ratingDoc?.rating,
-            strategy: undefined,
-            investmentGoal: undefined,
-            riskLevel: undefined,
+            // Private Personal Data (separate from public ratings)
+            personalNotes: personalNotesDoc?.personalNotes || '',
+            strategy: personalNotesDoc?.strategy,
+            investmentGoal: personalNotesDoc?.investmentGoal,
+            riskLevel: personalNotesDoc?.riskLevel,
 
             lastUpdated: timestamp
         };

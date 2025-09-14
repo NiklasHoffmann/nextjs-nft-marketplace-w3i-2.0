@@ -1,8 +1,7 @@
 import { memo, useMemo } from 'react';
 import { useAccount } from 'wagmi';
 import { CategoryPillsProps } from '@/types';
-import { AdminNFTInsight, AdminCollectionInsight } from '@/types';
-import { canEditInsights } from '@/utils/insights-access';
+import { canEditInsights } from '@/utils';
 import Link from 'next/link';
 
 function CategoryPills({
@@ -185,8 +184,8 @@ function CategoryPills({
         // Rarity pill (available in AdminInsights)
         if (insights.rarity) {
             const rarityColors = {
-                legendary: 'bg-purple-100 text-purple-800 border-purple-200',
-                epic: 'bg-red-100 text-red-800 border-red-200',
+                legendary: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+                epic: 'bg-purple-100 text-purple-800 border-purple-200',
                 rare: 'bg-blue-100 text-blue-800 border-blue-200',
                 uncommon: 'bg-green-100 text-green-800 border-green-200',
                 common: 'bg-gray-100 text-gray-800 border-gray-200'
@@ -202,14 +201,7 @@ function CategoryPills({
             );
         }
 
-        // Admin Insights indicator (for AdminNFTInsight/AdminCollectionInsight)
-        if ('projectName' in insights && insights.projectName) {
-            statusPills.push(
-                <span key="project-info" className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                    🚀 Project: {insights.projectName}
-                </span>
-            );
-        }
+
 
         // Partnership indicator
         if ('partnerships' in insights && insights.partnerships && insights.partnerships.length > 0) {
@@ -291,7 +283,7 @@ function CategoryPills({
             // Edit existing insights
             return (
                 <Link
-                    href={`/insights?contractAddress=${contractAddress}&tokenId=${tokenId}`}
+                    href={`/admin/insights?contractAddress=${contractAddress}&tokenId=${tokenId}`}
                     className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 text-purple-800 border border-purple-200 hover:bg-purple-200 transition-colors"
                 >
                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -304,7 +296,7 @@ function CategoryPills({
             // Create new insights
             return (
                 <Link
-                    href={`/insights?contractAddress=${contractAddress}&tokenId=${tokenId}`}
+                    href={`/admin/insights?contractAddress=${contractAddress}&tokenId=${tokenId}`}
                     className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-200 hover:bg-green-200 transition-colors"
                 >
                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

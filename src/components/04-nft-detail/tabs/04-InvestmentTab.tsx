@@ -1,4 +1,4 @@
-import { formatEther } from '@/utils/formatters';
+import { formatEther } from '@/utils';
 import { NFTInsights } from '@/types';
 import { PublicNFTInsights } from '@/types';
 import { RoyaltyInfo } from '@/types';
@@ -157,8 +157,8 @@ export default function InvestmentTab({
                             <div className="bg-blue-50 rounded-lg p-4">
                                 <h4 className="font-medium text-blue-900 mb-2">Market Analysis Report</h4>
                                 <p className="text-sm text-blue-800">
-                                    {typeof insights.marketAnalysis === 'string' 
-                                        ? insights.marketAnalysis 
+                                    {typeof insights.marketAnalysis === 'string'
+                                        ? insights.marketAnalysis
                                         : JSON.stringify(insights.marketAnalysis, null, 2)
                                     }
                                 </p>

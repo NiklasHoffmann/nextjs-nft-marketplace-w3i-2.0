@@ -105,6 +105,7 @@ export interface NFTPriceCardProps {
 export interface NFTTabNavigationProps {
     activeTab: TabType;
     onTabChange: (tab: TabType) => void;
+    isWalletConnected?: boolean; // Add wallet connection state to hide personal tab
 }
 
 export interface NFTInfoTabsProps {

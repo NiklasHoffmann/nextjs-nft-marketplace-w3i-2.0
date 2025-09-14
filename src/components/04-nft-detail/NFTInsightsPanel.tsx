@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAccount } from 'wagmi';
-import { useNFTInsights } from '@/hooks/nfts/04-detail-useNFTInsights';
-import { canEditInsights } from '@/utils/insights-access';
+import { useNFTInsights } from '@/hooks';
+import { canEditInsights } from '@/utils';
 import Link from 'next/link';
 
 interface NFTInsightsPanelProps {
@@ -37,7 +37,7 @@ export default function NFTInsightsPanel({ contractAddress, tokenId }: NFTInsigh
                     <h3 className="text-sm font-medium text-blue-800 mb-1">NFT Insights</h3>
                     <p className="text-xs text-blue-600 mb-3">Connect your wallet to view or add insights for this NFT</p>
                     <Link
-                        href="/insights"
+                        href="/admin/insights"
                         className="inline-flex items-center px-3 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition-colors"
                     >
                         Learn More
@@ -93,7 +93,7 @@ export default function NFTInsightsPanel({ contractAddress, tokenId }: NFTInsigh
                     </p>
                     {canEdit && (
                         <Link
-                            href={`/insights?contractAddress=${contractAddress}&tokenId=${tokenId}`}
+                            href={`/admin/insights?contractAddress=${contractAddress}&tokenId=${tokenId}`}
                             className="inline-flex items-center px-3 py-1 bg-yellow-600 text-white text-xs rounded-md hover:bg-yellow-700 transition-colors"
                         >
                             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -129,8 +129,8 @@ export default function NFTInsightsPanel({ contractAddress, tokenId }: NFTInsigh
                     {insights.rarity && (
                         <div className="text-center">
                             <div className="text-xs text-gray-500 mb-1">Rarity</div>
-                            <div className={`text-sm font-medium capitalize ${insights.rarity === 'legendary' ? 'text-purple-600' :
-                                insights.rarity === 'epic' ? 'text-red-600' :
+                            <div className={`text-sm font-medium capitalize ${insights.rarity === 'legendary' ? 'text-yellow-600' :
+                                insights.rarity === 'epic' ? 'text-purple-600' :
                                     insights.rarity === 'rare' ? 'text-blue-600' :
                                         insights.rarity === 'uncommon' ? 'text-green-600' :
                                             'text-gray-600'
@@ -150,7 +150,7 @@ export default function NFTInsightsPanel({ contractAddress, tokenId }: NFTInsigh
                     </div>
                     {canEdit && (
                         <Link
-                            href={`/insights?contractAddress=${contractAddress}&tokenId=${tokenId}`}
+                            href={`/admin?contractAddress=${contractAddress}&tokenId=${tokenId}`}
                             className="text-xs text-blue-600 hover:text-blue-700 font-medium"
                         >
                             Edit Insights →

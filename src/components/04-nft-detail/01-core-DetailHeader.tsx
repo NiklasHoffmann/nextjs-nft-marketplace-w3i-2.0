@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { NFTDetailHeaderProps } from '@/types';
-import { formatNFTDisplayName, formatCollectionDisplayName } from '@/utils/nft-helpers';
+import { formatNFTDisplayName, formatCollectionDisplayName } from '@/utils';
 
 interface ExtendedNFTDetailHeaderProps extends NFTDetailHeaderProps {
     // User Actions
@@ -11,13 +11,16 @@ interface ExtendedNFTDetailHeaderProps extends NFTDetailHeaderProps {
     userRating?: number;
     onToggleWatchlist?: () => void;
     onSetRating?: (rating: number) => void;
-    
+
     // Stats for display
     viewCount?: number;
     favoriteCount?: number;
     averageRating?: number;
     ratingCount?: number;
     watchlistCount?: number;
+
+    // Wallet Connection State
+    isWalletConnected?: boolean;
 }
 
 export default function NFTDetailHeader({
@@ -39,7 +42,8 @@ export default function NFTDetailHeader({
     favoriteCount = 0,
     averageRating = 0,
     ratingCount = 0,
-    watchlistCount = 0
+    watchlistCount = 0,
+    isWalletConnected = false
 }: ExtendedNFTDetailHeaderProps) {
     const router = useRouter();
     const [showRatingMenu, setShowRatingMenu] = useState(false);
@@ -49,8 +53,20 @@ export default function NFTDetailHeader({
     };
 
     const handleRatingClick = (rating: number) => {
+        if (!isWalletConnected) {
+            alert('Please connect your wallet to rate this NFT');
+            return;
+        }
         onSetRating?.(rating);
         setShowRatingMenu(false);
+    };
+
+    const handleWalletGatedAction = (action: () => void, actionName: string) => {
+        if (!isWalletConnected) {
+            alert(`Please connect your wallet to ${actionName}`);
+            return;
+        }
+        action();
     };
 
     return (
@@ -116,18 +132,21 @@ export default function NFTDetailHeader({
                         {/* Watchlist */}
                         {onToggleWatchlist && (
                             <button
-                                onClick={onToggleWatchlist}
-                                className={`p-2 rounded-lg transition-colors flex items-center gap-1 ${
-                                    isWatchlisted
+                                onClick={() => handleWalletGatedAction(onToggleWatchlist, 'manage your watchlist')}
+                                disabled={!isWalletConnected}
+                                className={`p-2 rounded-lg transition-colors flex items-center gap-1 ${!isWalletConnected
+                                    ? 'text-gray-400 cursor-not-allowed opacity-50'
+                                    : isWatchlisted
                                         ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
                                         : 'text-gray-600 hover:bg-gray-100'
-                                }`}
+                                    }`}
                                 aria-label={isWatchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
+                                title={!isWalletConnected ? 'Connect wallet to manage watchlist' : undefined}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                         d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                         d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                 </svg>
                                 <span className="hidden sm:inline text-xs">
@@ -138,13 +157,16 @@ export default function NFTDetailHeader({
 
                         {/* Favorite */}
                         <button
-                            onClick={onToggleFavorite}
-                            className={`p-2 rounded-lg transition-colors flex items-center gap-1 ${
-                                isFavorited
+                            onClick={() => handleWalletGatedAction(onToggleFavorite, 'like this NFT')}
+                            disabled={!isWalletConnected}
+                            className={`p-2 rounded-lg transition-colors flex items-center gap-1 ${!isWalletConnected
+                                ? 'text-gray-400 cursor-not-allowed opacity-50'
+                                : isFavorited
                                     ? 'bg-red-50 text-red-600 hover:bg-red-100'
                                     : 'text-gray-600 hover:bg-gray-100'
-                            }`}
+                                }`}
                             aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                            title={!isWalletConnected ? 'Connect wallet to like NFTs' : undefined}
                         >
                             {isFavorited ? (
                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -164,17 +186,26 @@ export default function NFTDetailHeader({
                         {onSetRating && (
                             <div className="relative">
                                 <button
-                                    onClick={() => setShowRatingMenu(!showRatingMenu)}
-                                    className={`p-2 rounded-lg transition-colors flex items-center gap-1 ${
-                                        userRating
+                                    onClick={() => {
+                                        if (!isWalletConnected) {
+                                            alert('Please connect your wallet to rate this NFT');
+                                            return;
+                                        }
+                                        setShowRatingMenu(!showRatingMenu);
+                                    }}
+                                    disabled={!isWalletConnected}
+                                    className={`p-2 rounded-lg transition-colors flex items-center gap-1 ${!isWalletConnected
+                                        ? 'text-gray-400 cursor-not-allowed opacity-50'
+                                        : userRating
                                             ? 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
                                             : 'text-gray-600 hover:bg-gray-100'
-                                    }`}
+                                        }`}
                                     aria-label={userRating ? `Rated ${userRating} stars` : 'Rate this NFT'}
+                                    title={!isWalletConnected ? 'Connect wallet to rate NFTs' : undefined}
                                 >
-                                    <svg className="w-4 h-4" fill={userRating ? 'currentColor' : 'none'} 
-                                         stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                    <svg className="w-4 h-4" fill={userRating ? 'currentColor' : 'none'}
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                             d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                                     </svg>
                                     <span className="hidden sm:inline text-xs">
@@ -183,18 +214,17 @@ export default function NFTDetailHeader({
                                 </button>
 
                                 {/* Rating Dropdown */}
-                                {showRatingMenu && (
+                                {showRatingMenu && isWalletConnected && (
                                     <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-10">
                                         <div className="flex space-x-1">
                                             {[1, 2, 3, 4, 5].map((rating) => (
                                                 <button
                                                     key={rating}
                                                     onClick={() => handleRatingClick(rating)}
-                                                    className={`w-6 h-6 rounded transition-colors ${
-                                                        (userRating && rating <= userRating)
-                                                            ? 'text-yellow-500 hover:text-yellow-600'
-                                                            : 'text-gray-300 hover:text-yellow-400'
-                                                    }`}
+                                                    className={`w-6 h-6 rounded transition-colors ${(userRating && rating <= userRating)
+                                                        ? 'text-yellow-500 hover:text-yellow-600'
+                                                        : 'text-gray-300 hover:text-yellow-400'
+                                                        }`}
                                                 >
                                                     <svg className="w-full h-full" fill="currentColor" viewBox="0 0 24 24">
                                                         <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -206,9 +236,7 @@ export default function NFTDetailHeader({
                                     </div>
                                 )}
                             </div>
-                        )}
-
-                        {/* Share */}
+                        )}                        {/* Share */}
                         <button
                             onClick={onShare}
                             className="p-2 rounded-lg hover:bg-gray-100 transition-colors"

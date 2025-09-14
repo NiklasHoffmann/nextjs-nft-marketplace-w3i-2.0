@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAccount } from 'wagmi';
 
 import { TabType, NFTDetailsPageData } from '@/types';
 import { UserNFTInteractions } from '@/types';
 
-import { useNFTInsights } from '@/hooks/nfts';
-import { useUserInteractions } from '@/hooks/interactions';
+import { useNFTInsights } from '@/hooks';
+import { useUserInteractions } from '@/hooks';
 
-import { isValidNFTAddress, isValidNFTTokenId, createShareableNFTUrl } from '@/utils/nft-helpers';
+import { isValidNFTAddress, isValidNFTTokenId, createShareableNFTUrl } from '@/utils';
 
 /**
  * Custom hook that manages UI logic and state for the NFT Detail Page
@@ -27,7 +27,7 @@ export function useNFTDetailLogic() {
     const [nftDetails, setNftDetails] = useState<NFTDetailsPageData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<TabType>('overview');
+    const [activeTab, setActiveTab] = useState<TabType>('project');
 
     // Extract and validate params
     const nftAddress = useMemo(() => params.nftAddress as string, [params.nftAddress]);
@@ -36,8 +36,11 @@ export function useNFTDetailLogic() {
     // Get wallet address from wagmi/RainbowKit
     const { address: connectedWalletAddress } = useAccount();
     const userWalletAddress = useMemo(() => {
-        return connectedWalletAddress || "0x8BbA5E9b30E986C55465fEaC4D3417791065d1bb"; // Fallback for development
+        return connectedWalletAddress || null; // No fallback - must be actually connected
     }, [connectedWalletAddress]);
+
+    // Check if user is actually connected to wallet
+    const isWalletConnected = Boolean(connectedWalletAddress);
 
     // Validate parameters with memoization
     const isValidParams = useMemo(() => {
@@ -65,15 +68,24 @@ export function useNFTDetailLogic() {
         createInteraction: createUserInteraction,
         toggleFavorite: toggleFavoriteAction,
         toggleWatchlist,
-        setRating
+        setRating,
+        recordView
     } = useUserInteractions({
         contractAddress: nftAddress,
         tokenId: tokenId,
-        userWalletAddress: userWalletAddress,
-        autoFetch: isValidParams
+        userWalletAddress: userWalletAddress || undefined, // Convert null to undefined
+        autoFetch: isValidParams && isWalletConnected // Only fetch if wallet is connected
     });
 
     console.log('🚀 useNFTDetailLogic: userInteractions', userInteractions);
+
+    // Record view when NFT is loaded (once per page visit)
+    // Views can be recorded even without wallet connection
+    useEffect(() => {
+        if (isValidParams && recordView) {
+            recordView();
+        }
+    }, [isValidParams, recordView]);
 
     // Memoized mock listing data fetcher
     const createMockNFTDetails = useCallback((address: string, token: string): NFTDetailsPageData => ({
@@ -109,6 +121,12 @@ export function useNFTDetailLogic() {
 
     // User interaction handlers
     const handleUpdateUserInteraction = useCallback(async (data: Partial<UserNFTInteractions>) => {
+        if (!isWalletConnected) {
+            console.warn('❌ Update user interaction requires wallet connection');
+            alert('Please connect your wallet to save personal data');
+            return;
+        }
+
         try {
             console.log('🔧 useNFTDetailLogic: handleUpdateUserInteraction called with:', data);
 
@@ -125,12 +143,37 @@ export function useNFTDetailLogic() {
             console.error('❌ Error updating user interaction:', err);
             throw err;
         }
-    }, [userInteractions, updateUserInteraction, createUserInteraction]);
+    }, [userInteractions, updateUserInteraction, createUserInteraction, isWalletConnected]);
 
-    // Toggle favorite status (derived from user interactions)
+    // Toggle favorite status (wallet-gated)
     const toggleFavorite = useCallback(async () => {
+        if (!isWalletConnected) {
+            console.warn('❌ Add to favorites requires wallet connection');
+            alert('Please connect your wallet to add favorites');
+            return;
+        }
         await toggleFavoriteAction();
-    }, [toggleFavoriteAction]);
+    }, [isWalletConnected, toggleFavoriteAction]);
+
+    // Toggle watchlist status (wallet-gated)  
+    const toggleWatchlistGated = useCallback(async () => {
+        if (!isWalletConnected) {
+            console.warn('❌ Add to watchlist requires wallet connection');
+            alert('Please connect your wallet to add to watchlist');
+            return;
+        }
+        await toggleWatchlist();
+    }, [isWalletConnected, toggleWatchlist]);
+
+    // Set rating (wallet-gated)
+    const setRatingGated = useCallback(async (rating: number) => {
+        if (!isWalletConnected) {
+            console.warn('❌ Rating requires wallet connection');
+            alert('Please connect your wallet to rate this NFT');
+            return;
+        }
+        await setRating(rating);
+    }, [isWalletConnected, setRating]);
 
     // Tab change handler
     const handleTabChange = useCallback((tab: TabType) => {
@@ -192,17 +235,18 @@ export function useNFTDetailLogic() {
         error: error || insightsError,
         hasValidData,
 
-        // Identifiers
+        // Identifiers & Wallet State
         nftAddress,
         tokenId,
         userWalletAddress,
+        isWalletConnected,
 
         // Handlers
         handleBack,
         handleShare,
         toggleFavorite,
-        toggleWatchlist,
-        setRating,
+        toggleWatchlist: toggleWatchlistGated,
+        setRating: setRatingGated,
         handleTabChange,
         handleUpdateUserInteraction,
         fetchListingData,

@@ -2,9 +2,9 @@
 import type { Metadata } from "next";
 import React from "react";
 import { Poppins, Roboto, Inter } from "next/font/google";
-import ClientLayout from "@/ui/ClientLayout";
+import { ClientLayout } from "@/components";
 import "@/app/globals.css";
-import "./globals"; // Import BigInt serialization setup
+import "@/lib/globals";
 
 
 const poppins = Poppins({

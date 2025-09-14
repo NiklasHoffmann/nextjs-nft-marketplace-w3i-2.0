@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import type { NFTProjectDescriptions } from '@/types/05-features/03-nft-insights';
 
 interface AdminCollectionInsight {
   _id?: ObjectId;
   contractAddress: string;
-  title: string;
+  customTitle?: string; // New consistent field name
+  title: string; // Legacy support
   description?: string;
+  descriptions?: string[]; // Legacy array of descriptions
+  specificDescriptions?: NFTProjectDescriptions; // Enhanced title-description pairs
   category?: string;
   tags?: string[];
   rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
@@ -34,9 +38,9 @@ export async function POST(request: NextRequest) {
 
     // TODO: Add admin authentication check here
 
-    if (!data.contractAddress || !data.title) {
+    if (!data.contractAddress || (!data.customTitle && !data.title)) {
       return NextResponse.json(
-        { success: false, error: 'contractAddress and title are required' },
+        { success: false, error: 'contractAddress and customTitle (or title) are required' },
         { status: 400 }
       );
     }
@@ -57,7 +61,8 @@ export async function POST(request: NextRequest) {
 
     const insight: Omit<AdminCollectionInsight, '_id'> = {
       contractAddress: data.contractAddress.toLowerCase(),
-      title: data.title,
+      customTitle: data.customTitle || data.title, // Use customTitle first, fallback to title
+      title: data.title || data.customTitle, // Legacy support
       description: data.description,
       category: data.category,
       tags: data.tags || [],
@@ -110,7 +115,8 @@ export async function PUT(request: NextRequest) {
     const collection = await getCollection('admin_collection_insights');
 
     const updateData = {
-      title: data.title,
+      customTitle: data.customTitle || data.title, // Use customTitle first, fallback to title
+      title: data.title || data.customTitle, // Legacy support
       description: data.description,
       category: data.category,
       tags: data.tags || [],

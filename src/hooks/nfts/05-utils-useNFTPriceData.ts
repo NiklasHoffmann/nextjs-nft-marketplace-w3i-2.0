@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useETHPrice, useCurrency } from '@/contexts/CurrencyContext';
-import { formatEther } from '@/utils/formatters';
+import { formatEther } from '@/utils';
 
 /**
  * Custom hook for managing price data and conversions

@@ -40,16 +40,17 @@ export async function GET(request: NextRequest) {
       tokenId: tokenId
     });
 
-    // Get rating statistics
+    // Get rating statistics (ONLY public ratings for community averages)
     const ratingsCollection = await getCollection('user_ratings');
     const ratings = await ratingsCollection.find({
       contractAddress: contractAddress.toLowerCase(),
-      tokenId: tokenId
+      tokenId: tokenId,
+      isPublic: true // Only include public ratings in community averages
     }).toArray();
 
     const ratingCount = ratings.length;
-    const averageRating = ratingCount > 0 
-      ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratingCount 
+    const averageRating = ratingCount > 0
+      ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratingCount
       : 0;
 
     // Get watchlist count
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
     }
 
     const collection = await getCollection('nft_views');
-    
+
     const viewRecord = {
       contractAddress: contractAddress.toLowerCase(),
       tokenId: tokenId,

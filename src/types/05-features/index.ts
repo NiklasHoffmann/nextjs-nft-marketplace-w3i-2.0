@@ -15,3 +15,12 @@ export type {
     CombinedUserInteractionsResponse,
     NFTDetailData
 } from './02-user-interactions';
+
+// NFT Insights - Enhanced descriptions and metadata
+export type {
+    NFTProjectDescriptions,
+    NFTFunctionalitiesDescriptions,
+    TitleDescriptionPair,
+    createEmptyNFTProjectDescriptions,
+    createEmptyNFTFunctionalitiesDescriptions
+} from './03-nft-insights';

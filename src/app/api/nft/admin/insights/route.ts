@@ -1,19 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import type { NFTProjectDescriptions, NFTFunctionalitiesDescriptions } from '@/types/05-features/03-nft-insights';
 
 interface AdminNFTInsight {
   _id?: ObjectId;
   contractAddress: string;
   tokenId: string;
-  title: string;
+  customTitle?: string; // New consistent field name
+  title: string; // Legacy support
   description?: string;
+  descriptions?: string[]; // Legacy array of descriptions
+  projectDescriptions?: NFTProjectDescriptions; // Enhanced project-specific descriptions
+  functionalitiesDescriptions?: NFTFunctionalitiesDescriptions; // Enhanced functionalities descriptions
+  specificDescriptions?: NFTProjectDescriptions; // Legacy support - maps to projectDescriptions
+  cardDescriptions?: string[]; // NFT Card descriptions (max 3, with character limit)
   category?: string;
   tags?: string[];
   rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-  // Project/Product Information
-  projectName?: string;
-  projectDescription?: string;
+  // Social/Partnership Information
   projectWebsite?: string;
   projectTwitter?: string;
   projectDiscord?: string;
@@ -32,12 +37,13 @@ interface AdminNFTInsight {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
+    console.log('🔍 POST /api/nft/admin/insights - Received data:', JSON.stringify(data, null, 2));
 
     // TODO: Add admin authentication check here
 
-    if (!data.contractAddress || !data.tokenId || !data.title) {
+    if (!data.contractAddress || !data.tokenId || (!data.customTitle && !data.title)) {
       return NextResponse.json(
-        { success: false, error: 'contractAddress, tokenId, and title are required' },
+        { success: false, error: 'contractAddress, tokenId, and customTitle (or title) are required' },
         { status: 400 }
       );
     }
@@ -47,14 +53,18 @@ export async function POST(request: NextRequest) {
     const insight: Omit<AdminNFTInsight, '_id'> = {
       contractAddress: data.contractAddress.toLowerCase(),
       tokenId: data.tokenId,
-      title: data.title,
+      customTitle: data.customTitle || data.title, // Use customTitle first, fallback to title
+      title: data.title || data.customTitle, // Legacy support
       description: data.description,
+      descriptions: data.descriptions || [], // Legacy descriptions array
+      projectDescriptions: data.projectDescriptions, // Enhanced project descriptions
+      functionalitiesDescriptions: data.functionalitiesDescriptions, // Enhanced functionalities descriptions
+      specificDescriptions: data.specificDescriptions || data.projectDescriptions, // Legacy support
+      cardDescriptions: data.cardDescriptions || [], // NFT Card descriptions
       category: data.category,
       tags: data.tags || [],
       rarity: data.rarity,
-      // Project/Product Information
-      projectName: data.projectName,
-      projectDescription: data.projectDescription,
+      // Social/Partnership Information
       projectWebsite: data.projectWebsite,
       projectTwitter: data.projectTwitter,
       projectDiscord: data.projectDiscord,
@@ -68,6 +78,8 @@ export async function POST(request: NextRequest) {
 
     const result = await collection.insertOne(insight);
     const created = await collection.findOne({ _id: result.insertedId });
+
+    console.log('✅ Created insight in database:', JSON.stringify(created, null, 2));
 
     return NextResponse.json({
       success: true,
@@ -87,6 +99,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const data = await request.json();
+    console.log('🔍 PUT /api/nft/admin/insights - Received data:', JSON.stringify(data, null, 2));
 
     // TODO: Add admin authentication check here
 
@@ -100,14 +113,18 @@ export async function PUT(request: NextRequest) {
     const collection = await getCollection('admin_nft_insights');
 
     const updateData = {
-      title: data.title,
+      customTitle: data.customTitle || data.title, // Use customTitle first, fallback to title
+      title: data.title || data.customTitle, // Legacy support
       description: data.description,
+      descriptions: data.descriptions || [], // Legacy descriptions array
+      projectDescriptions: data.projectDescriptions, // Enhanced project descriptions
+      functionalitiesDescriptions: data.functionalitiesDescriptions, // Enhanced functionalities descriptions
+      specificDescriptions: data.specificDescriptions || data.projectDescriptions, // Legacy support
+      cardDescriptions: data.cardDescriptions || [], // NFT Card descriptions
       category: data.category,
       tags: data.tags || [],
       rarity: data.rarity,
-      // Project/Product Information
-      projectName: data.projectName,
-      projectDescription: data.projectDescription,
+      // Social/Partnership Information
       projectWebsite: data.projectWebsite,
       projectTwitter: data.projectTwitter,
       projectDiscord: data.projectDiscord,
@@ -130,6 +147,8 @@ export async function PUT(request: NextRequest) {
       contractAddress: data.contractAddress.toLowerCase(),
       tokenId: data.tokenId
     });
+
+    console.log('✅ Updated insight in database:', JSON.stringify(updated, null, 2));
 
     return NextResponse.json({
       success: true,

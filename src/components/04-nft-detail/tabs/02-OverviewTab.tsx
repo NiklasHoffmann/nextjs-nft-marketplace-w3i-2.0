@@ -1,6 +1,4 @@
-import { formatEther } from '@/utils/formatters';
-import { truncateAddress } from '@/utils/nft-helpers';
-import { NFTDetailsPageData, NFTMetadataExtended, RoyaltyInfo } from '@/types';
+import { truncateAddress } from '@/utils';
 import { NFTAttribute } from '@/types';
 import { NFTInsights } from '@/types';
 import { PublicNFTInsights } from '@/types';

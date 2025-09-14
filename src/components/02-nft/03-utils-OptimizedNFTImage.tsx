@@ -30,15 +30,17 @@ const gatewayPerformanceCache = new Map<string, number>();
 class ImageCache {
     private cache = new Map<string, boolean>();
     private maxSize = 100;
-    
+
     set(key: string, value: boolean) {
         if (this.cache.size >= this.maxSize) {
             const firstKey = this.cache.keys().next().value;
-            this.cache.delete(firstKey);
+            if (typeof firstKey === 'string') {
+                this.cache.delete(firstKey);
+            }
         }
         this.cache.set(key, value);
     }
-    
+
     get(key: string): boolean | undefined {
         return this.cache.get(key);
     }
@@ -49,7 +51,7 @@ const imageLoadCache = new ImageCache();
 // Convert IPFS URLs to use faster gateways
 const optimizeImageUrl = (url: string): string[] => {
     if (!url) return [];
-    
+
     // If it's already an HTTP URL, use it as is
     if (url.startsWith('http')) {
         // If it's an IPFS gateway URL, also provide fallbacks
@@ -61,13 +63,13 @@ const optimizeImageUrl = (url: string): string[] => {
         }
         return [url];
     }
-    
+
     // Handle ipfs:// protocol
     if (url.startsWith('ipfs://')) {
         const hash = url.replace('ipfs://', '');
         return IPFS_GATEWAYS.map(gateway => `${gateway}${hash}`);
     }
-    
+
     return [url];
 };
 
@@ -90,49 +92,51 @@ const OptimizedNFTImage = memo(({
     const [isIntersecting, setIsIntersecting] = useState(priority);
     const [hasBeenVisible, setHasBeenVisible] = useState(false);
     const imgRef = useRef<HTMLDivElement>(null);
-    
+
     // Get all possible URLs for this image
     const imageUrls = optimizeImageUrl(imageUrl);
-    
+
     // Check if image might be cached from previous view
     useEffect(() => {
         if (typeof window !== 'undefined' && imageUrls.length > 0) {
             const cacheKey = imageUrls[0];
             const cachedResult = imageLoadCache.get(cacheKey);
-            
+
             if (cachedResult) {
                 setHasBeenVisible(true);
                 setIsIntersecting(true);
+                setIsLoading(false); // Important: Set loading to false for cached images
                 return;
             }
-            
+
             // Test image loading with timeout
             const testImg = new window.Image();
             const timeout = setTimeout(() => {
                 testImg.onload = null;
                 testImg.onerror = null;
             }, 1000);
-            
+
             testImg.onload = () => {
                 clearTimeout(timeout);
                 imageLoadCache.set(cacheKey, true);
                 setHasBeenVisible(true);
                 setIsIntersecting(true);
+                setIsLoading(false); // Set loading to false when preload completes
             };
-            
+
             testImg.onerror = () => {
                 clearTimeout(timeout);
                 imageLoadCache.set(cacheKey, false);
             };
-            
+
             testImg.src = cacheKey;
         }
     }, [imageUrls]);
-    
+
     // Intersection Observer for lazy loading (unless priority or cached)
     useEffect(() => {
         if (priority || hasBeenVisible || !imgRef.current) return;
-        
+
         const observer = new IntersectionObserver(
             ([entry]) => {
                 if (entry.isIntersecting) {
@@ -143,12 +147,12 @@ const OptimizedNFTImage = memo(({
             },
             { rootMargin: '200px' }
         );
-        
+
         observer.observe(imgRef.current);
-        
+
         return () => observer.disconnect();
     }, [priority, hasBeenVisible]);
-    
+
     // Preload image when in viewport range
     useEffect(() => {
         if (isIntersecting && imageUrls.length > 0 && typeof window !== 'undefined') {
@@ -156,7 +160,7 @@ const OptimizedNFTImage = memo(({
             img.src = imageUrls[0];
         }
     }, [isIntersecting, imageUrls]);
-    
+
     // Update current image URL when imageUrl prop changes
     useEffect(() => {
         setCurrentImageUrl(imageUrl);
@@ -198,7 +202,7 @@ const OptimizedNFTImage = memo(({
     // Don't render image until it's in viewport (unless priority or previously cached)
     if (!isIntersecting && !hasBeenVisible) {
         return (
-            <div 
+            <div
                 ref={imgRef}
                 className={`bg-gradient-to-br from-gray-100 to-gray-200 animate-pulse ${borderRadius} ${className}`}
                 style={fill ? {} : { width, height }}
@@ -250,7 +254,7 @@ const OptimizedNFTImage = memo(({
     };
 
     return (
-        <div 
+        <div
             ref={imgRef}
             className={`relative ${borderRadius} overflow-hidden ${fill ? 'w-full h-full' : ''} ${aspectRatio && Math.abs(aspectRatio - 1) < 0.1 ? 'bg-transparent' : ''}`}
         >

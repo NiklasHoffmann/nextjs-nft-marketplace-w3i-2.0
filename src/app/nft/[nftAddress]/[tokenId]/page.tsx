@@ -39,6 +39,7 @@ function NFTDetailPage() {
         nftAddress,
         tokenId,
         userWalletAddress,
+        isWalletConnected,
         handleBack,
         handleShare,
         handleTabChange,
@@ -80,14 +81,12 @@ function NFTDetailPage() {
         hasSetRating: !!setRating
     });
 
-    // Effect to fetch listing data and record view
+    // Effect to fetch listing data
     useEffect(() => {
         fetchListingData();
-        // Record view when NFT is loaded
-        if (nftAddress && tokenId) {
-            nftStats.recordView();
-        }
-    }, [fetchListingData, nftAddress, tokenId, nftStats.recordView]);
+        // NOTE: View tracking is handled by useUserInteractions in useNFTDetailLogic
+        // to avoid duplicate view records
+    }, [fetchListingData, nftAddress, tokenId]);
 
     // Memoize header props to prevent unnecessary re-renders
     const headerProps = useMemo(() => ({
@@ -105,6 +104,7 @@ function NFTDetailPage() {
         userRating: userInteractions?.rating || 0,
         onToggleWatchlist: toggleWatchlist,
         onSetRating: setRating,
+        isWalletConnected, // Add wallet connection state for button states
         // Stats for display - using real data from useNFTStats
         viewCount: nftStats.stats?.viewCount || 0,
         favoriteCount: nftStats.stats?.favoriteCount || 0,
@@ -115,7 +115,7 @@ function NFTDetailPage() {
         nftData.name, tokenId, nftData.contractName,
         nftData.contractSymbol, nftAddress, userInteractions,
         toggleFavorite, handleShare, toggleWatchlist, setRating,
-        nftStats.stats
+        nftStats.stats, isWalletConnected
     ]);
 
     // Memoize category pills props with insights
@@ -191,7 +191,8 @@ function NFTDetailPage() {
             // Correct props for NewNFTInfoTabs (with type compatibility)
             publicInsights: publicInsights as any, // Type compatibility: AdminNFTInsight → PublicNFTInsights
             userInteractions: userInteractions as any, // Type compatibility: CombinedUserInteractionData → UserNFTInteractions
-            userWalletAddress: userWalletAddress,
+            userWalletAddress: userWalletAddress || undefined, // Convert null to undefined
+            isWalletConnected, // Add wallet connection state
             insightsLoading: isLoading,
             onUpdateUserInteraction: handleUpdateUserInteraction,
 
@@ -212,7 +213,7 @@ function NFTDetailPage() {
     }, [
         activeTab, handleTabChange, nftAddress, tokenId, nftData, nftDetails,
         userInteractions, publicInsights, isLoading, toggleFavorite, toggleWatchlist, setRating,
-        handleUpdateUserInteraction
+        handleUpdateUserInteraction, userWalletAddress, isWalletConnected
     ]);
 
     // Memoize conditional renders (simplified)

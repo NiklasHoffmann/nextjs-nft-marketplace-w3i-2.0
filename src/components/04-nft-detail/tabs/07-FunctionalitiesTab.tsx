@@ -1,5 +1,4 @@
 import { FunctionalitiesTabProps } from '@/types';
-import { formatRoyaltyInfo } from '@/utils/nft-helpers';
 
 export default function FunctionalitiesTab({
     attributes,

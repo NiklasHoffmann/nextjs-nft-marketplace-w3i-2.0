@@ -1,6 +1,6 @@
-import { formatEther } from '@/utils/formatters';
+import { formatEther } from '@/utils';
 import { CollectionItemsListProps } from '@/types';
-import { formatNFTDisplayName, truncateAddress, generateMockCollectionItems } from '@/utils/nft-helpers';
+import { formatNFTDisplayName, truncateAddress, generateMockCollectionItems } from '@/utils';
 
 export default function CollectionItemsList({
     collection,

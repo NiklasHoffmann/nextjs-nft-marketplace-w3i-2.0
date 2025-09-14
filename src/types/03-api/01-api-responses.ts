@@ -1,18 +1,24 @@
 // Clean API Types - Minimalistic Structure
 
+import type { NFTProjectDescriptions, NFTFunctionalitiesDescriptions } from '../05-features/03-nft-insights';
+
 // Admin Insights
 export interface AdminNFTInsight {
   _id?: string;
   contractAddress: string;
   tokenId: string;
-  title: string;
+  customTitle: string; // Renamed from title to customTitle for clarity
+  title?: string; // Legacy support
   description?: string;
+  descriptions?: string[];  // ✨ Legacy: Array für mehrere Descriptions  
+  projectDescriptions?: NFTProjectDescriptions; // ✨ Enhanced: Project-spezifische Beschreibungen
+  functionalitiesDescriptions?: NFTFunctionalitiesDescriptions; // ✨ Enhanced: Funktionalitäts-spezifische Beschreibungen
+  specificDescriptions?: NFTProjectDescriptions; // ✨ Legacy support - maps to projectDescriptions
+  cardDescriptions?: string[]; // ✨ NFT Card descriptions (max 3, with character limit)
   category?: string;
   tags?: string[];
   rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-  // Project/Product Information
-  projectName?: string;
-  projectDescription?: string;
+  // Social/Partnership Information (project info now in title-description pairs)
   projectWebsite?: string;
   projectTwitter?: string;
   projectDiscord?: string;
@@ -28,14 +34,17 @@ export interface AdminNFTInsight {
 export interface AdminCollectionInsight {
   _id?: string;
   contractAddress: string;
-  title: string;
+  customTitle: string; // Renamed from title to customTitle for clarity
+  title?: string; // Legacy support
   description?: string;
+  descriptions?: string[];  // ✨ Legacy: Array für mehrere Descriptions
+  projectDescriptions?: NFTProjectDescriptions; // ✨ Enhanced: Project-spezifische Beschreibungen
+  functionalitiesDescriptions?: NFTFunctionalitiesDescriptions; // ✨ Enhanced: Funktionalitäts-spezifische Beschreibungen
+  specificDescriptions?: NFTProjectDescriptions; // ✨ Legacy support - maps to projectDescriptions
   category?: string;
   tags?: string[];
   rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-  // Project/Product Information
-  projectName?: string;
-  projectDescription?: string;
+  // Social/Partnership Information (project info now in title-description pairs)
   projectWebsite?: string;
   projectTwitter?: string;
   projectDiscord?: string;
@@ -100,13 +109,13 @@ export interface NFTPageData {
   isWatchlisted: boolean;
   isFavorited: boolean;
   userRating?: number;
-  
+
   // Public stats
   stats: NFTStats;
 
   // Admin insights (publicly available but created by admins)
   adminInsights?: AdminNFTInsight;
-  
+
   // Collection insights (fallback if no specific NFT insights exist)
   collectionInsights?: AdminCollectionInsight;
 }

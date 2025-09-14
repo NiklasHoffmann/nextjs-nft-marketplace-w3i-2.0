@@ -1,6 +1,5 @@
-import { formatEther } from '@/utils/formatters';
+import { formatEther } from '@/utils';
 import { TokenomicsTabProps } from '@/types';
-import { getCollectionSizeCategory, formatRoyaltyInfo } from '@/utils/nft-helpers';
 
 export default function TokenomicsTab({
     price,

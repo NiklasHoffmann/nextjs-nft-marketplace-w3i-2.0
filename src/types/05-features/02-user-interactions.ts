@@ -105,7 +105,7 @@ export interface CombinedUserInteractionData {
     isFavorite: boolean;
     favoriteAddedAt?: string;
 
-    // Ratings
+    // Public Ratings (used for community averages)
     rating?: number;
     ratedAt?: string;
 
@@ -113,9 +113,8 @@ export interface CombinedUserInteractionData {
     isWatchlisted: boolean;
     watchlistAddedAt?: string;
 
-    // Personal Data (extensible for future features)
+    // Private Personal Data (separate from public ratings)
     personalNotes?: string;
-    personalRating?: number;
     strategy?: string;
     investmentGoal?: string;
     riskLevel?: string;

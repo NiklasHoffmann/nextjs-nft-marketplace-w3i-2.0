@@ -25,12 +25,12 @@
  * <NFTCardWithMetadata enableInsights={true} {...props} />
  */
 
-import { formatEther } from "@/utils/formatters";
 import { useMemo, memo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import OptimizedNFTImage from "./03-utils-OptimizedNFTImage";
 import { useETHPrice } from "@/contexts/CurrencyContext";
-import { useNFTInsights } from "@/hooks";
+import { formatEther } from "@/utils";
+import { useNFTInsights, useNFTStats } from "@/hooks";
+import OptimizedNFTImage from "./03-utils-OptimizedNFTImage";
 
 interface NFTCardProps {
   listingId: string;
@@ -44,6 +44,7 @@ interface NFTCardProps {
   desiredTokenId: string;
   imageUrl?: string;
   likeCount?: number;
+  watchlistCount?: number; // New prop for watchlist count
   category?: string | string[];
   description?: string | string[];
   priority?: boolean;
@@ -51,7 +52,7 @@ interface NFTCardProps {
 }
 
 // Separate price component to prevent unnecessary re-renders
-const PriceDisplay = memo(({ price, imageUrl }: { price: string; imageUrl?: string }) => {
+const PriceDisplay = memo(({ price, imageUrl, desiredNftAddress }: { price: string; imageUrl?: string; desiredNftAddress: string }) => {
   const ethPrice = useMemo(() => parseFloat(formatEther(price)), [price]);
   const { convertedPrice, loading } = useETHPrice(ethPrice);
 
@@ -64,6 +65,20 @@ const PriceDisplay = memo(({ price, imageUrl }: { price: string; imageUrl?: stri
             <div className="text-xs text-gray-500">Lädt...</div>
           ) : (
             <div className="text-xs text-gray-600">≈ {convertedPrice}</div>
+          )}
+        </div>
+        {/* Sell/Swap Indikator im Preisfeld */}
+        <div className="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full shadow-lg border border-white/20">
+          {desiredNftAddress !== "0x0000000000000000000000000000000000000000" ? (
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-orange rounded-full"></div>
+              <span className="text-xs font-medium text-orange">Swap</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-forestgreen rounded-full"></div>
+              <span className="text-xs font-medium text-forestgreen">Sell</span>
+            </div>
           )}
         </div>
       </div>
@@ -84,6 +99,7 @@ const NFTCard = memo(({
   desiredTokenId,
   imageUrl,
   likeCount = 0,
+  watchlistCount = 0,
   category = ["Art", "DigitalTwin", "Collectible", "Sports", "Music", "VirtualRealEstate"],
   description = ["Access to multisignature wallet with 2/3 approvals required", "Includes 1 free on-chain transaction", "Premium security features"],
   priority = false,
@@ -96,6 +112,13 @@ const NFTCard = memo(({
     contractAddress: enableInsights ? nftAddress : undefined,
     tokenId: enableInsights ? tokenId : undefined,
     autoFetch: enableInsights
+  });
+
+  // Fetch stats data for social metrics
+  const { stats, loading: statsLoading } = useNFTStats({
+    contractAddress: nftAddress,
+    tokenId: tokenId,
+    autoFetch: true
   });
 
   // Determine final category - prioritize insights over props
@@ -117,11 +140,20 @@ const NFTCard = memo(({
   // Determine final description - prioritize insights over props
   const finalDescription = useMemo(() => {
     if (enableInsights && insights && !insightsLoading) {
-      // Use insights description if available
-      if (insights.description) {
-        return [insights.description];
+      // 1. Priorität: cardDescriptions aus Insights (speziell für NFT Cards)
+      if (insights.cardDescriptions && insights.cardDescriptions.length > 0) {
+        return insights.cardDescriptions;
       }
-
+      // 2. Priorität: descriptions Array aus Insights (für mehrere Descriptions)
+      if (insights.descriptions && insights.descriptions.length > 0) {
+        return insights.descriptions;
+      }
+      // 3. Priorität: einzelne description aus Insights (mit Komma-Split für Legacy)
+      if (insights.description) {
+        // Split by comma and trim whitespace - für komma-getrennte Descriptions
+        const splitDescriptions = insights.description.split(',').map(desc => desc.trim()).filter(desc => desc.length > 0);
+        return splitDescriptions.length > 1 ? splitDescriptions : [insights.description];
+      }
     }
     // Fall back to prop description
     return Array.isArray(description) ? description : [description];
@@ -168,16 +200,22 @@ const NFTCard = memo(({
                   <h3 className="text-sm font-semibold text-gray-900 truncate">
                     {`NFT #${tokenId}`}
                   </h3>
-                  <p className="text-xs text-gray-600 truncate">
-                    {nftAddress.slice(0, 6)}...{nftAddress.slice(-4)}
-                  </p>
+                  {insights?.customTitle ? (
+                    <p className="text-xs text-gray-600 truncate">
+                      {insights.customTitle}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-600 truncate">
+                      {nftAddress.slice(0, 6)}...{nftAddress.slice(-4)}
+                    </p>)
+                  }
                 </div>
                 {/* Rarity and Rating Indicators */}
                 {enableInsights && insights && (
                   <div className="flex flex-col items-end gap-1 ml-2">
                     {insights.rarity && (
-                      <div className={`px-1.5 py-0.5 rounded text-xs font-medium ${insights.rarity === 'legendary' ? 'bg-purple-100 text-purple-700' :
-                        insights.rarity === 'epic' ? 'bg-red-100 text-red-700' :
+                      <div className={`px-1.5 py-0.5 rounded text-xs font-medium ${insights.rarity === 'legendary' ? 'bg-yellow-100 text-yellow-700' :
+                        insights.rarity === 'epic' ? 'bg-purple-100 text-purple-700' :
                           insights.rarity === 'rare' ? 'bg-blue-100 text-blue-700' :
                             insights.rarity === 'uncommon' ? 'bg-green-100 text-green-700' :
                               'bg-gray-100 text-gray-700'
@@ -185,88 +223,111 @@ const NFTCard = memo(({
                         {insights.rarity.charAt(0).toUpperCase()}
                       </div>
                     )}
+                  </div>
+                )}
 
+                {/* Average Rating Stars - moved to header */}
+                {stats?.ratingCount && stats.ratingCount > 0 && (
+                  <div className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-white/20 h-6 flex items-center gap-1 ml-2">
+                    <div className="flex items-center gap-0.5">
+                      {Array.from({ length: 5 }, (_, i) => (
+                        <svg
+                          key={i}
+                          className={`w-2.5 h-2.5 ${stats.averageRating && i < Math.round(stats.averageRating) ? 'text-yellow-400' : 'text-gray-300'}`}
+                          fill="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                        </svg>
+                      ))}
+                    </div>
+                    <span className="text-xs font-medium text-gray-700">({stats.ratingCount})</span>
                   </div>
                 )}
               </div>
             </div>
           </div>          {/* Price Display at bottom */}
           <div className="mt-auto">
-            {/* Dynamic Sell/Swap Indicator - directly above price */}
-            <div className="mb-2 flex justify-between items-center">
-              <div className="flex gap-1">
-              </div>
-
-              <div className="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full shadow-lg border border-white/20">
-                {desiredNftAddress !== "0x0000000000000000000000000000000000000000" ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-orange rounded-full"></div>
-                    <span className="text-xs font-medium text-orange">Swap</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-forestgreen rounded-full"></div>
-                    <span className="text-xs font-medium text-forestgreen">Sell</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Category and Like Count - directly above price */}
-            <div className="flex justify-between items-start mb-2">
-              {/* Categories */}
-              <div className="flex flex-wrap gap-1 flex-1 mr-2">
-                {insightsLoading && enableInsights ? (
-                  // Loading state for insights
-                  <div className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-white/20 h-6 flex items-center">
-                    <div className="animate-pulse flex items-center gap-1">
-                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                      <span className="text-xs text-gray-400">Loading...</span>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {categories.slice(0, 3).map((cat, index) => (
-                      <div key={index} className={`backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border h-6 flex items-center ${enableInsights && insights ?
-                        'bg-purple-100/90 border-purple-200/40' :
-                        'bg-white/90 border-white/20'
-                        }`}>
-                        <span className={`text-xs font-medium ${enableInsights && insights ? 'text-purple-700' : 'text-gray-700'
-                          }`}>
-                          {cat}
-                        </span>
-                      </div>
-                    ))}
-                    {categories.length > 3 && (
-                      <div className={`backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border h-6 flex items-center ${enableInsights && insights ?
-                        'bg-purple-100/90 border-purple-200/40' :
-                        'bg-white/90 border-white/20'
-                        }`}>
-                        <span className={`text-xs font-medium ${enableInsights && insights ? 'text-purple-600' : 'text-gray-500'
-                          }`}>
-                          +{categories.length - 3}
-                        </span>
-                      </div>
-                    )}
-                    {/* Insights indicator badge */}
-                    {enableInsights && insights && (
-                      <div className="bg-purple-500/90 backdrop-blur-sm px-1.5 py-0.5 rounded-md shadow-sm border border-purple-400/40 h-6 flex items-center">
-                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {/* Like Count */}
-              <div className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-white/20 h-6 flex items-center gap-1 flex-shrink-0">
+            {/* Social Stats - über den Categories */}
+            <div className="flex items-center gap-2 mb-2">
+              {/* Like/Favorite Count */}
+              <div className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-white/20 h-6 flex items-center gap-1">
                 <svg className="w-3 h-3 text-red-500" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
                 </svg>
-                <span className="text-xs font-medium text-gray-700">{likeCount}</span>
+                <span className="text-xs font-medium text-gray-700">
+                  {stats?.favoriteCount || likeCount || 0}
+                </span>
               </div>
+
+              {/* Watchlist Count */}
+              {(stats?.watchlistCount || watchlistCount) > 0 && (
+                <div className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-white/20 h-6 flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  <span className="text-xs font-medium text-gray-700">
+                    {stats?.watchlistCount || watchlistCount}
+                  </span>
+                </div>
+              )}
+
+              {/* Loading indicator */}
+              {statsLoading && (
+                <div className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-white/20 h-6 flex items-center">
+                  <div className="animate-pulse flex items-center gap-1">
+                    <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                    <span className="text-xs text-gray-400">...</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Categories - haben jetzt ihren eigenen Platz */}
+            <div className="flex flex-wrap gap-1 mb-2">
+              {insightsLoading && enableInsights ? (
+                // Loading state for insights
+                <div className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-white/20 h-6 flex items-center">
+                  <div className="animate-pulse flex items-center gap-1">
+                    <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                    <span className="text-xs text-gray-400">Loading...</span>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {categories.slice(0, 3).map((cat, index) => (
+                    <div key={index} className={`backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border h-6 flex items-center ${enableInsights && insights ?
+                      'bg-purple-100/90 border-purple-200/40' :
+                      'bg-white/90 border-white/20'
+                      }`}>
+                      <span className={`text-xs font-medium ${enableInsights && insights ? 'text-purple-700' : 'text-gray-700'
+                        }`}>
+                        {cat}
+                      </span>
+                    </div>
+                  ))}
+                  {categories.length > 3 && (
+                    <div className={`backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border h-6 flex items-center ${enableInsights && insights ?
+                      'bg-purple-100/90 border-purple-200/40' :
+                      'bg-white/90 border-white/20'
+                      }`}>
+                      <span className={`text-xs font-medium ${enableInsights && insights ? 'text-purple-600' : 'text-gray-500'
+                        }`}>
+                        +{categories.length - 3}
+                      </span>
+                    </div>
+                  )}
+                  {/* Insights indicator badge */}
+                  {enableInsights && insights && (
+                    <div className="bg-purple-500/90 backdrop-blur-sm px-1.5 py-0.5 rounded-md shadow-sm border border-purple-400/40 h-6 flex items-center">
+                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                      </svg>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Description - directly above price */}
@@ -283,7 +344,7 @@ const NFTCard = memo(({
               )}
             </div>
 
-            <PriceDisplay price={price} imageUrl={imageUrl} />
+            <PriceDisplay price={price} imageUrl={imageUrl} desiredNftAddress={desiredNftAddress} />
           </div>
 
           {/* Swap Target Info - only show if exists */}

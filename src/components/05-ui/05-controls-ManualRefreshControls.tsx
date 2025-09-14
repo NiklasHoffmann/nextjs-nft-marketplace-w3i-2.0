@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { createCacheInvalidationManager } from '@/utils/cache-invalidation';
+import { createCacheInvalidationManager } from '@/utils';
 
 interface ManualRefreshControlsProps {
   contractAddress?: string;
@@ -25,7 +25,7 @@ export default function ManualRefreshControls({
 
   const handleRefresh = async (type: string) => {
     setIsRefreshing(type);
-    
+
     try {
       switch (type) {
         case 'nft':
@@ -33,21 +33,21 @@ export default function ManualRefreshControls({
             cacheManager.manualRefresh.nftData(contractAddress, tokenId);
           }
           break;
-          
+
         case 'contract':
           if (contractAddress) {
             cacheManager.manualRefresh.contractData(contractAddress);
           }
           break;
-          
+
         case 'market':
           cacheManager.manualRefresh.marketData(contractAddress);
           break;
-          
+
         case 'insights':
           cacheManager.manualRefresh.insightsData(contractAddress, tokenId);
           break;
-          
+
         case 'all':
           if (contractAddress && tokenId) {
             cacheManager.manualRefresh.nftData(contractAddress, tokenId);
@@ -56,10 +56,10 @@ export default function ManualRefreshControls({
           cacheManager.manualRefresh.insightsData(contractAddress, tokenId);
           break;
       }
-      
+
       // Small delay to show loading state
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
     } catch (error) {
       console.error(`Failed to refresh ${type}:`, error);
     } finally {
@@ -91,7 +91,7 @@ export default function ManualRefreshControls({
           </button>
         )}
       </div>
-      
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <button
           onClick={() => handleRefresh('nft')}
@@ -100,7 +100,7 @@ export default function ManualRefreshControls({
         >
           {isRefreshing === 'nft' ? '⟳' : '🎨'} NFT Data
         </button>
-        
+
         <button
           onClick={() => handleRefresh('contract')}
           disabled={isRefreshing !== null || !contractAddress}
@@ -108,7 +108,7 @@ export default function ManualRefreshControls({
         >
           {isRefreshing === 'contract' ? '⟳' : '📝'} Contract
         </button>
-        
+
         <button
           onClick={() => handleRefresh('market')}
           disabled={isRefreshing !== null}
@@ -116,7 +116,7 @@ export default function ManualRefreshControls({
         >
           {isRefreshing === 'market' ? '⟳' : '📊'} Market
         </button>
-        
+
         <button
           onClick={() => handleRefresh('insights')}
           disabled={isRefreshing !== null}
@@ -125,7 +125,7 @@ export default function ManualRefreshControls({
           {isRefreshing === 'insights' ? '⟳' : '💡'} Insights
         </button>
       </div>
-      
+
       <div className="flex gap-2">
         <button
           onClick={() => handleRefresh('all')}
@@ -134,7 +134,7 @@ export default function ManualRefreshControls({
         >
           {isRefreshing === 'all' ? '⟳ Refreshing...' : '🔄 Refresh All'}
         </button>
-        
+
         <button
           onClick={handleEmergencyReset}
           disabled={isRefreshing !== null}
@@ -144,7 +144,7 @@ export default function ManualRefreshControls({
           🚨
         </button>
       </div>
-      
+
       {cacheStats && (
         <div className="mt-3 p-3 bg-white rounded border text-xs">
           <h4 className="font-medium mb-2">Cache Statistics</h4>

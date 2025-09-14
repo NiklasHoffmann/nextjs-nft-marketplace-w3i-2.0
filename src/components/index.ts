@@ -16,5 +16,8 @@ export * from './04-nft-detail';
 // UI Components
 export * from './05-ui';
 
+// Admin Components
+export * from './06-admin';
+
 // Debug Components (conditionally export only in development)
-export * from './06-debug';
+export * from './07-debug';

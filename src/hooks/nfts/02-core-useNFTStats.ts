@@ -23,7 +23,7 @@ interface UseNFTStatsReturn {
     loading: boolean;
     error: string | null;
     refetch: () => Promise<void>;
-    recordView: () => Promise<void>;
+    // recordView removed - now handled by useUserInteractions
 }
 
 export function useNFTStats(options: UseNFTStatsOptions = {}): UseNFTStatsReturn {
@@ -79,33 +79,6 @@ export function useNFTStats(options: UseNFTStatsOptions = {}): UseNFTStatsReturn
         }
     }, [contractAddress, tokenId]);
 
-    // Record a view for this NFT
-    const recordView = useCallback(async () => {
-        if (!contractAddress || !tokenId) return;
-
-        try {
-            await fetch('/api/nft/stats', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    contractAddress,
-                    tokenId,
-                    userId: null // Could be enhanced with actual user ID
-                }),
-            });
-
-            // Refetch stats after recording view
-            setTimeout(() => {
-                fetchStats();
-            }, 500);
-
-        } catch (err) {
-            console.error('❌ Error recording view:', err);
-        }
-    }, [contractAddress, tokenId, fetchStats]);
-
     // Auto-fetch stats
     useEffect(() => {
         if (autoFetch && contractAddress && tokenId) {
@@ -143,7 +116,7 @@ export function useNFTStats(options: UseNFTStatsOptions = {}): UseNFTStatsReturn
         stats,
         loading,
         error,
-        refetch: fetchStats,
-        recordView
+        refetch: fetchStats
+        // recordView removed - now handled by useUserInteractions
     };
 }
