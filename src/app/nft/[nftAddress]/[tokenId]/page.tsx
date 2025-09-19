@@ -83,10 +83,12 @@ function NFTDetailPage() {
             nftAddress,
             tokenId,
             isListed: true,
-            price: nftContextData?.price || null, // 0.05 ETH in Wei
-            seller: nftContextData?.owner || null, // Use actual owner from context
-            desiredNftAddress: nftContextData?.desiredNftAddress || null,
-            desiredTokenId: nftContextData?.desiredTokenId || null
+            price: nftContextData?.price ?? "0", // Ensure string, never null
+            seller: nftContextData?.owner || "", // Use actual owner from context, fallback to empty string
+            desiredNftAddress: nftContextData?.desiredNftAddress || "", // Always string
+            desiredTokenId: nftContextData?.desiredTokenId !== undefined && nftContextData?.desiredTokenId !== null
+                ? String(nftContextData.desiredTokenId)
+                : ""
         };
     }, [nftAddress, tokenId, isValidParams]);
 
@@ -298,7 +300,9 @@ function NFTDetailPage() {
 
     const swapTargetProps = useMemo(() => ({
         desiredNftAddress: nftDetails?.desiredNftAddress || "",
-        desiredTokenId: nftDetails?.desiredTokenId || ""
+        desiredTokenId: nftDetails?.desiredTokenId !== undefined && nftDetails?.desiredTokenId !== null
+            ? String(nftDetails.desiredTokenId)
+            : ""
     }), [nftDetails?.desiredNftAddress, nftDetails?.desiredTokenId]);
 
     const collectionItemsProps = useMemo(() => ({
