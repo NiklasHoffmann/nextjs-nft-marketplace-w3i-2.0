@@ -496,8 +496,6 @@ export function ActiveItemsList() {
                             <div>
                                 <div className="font-medium text-blue-700">Live Stats:</div>
                                 <ul className="text-blue-600 ml-4 mt-1 space-y-1">
-                                    <li>• {items.length} total items • {cachedCount} cached</li>
-                                    <li>• {visibleCount}/{items.length} rendered • {loadingCount} loading</li>
                                     <li>• {safeItems.length} total items • {cachedCount} cached</li>
                                     <li>• {visibleCount}/{safeItems.length} rendered • {loadingCount} loading</li>
                                     <li>• Memory usage: {memoryUsage}</li>
