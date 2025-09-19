@@ -336,7 +336,7 @@ export function ActiveItemsList() {
                     {/* Performance Indicators - Admin Only */}
                     <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
                         <div className="bg-white p-3 rounded-lg shadow-sm">
-                            <div className="font-semibold text-blue-600">{items.length}</div>
+                            <div className="font-semibold text-blue-600">{safeItems.length}</div>
                             <div className="text-gray-600">Total Items</div>
                         </div>
                         <div className="bg-white p-3 rounded-lg shadow-sm">
