@@ -167,47 +167,47 @@ export function useActiveItems() {
         fetchPolicy: 'cache-and-network',
     });
 
-    // Extract raw marketplace items from GraphQL
-    const marketplaceItems = useMemo(() => {
+    // raw list from Graph, safely default to empty array
+    const rawItems = data?.items ?? [];
 
-        // Combine real data with custom NFTs
-        const realItems = data.items.map((item: MarketplaceItem) => ({
-            contractAddress: item.nftAddress,
-            tokenId: item.tokenId,
-            listingId: item.listingId,
-            price: item.price,
-            seller: item.seller,
-            buyer: item.buyer,
-            isListed: item.isListed,
-            desiredNftAddress: item.desiredNftAddress,
-            desiredTokenId: item.desiredTokenId,
-        }));
+    // map only after we know we have an array
+    const items = useMemo(
+        () =>
+            rawItems.map((e: any) => ({
+                nftAddress: e.nftAddress,
+                tokenId: e.tokenId,
+                listingId: e.listingId,
+                price: e.price,
+                seller: e.seller,
+                buyer: e.buyer,
+                isListed: e.isListed,
+                desiredNftAddress: e.desiredNftAddress,
+                desiredTokenId: e.desiredTokenId,
+            })),
+        [rawItems]
+    );
 
-        // Add custom NFTs at the beginning
-        return [...realItems];
-    }, [data]);
-
-    // Smart preloading - only visible items
+    // use items from above everywhere below
     useEffect(() => {
-        if (marketplaceItems.length > 0) {
-            const visibleItems = marketplaceItems.slice(0, 12); // First 12 items
-            const nftsToPreload = visibleItems.map((item: any) => ({
-                nftAddress: item.contractAddress,
-                tokenId: item.tokenId,
+        if (items.length > 0) {
+            const firstBatch = items.slice(0, 12).map((e: MarketplaceItem) => ({
+                nftAddress: e.nftAddress,
+                tokenId: e.tokenId,
             }));
-
-            preloader.preloadMultipleNFTs(nftsToPreload);
+            preloader.preloadMultipleNFTs(firstBatch);
         }
-    }, [marketplaceItems, preloader]);
+    }, [items, preloader]);
 
-    // Enrich marketplace data with NFT context
-    const enrichedItems = useMemo((): EnrichedMarketplaceItem[] => {
-        return marketplaceItems.map((item: any) => {
-            const nftData = getNFTData(item.contractAddress, item.tokenId);
-
-            return enrichMarketplaceItem(item, nftData);
+    // Enrich marketplace items with NFT data
+    const enrichedItems = useMemo(() => {
+        return items.map((marketplaceItem: MarketplaceItem) => {
+            const nftData = getNFTData(marketplaceItem.nftAddress, marketplaceItem.tokenId);
+            return enrichMarketplaceItem(marketplaceItem, nftData);
         });
-    }, [marketplaceItems, getNFTData]);
+    }, [items, getNFTData]);
+
+    // Expose raw items for NFTCard props
+    const marketplaceItems = items;
 
     return {
         items: enrichedItems,
@@ -217,7 +217,7 @@ export function useActiveItems() {
         refetch,
         // Convenience accessors
         totalCount: enrichedItems.length,
-        hasRealData: enrichedItems.some(item => item.hasRealMetadata),
+        hasRealData: enrichedItems.some((item: EnrichedMarketplaceItem) => item.hasRealMetadata),
     };
 }
 
