@@ -131,6 +131,8 @@ export interface NFTDetailData {
     seller: string | null;
     owner: string | null;
     listingId: string | null;
+    desiredNftAddress?: string | null;
+    desiredTokenId?: string | number | null;
     insights: AdminNFTInsight | null;
     stats: NFTStats | null;
     contractInfo: NFTContractInfo | null;
