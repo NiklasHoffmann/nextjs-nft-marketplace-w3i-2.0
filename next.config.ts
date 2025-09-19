@@ -23,37 +23,37 @@ const nextConfig: import('next').NextConfig = {
     }
 
     // Bundle analyzer optimization
-    config.optimization = {
-      ...config.optimization,
-      splitChunks: {
-        chunks: 'all',
-        cacheGroups: {
-          default: {
-            minChunks: 2,
-            priority: -20,
-            reuseExistingChunk: true,
-          },
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            priority: -10,
-            reuseExistingChunk: true,
-          },
-          web3: {
-            test: /[\\/]node_modules[\\/](wagmi|viem|@rainbow-me|@walletconnect)/,
-            name: 'web3',
-            priority: 10,
-            reuseExistingChunk: true,
-          },
-          apollo: {
-            test: /[\\/]node_modules[\\/]@apollo/,
-            name: 'apollo',
-            priority: 5,
-            reuseExistingChunk: true,
-          }
-        }
-      }
-    };
+    // config.optimization = {
+    //   ...config.optimization,
+    //   splitChunks: {
+    //     chunks: 'all',
+    //     cacheGroups: {
+    //       default: {
+    //         minChunks: 2,
+    //         priority: -20,
+    //         reuseExistingChunk: true,
+    //       },
+    //       vendor: {
+    //         test: /[\\/]node_modules[\\/]/,
+    //         name: 'vendors',
+    //         priority: -10,
+    //         reuseExistingChunk: true,
+    //       },
+    //       web3: {
+    //         test: /[\\/]node_modules[\\/](wagmi|viem|@rainbow-me|@walletconnect)/,
+    //         name: 'web3',
+    //         priority: 10,
+    //         reuseExistingChunk: true,
+    //       },
+    //       apollo: {
+    //         test: /[\\/]node_modules[\\/]@apollo/,
+    //         name: 'apollo',
+    //         priority: 5,
+    //         reuseExistingChunk: true,
+    //       }
+    //     }
+    //   }
+    // };
 
     return config;
   },

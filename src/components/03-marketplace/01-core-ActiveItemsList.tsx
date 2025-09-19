@@ -50,6 +50,7 @@ export function ActiveItemsList() {
 
     // Get real marketplace data from The Graph + NFT Context
     const { items, marketplaceItems, loading: graphLoading, error: graphError, refetch } = useActiveItems();
+    const safeItems = items ?? []; // <- Guard
 
     // Debug logging
     console.log('ActiveItemsList Debug:', {
@@ -114,7 +115,7 @@ export function ActiveItemsList() {
 
     // Convert items to filterable format (already enriched with NFT context data)
     const filterableItems: FilterableNFTItem[] = useMemo(() => {
-        return items.map((item: any) => ({
+        return safeItems.map((item: any) => ({
             contractAddress: item.contractAddress,
             tokenId: item.tokenId,
             price: item.price,
@@ -138,7 +139,7 @@ export function ActiveItemsList() {
             tags: item.tags,
             imageUrl: item.imageUrl,
         }));
-    }, [items]);
+    }, [safeItems]);
 
     // Apply filters and sorting
     const { filteredItems, totalCount, filteredCount } = useNFTFilters(
@@ -476,7 +477,7 @@ export function ActiveItemsList() {
             </div>
 
             {/* Optimized Performance Summary - Admin Only */}
-            {isAdmin && items.length > 0 && (
+            {isAdmin && safeItems.length > 0 && (
                 <div className="max-w-7xl mx-auto px-6 mt-8">
                     <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                         <h3 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
@@ -497,6 +498,8 @@ export function ActiveItemsList() {
                                 <ul className="text-blue-600 ml-4 mt-1 space-y-1">
                                     <li>• {items.length} total items • {cachedCount} cached</li>
                                     <li>• {visibleCount}/{items.length} rendered • {loadingCount} loading</li>
+                                    <li>• {safeItems.length} total items • {cachedCount} cached</li>
+                                    <li>• {visibleCount}/{safeItems.length} rendered • {loadingCount} loading</li>
                                     <li>• Memory usage: {memoryUsage}</li>
                                 </ul>
                             </div>

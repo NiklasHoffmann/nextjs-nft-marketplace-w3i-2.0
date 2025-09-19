@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   title: "W3I Marketplace v2.0",
   description: "A decentralized marketplace for Utility NFTs services.",
   robots: { index: false, follow: false },
-  metadataBase: new URL("https://ideationmarket.com"),
+  metadataBase: new URL("https://hoffmann-niklas.de"),
   icons: [{ rel: "icon", url: "/media/only-lightbulb-favicone.ico" }],
 };
 
