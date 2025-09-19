@@ -52,16 +52,6 @@ export function ActiveItemsList() {
     const { items, marketplaceItems, loading: graphLoading, error: graphError, refetch } = useActiveItems();
     const safeItems = items ?? []; // <- Guard
 
-    // Debug logging
-    console.log('ActiveItemsList Debug:', {
-        itemsCount: items?.length || 0,
-        marketplaceItemsCount: marketplaceItems?.length || 0,
-        graphLoading,
-        graphError: graphError?.message || null,
-        hasRefetch: !!refetch,
-        items: items || []
-    });
-
     // Auto-refresh when page becomes visible (e.g., when returning from detail page)
     useEffect(() => {
         const handleVisibilityChange = () => {
