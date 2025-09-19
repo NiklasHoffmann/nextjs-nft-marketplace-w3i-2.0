@@ -6,10 +6,11 @@ import { useRouter } from 'next/navigation';
 import { formatEther as formatEtherViem } from 'viem';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useETHPrice } from '@/contexts/CurrencyContext';
-import { useCurrency } from '@/contexts/CurrencyContext';
+import { useETHPrice } from '@/contexts/OptimizedCurrencyContext';
+import { useCurrency } from '@/contexts/OptimizedCurrencyContext';
 import { useMarketplaceUser } from '@/hooks';
 import { getMarketplaceAddress } from '@/utils';
+import { WalletNFTsList } from '@/components';
 
 // Force dynamic rendering for this page to prevent SSG issues
 export const dynamic = 'force-dynamic';
@@ -50,6 +51,7 @@ export default function WalletDashboard() {
 function WalletDashboardContent() {
     const router = useRouter();
     const { address, isConnected, chainId } = useAccount();
+    console.log('WalletDashboard - address:', address, 'isConnected:', isConnected, 'chainId:', chainId);
     const { data: balance, isLoading: balanceLoading, error: balanceError, refetch: refetchBalance } = useBalance({
         address: address,
         query: {
@@ -411,6 +413,7 @@ function WalletDashboardContent() {
                     </div>
                 </div>
 
+                <WalletNFTsList walletAddress={address} />
                 {/* NFT Collection */}
                 <div className="bg-white rounded-2xl shadow-lg p-6">
                     <div className="flex items-center justify-between mb-6">

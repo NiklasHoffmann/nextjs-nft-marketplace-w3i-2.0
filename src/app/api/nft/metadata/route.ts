@@ -1,8 +1,8 @@
-// app/api/nft-metadata/route.ts
+// app/api/nft-metadata/route.ts - Optimized Version
 import { NextRequest, NextResponse } from 'next/server';
 import { LRUCache } from 'lru-cache';
-import { createPublicClient, http } from 'viem';
-import { sepolia, mainnet } from 'viem/chains';
+import { fetchComprehensiveNFTDataNew } from '@/utils/04-blockchain/nft-data-fetcher';
+import { createRobustPublicClient, getTimeoutConfig } from '@/utils/04-blockchain/rpc-config';
 
 // Enhanced server-side cache für NFT Metadaten mit größerem TTL und besserer Performance
 const metadataCache = new LRUCache<string, any>({
@@ -16,12 +16,6 @@ const metadataCache = new LRUCache<string, any>({
 const imageCache = new LRUCache<string, string>({
     max: 1000,
     ttl: 1000 * 60 * 60 * 6, // 6 Stunden TTL für Images
-});
-
-// Response cache with compression headers
-const responseCache = new LRUCache<string, Response>({
-    max: 500,
-    ttl: 1000 * 60 * 15, // 15 Minuten für Response Cache
 });
 
 export async function GET(request: NextRequest) {
@@ -39,47 +33,73 @@ export async function GET(request: NextRequest) {
     const cacheKey = `${nftAddress}-${tokenId}`;
 
     try {
+        // Clear cache for custom NFTs during development
+        if (process.env.NODE_ENV === 'development') {
+            metadataCache.delete(cacheKey);
+        }
+
         // Check cache first
         const cachedMetadata = metadataCache.get(cacheKey);
         if (cachedMetadata) {
             // Return with optimized headers
             const response = NextResponse.json({
-                metadata: cachedMetadata.metadata,
-                imageUrl: cachedMetadata.imageUrl,
+                ...cachedMetadata,
                 cached: true
             });
 
-            // Add cache headers for client-side caching
-            response.headers.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+            response.headers.set('Cache-Control', 'public, max-age=3600, s-maxage=7200');
             response.headers.set('CDN-Cache-Control', 'public, max-age=86400');
+            response.headers.set('Vary', 'Accept-Encoding');
+
             return response;
         }
 
-        // Fetch tokenURI from blockchain (simulate for now)
-        // In production, you would call your Web3 provider here
-        const tokenURI = await fetchTokenURIFromBlockchain(nftAddress, tokenId);
+        // Use the optimized blockchain data fetcher
+        const blockchainData = await fetchComprehensiveNFTDataNew(nftAddress, tokenId);
 
-        if (!tokenURI) {
-            return NextResponse.json(
-                { error: 'Could not fetch tokenURI from blockchain' },
-                { status: 404 }
-            );
+        if (!blockchainData?.tokenURI) {
+            console.warn('No tokenURI available, cannot fetch metadata');
+            return NextResponse.json({ error: 'No tokenURI available' }, { status: 404 });
         }
 
-        // Process metadata
-        const { metadata, imageUrl } = await processMetadata(tokenURI);
+        // Process metadata from tokenURI
+        let metadata = null;
+        let imageUrl = null;
+
+        try {
+            const { metadata: processedMetadata, imageUrl: processedImageUrl } = await processMetadata(blockchainData.tokenURI);
+            metadata = processedMetadata;
+            imageUrl = processedImageUrl;
+        } catch (metadataError) {
+            console.error('Error processing metadata:', metadataError);
+            // Continue with blockchain data even if metadata processing fails
+        }
+
+        // Prepare comprehensive response
+        const result = {
+            nftAddress,
+            tokenId,
+            metadata,
+            imageUrl,
+            blockchain: {
+                tokenURI: blockchainData.tokenURI,
+                name: blockchainData.contractName,
+                symbol: blockchainData.contractSymbol,
+                totalSupply: blockchainData.totalSupply,
+                owner: blockchainData.owner,
+                ownerBalance: blockchainData.ownerBalance,
+                approvedAddress: blockchainData.approvedAddress,
+            },
+            cached: false
+        };
 
         // Cache the result
-        metadataCache.set(cacheKey, { metadata, imageUrl });
+        metadataCache.set(cacheKey, result);
         if (imageUrl) {
             imageCache.set(`image-${cacheKey}`, imageUrl);
         }
 
-        return NextResponse.json({
-            metadata,
-            imageUrl,
-            cached: false
-        });
+        return NextResponse.json(result);
 
     } catch (error) {
         console.error('Error fetching NFT metadata:', error);
@@ -87,69 +107,6 @@ export async function GET(request: NextRequest) {
             { error: 'Failed to fetch NFT metadata' },
             { status: 500 }
         );
-    }
-}
-
-async function fetchTokenURIFromBlockchain(nftAddress: string, tokenId: string): Promise<string | null> {
-    try {
-        // ERC721 ABI für tokenURI
-        const ERC721_ABI = [
-            {
-                name: 'tokenURI',
-                type: 'function',
-                stateMutability: 'view',
-                inputs: [{ name: 'tokenId', type: 'uint256' }],
-                outputs: [{ name: '', type: 'string' }],
-            },
-        ] as const;
-
-        // Konfiguration für verschiedene Chains
-        const getChainConfig = () => {
-            const sepoliaRpcUrl = process.env.ALCHEMY_URL || process.env.INFURA_URL || 'https://rpc.sepolia.org';
-            return {
-                chain: sepolia,
-                rpcUrl: sepoliaRpcUrl
-            };
-        };
-
-        // Validate address format
-        if (!/^0x[a-fA-F0-9]{40}$/.test(nftAddress)) {
-            console.error('Invalid NFT address format');
-            return null;
-        }
-
-        // Convert tokenId to BigInt with validation
-        let tokenIdBigInt: bigint;
-        try {
-            tokenIdBigInt = BigInt(tokenId);
-        } catch (error) {
-            console.error('Invalid tokenId - must be a valid number');
-            return null;
-        }
-
-        const chainConfig = getChainConfig();
-        const publicClient = createPublicClient({
-            chain: chainConfig.chain,
-            transport: http(chainConfig.rpcUrl)
-        });
-
-        // Call tokenURI function on the contract with timeout
-        const tokenURI = await Promise.race([
-            publicClient.readContract({
-                address: nftAddress as `0x${string}`,
-                abi: ERC721_ABI,
-                functionName: 'tokenURI',
-                args: [tokenIdBigInt],
-            }),
-            new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error('Request timeout')), 10000)
-            )
-        ]);
-
-        return tokenURI as string;
-    } catch (error) {
-        console.error('Error calling Web3 directly:', error);
-        return null;
     }
 }
 
@@ -161,48 +118,88 @@ async function processMetadata(tokenURI: string): Promise<{ metadata: any; image
         metadataUri = metadataUri.replace('ipfs://', 'https://ipfs.io/ipfs/');
     }
 
-    let metadata: any;
+    // Fetch metadata with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
     try {
-        // Handle data URIs
-        if (metadataUri.startsWith('data:application/json;base64,')) {
-            const base64Data = metadataUri.replace('data:application/json;base64,', '');
-            const jsonString = atob(base64Data);
-            metadata = JSON.parse(jsonString);
-        } else {
-            // Fetch from HTTP/HTTPS with timeout
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+        const metadataResponse = await fetch(metadataUri, {
+            signal: controller.signal,
+            headers: {
+                'Accept': 'application/json',
+            },
+        });
 
-            const response = await fetch(metadataUri, {
-                signal: controller.signal,
-                headers: {
-                    'User-Agent': 'NFT-Marketplace/1.0',
-                    'Cache-Control': 'public, max-age=3600',
-                    'Accept': 'application/json',
-                },
-            });
+        clearTimeout(timeoutId);
 
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            metadata = await response.json();
+        if (!metadataResponse.ok) {
+            throw new Error(`Failed to fetch metadata: ${metadataResponse.status}`);
         }
 
-        // Process image URL
-        let imageUrl: string | null = null;
-        if (metadata.image) {
-            imageUrl = metadata.image.startsWith('ipfs://')
-                ? metadata.image.replace('ipfs://', 'https://ipfs.io/ipfs/')
-                : metadata.image;
+        const metadata = await metadataResponse.json();
+
+        // Extract and process image URL
+        let imageUrl = metadata.image || metadata.image_url || metadata.imageUrl || null;
+
+        if (imageUrl && imageUrl.startsWith('ipfs://')) {
+            imageUrl = imageUrl.replace('ipfs://', 'https://ipfs.io/ipfs/');
         }
 
         return { metadata, imageUrl };
+
     } catch (error) {
-        console.error('Error processing metadata:', error);
+        clearTimeout(timeoutId);
+        console.error('Error fetching metadata from URI:', error);
         return { metadata: null, imageUrl: null };
+    }
+}
+
+async function getTokenURIWithFallback(nftAddress: string, tokenId: string): Promise<string | null> {
+    try {
+        // Enhanced ERC721 ABI for tokenURI function
+        const ERC721_ABI = [
+            {
+                name: 'tokenURI',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [{ name: 'tokenId', type: 'uint256' }],
+                outputs: [{ name: '', type: 'string' }],
+            },
+        ] as const;
+
+        // Validate inputs
+        if (!/^0x[a-fA-F0-9]{40}$/.test(nftAddress)) {
+            console.error('Invalid NFT address format');
+            return null;
+        }
+
+        let tokenIdBigInt: bigint;
+        try {
+            tokenIdBigInt = BigInt(tokenId);
+        } catch (error) {
+            console.error('Invalid tokenId - must be a valid number');
+            return null;
+        }
+
+        // Verwende den robusten PublicClient
+        const publicClient = createRobustPublicClient();
+
+        // Call tokenURI function on the contract with timeout
+        const tokenURI = await Promise.race([
+            publicClient.readContract({
+                address: nftAddress as `0x${string}`,
+                abi: ERC721_ABI,
+                functionName: 'tokenURI',
+                args: [tokenIdBigInt],
+            }),
+            new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('Request timeout')), getTimeoutConfig('critical'))
+            )
+        ]);
+
+        return tokenURI as string;
+    } catch (error) {
+        console.error('Error calling Web3 directly:', error);
+        return null;
     }
 }

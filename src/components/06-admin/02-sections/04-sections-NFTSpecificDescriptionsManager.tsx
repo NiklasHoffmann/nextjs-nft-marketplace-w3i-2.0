@@ -1,9 +1,29 @@
 "use client";
 
 import React from 'react';
-import { TitleDescriptionManager, NFTCardDescriptionsManager } from '../03-forms';
+import { TitleDescriptionManager } from '../03-forms';
 
-import type { NFTProjectDescriptions, NFTFunctionalitiesDescriptions } from "@/types/05-features/03-nft-insights";
+import type { NFTProjectDescriptions, NFTFunctionalitiesDescriptions, TitleDescriptionPair } from "@/types/05-features/03-nft-insights";
+
+// Helper function to convert string[] to TitleDescriptionPair[] for card descriptions
+const convertCardDescriptionsToTitlePairs = (descriptions: string[]): TitleDescriptionPair[] => {
+    // For card descriptions, don't create empty entries automatically
+    // Start with empty array to implement button-first pattern
+    if (descriptions.length === 0) {
+        return [];
+    }
+
+    return descriptions.map((desc, index) => ({
+        id: `card-desc-${index}`, // Stable ID based on index only
+        title: '', // Empty title for card descriptions
+        descriptions: [desc],
+        createdAt: new Date(),
+        updatedAt: new Date()
+    }));
+};// Helper function to convert TitleDescriptionPair[] back to string[] for card descriptions
+const convertTitlePairsToCardDescriptions = (pairs: TitleDescriptionPair[]): string[] => {
+    return pairs.map(pair => pair.descriptions[0] || '');
+};
 
 interface NFTSpecificDescriptionsManagerProps {
     projectDescriptions: NFTProjectDescriptions;
@@ -27,7 +47,7 @@ const NFTSpecificDescriptionsManager: React.FC<NFTSpecificDescriptionsManagerPro
     onActiveTabChange
 }) => {
     return (
-        <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
+        <div className="space-y-4 border-t pt-6">
             <div className="flex items-center justify-between mb-4">
                 <div>
                     <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
@@ -36,8 +56,8 @@ const NFTSpecificDescriptionsManager: React.FC<NFTSpecificDescriptionsManagerPro
                         </svg>
                         NFT-Specific Descriptions
                     </h3>
-                    <p className="text-sm text-blue-700">
-                        Specific descriptions for this individual NFT (shown in NFT detail view)
+                    <p className="text-sm">
+                        Specific descriptions for this individual NFT
                     </p>
                 </div>
             </div>
@@ -55,7 +75,6 @@ const NFTSpecificDescriptionsManager: React.FC<NFTSpecificDescriptionsManagerPro
                                 }`}
                         >
                             <div className="flex items-center">
-                                <span className="mr-2">📋</span>
                                 Projekt-Beschreibungen
                                 <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                     {projectDescriptions.titleDescriptionPairs.length}
@@ -71,7 +90,6 @@ const NFTSpecificDescriptionsManager: React.FC<NFTSpecificDescriptionsManagerPro
                                 }`}
                         >
                             <div className="flex items-center">
-                                <span className="mr-2">⚙️</span>
                                 Funktionalitäts-Beschreibungen
                                 <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                     {functionalitiesDescriptions.titleDescriptionPairs.length}
@@ -87,7 +105,6 @@ const NFTSpecificDescriptionsManager: React.FC<NFTSpecificDescriptionsManagerPro
                                 }`}
                         >
                             <div className="flex items-center">
-                                <span className="mr-2">🎴</span>
                                 NFT Card Descriptions
                                 <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                                     {cardDescriptions.length}
@@ -135,11 +152,24 @@ const NFTSpecificDescriptionsManager: React.FC<NFTSpecificDescriptionsManagerPro
                         </div>
                     ) : (
                         <div className="border border-purple-200 rounded-lg p-4 bg-purple-50">
-                            <NFTCardDescriptionsManager
-                                descriptions={cardDescriptions}
-                                onChange={onCardDescriptionsChange}
+                            <div className="mb-4">
+                                <h3 className="text-lg font-semibold text-purple-800 mb-2">NFT Card Descriptions</h3>
+                                <p className="text-sm text-purple-600">
+                                    Diese Beschreibungen werden direkt in den <strong>NFT Cards</strong> angezeigt und enthalten kurze, prägnante Informationen.
+                                </p>
+                            </div>
+                            <TitleDescriptionManager
+                                label="NFT Card Descriptions"
+                                helpText="Kurze, prägnante Beschreibungen für NFT-Karten (max. 80 Zeichen pro Beschreibung, max. 2 Beschreibungen)"
+                                descriptions={{ titleDescriptionPairs: convertCardDescriptionsToTitlePairs(cardDescriptions) }}
+                                onChange={(newDescriptions) => {
+                                    const updatedCardDescriptions = convertTitlePairsToCardDescriptions(newDescriptions.titleDescriptionPairs);
+                                    onCardDescriptionsChange(updatedCardDescriptions);
+                                }}
+                                hideTitle={true}
                                 maxDescriptions={2}
                                 maxCharactersPerDescription={80}
+                                placeholderDescription="z.B. 'Access to exclusive features'"
                             />
                         </div>
                     )}

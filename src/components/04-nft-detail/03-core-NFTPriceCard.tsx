@@ -12,6 +12,8 @@ function NFTPriceCard({
     // Memoize price formatting
     const formattedPrice = useMemo(() => formatEther(price), [price]);
 
+
+    console.log('NFTPriceCard Rendered with price:', price, 'isListed:', isListed);
     // Memoize status styling
     const statusConfig = useMemo(() => ({
         className: isListed

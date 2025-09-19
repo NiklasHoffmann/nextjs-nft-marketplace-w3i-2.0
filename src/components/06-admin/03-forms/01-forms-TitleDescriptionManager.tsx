@@ -37,6 +37,9 @@ interface TitleDescriptionManagerProps {
     onChange: (descriptions: DescriptionStructure) => void;
     placeholderTitle?: string;
     placeholderDescription?: string;
+    hideTitle?: boolean; // New option to hide title input
+    maxDescriptions?: number; // For simple description mode
+    maxCharactersPerDescription?: number; // For simple description mode
 }
 
 export default function TitleDescriptionManager({
@@ -45,22 +48,32 @@ export default function TitleDescriptionManager({
     descriptions,
     onChange,
     placeholderTitle = "z.B. 'Exklusive Features', 'Utility & Benefits', 'Roadmap Highlights'",
-    placeholderDescription = "Beschreibung für diesen Titel"
+    placeholderDescription = "Beschreibung für diesen Titel",
+    hideTitle = false,
+    maxDescriptions = 10,
+    maxCharactersPerDescription = 200
 }: TitleDescriptionManagerProps) {
 
     // Ensure descriptions has a proper structure
+    // For hideTitle mode, allow empty titleDescriptionPairs for button-first pattern
     const safeDescriptions: DescriptionStructure = descriptions || {
-        titleDescriptionPairs: [createEmptyPair()]
+        titleDescriptionPairs: hideTitle ? [] : [createEmptyPair()]
     };
 
     const addTitleDescriptionPair = useCallback(() => {
+        const currentPairs = safeDescriptions?.titleDescriptionPairs || [];
+        // For hideTitle mode, check if we're under maxDescriptions limit
+        if (hideTitle && currentPairs.length >= maxDescriptions) {
+            return;
+        }
+
         const newPair = createEmptyPair();
         const updated: DescriptionStructure = {
             ...safeDescriptions,
-            titleDescriptionPairs: [...(safeDescriptions?.titleDescriptionPairs || []), newPair]
+            titleDescriptionPairs: [...currentPairs, newPair]
         };
         onChange(updated);
-    }, [safeDescriptions, onChange]);
+    }, [safeDescriptions, onChange, hideTitle, maxDescriptions]);
 
     const removeTitleDescriptionPair = useCallback((pairId: string) => {
         const currentPairs = safeDescriptions?.titleDescriptionPairs || [];
@@ -151,9 +164,11 @@ export default function TitleDescriptionManager({
                     </p>
                 </div>
                 <div className="text-right">
-                    <div className="text-xs text-gray-500">
-                        {activePairs} von {totalPairs} Titel aktiv
-                    </div>
+                    {label !== "NFT Card Descriptions" && (
+                        <div className="text-xs text-gray-500">
+                            {activePairs} von {totalPairs} Titel aktiv
+                        </div>
+                    )}
                     <div className="text-xs text-gray-500">
                         {totalDescriptions} Beschreibungen gesamt
                     </div>
@@ -161,141 +176,163 @@ export default function TitleDescriptionManager({
             </div>
 
             {/* Title-Description Pairs */}
-            <div className="space-y-6">
-                {titleDescriptionPairs.map((pair: TitleDescriptionPair, pairIndex: number) => (
-                    <div key={pair.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                        {/* Pair Header */}
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                                    <span className="text-sm font-semibold text-blue-600">
-                                        {pairIndex + 1}
-                                    </span>
-                                </div>
-                                <h4 className="text-sm font-medium text-gray-700">
-                                    Titel & Beschreibungen
-                                </h4>
-                            </div>
-                            {titleDescriptionPairs.length > 1 && (
-                                <button
-                                    type="button"
-                                    onClick={() => removeTitleDescriptionPair(pair.id)}
-                                    className="p-2 text-red-600 hover:bg-red-100 rounded-md transition-colors"
-                                    title="Titel-Beschreibungs-Paar entfernen"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Title Input */}
-                        <div className="mb-4">
-                            <label className="block text-xs font-medium text-gray-600 mb-2">
-                                Titel
-                            </label>
-                            <input
-                                type="text"
-                                value={pair.title}
-                                onChange={(e) => updatePairTitle(pair.id, e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                placeholder={placeholderTitle}
-                            />
-                        </div>
-
-                        {/* Descriptions */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <label className="block text-xs font-medium text-gray-600">
-                                    Beschreibungen
-                                </label>
-                                <span className="text-xs text-gray-500">
-                                    {pair.descriptions.filter((desc: string) => desc.trim().length > 0).length} aktiv
-                                </span>
-                            </div>
-
-                            {pair.descriptions.map((description: string, descIndex: number) => (
-                                <div key={descIndex} className="flex gap-3 items-start">
-                                    {/* Description Number */}
-                                    <div className="flex-shrink-0 w-6 h-8 bg-green-100 rounded flex items-center justify-center">
-                                        <span className="text-xs font-medium text-green-600">
-                                            {descIndex + 1}
+            {titleDescriptionPairs.length > 0 ? (
+                <div className="space-y-6">
+                    {titleDescriptionPairs.map((pair: TitleDescriptionPair, pairIndex: number) => (
+                        <div key={pair.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            {/* Pair Header */}
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                                        <span className="text-sm font-semibold text-blue-600">
+                                            {pairIndex + 1}
                                         </span>
                                     </div>
-
-                                    {/* Description Input */}
-                                    <div className="flex-1">
-                                        <textarea
-                                            value={description}
-                                            onChange={(e) => updateDescription(pair.id, descIndex, e.target.value)}
-                                            rows={2}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white text-sm"
-                                            placeholder={`${placeholderDescription} ${descIndex + 1} für "${pair.title || 'diesen Titel'}"`}
-                                        />
-                                        {description.trim().length > 0 && (
-                                            <div className="mt-1 text-xs text-gray-400">
-                                                {description.trim().length} Zeichen
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Remove Description Button */}
-                                    <div className="flex-shrink-0">
-                                        {pair.descriptions.length > 1 ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => removeDescriptionFromPair(pair.id, descIndex)}
-                                                className="w-8 h-8 bg-red-100 text-red-600 hover:bg-red-200 rounded flex items-center justify-center transition-colors"
-                                                title="Beschreibung entfernen"
-                                            >
-                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                            </button>
-                                        ) : (
-                                            <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
-                                                <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                                </svg>
-                                            </div>
-                                        )}
-                                    </div>
+                                    {!hideTitle && (
+                                        <h4 className="text-sm font-medium text-gray-700">
+                                            Titel & Beschreibungen
+                                        </h4>
+                                    )}
+                                    {hideTitle && (
+                                        <h4 className="text-sm font-medium text-gray-700">
+                                            Beschreibung {pairIndex + 1}
+                                        </h4>
+                                    )}
                                 </div>
-                            ))}
+                                {titleDescriptionPairs.length > 1 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => removeTitleDescriptionPair(pair.id)}
+                                        className="p-2 text-red-600 hover:bg-red-100 rounded-md transition-colors"
+                                        title={hideTitle ? "Beschreibung entfernen" : "Titel-Beschreibungs-Paar entfernen"}
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                )}
+                            </div>
 
-                            {/* Add Description Button */}
-                            <button
-                                type="button"
-                                onClick={() => addDescriptionToPair(pair.id)}
-                                className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors"
-                            >
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                </svg>
-                                Beschreibung hinzufügen
-                            </button>
+                            {/* Title Input - only show if hideTitle is false */}
+                            {!hideTitle && (
+                                <div className="mb-4">
+                                    <label className="block text-xs font-medium text-gray-600 mb-2">
+                                        Titel
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={pair.title}
+                                        onChange={(e) => updatePairTitle(pair.id, e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                        placeholder={placeholderTitle}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Descriptions */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-xs font-medium text-gray-600">
+                                        Beschreibungen
+                                    </label>
+                                    <span className="text-xs text-gray-500">
+                                        {pair.descriptions.filter((desc: string) => desc.trim().length > 0).length} aktiv
+                                    </span>
+                                </div>
+
+                                {pair.descriptions.map((description: string, descIndex: number) => (
+                                    <div key={descIndex} className="flex gap-3 items-start">
+                                        {/* Description Number */}
+                                        <div className="flex-shrink-0 w-6 h-8 bg-green-100 rounded flex items-center justify-center">
+                                            <span className="text-xs font-medium text-green-600">
+                                                {descIndex + 1}
+                                            </span>
+                                        </div>
+
+                                        {/* Description Input */}
+                                        <div className="flex-1">
+                                            <textarea
+                                                value={description}
+                                                onChange={(e) => updateDescription(pair.id, descIndex, e.target.value)}
+                                                rows={hideTitle ? 1 : 2}
+                                                maxLength={hideTitle ? maxCharactersPerDescription : undefined}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white text-sm"
+                                                placeholder={hideTitle
+                                                    ? `Beschreibung ${descIndex + 1}`
+                                                    : `${placeholderDescription} ${descIndex + 1} für "${pair.title || 'diesen Titel'}"`
+                                                }
+                                            />
+                                            {description.trim().length > 0 && (
+                                                <div className="mt-1 text-xs text-gray-400">
+                                                    {description.trim().length} Zeichen
+                                                    {hideTitle && maxCharactersPerDescription && (
+                                                        <span className={description.length > maxCharactersPerDescription * 0.8 ? 'text-red-600' : ''}>
+                                                            /{maxCharactersPerDescription}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Remove Description Button */}
+                                        <div className="flex-shrink-0">
+                                            {pair.descriptions.length > 1 ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeDescriptionFromPair(pair.id, descIndex)}
+                                                    className="w-8 h-8 bg-red-100 text-red-600 hover:bg-red-200 rounded flex items-center justify-center transition-colors"
+                                                    title="Beschreibung entfernen"
+                                                >
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            ) : (
+                                                <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
+                                                    <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                    </svg>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {/* Add Description Button */}
+                                <button
+                                    type="button"
+                                    onClick={() => addDescriptionToPair(pair.id)}
+                                    className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors"
+                                >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                    </svg>
+                                    Beschreibung hinzufügen
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            ) : null}
 
             {/* Add New Title-Description Pair */}
-            <div className="border-t pt-4">
-                <button
-                    type="button"
-                    onClick={addTitleDescriptionPair}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
-                >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Neuen Titel mit Beschreibungen hinzufügen
-                </button>
-            </div>
+            {(!hideTitle || totalPairs < maxDescriptions) && (
+                <div className="border-t pt-4">
+                    <button
+                        type="button"
+                        onClick={addTitleDescriptionPair}
+                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200 flex items-center justify-center"
+                    >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        {hideTitle ? 'Beschreibung hinzufügen' : 'Neuen Titel mit Beschreibungen hinzufügen'}
+                    </button>
+                </div>
+            )}
 
             {/* Preview */}
-            {activePairs > 0 && (
+            {activePairs > 0 && !hideTitle && (
                 <div className="border-t pt-4">
                     <h4 className="text-sm font-medium text-gray-700 mb-3">Preview der Struktur:</h4>
                     <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">

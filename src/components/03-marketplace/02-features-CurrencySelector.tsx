@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useCurrency, Currency } from '@/contexts/CurrencyContext';
+import { useCurrency, Currency } from '@/contexts/OptimizedCurrencyContext';
 
 export default function CurrencySelector() {
     const { selectedCurrency, setCurrency, currencies } = useCurrency();

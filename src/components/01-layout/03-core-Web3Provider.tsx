@@ -5,9 +5,11 @@ import { WagmiProvider } from 'wagmi'
 import { wagmiConfig } from '@/config/wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import { ReactNode, useState } from 'react'
+import { ReactNode, useState, useEffect } from 'react'
 
 export default function Web3Provider({ children }: { children: ReactNode }) {
+    const [mounted, setMounted] = useState(false)
+
     // React Query: optimized for Web3 operations
     const [queryClient] = useState(
         () =>
@@ -28,10 +30,31 @@ export default function Web3Provider({ children }: { children: ReactNode }) {
             })
     );
 
+    // Prevent hydration errors
+    useEffect(() => {
+        setMounted(true)
+    }, [])
+
+    // Zeige einen Loader während der Hydration
+    if (!mounted) {
+        return (
+            <div className="min-h-screen bg-white">
+                <div className="flex items-center justify-center h-screen">
+                    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <WagmiProvider config={wagmiConfig}>
             <QueryClientProvider client={queryClient}>
-                <RainbowKitProvider theme={darkTheme()}>
+                <RainbowKitProvider
+                    theme={darkTheme()}
+                    modalSize="compact"
+                    showRecentTransactions={true}
+                    initialChain={wagmiConfig.chains[0]} // Setzt Sepolia als Standard
+                >
                     {children}
                 </RainbowKitProvider>
                 {/* React Query Devtools only in development */}

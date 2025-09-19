@@ -12,7 +12,7 @@ interface NFTStats {
   lastViewed?: string;
 }
 
-// GET /api/stats/nft - Get NFT statistics
+// GET /api/nft/stats - Get NFT statistics
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/stats/nft - Record NFT view
+// POST /api/nft/stats - Record NFT view
 export async function POST(request: NextRequest) {
   try {
     const { contractAddress, tokenId, userId } = await request.json();

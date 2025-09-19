@@ -4,8 +4,10 @@ import React, { type ErrorInfo } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { ApolloProvider } from "@apollo/client/react";
 import apolloClient from "../../config/apolloClient";
-import { CurrencyProvider } from "@/contexts/CurrencyContext";
-import { Navbar } from "@/components";
+import { CurrencyProvider } from "@/contexts/OptimizedCurrencyContext";
+import { NFTProvider } from "@/contexts/NFTContext";
+import { NFTStatsProvider } from "@/contexts/NFTStatsContext";
+import Navbar from "./02-core-Navbar";
 import Web3Provider from "./03-core-Web3Provider";
 
 // --- Simple global fallback UI for render errors ---
@@ -43,12 +45,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     >
       <Web3Provider>
         <ApolloProvider client={apolloClient}>
-          <CurrencyProvider>
-            <div>
-              <Navbar />
-              <main>{children}</main>
-            </div>
-          </CurrencyProvider>
+          <NFTProvider>
+            <NFTStatsProvider>
+              <CurrencyProvider>
+                <div>
+                  <Navbar />
+                  <main>{children}</main>
+                </div>
+              </CurrencyProvider>
+            </NFTStatsProvider>
+          </NFTProvider>
         </ApolloProvider>
       </Web3Provider>
     </ErrorBoundary>

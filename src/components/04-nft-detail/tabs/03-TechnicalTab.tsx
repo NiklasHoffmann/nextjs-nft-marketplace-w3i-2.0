@@ -35,6 +35,8 @@ export default function TechnicalTab({
     rarityRank,
     rarityScore
 }: TechnicalTabProps) {
+
+    console.log('totalSupply Info:', { totalSupply });
     return (
         <div className="space-y-6">
             {/* Contract Information */}

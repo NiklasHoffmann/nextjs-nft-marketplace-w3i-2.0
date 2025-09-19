@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
 
-// GET /api/insights/nft - Read-only access to NFT insights
-// For admin CUD operations, use /api/admin/insights/nft
+// GET /api/nft/insights - Read-only access to NFT insights
+// For admin CUD operations, use /api/nft/admin/insights
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
-        console.log('🔍 GET /api/insights/nft called with params:', searchParams.toString());
+        console.log('🔍 GET /api/nft/insights called with params:', searchParams.toString());
 
         // Extract query parameters
         const contractAddress = searchParams.get('contractAddress');
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(response);
 
     } catch (error) {
-        console.error('GET /api/insights/nft error:', error);
+        console.error('GET /api/nft/insights error:', error);
         return NextResponse.json(
             { success: false, error: 'Failed to fetch insights' },
             { status: 500 }

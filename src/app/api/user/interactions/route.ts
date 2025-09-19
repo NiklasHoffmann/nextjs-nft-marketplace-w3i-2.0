@@ -186,22 +186,33 @@ export async function POST(request: NextRequest) {
         }
 
         // Update rating if specified (PUBLIC ratings only)
-        if (typeof updates.rating === 'number' && updates.rating >= 1 && updates.rating <= 5) {
-            const result = await ratingsCollection.updateOne(
-                { userId: lowerUserId, contractAddress: lowerContractAddress, tokenId },
-                {
-                    $set: {
-                        userId: lowerUserId,
-                        contractAddress: lowerContractAddress,
-                        tokenId,
-                        rating: updates.rating,
-                        isPublic: true, // All ratings are public for community averages
-                        ratedAt: timestamp
-                    }
-                },
-                { upsert: true }
-            );
-            results.push({ type: 'rating', action: 'updated', result });
+        if (typeof updates.rating === 'number' && updates.rating >= 0 && updates.rating <= 5) {
+            if (updates.rating === 0) {
+                // Remove rating when rating is 0
+                const result = await ratingsCollection.deleteOne({
+                    userId: lowerUserId,
+                    contractAddress: lowerContractAddress,
+                    tokenId
+                });
+                results.push({ type: 'rating', action: 'removed', result });
+            } else {
+                // Add or update rating when rating is 1-5
+                const result = await ratingsCollection.updateOne(
+                    { userId: lowerUserId, contractAddress: lowerContractAddress, tokenId },
+                    {
+                        $set: {
+                            userId: lowerUserId,
+                            contractAddress: lowerContractAddress,
+                            tokenId,
+                            rating: updates.rating,
+                            isPublic: true, // All ratings are public for community averages
+                            ratedAt: timestamp
+                        }
+                    },
+                    { upsert: true }
+                );
+                results.push({ type: 'rating', action: 'updated', result });
+            }
         }
 
         // Update personal notes independently (PRIVATE data)

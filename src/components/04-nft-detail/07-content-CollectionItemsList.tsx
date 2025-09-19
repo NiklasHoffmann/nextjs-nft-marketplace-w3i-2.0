@@ -1,6 +1,6 @@
 import { formatEther } from '@/utils';
 import { CollectionItemsListProps } from '@/types';
-import { formatNFTDisplayName, truncateAddress, generateMockCollectionItems } from '@/utils';
+import { formatNFTDisplayName, truncateAddress } from '@/utils';
 
 export default function CollectionItemsList({
     collection,
@@ -9,7 +9,25 @@ export default function CollectionItemsList({
     name,
     price
 }: CollectionItemsListProps) {
-    const mockItems = generateMockCollectionItems(tokenId, price);
+    // No mock data - show real collection items only
+    const mockItems: any[] = [];
+
+    if (mockItems.length === 0) {
+        return (
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900">More from this Collection</h3>
+                    <div className="text-sm text-gray-500">
+                        {collection || truncateAddress(nftAddress)}
+                    </div>
+                </div>
+                <div className="text-center py-8 text-gray-500">
+                    <p>No other items from this collection available</p>
+                    <p className="text-sm mt-2">Connect to real collection data to show more items</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="bg-white rounded-2xl shadow-lg p-6">

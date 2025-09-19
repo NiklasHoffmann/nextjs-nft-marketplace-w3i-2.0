@@ -4,21 +4,28 @@ import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useAccount, useBalance } from 'wagmi';
-import { Web3ConnectButton, CurrencySelector } from "@/components";
+import { Web3ConnectButton } from "./04-features-Web3ConnectButton";
+import CurrencySelector from "../03-marketplace/02-features-CurrencySelector";
 import { hasAdminAccess } from '@/utils';
 
 export default function Navbar() {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [mounted, setMounted] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    // Wallet connection state
+    // Wait for hydration before using wagmi hooks
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    // Wallet connection state - only after mounted
     const { address, isConnected } = useAccount();
     const { data: balance } = useBalance({
         address: address,
     });
 
     // Check if user has admin access
-    const isAdmin = hasAdminAccess(address);
+    const isAdmin = mounted ? hasAdminAccess(address) : false;
 
     // Format wallet address (show first 6 and last 4 characters)
     const formatAddress = (addr: string) => {
@@ -75,12 +82,12 @@ export default function Navbar() {
             {/* Right Section */}
             <div className="flex items-center gap-4 ml-6">
                 {/* Links */}
-                <Link href="#" className="text-gray-700 hover:text-blue-600 font-medium">Sell</Link>
-                <Link href="#" className="text-gray-700 hover:text-blue-600 font-medium">Swap</Link>
+                <Link href="/sell" className="text-gray-700 hover:text-blue-600 font-medium">Sell</Link>
+                <Link href="/sell" className="text-gray-700 hover:text-blue-600 font-medium">Trade</Link>
                 {/* Currency Selector */}
                 <CurrencySelector />
                 {/* Wallet Section */}
-                {isConnected && address ? (
+                {mounted && isConnected && address ? (
                     /* Connected: Show Wallet Dropdown with same styling as Currency Selector */
                     <div className="relative" ref={dropdownRef}>
                         {/* Wallet Button (matches Currency Selector styling) */}
@@ -180,9 +187,12 @@ export default function Navbar() {
                             </div>
                         )}
                     </div>
-                ) : (
+                ) : mounted ? (
                     /* Not Connected: Show Connect Button directly in Navbar */
                     <Web3ConnectButton />
+                ) : (
+                    /* Loading state before provider is mounted */
+                    <div className="w-24 h-10 bg-gray-200 animate-pulse rounded-lg"></div>
                 )}
                 {/*<Image src="/media/Logo-insconsolata-straightened-e1690296964226.png" alt="Logo" className="h-10 w-auto" width={256} height={64} />*/}
             </div>

@@ -34,7 +34,12 @@ export default function NFTSelector({
 
     return (
         <div className="space-y-4 border-t pt-6">
-            <h3 className="text-lg font-medium text-gray-900">NFT Selection</h3>
+            <div>
+                <h3 className="text-lg font-medium text-gray-900">NFT Selection</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                    Wähle Contract Address (erforderlich) und optional Token ID für spezifische NFT-Insights
+                </p>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Contract Address */}
@@ -83,7 +88,7 @@ export default function NFTSelector({
                 {/* Token ID */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Token ID *
+                        Token ID (optional)
                     </label>
                     <div className="relative">
                         <input
@@ -96,8 +101,7 @@ export default function NFTSelector({
                                     ? 'border-green-300 focus:ring-green-500 bg-green-50'
                                     : 'border-red-300 focus:ring-red-500 bg-red-50'
                                 }`}
-                            placeholder="z.B. 1234"
-                            required
+                            placeholder="z.B. 1234 (optional für Collection-weite Insights)"
                         />
 
                         {/* Validation Icon */}
@@ -124,16 +128,30 @@ export default function NFTSelector({
                 </div>
             </div>
 
-            {/* NFT Summary */}
-            {isValidAddress(contractAddress) && isValidTokenId(tokenId) && (
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+            {/* Selection Summary */}
+            {isValidAddress(contractAddress) && (
+                <div className={`border rounded-md p-4 ${tokenId && isValidTokenId(tokenId)
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-blue-50 border-blue-200'
+                    }`}>
                     <div className="flex items-center gap-2">
                         <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-sm font-medium text-blue-800">
-                            NFT Selected: {contractAddress.slice(0, 6)}...{contractAddress.slice(-4)} #{tokenId}
-                        </span>
+                        <div className="flex-1">
+                            <span className="text-sm font-medium text-blue-800">
+                                {tokenId && isValidTokenId(tokenId)
+                                    ? `🎯 NFT-spezifisch: ${contractAddress.slice(0, 6)}...${contractAddress.slice(-4)} #${tokenId}`
+                                    : `🌐 Collection-weit: ${contractAddress.slice(0, 6)}...${contractAddress.slice(-4)}`
+                                }
+                            </span>
+                            <div className="text-xs text-gray-600 mt-1">
+                                {tokenId && isValidTokenId(tokenId)
+                                    ? 'Insights gelten nur für dieses spezifische NFT'
+                                    : 'Insights gelten für die gesamte Collection'
+                                }
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { PersonalTab, MarketInsightsTab } from '@/components';
-import { useNFTInsights } from '@/hooks';
+import { useNFTDetailData } from '@/contexts/NFTContext';
 import { useUserInteractions } from '@/hooks';
 
 interface SimpleNFTInteractionTestProps {
@@ -19,16 +19,14 @@ export default function SimpleNFTInteractionTest({
     // Mock user wallet address - in real app this would come from Web3 context
     const userWalletAddress = "0x8BbA5E9b30E986C55465fEaC4D3417791065d1bb";
 
-    // Separate hooks for NFT data and user interactions
+    // Get NFT data from context (includes insights)
     const {
-        insights: publicInsights,
-        loading: nftLoading,
-        error: nftError
-    } = useNFTInsights({
-        contractAddress,
-        tokenId,
-        autoFetch: true
-    });
+        data: nftData,
+        isLoading: nftLoading
+    } = useNFTDetailData(contractAddress, tokenId);
+
+    const publicInsights = nftData?.insights;
+    const nftError = null; // Context handles errors internally
 
     const {
         userInteractions,

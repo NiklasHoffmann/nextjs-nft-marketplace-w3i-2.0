@@ -145,31 +145,3 @@ export const createShareableNFTUrl = (nftAddress: string, tokenId: string): stri
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
     return `${baseUrl}/nft/${nftAddress}/${tokenId}`;
 };
-
-/**
- * Generates mock collection items for display
- */
-export const generateMockCollectionItems = (
-    baseTokenId: string,
-    basePrice: string,
-    count: number = 8
-) => {
-    const items = [];
-    const baseId = parseInt(baseTokenId);
-
-    for (let i = 0; i < count; i++) {
-        const tokenId = (baseId + i + 1).toString();
-        const priceModifier = i * 0.01;
-        const status = i % 3 === 0 ? 'Listed' : i % 3 === 1 ? 'Auction' : 'Not Listed';
-        const statusColor = i % 3 === 0 ? 'green' : i % 3 === 1 ? 'blue' : 'gray';
-
-        items.push({
-            tokenId,
-            priceModifier,
-            status,
-            statusColor
-        });
-    }
-
-    return items;
-};

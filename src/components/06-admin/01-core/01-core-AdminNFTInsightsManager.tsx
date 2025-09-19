@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { useAdminNFTInsights, useNFTInsights } from "@/hooks";
+import { useAdminNFTInsights } from "@/hooks";
+import { useNFTContext } from "@/contexts/NFTContext";
 import {
     NFTSelector,
     BasicInfoManager,
@@ -11,7 +12,7 @@ import {
     NFTSpecificDescriptionsManager,
     ProjectLinkManager,
     PartnershipManager,
-} from "../index";
+} from "../02-sections";
 import type {
     NFTProjectDescriptions,
     NFTFunctionalitiesDescriptions,
@@ -91,33 +92,62 @@ export default function AdminNFTInsightsManager() {
     const [error, setError] = useState<string | null>(null);
     const [isEditMode, setIsEditMode] = useState(false);
     const [activeDescriptionTab, setActiveDescriptionTab] = useState<'project' | 'functionalities' | 'cards'>('project');
+    const [currentCardInput, setCurrentCardInput] = useState<string>('');
 
     const { create, update } = useAdminNFTInsights();
+    const nftContext = useNFTContext();
+    const [isLoadingNFT, setIsLoadingNFT] = useState(false);
 
     // Existing insights laden für Edit-Mode
-    const { insights: existingInsights, loading: insightsLoading } = useNFTInsights({
-        contractAddress: formData.contractAddress,
-        tokenId: formData.tokenId,
-        autoFetch: !!(formData.contractAddress && formData.tokenId)
-    });
+    const nftData = nftContext.getNFTDetailData(
+        formData.contractAddress || '',
+        formData.tokenId || ''
+    );
+    const existingInsights = nftData?.insights;
 
-    // URL-Parameter beim ersten Laden übernehmen
+    // NFT data laden wenn nötig
+    useEffect(() => {
+        if (formData.contractAddress && formData.tokenId &&
+            !nftContext.isDataFresh(formData.contractAddress, formData.tokenId)) {
+            setIsLoadingNFT(true);
+            nftContext.loadNFTData(formData.contractAddress, formData.tokenId)
+                .finally(() => setIsLoadingNFT(false));
+        }
+    }, [nftContext, formData.contractAddress, formData.tokenId]);
+
+    // URL-Parameter beim ersten Laden übernehmen und Form zurücksetzen
     useEffect(() => {
         const contractAddress = searchParams.get('contractAddress');
         const tokenId = searchParams.get('tokenId');
 
+        // Reset form to initial state and load new URL parameters
         if (contractAddress || tokenId) {
-            setFormData(prev => ({
-                ...prev,
-                contractAddress: contractAddress || prev.contractAddress,
-                tokenId: tokenId || prev.tokenId
-            }));
+            console.log('🔄 Resetting form for new URL parameters:', { contractAddress, tokenId });
+
+            setFormData({
+                ...initialFormData, // Start with fresh form
+                contractAddress: contractAddress || '',
+                tokenId: tokenId || ''
+            });
+
+            // Reset other states
+            setIsEditMode(false);
+            setError(null);
+            setSuccess(null);
+            setCurrentCardInput('');
+            setActiveDescriptionTab('project');
         }
     }, [searchParams]);
 
     // Existierende Insights in Form laden mit Migration
     useEffect(() => {
-        if (existingInsights && !insightsLoading) {
+        // Only proceed if we have contract address and loading is complete
+        if (!formData.contractAddress || isLoadingNFT) {
+            return;
+        }
+
+        if (existingInsights) {
+            console.log('📝 Loading existing insights into form:', existingInsights._id);
             setIsEditMode(true);
 
             // Check if existing insights have the new structure
@@ -165,11 +195,19 @@ export default function AdminNFTInsightsManager() {
                 partnerships: existingInsights.partnerships || [],
                 partnershipDetails: existingInsights.partnershipDetails || ''
             }));
-        } else if (!insightsLoading && formData.contractAddress && formData.tokenId) {
-            // Kein existing insight gefunden, aber contractAddress/tokenId vorhanden
+        } else {
+            // No existing insights found - keep fresh form (already set by URL parameter effect)
+            console.log('🆕 No existing insights found - keeping fresh form');
             setIsEditMode(false);
         }
-    }, [existingInsights, insightsLoading, formData.contractAddress, formData.tokenId]);
+    }, [existingInsights, isLoadingNFT, formData.contractAddress, formData.tokenId]);
+
+    // Cleanup effect - reset form when component unmounts for completely fresh start
+    useEffect(() => {
+        return () => {
+            console.log('🧹 Component unmounting - cleanup complete');
+        };
+    }, []);
 
     const handleSubmit = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
@@ -178,25 +216,33 @@ export default function AdminNFTInsightsManager() {
         setSuccess(null);
 
         try {
-            // Validierung
-            if (!formData.contractAddress || !formData.tokenId || !formData.customTitle) {
-                throw new Error('Contract Address, Token ID und Custom Title sind erforderlich');
+            // Validierung - nur contractAddress ist zwingend erforderlich
+            if (!formData.contractAddress) {
+                throw new Error('Contract Address ist erforderlich');
+            }
+
+            // Token ID validation - only validate format if provided
+            if (formData.tokenId && formData.tokenId.trim() !== '' && !/^\d+$/.test(formData.tokenId.trim())) {
+                throw new Error('Token ID muss eine gültige Zahl sein oder leer bleiben für Collection-weite Insights');
             }
 
             let requestData: any;
 
             // Use enhanced structure with title-description pairs
+            // Ensure empty tokenId is sent as empty string for collection-wide insights
+            const cleanTokenId = formData.tokenId && formData.tokenId.trim() !== '' ? formData.tokenId.trim() : '';
+
             requestData = {
                 contractAddress: formData.contractAddress,
-                tokenId: formData.tokenId,
-                customTitle: formData.customTitle,
-                title: formData.title || formData.customTitle, // Legacy support
+                tokenId: cleanTokenId, // Explicitly clean empty values
+                customTitle: formData.customTitle || '', // Allow empty custom title
+                title: formData.title || formData.customTitle || '', // Legacy support
                 category: formData.category,
                 tags: formData.tags,
                 rarity: formData.rarity,
                 projectDescriptions: formData.projectDescriptions,
                 functionalitiesDescriptions: formData.functionalitiesDescriptions,
-                cardDescriptions: formData.cardDescriptions, // NFT Card descriptions
+                // cardDescriptions will be set below after function call
                 // Legacy support - keep specificDescriptions pointing to projectDescriptions
                 specificDescriptions: formData.projectDescriptions,
                 // Also keep legacy descriptions for backward compatibility (flattened)
@@ -212,8 +258,33 @@ export default function AdminNFTInsightsManager() {
             };
 
             console.log('🎴 cardDescriptions in requestData:', requestData.cardDescriptions);
+            console.log('🎴 Building final cardDescriptions:', {
+                savedDescriptions: formData.cardDescriptions,
+                currentInput: currentCardInput,
+                maxCharacters: 80
+            });
 
-            console.log('📋 Full requestData being sent:', JSON.stringify(requestData, null, 2));
+            // Build final card descriptions including current input
+            let finalCardDescriptions = [...formData.cardDescriptions];
+            if (currentCardInput.trim() && currentCardInput.trim().length <= 80) {
+                finalCardDescriptions.push(currentCardInput.trim());
+                console.log('🎴 Added current input to descriptions:', currentCardInput.trim());
+            }
+
+            requestData.cardDescriptions = finalCardDescriptions;
+            console.log('🎴 Final cardDescriptions:', finalCardDescriptions);
+
+            console.log('� Token ID Debug Check:', {
+                'Original formData.tokenId': formData.tokenId,
+                'FormData tokenId type': typeof formData.tokenId,
+                'FormData tokenId length': formData.tokenId?.length,
+                'Cleaned tokenId': cleanTokenId,
+                'Cleaned tokenId type': typeof cleanTokenId,
+                'Will create collection-wide insights': cleanTokenId === '',
+                'Request tokenId': requestData.tokenId
+            });
+
+            console.log('�📋 Full requestData being sent:', JSON.stringify(requestData, null, 2));
 
             let result;
             if (isEditMode && existingInsights) {
@@ -235,7 +306,12 @@ export default function AdminNFTInsightsManager() {
     }, [formData, create, update, isEditMode, existingInsights]);
 
     const updateFormData = useCallback((updates: Partial<NFTInsightFormData>) => {
-        setFormData(prev => ({ ...prev, ...updates }));
+        console.log('📋 updateFormData called with:', updates);
+        setFormData(prev => {
+            const newData = { ...prev, ...updates };
+            console.log('📋 New formData:', newData);
+            return newData;
+        });
     }, []);
 
     return (
@@ -259,7 +335,7 @@ export default function AdminNFTInsightsManager() {
                         </div>
                     )}
                 </div>
-                {insightsLoading && (
+                {isLoadingNFT && (
                     <div className="mt-3 text-sm text-gray-500 flex items-center gap-2">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                         Loading existing data...
@@ -299,7 +375,10 @@ export default function AdminNFTInsightsManager() {
                     activeDescriptionTab={activeDescriptionTab}
                     onProjectDescriptionsChange={(projectDescriptions) => updateFormData({ projectDescriptions })}
                     onFunctionalitiesDescriptionsChange={(functionalitiesDescriptions) => updateFormData({ functionalitiesDescriptions })}
-                    onCardDescriptionsChange={(cardDescriptions) => updateFormData({ cardDescriptions })}
+                    onCardDescriptionsChange={(cardDescriptions) => {
+                        console.log('📋 onCardDescriptionsChange called with:', cardDescriptions);
+                        updateFormData({ cardDescriptions });
+                    }}
                     onActiveTabChange={setActiveDescriptionTab}
                 />
 

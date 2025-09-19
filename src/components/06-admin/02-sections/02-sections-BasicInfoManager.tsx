@@ -26,7 +26,7 @@ const BasicInfoManager: React.FC<BasicInfoManagerProps> = ({
                         Basic Information
                     </h3>
                     <p className="text-sm text-blue-700">
-                        Essential details for this NFT
+                        Optional details for this NFT
                     </p>
                 </div>
             </div>
@@ -34,7 +34,7 @@ const BasicInfoManager: React.FC<BasicInfoManagerProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Custom Title *
+                        Custom Title
                     </label>
                     <input
                         type="text"
@@ -42,7 +42,6 @@ const BasicInfoManager: React.FC<BasicInfoManagerProps> = ({
                         onChange={(e) => onCustomTitleChange(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="z.B. Premium Access NFT"
-                        required
                     />
                 </div>
 

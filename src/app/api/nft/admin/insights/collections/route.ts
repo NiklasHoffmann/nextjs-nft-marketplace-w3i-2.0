@@ -38,9 +38,10 @@ export async function POST(request: NextRequest) {
 
     // TODO: Add admin authentication check here
 
-    if (!data.contractAddress || (!data.customTitle && !data.title)) {
+    // Validation - only contractAddress is required
+    if (!data.contractAddress) {
       return NextResponse.json(
-        { success: false, error: 'contractAddress and customTitle (or title) are required' },
+        { success: false, error: 'contractAddress is required' },
         { status: 400 }
       );
     }
@@ -61,8 +62,8 @@ export async function POST(request: NextRequest) {
 
     const insight: Omit<AdminCollectionInsight, '_id'> = {
       contractAddress: data.contractAddress.toLowerCase(),
-      customTitle: data.customTitle || data.title, // Use customTitle first, fallback to title
-      title: data.title || data.customTitle, // Legacy support
+      customTitle: data.customTitle || '', // Allow empty custom title
+      title: data.title || data.customTitle || '', // Legacy support
       description: data.description,
       category: data.category,
       tags: data.tags || [],
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT /api/admin/insights/collection - Update admin insight for Collection
+// PUT /api/nft/admin/insights/collections - Update admin insight for Collection
 export async function PUT(request: NextRequest) {
   try {
     const data = await request.json();
@@ -159,7 +160,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE /api/admin/insights/collection - Delete collection insights
+// DELETE /api/nft/admin/insights/collections - Delete collection insights
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -188,7 +189,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
 
   } catch (error) {
-    console.error('DELETE /api/admin/insights/collection error:', error);
+    console.error('DELETE /api/nft/admin/insights/collections error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to delete collection insights' },
       { status: 500 }

@@ -21,19 +21,10 @@ const NFTCardSkeleton = memo(() => (
 NFTCardSkeleton.displayName = 'NFTCardSkeleton';
 
 interface LazyNFTCardProps {
-  listingId: string;
-  nftAddress: string;
+  contractAddress: string;
   tokenId: string;
-  isListed: boolean;
-  price: string;
-  seller: string;
-  buyer?: string;
-  desiredNftAddress: string;
-  desiredTokenId: string;
-  imageUrl?: string;
-  likeCount?: number;
-  category?: string | string[];
-  description?: string | string[];
+  showStats?: boolean;
+  className?: string;
   priority?: boolean;
   enableInsights?: boolean;
 }

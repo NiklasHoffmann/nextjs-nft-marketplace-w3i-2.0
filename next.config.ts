@@ -21,7 +21,7 @@ const nextConfig: import('next').NextConfig = {
         fs: false,
       };
     }
-    
+
     // Bundle analyzer optimization
     config.optimization = {
       ...config.optimization,
@@ -54,7 +54,7 @@ const nextConfig: import('next').NextConfig = {
         }
       }
     };
-    
+
     return config;
   },
   images: {
@@ -95,10 +95,17 @@ const nextConfig: import('next').NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'picsum.photos',
+        port: '',
+        pathname: '/**',
+      },
     ],
     deviceSizes: [640, 768, 1024, 1280, 1600],
     imageSizes: [128, 256, 384, 512],
     formats: ['image/webp', 'image/avif'],
+    qualities: [40, 50, 75, 85, 90, 95], // Add quality 90 for components that use it
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days for better caching
     dangerouslyAllowSVG: false,
     contentDispositionType: 'attachment',

@@ -1,8 +1,14 @@
 "use client";
 
 import React, { useEffect, memo, useMemo, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 
-import { useNFT, useNFTDetailLogic, useNFTStats, useNFTPriceData } from '@/hooks';
+// Updated imports: Direct NFTContext access
+import { useNFTStats, useNFTPriceData, useNFTUserActions } from '@/hooks';
+import { useNFTContext } from '@/contexts/NFTContext';
+
+// Validation utilities moved to component level
+import { isValidNFTAddress, isValidNFTTokenId } from '@/utils';
 
 import {
     NFTDetailHeader,
@@ -27,102 +33,163 @@ const MemoizedSwapTargetInfo = memo(SwapTargetInfo);
 const MemoizedCollectionItemsList = memo(CollectionItemsList);
 
 function NFTDetailPage() {
-    // Logic hook for UI state, navigation, and marketplace functionality
+    // SIMPLIFIED: Extract parameters directly in component
+    const params = useParams();
+    const nftAddress = params.nftAddress as string;
+    const tokenId = params.tokenId as string;
+
+    // SIMPLIFIED: Validate parameters directly in component
+    const isValidParams = useMemo(() => {
+        return isValidNFTAddress(nftAddress) && isValidNFTTokenId(tokenId);
+    }, [nftAddress, tokenId]);
+
+    // OPTIMIZED: Use NFTContext directly for insights (no redundant wrapper)
+    const nftContext = useNFTContext();
+    const nftContextData = nftContext.getNFTDetailData(nftAddress, tokenId);
+    const publicInsights = nftContextData?.insights;
+
+    // Load data if not available
+    useEffect(() => {
+        if (!nftContextData && !nftContext.isDataFresh(nftAddress, tokenId)) {
+            nftContext.loadNFTData(nftAddress, tokenId);
+        }
+    }, [nftContext, nftAddress, tokenId, nftContextData]);
+
+    // OPTIMIZED: Use focused hook only for user actions and UI state
     const {
-        nftDetails,
-        publicInsights,
-        userInteractions,
         activeTab,
-        isLoading: logicLoading,
-        error: logicError,
-        hasValidData,
-        nftAddress,
-        tokenId,
-        userWalletAddress,
+        isFavorited,
         isWalletConnected,
         handleBack,
         handleShare,
-        handleTabChange,
         toggleFavorite,
         toggleWatchlist,
         setRating,
-        handleUpdateUserInteraction,
-        fetchListingData
-    } = useNFTDetailLogic();
+        handleTabChange,
+        userInteractions,
+        recordView
+    } = useNFTUserActions(nftAddress, tokenId);
 
-    // NFT metadata hook (blockchain/IPFS data)
-    const nftData = useNFT(nftAddress, tokenId);
+    // OPTIMIZED: Get metadata from NFTContext (avoid duplicate calls)
+    const metadata = nftContextData?.metadata;
+    const imageUrl = nftContextData?.imageUrl;
+    const contractInfo = nftContextData?.contractInfo;
+
+    // SIMPLIFIED: Generate mock marketplace data directly with useMemo
+    const nftDetails = useMemo(() => {
+        if (!isValidParams) return null;
+        return {
+            listingId: `${nftAddress}-${tokenId}`,
+            nftAddress,
+            tokenId,
+            isListed: true,
+            price: nftContextData?.price || null, // 0.05 ETH in Wei
+            seller: nftContextData?.owner || null, // Use actual owner from context
+            desiredNftAddress: nftContextData?.desiredNftAddress || null,
+            desiredTokenId: nftContextData?.desiredTokenId || null
+        };
+    }, [nftAddress, tokenId, isValidParams]);
 
     // Use custom hook for price data
     const priceData = useNFTPriceData(nftDetails?.price || null);
 
-    // Use custom hook for NFT stats
-    const nftStats = useNFTStats({
-        contractAddress: nftAddress,
-        tokenId: tokenId,
-        autoFetch: !!hasValidData,
-        refetchInterval: 30000 // Refetch every 30 seconds
+    // Use custom hook for NFT stats (Context hook expects 2 parameters)
+    const { data: statsData, refresh } = useNFTStats(nftAddress, tokenId);
+    const nftStats = {
+        stats: statsData?.stats,
+        loading: false, // Context handles loading internally
+        error: null,
+        refetch: refresh // Add refetch function
+    };
+
+    // OPTIMIZED: Combined loading and error states
+    const isLoading = !nftContextData;
+    const error = null; // NFTDetailData doesn't expose errorState - handle via context if needed
+    const hasValidData = isValidParams && nftDetails;
+
+    // Debug: Log NFT data sources to identify image loading issues
+    console.log('🖼️ Image Loading Debug:', {
+        nftContextData: {
+            available: !!nftContextData,
+            imageUrl: nftContextData?.imageUrl,
+            metadata: !!nftContextData?.metadata,
+            metadataName: nftContextData?.metadata?.name,
+            loading: isLoading
+        },
+        finalImageUrl: imageUrl,
+        isValidParams
     });
 
-    // Combined loading and error states
-    const isLoading = logicLoading || nftData.loading;
-    const error = logicError || nftData.error;
+    // Use NFTContext data directly
+    const finalImageUrl = imageUrl;
+    const finalName = metadata?.name || `Token #${tokenId}`;
 
-    // Debug: Log user interactions data
-    console.log('🐛 NFT Page Debug:', {
+    // Record view on mount (moved from hook)
+    useEffect(() => {
+        if (isValidParams && recordView) {
+            recordView();
+        }
+    }, [isValidParams, recordView]);
+
+    // Debug: Log user interactions data (simplified)
+    console.log('🐛 NFT Page Debug (Simplified):', {
         nftAddress,
         tokenId,
-        userWalletAddress,
         userInteractions,
-        userInteractionsLoading: logicLoading,
-        userInteractionsError: logicError,
+        isWalletConnected,
+        hasValidData,
         hasToggleFavorite: !!toggleFavorite,
         hasToggleWatchlist: !!toggleWatchlist,
         hasSetRating: !!setRating
     });
 
-    // Effect to fetch listing data
-    useEffect(() => {
-        fetchListingData();
-        // NOTE: View tracking is handled by useUserInteractions in useNFTDetailLogic
-        // to avoid duplicate view records
-    }, [fetchListingData, nftAddress, tokenId]);
+    // Enhanced toggle functions that also update stats
+    // NOTE: These are now legacy - NFTStatsContext handles all stats updates automatically
+    // Kept for backward compatibility with any remaining legacy components
+    const enhancedToggleWatchlist = useCallback(async () => {
+        await toggleWatchlist();
+        // Force refresh of stats after watchlist change
+        await nftStats.refetch();
+    }, [toggleWatchlist, nftStats.refetch]);
+
+    const enhancedToggleFavorite = useCallback(async () => {
+        await toggleFavorite();
+        // Force refresh of stats after favorite change
+        await nftStats.refetch();
+    }, [toggleFavorite, nftStats.refetch]);
+
+    const enhancedSetRating = useCallback(async (rating: number) => {
+        await setRating(rating);
+        // Force refresh of stats after rating change
+        await nftStats.refetch();
+    }, [setRating, nftStats.refetch]);
 
     // Memoize header props to prevent unnecessary re-renders
+    // NOTE: Simplified since NFTDetailHeader now uses NFTStatsContext directly
     const headerProps = useMemo(() => ({
-        name: nftData.name,
+        name: finalName,
         tokenId,
-        contractName: nftData.contractName,
-        collection: nftData.contractName, // Using contractName as collection fallback
-        contractSymbol: nftData.contractSymbol,
+        contractName: contractInfo?.name || null,
+        collection: contractInfo?.name || null,
+        contractSymbol: contractInfo?.symbol || null,
         nftAddress,
+        // Legacy props kept for backward compatibility (context will override these)
         isFavorited: userInteractions?.isFavorite || false,
-        onToggleFavorite: toggleFavorite,
-        onShare: handleShare,
-        // Extended props for user actions - now working!
-        isWatchlisted: userInteractions?.isWatchlisted || false,
-        userRating: userInteractions?.rating || 0,
-        onToggleWatchlist: toggleWatchlist,
-        onSetRating: setRating,
-        isWalletConnected, // Add wallet connection state for button states
-        // Stats for display - using real data from useNFTStats
-        viewCount: nftStats.stats?.viewCount || 0,
-        favoriteCount: nftStats.stats?.favoriteCount || 0,
-        averageRating: nftStats.stats?.averageRating || 0,
-        ratingCount: nftStats.stats?.ratingCount || 0,
-        watchlistCount: nftStats.stats?.watchlistCount || 0
+        onToggleFavorite: enhancedToggleFavorite,
+        onShare: handleShare
+        // NOTE: Removed individual stats props and user action props
+        // NFTDetailHeader now gets all this data from NFTStatsContext
     }), [
-        nftData.name, tokenId, nftData.contractName,
-        nftData.contractSymbol, nftAddress, userInteractions,
-        toggleFavorite, handleShare, toggleWatchlist, setRating,
-        nftStats.stats, isWalletConnected
+        finalName, tokenId, contractInfo?.name,
+        contractInfo?.symbol, nftAddress, userInteractions,
+        enhancedToggleFavorite, handleShare
     ]);
 
     // Memoize category pills props with insights
     const categoryPillsProps = useMemo(() => ({
         categories: [], // From NFT metadata - could be enhanced later
         tags: [],
-        externalUrl: nftData.metadata?.external_url,
+        externalUrl: metadata?.external_url,
         // Use insights data for website/twitter links
         websiteUrl: publicInsights?.projectWebsite || null,
         twitterUrl: publicInsights?.projectTwitter || null,
@@ -132,20 +199,27 @@ function NFTDetailPage() {
         contractAddress: nftAddress,
         tokenId
     }), [
-        nftData.metadata?.external_url, nftAddress, tokenId,
+        metadata?.external_url, nftAddress, tokenId,
         publicInsights, isLoading
     ]);
 
-    // Memoize media section props
-    const mediaSectionProps = useMemo(() => ({
-        imageUrl: nftData.imageUrl,
-        animationUrl: nftData.metadata?.animation_url,
-        videoUrl: null, // Simplified
-        audioUrl: null, // Simplified  
-        name: nftData.name,
-        tokenId
-    }), [
-        nftData.imageUrl, nftData.metadata?.animation_url, nftData.name, tokenId
+    // Memoize media section props (FIXED: Better fallback logic for images)
+    const mediaSectionProps = useMemo(() => {
+        const props = {
+            imageUrl: finalImageUrl, // Use consolidated image URL
+            animationUrl: metadata?.animation_url, // Use consolidated metadata
+            videoUrl: null, // Simplified
+            audioUrl: null, // Simplified  
+            name: finalName, // Use consolidated name
+            tokenId
+        };
+
+        // Debug: Log media section props
+        console.log('🎬 Media Section Props:', props);
+
+        return props;
+    }, [
+        finalImageUrl, metadata?.animation_url, finalName, tokenId
     ]);
 
     // Memoize price card props
@@ -169,19 +243,21 @@ function NFTDetailPage() {
             onTabChange: handleTabChange,
             nftAddress,
             tokenId,
-            contractName: nftData.contractName,
-            collection: nftData.contractName, // Simplified
-            contractSymbol: nftData.contractSymbol,
+            contractName: contractInfo?.name || null,
+            collection: contractInfo?.name || null, // Simplified
+            contractSymbol: contractInfo?.symbol || null,
             tokenStandard: 'ERC721', // Simplified
             blockchain: 'Ethereum', // Simplified  
-            totalSupply: null, // Simplified
-            currentOwner: nftData.owner,
+            totalSupply: typeof contractInfo?.totalSupply === 'bigint'
+                ? Number(contractInfo.totalSupply)
+                : contractInfo?.totalSupply ?? null, // Ensure number | null
+            currentOwner: nftContextData?.owner || null, // Use NFTContext owner
             creator: null, // Simplified
             nftDetails,
-            description: nftData.description,
+            description: metadata?.description || '',
             rarityRank: null, // Simplified
             rarityScore: null, // Simplified  
-            attributes: nftData.attributes?.map(attr => ({
+            attributes: metadata?.attributes?.map((attr: { trait_type: string; value: string | number; display_type?: 'boost_number' | 'boost_percentage' | 'number' | 'date' }) => ({
                 ...attr,
                 display_type: attr.display_type as 'boost_number' | 'boost_percentage' | 'number' | 'date' | undefined
             })) || undefined,
@@ -191,18 +267,17 @@ function NFTDetailPage() {
             // Correct props for NewNFTInfoTabs (with type compatibility)
             publicInsights: publicInsights as any, // Type compatibility: AdminNFTInsight → PublicNFTInsights
             userInteractions: userInteractions as any, // Type compatibility: CombinedUserInteractionData → UserNFTInteractions
-            userWalletAddress: userWalletAddress || undefined, // Convert null to undefined
             isWalletConnected, // Add wallet connection state
             insightsLoading: isLoading,
-            onUpdateUserInteraction: handleUpdateUserInteraction,
 
-            // User action handlers for PersonalTab
-            onToggleFavorite: toggleFavorite,
-            onToggleWatchlist: toggleWatchlist,
-            onSetRating: setRating,
+            // User action handlers for PersonalTab (legacy compatibility)
+            // NOTE: PersonalTab now prefers NFTStatsContext but keeps these for fallback
+            onToggleFavorite: enhancedToggleFavorite,
+            onToggleWatchlist: enhancedToggleWatchlist,
+            onSetRating: enhancedSetRating,
 
-            // Clean data structure props
-            stats: undefined, // TODO: Implement stats fetching
+            // Legacy user interaction data (context will override for PersonalTab)
+            stats: undefined, // PersonalTab gets stats from NFTStatsContext
             userRating: userInteractions?.rating || 0,
             isWatchlisted: userInteractions?.isWatchlisted || false,
             isFavorited: userInteractions?.isFavorite || false,
@@ -211,15 +286,15 @@ function NFTDetailPage() {
             adminInsightsLoading: isLoading
         };
     }, [
-        activeTab, handleTabChange, nftAddress, tokenId, nftData, nftDetails,
-        userInteractions, publicInsights, isLoading, toggleFavorite, toggleWatchlist, setRating,
-        handleUpdateUserInteraction, userWalletAddress, isWalletConnected
+        activeTab, handleTabChange, nftAddress, tokenId, contractInfo, metadata, nftDetails,
+        userInteractions, publicInsights, isLoading, enhancedToggleFavorite, enhancedToggleWatchlist, enhancedSetRating,
+        isWalletConnected, nftContextData?.owner
     ]);
 
     // Memoize conditional renders (simplified)
     const hasProperties = useMemo(() => {
-        return nftData.attributes && nftData.attributes.length > 0;
-    }, [nftData.attributes]);
+        return metadata?.attributes && metadata.attributes.length > 0;
+    }, [metadata?.attributes]);
 
     const swapTargetProps = useMemo(() => ({
         desiredNftAddress: nftDetails?.desiredNftAddress || "",
@@ -227,12 +302,12 @@ function NFTDetailPage() {
     }), [nftDetails?.desiredNftAddress, nftDetails?.desiredTokenId]);
 
     const collectionItemsProps = useMemo(() => ({
-        collection: nftData.contractName,
+        collection: contractInfo?.name || null,
         nftAddress,
         tokenId,
-        name: nftData.name,
+        name: finalName,
         price: nftDetails?.price || "0"
-    }), [nftData.contractName, nftAddress, tokenId, nftData.name, nftDetails?.price]);
+    }), [contractInfo?.name, nftAddress, tokenId, finalName, nftDetails?.price]);
 
 
     // Early returns for loading and error states
@@ -286,7 +361,7 @@ function NFTDetailPage() {
                             <div className="bg-gray-100 p-4 rounded-lg mt-6">
                                 <h3 className="font-bold mb-2">🐛 User Interactions Debug</h3>
                                 <div className="text-sm space-y-1">
-                                    <div>Wallet: {userWalletAddress || 'Not connected'}</div>
+                                    <div>Wallet Connected: {isWalletConnected ? 'Yes' : 'No'}</div>
                                     <div>Loading: {isLoading ? 'Yes' : 'No'}</div>
                                     <div>Error: {error || 'None'}</div>
                                     <div>Data: {userInteractions ? 'Loaded' : 'None'}</div>

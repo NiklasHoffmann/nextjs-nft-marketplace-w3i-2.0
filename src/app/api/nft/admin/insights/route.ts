@@ -38,12 +38,30 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
     console.log('🔍 POST /api/nft/admin/insights - Received data:', JSON.stringify(data, null, 2));
+    console.log('🎯 Token ID Debug - API side:', {
+      'Received tokenId': data.tokenId,
+      'Type': typeof data.tokenId,
+      'Length': data.tokenId?.length,
+      'Is empty string': data.tokenId === '',
+      'Is undefined': data.tokenId === undefined,
+      'Is null': data.tokenId === null,
+      'Will be collection-wide': (data.tokenId || '') === ''
+    });
 
     // TODO: Add admin authentication check here
 
-    if (!data.contractAddress || !data.tokenId || (!data.customTitle && !data.title)) {
+    // Validation - only contractAddress is required
+    if (!data.contractAddress) {
       return NextResponse.json(
-        { success: false, error: 'contractAddress, tokenId, and customTitle (or title) are required' },
+        { success: false, error: 'contractAddress is required' },
+        { status: 400 }
+      );
+    }
+
+    // Token ID validation - only validate format if provided
+    if (data.tokenId && !/^\d+$/.test(data.tokenId.toString())) {
+      return NextResponse.json(
+        { success: false, error: 'tokenId must be a valid number if provided' },
         { status: 400 }
       );
     }
@@ -52,9 +70,9 @@ export async function POST(request: NextRequest) {
 
     const insight: Omit<AdminNFTInsight, '_id'> = {
       contractAddress: data.contractAddress.toLowerCase(),
-      tokenId: data.tokenId,
-      customTitle: data.customTitle || data.title, // Use customTitle first, fallback to title
-      title: data.title || data.customTitle, // Legacy support
+      tokenId: data.tokenId || '', // Allow empty for collection-wide insights
+      customTitle: data.customTitle || '', // Allow empty custom title
+      title: data.title || data.customTitle || '', // Legacy support
       description: data.description,
       descriptions: data.descriptions || [], // Legacy descriptions array
       projectDescriptions: data.projectDescriptions, // Enhanced project descriptions
@@ -95,7 +113,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT /api/admin/insights/nft - Update admin insight for NFT
+// PUT /api/nft/admin/insights - Update admin insight for NFT
 export async function PUT(request: NextRequest) {
   try {
     const data = await request.json();
@@ -103,9 +121,18 @@ export async function PUT(request: NextRequest) {
 
     // TODO: Add admin authentication check here
 
-    if (!data.contractAddress || !data.tokenId) {
+    // Validation - only contractAddress is required for updates
+    if (!data.contractAddress) {
       return NextResponse.json(
-        { success: false, error: 'contractAddress and tokenId are required' },
+        { success: false, error: 'contractAddress is required' },
+        { status: 400 }
+      );
+    }
+
+    // Token ID validation - only validate format if provided
+    if (data.tokenId && !/^\d+$/.test(data.tokenId.toString())) {
+      return NextResponse.json(
+        { success: false, error: 'tokenId must be a valid number if provided' },
         { status: 400 }
       );
     }
@@ -113,8 +140,8 @@ export async function PUT(request: NextRequest) {
     const collection = await getCollection('admin_nft_insights');
 
     const updateData = {
-      customTitle: data.customTitle || data.title, // Use customTitle first, fallback to title
-      title: data.title || data.customTitle, // Legacy support
+      customTitle: data.customTitle || '', // Allow empty custom title
+      title: data.title || data.customTitle || '', // Legacy support
       description: data.description,
       descriptions: data.descriptions || [], // Legacy descriptions array
       projectDescriptions: data.projectDescriptions, // Enhanced project descriptions
@@ -134,11 +161,20 @@ export async function PUT(request: NextRequest) {
       updatedAt: new Date().toISOString(),
     };
 
+    // Build query - handle both collection-wide and NFT-specific insights
+    const query: any = {
+      contractAddress: data.contractAddress.toLowerCase()
+    };
+
+    // Add tokenId to query if provided, otherwise look for collection-wide insights (empty tokenId)
+    if (data.tokenId) {
+      query.tokenId = data.tokenId;
+    } else {
+      query.tokenId = '';
+    }
+
     const result = await collection.updateOne(
-      {
-        contractAddress: data.contractAddress.toLowerCase(),
-        tokenId: data.tokenId
-      },
+      query,
       { $set: updateData },
       { upsert: true }
     );
@@ -164,7 +200,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE /api/admin/insights/nft - Delete admin insight for NFT
+// DELETE /api/nft/admin/insights - Delete admin insight for NFT
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -173,19 +209,29 @@ export async function DELETE(request: NextRequest) {
 
     // TODO: Add admin authentication check here
 
-    if (!contractAddress || !tokenId) {
+    // Validation - only contractAddress is required for deletion
+    if (!contractAddress) {
       return NextResponse.json(
-        { success: false, error: 'contractAddress and tokenId are required' },
+        { success: false, error: 'contractAddress is required' },
         { status: 400 }
       );
     }
 
     const collection = await getCollection('admin_nft_insights');
 
-    const result = await collection.deleteOne({
-      contractAddress: contractAddress.toLowerCase(),
-      tokenId: tokenId
-    });
+    // Build query - handle both collection-wide and NFT-specific insights
+    const query: any = {
+      contractAddress: contractAddress.toLowerCase()
+    };
+
+    // Add tokenId to query if provided, otherwise look for collection-wide insights (empty tokenId)
+    if (tokenId) {
+      query.tokenId = tokenId;
+    } else {
+      query.tokenId = '';
+    }
+
+    const result = await collection.deleteOne(query);
 
     if (result.deletedCount === 0) {
       return NextResponse.json(

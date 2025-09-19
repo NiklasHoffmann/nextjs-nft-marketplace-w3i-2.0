@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAccount } from 'wagmi';
-import { useNFTInsights } from '@/hooks';
+import { useNFTDetailData } from '@/contexts/NFTContext';
 import { canEditInsights } from '@/utils';
 import Link from 'next/link';
 
@@ -11,10 +11,9 @@ interface NFTInsightsPanelProps {
 
 export default function NFTInsightsPanel({ contractAddress, tokenId }: NFTInsightsPanelProps) {
     const { address, isConnected } = useAccount();
-    const { insights, loading, error, refetch } = useNFTInsights({
-        contractAddress,
-        tokenId
-    });
+    const { data: nftData, isLoading: loading, refresh: refetch } = useNFTDetailData(contractAddress, tokenId);
+    const insights = nftData?.insights;
+    const error = null; // Context handles errors internally
 
     const [expandedSection, setExpandedSection] = useState<string | null>(null);
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
 
 // GET /api/insights/collection - Read-only access to Collection insights
-// For admin CUD operations, use /api/admin/insights/collection
+// For admin CUD operations, use /api/nft/admin/insights/collections
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);

@@ -20,3 +20,6 @@ export * from './05-performance';
 
 // 06-features: Feature-specific utilities and access control
 export * from './06-features';
+
+// 07-api: API layer utilities for data fetching and external services
+export * from './07-api';

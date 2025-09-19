@@ -1,15 +1,17 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useAccount } from 'wagmi';
+import { useNFTUserStats } from '@/contexts/NFTStatsContext';
 import { CombinedUserInteractionData } from '@/types';
 
 interface PersonalTabProps {
     contractAddress: string;
     tokenId: string;
+    // Legacy props - kept for backward compatibility but will be overridden by context
     userInteractions?: CombinedUserInteractionData | null;
     userWalletAddress?: string;
     loading?: boolean;
     onUpdateInteraction?: (data: Partial<CombinedUserInteractionData>) => Promise<void>;
-    // New direct action props from useNFTDetailLogic
     onToggleFavorite?: () => Promise<void>;
     onToggleWatchlist?: () => Promise<void>;
     onSetRating?: (rating: number) => Promise<void>;
@@ -18,27 +20,71 @@ interface PersonalTabProps {
 export default function PersonalTab({
     contractAddress,
     tokenId,
-    userInteractions,
-    userWalletAddress,
-    loading,
+    // Legacy props - context will override these
+    userInteractions: legacyUserInteractions,
+    userWalletAddress: legacyUserWalletAddress,
+    loading: legacyLoading,
     onUpdateInteraction,
-    // New direct action props from useNFTDetailLogic
-    onToggleFavorite,
-    onToggleWatchlist,
-    onSetRating
+    onToggleFavorite: legacyOnToggleFavorite,
+    onToggleWatchlist: legacyOnToggleWatchlist,
+    onSetRating: legacyOnSetRating
 }: PersonalTabProps) {
-    const [localRating, setLocalRating] = useState(userInteractions?.rating || 0);
-    const [personalNotes, setPersonalNotes] = useState(userInteractions?.personalNotes || '');
-    const [isUpdating, setIsUpdating] = useState(false);
-    const [isUpdatingNotes, setIsUpdatingNotes] = useState(false); // Separate state for notes
-    const [lastSavedNotes, setLastSavedNotes] = useState(userInteractions?.personalNotes || '');
+    // Get wallet connection state
+    const { address: userAddress, isConnected } = useAccount();
+
+    // Use the new unified stats context - this ensures real-time sync with header
+    const {
+        stats,
+        userInteractions,
+        loading: statsLoading,
+        toggleFavorite,
+        toggleWatchlist,
+        setRating,
+        hasUserAddress
+    } = useNFTUserStats(contractAddress, tokenId, userAddress);
+
+    // Use context data with fallbacks to legacy props
+    const effectiveUserAddress = userAddress || legacyUserWalletAddress;
+    const effectiveUserInteractions = userInteractions || legacyUserInteractions;
+
+    const [localRating, setLocalRating] = useState(() => {
+        // Context userInteractions uses 'userRating', legacy uses 'rating'
+        if (userInteractions) return userInteractions.userRating || 0;
+        if (legacyUserInteractions) return (legacyUserInteractions as any).rating || 0;
+        return 0;
+    });
+
+    const [personalNotes, setPersonalNotes] = useState(() => {
+        // Personal notes only exist in legacy interactions (not in context yet)
+        return legacyUserInteractions?.personalNotes || '';
+    });
+
+    const [isUpdatingNotes, setIsUpdatingNotes] = useState(false);
+    const [lastSavedNotes, setLastSavedNotes] = useState(() => {
+        return legacyUserInteractions?.personalNotes || '';
+    });
 
     // Sync local state with userInteractions when they change
     useEffect(() => {
-        setLocalRating(userInteractions?.rating || 0);
-        setPersonalNotes(userInteractions?.personalNotes || '');
-        setLastSavedNotes(userInteractions?.personalNotes || '');
-    }, [userInteractions?.rating, userInteractions?.personalNotes]);
+        // Handle rating from context (userRating) or legacy (rating)
+        let rating = 0;
+        if (userInteractions) {
+            rating = userInteractions.userRating || 0;
+        } else if (legacyUserInteractions) {
+            rating = (legacyUserInteractions as any).rating || 0;
+        }
+
+        // Handle notes (only from legacy for now)
+        const notes = legacyUserInteractions?.personalNotes || '';
+
+        setLocalRating(rating);
+        setPersonalNotes(notes);
+        setLastSavedNotes(notes);
+    }, [userInteractions?.userRating, legacyUserInteractions?.personalNotes]);
+
+    // Create effective values that handle both context and legacy data
+    const effectiveIsFavorited = userInteractions?.isFavorited ?? (legacyUserInteractions as any)?.isFavorite ?? false;
+    const effectiveIsWatchlisted = userInteractions?.isWatchlisted ?? legacyUserInteractions?.isWatchlisted ?? false;
 
     // Memoize button state to prevent flickering
     const notesButtonState = useMemo(() => {
@@ -87,7 +133,7 @@ export default function PersonalTab({
             setIsUpdatingNotes(false);
         }
     }, [personalNotes, lastSavedNotes, onUpdateInteraction]);    // If user is not connected, show connection prompt
-    if (!userWalletAddress) {
+    if (!effectiveUserAddress || !isConnected) {
         return (
             <div className="text-center py-12">
                 <div className="mx-auto h-12 w-12 text-gray-400 mb-4">
@@ -102,89 +148,65 @@ export default function PersonalTab({
     }
 
     const handleToggleFavorite = async () => {
-        if (onToggleFavorite) {
-            setIsUpdating(true);
-            try {
-                await onToggleFavorite();
-            } catch (error) {
-                console.error('Error with onToggleFavorite:', error);
-            } finally {
-                setIsUpdating(false);
-            }
-        } else if (onUpdateInteraction) {
-            setIsUpdating(true);
-            try {
+        try {
+            // Prefer context action over legacy
+            if (toggleFavorite) {
+                await toggleFavorite();
+            } else if (legacyOnToggleFavorite) {
+                await legacyOnToggleFavorite();
+            } else if (onUpdateInteraction) {
+                // Use context data for current state
+                const currentState = userInteractions?.isFavorited ?? (legacyUserInteractions as any)?.isFavorite ?? false;
                 await onUpdateInteraction({
-                    isFavorite: !userInteractions?.isFavorite
+                    isFavorite: !currentState
                 });
-            } catch (error) {
-                console.error('Error with onUpdateInteraction:', error);
-            } finally {
-                setIsUpdating(false);
             }
+        } catch (error) {
+            console.error('Error toggling favorite:', error);
         }
     };
 
     const handleToggleWatchlist = async () => {
-        if (onToggleWatchlist) {
-            setIsUpdating(true);
-            try {
-                await onToggleWatchlist();
-            } catch (error) {
-                console.error('Error toggling watchlist:', error);
-            } finally {
-                setIsUpdating(false);
-            }
-        } else if (onUpdateInteraction) {
-            setIsUpdating(true);
-            try {
+        try {
+            // Prefer context action over legacy
+            if (toggleWatchlist) {
+                await toggleWatchlist();
+            } else if (legacyOnToggleWatchlist) {
+                await legacyOnToggleWatchlist();
+            } else if (onUpdateInteraction) {
+                // Use context data for current state
+                const currentState = userInteractions?.isWatchlisted ?? legacyUserInteractions?.isWatchlisted ?? false;
                 await onUpdateInteraction({
-                    isWatchlisted: !userInteractions?.isWatchlisted
+                    isWatchlisted: !currentState
                 });
-            } catch (error) {
-                console.error('Error toggling watchlist:', error);
-            } finally {
-                setIsUpdating(false);
             }
+        } catch (error) {
+            console.error('Error toggling watchlist:', error);
         }
     };
 
     const handleRatingChange = async (rating: number) => {
+        // Update local state immediately for instant feedback
         setLocalRating(rating);
 
-        if (onSetRating) {
-            setIsUpdating(true);
-            try {
-                await onSetRating(rating);
-            } catch (error) {
-                console.error('Error with onSetRating:', error);
-                setLocalRating(userInteractions?.rating || 0);
-            } finally {
-                setIsUpdating(false);
-            }
-        } else if (onUpdateInteraction) {
-            setIsUpdating(true);
-            try {
+        try {
+            // Prefer context action over legacy
+            if (setRating) {
+                await setRating(rating);
+            } else if (legacyOnSetRating) {
+                await legacyOnSetRating(rating);
+            } else if (onUpdateInteraction) {
                 await onUpdateInteraction({
                     rating: rating
                 });
-            } catch (error) {
-                console.error('Error with onUpdateInteraction for rating:', error);
-                setLocalRating(userInteractions?.rating || 0);
-            } finally {
-                setIsUpdating(false);
             }
+        } catch (error) {
+            console.error('Error setting rating:', error);
+            // Revert local state on error
+            const currentRating = userInteractions?.userRating ?? (legacyUserInteractions as any)?.rating ?? 0;
+            setLocalRating(currentRating);
         }
     };
-
-    if (loading) {
-        return (
-            <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading your personal data...</p>
-            </div>
-        );
-    }
 
     return (
         <div className="space-y-6 min-h-[600px]">
@@ -209,35 +231,33 @@ export default function PersonalTab({
                     {/* Favorite Button */}
                     <button
                         onClick={handleToggleFavorite}
-                        disabled={isUpdating}
-                        className={`flex items-center justify-center p-4 rounded-lg border-2 transition-all duration-200 min-h-[64px] ${userInteractions?.isFavorite
+                        className={`flex items-center justify-center p-4 rounded-lg border-2 transition-colors duration-200 min-h-[80px] w-full ${effectiveIsFavorited
                             ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
                             : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600'
-                            } ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            }`}
                     >
-                        <svg className={`w-6 h-6 mr-2 flex-shrink-0 ${userInteractions?.isFavorite ? 'fill-current' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className={`w-6 h-6 mr-2 flex-shrink-0 ${effectiveIsFavorited ? 'fill-current' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                         </svg>
-                        <span className="text-center leading-tight">
-                            {userInteractions?.isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+                        <span className="text-center leading-tight w-[140px] flex-shrink-0">
+                            {effectiveIsFavorited ? 'Remove from Favorites' : 'Add to Favorites'}
                         </span>
                     </button>
 
                     {/* Watchlist Button */}
                     <button
                         onClick={handleToggleWatchlist}
-                        disabled={isUpdating}
-                        className={`flex items-center justify-center p-4 rounded-lg border-2 transition-all duration-200 min-h-[64px] ${userInteractions?.isWatchlisted
+                        className={`flex items-center justify-center p-4 rounded-lg border-2 transition-colors duration-200 min-h-[80px] w-full ${effectiveIsWatchlisted
                             ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
                             : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600'
-                            } ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            }`}
                     >
-                        <svg className={`w-6 h-6 mr-2 flex-shrink-0 ${userInteractions?.isWatchlisted ? 'fill-current' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className={`w-6 h-6 mr-2 flex-shrink-0 ${effectiveIsWatchlisted ? 'fill-current' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         </svg>
-                        <span className="text-center leading-tight">
-                            {userInteractions?.isWatchlisted ? 'Remove from Watchlist' : 'Add to Watchlist'}
+                        <span className="text-center leading-tight w-[140px] flex-shrink-0">
+                            {effectiveIsWatchlisted ? 'Remove from Watchlist' : 'Add to Watchlist'}
                         </span>
                     </button>
                 </div>
@@ -257,9 +277,7 @@ export default function PersonalTab({
                         <button
                             key={star}
                             onClick={() => handleRatingChange(star)}
-                            disabled={isUpdating}
-                            className={`text-3xl transition-all duration-200 transform ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-110'
-                                }`}
+                            className="text-3xl transition-all duration-200 transform cursor-pointer hover:scale-110"
                         >
                             <svg
                                 className={`w-8 h-8 transition-colors duration-200 ${star <= localRating ? 'text-yellow-400' : 'text-gray-300'}`}
@@ -279,6 +297,15 @@ export default function PersonalTab({
                     <span className="ml-4 text-gray-600 min-w-[120px] flex-shrink-0">
                         {localRating > 0 ? `${localRating}/5 stars` : 'No rating yet'}
                     </span>
+                    {localRating > 0 && (
+                        <button
+                            onClick={() => handleRatingChange(0)}
+                            className="ml-4 text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1 rounded-lg text-sm transition-colors"
+                            title="Remove your rating"
+                        >
+                            Remove
+                        </button>
+                    )}
                 </div>
             </div>
 
