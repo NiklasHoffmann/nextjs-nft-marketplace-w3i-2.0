@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from 'react';
-import { PersonalTab, MarketInsightsTab } from '@/components';
-import { useNFTDetailData } from '@/contexts/NFTContext';
+// Note: PersonalTab und MarketInsightsTab wurden zu NFT Detail Components verschoben
+// Diese Debug-Component sollte aktualisiert oder entfernt werden
+import { PersonalTab, MarketInsightsTab } from '@/app/nft/[nftAddress]/[tokenId]/components/tabs';
+import { useModernNFT } from '@/contexts/NFTContext';
 import { useUserInteractions } from '@/hooks';
 
 interface SimpleNFTInteractionTestProps {
@@ -19,14 +21,13 @@ export default function SimpleNFTInteractionTest({
     // Mock user wallet address - in real app this would come from Web3 context
     const userWalletAddress = "0x8BbA5E9b30E986C55465fEaC4D3417791065d1bb";
 
-    // Get NFT data from context (includes insights)
-    const {
-        data: nftData,
-        isLoading: nftLoading
-    } = useNFTDetailData(contractAddress, tokenId);
+    // Get NFT data from modern hook
+    const { nft: nftData, isLoading: nftLoading, error: nftError } = useModernNFT(
+        contractAddress,
+        tokenId
+    );
 
-    const publicInsights = nftData?.insights;
-    const nftError = null; // Context handles errors internally
+    const publicInsights = nftData?.insight;
 
     const {
         userInteractions,

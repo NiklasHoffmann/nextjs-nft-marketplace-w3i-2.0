@@ -1,5 +1,5 @@
 import { truncateAddress } from '@/utils';
-import { NFTAttribute } from '@/types';
+import { NFTAttribute } from '@/types/05-features/01-nft-detail';
 import { NFTInsights } from '@/types';
 import { PublicNFTInsights } from '@/types';
 

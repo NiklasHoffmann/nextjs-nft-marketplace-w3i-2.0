@@ -10,8 +10,8 @@ interface ImagePreloaderProps {
 // Component to preload critical images
 const ImagePreloader = memo(({ imageUrls, priority = false }: ImagePreloaderProps) => {
     useEffect(() => {
-        if (!priority) return;
-        
+        if (!priority || !Array.isArray(imageUrls)) return;
+
         const preloadImages = () => {
             imageUrls.forEach((url, index) => {
                 if (index < 3) { // Only preload first 3 images

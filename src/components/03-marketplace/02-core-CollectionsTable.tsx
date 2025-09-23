@@ -4,10 +4,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAccount } from "wagmi";
 import { useRouter } from 'next/navigation';
 import { getAdminAddressesList } from '@/utils';
-import { useActiveItems } from '@/hooks';
-import { useNFTContext } from '@/contexts/NFTContext';
-import { useETHPrice } from "@/contexts/OptimizedCurrencyContext";
-import { formatEther } from "@/utils";
+import { useAllCollections } from '@/hooks';
+import { useETHPrice } from "@/contexts/CurrencyContext";
 import OptimizedNFTImage from '../02-nft/02-utils-OptimizedNFTImage';
 
 interface CollectionData {
@@ -63,7 +61,7 @@ CollectionPriceDisplay.displayName = 'CollectionPriceDisplay';
 export function CollectionsTable() {
     const [isClient, setIsClient] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
-    const [sortBy, setSortBy] = useState<'name' | 'totalSupply' | 'listedItems' | 'totalValue' | 'totalLikes' | 'totalWatchlist'>('totalValue');
+    const [sortBy, setSortBy] = useState<'name' | 'totalSupply' | 'totalOwnedNFTs' | 'totalListedNFTs' | 'totalValue' | 'totalLikes' | 'totalWatchlist'>('totalValue');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
     // Router for navigation
@@ -83,108 +81,17 @@ export function CollectionsTable() {
         }
     }, [address]);
 
-    // Get marketplace data
-    const { marketplaceItems, loading: graphLoading, error: graphError, refetch } = useActiveItems();
-    const nftContext = useNFTContext();
-
-    // Process items into collections
-    const collections = useMemo(() => {
-        if (!marketplaceItems || marketplaceItems.length === 0) return [];
-
-        const collectionMap = new Map<string, CollectionData>();
-
-        marketplaceItems.forEach((item: any) => {
-            const contractAddress = item.contractAddress;
-
-            // Get NFT data from context (includes contractInfo)
-            const nftData = nftContext.getNFTCardData(contractAddress, item.tokenId);
-
-            // Note: We don't load data here to avoid setState during render
-            // Data loading is handled by separate useEffect
-
-            if (!collectionMap.has(contractAddress)) {
-                collectionMap.set(contractAddress, {
-                    contractAddress,
-                    symbol: nftData?.contractInfo?.symbol || `${contractAddress.slice(0, 6)}...`,
-                    name: nftData?.contractInfo?.name || 'Unknown Collection',
-                    totalSupply: nftData?.contractInfo?.totalSupply
-                        ? (typeof nftData.contractInfo.totalSupply === 'bigint'
-                            ? Number(nftData.contractInfo.totalSupply)
-                            : nftData.contractInfo.totalSupply)
-                        : 0,
-                    listedItems: 0,
-                    totalValue: '0',
-                    floorPrice: null,
-                    averagePrice: null,
-                    imageUrl: null,
-                    previewImages: [],
-                    totalLikes: 0,
-                    totalWatchlist: 0,
-                    items: []
-                });
-            }
-
-            const collection = collectionMap.get(contractAddress)!;
-            collection.items.push({ ...item, nftData });
-
-            // Add social metrics from NFT data
-            if (nftData) {
-                collection.totalLikes += nftData.likeCount || 0;
-                collection.totalWatchlist += nftData.watchlistCount || 0;
-            }
-
-            // Count listed items and calculate values
-            if (item.isListed && item.price) {
-                collection.listedItems++;
-
-                const priceInEth = parseFloat(formatEther(item.price));
-                const currentTotal = parseFloat(collection.totalValue);
-                collection.totalValue = (currentTotal + priceInEth).toFixed(6);
-
-                // Update floor price
-                if (!collection.floorPrice || priceInEth < parseFloat(collection.floorPrice)) {
-                    collection.floorPrice = priceInEth.toFixed(6);
-                }
-            }
-
-            // Collect preview images (up to 3 unique images)
-            if (nftData?.imageUrl && collection.previewImages.length < 3) {
-                if (!collection.previewImages.includes(nftData.imageUrl)) {
-                    collection.previewImages.push(nftData.imageUrl);
-                }
-            }
-
-            // Use first available image as main collection image
-            if (!collection.imageUrl && nftData?.imageUrl) {
-                collection.imageUrl = nftData.imageUrl;
-            }
-        });
-
-        // Calculate average prices
-        collectionMap.forEach((collection) => {
-            if (collection.listedItems > 0) {
-                const avgPrice = parseFloat(collection.totalValue) / collection.listedItems;
-                collection.averagePrice = avgPrice.toFixed(6);
-            }
-        });
-
-        return Array.from(collectionMap.values());
-    }, [marketplaceItems, nftContext]);
-
-    // Load missing NFT data (separate from useMemo to avoid setState during render)
-    useEffect(() => {
-        if (!marketplaceItems || marketplaceItems.length === 0) return;
-
-        marketplaceItems.forEach((item: any) => {
-            const contractAddress = item.contractAddress;
-            const nftData = nftContext.getNFTCardData(contractAddress, item.tokenId);
-
-            // Load data if not available
-            if (!nftData && !nftContext.isDataFresh(contractAddress, item.tokenId)) {
-                nftContext.loadNFTData(contractAddress, item.tokenId);
-            }
-        });
-    }, [marketplaceItems, nftContext]);
+    // Get all collections data (marketplace + insights)
+    const {
+        collections,
+        loading: collectionsLoading,
+        error: collectionsError,
+        refresh: refreshCollections,
+        totalListedNFTs,
+        totalValue
+    } = useAllCollections({
+        autoFetch: true
+    });
 
     // Sort collections
     const sortedCollections = useMemo(() => {
@@ -200,9 +107,9 @@ export function CollectionsTable() {
                     aValue = a.totalSupply;
                     bValue = b.totalSupply;
                     break;
-                case 'listedItems':
-                    aValue = a.listedItems;
-                    bValue = b.listedItems;
+                case 'totalListedNFTs':
+                    aValue = a.totalListedNFTs;
+                    bValue = b.totalListedNFTs;
                     break;
                 case 'totalValue':
                     aValue = parseFloat(a.totalValue);
@@ -269,7 +176,7 @@ export function CollectionsTable() {
         );
     }
 
-    if (graphLoading && collections.length === 0) {
+    if (collectionsLoading && collections.length === 0) {
         return (
             <div className="py-8">
                 <h2 className="text-2xl font-bold mb-4">Collections</h2>
@@ -278,7 +185,7 @@ export function CollectionsTable() {
         );
     }
 
-    if (graphError && collections.length === 0) {
+    if (collectionsError && collections.length === 0) {
         return (
             <div className="py-8">
                 <h2 className="text-2xl font-bold mb-4">Collections</h2>
@@ -316,12 +223,12 @@ export function CollectionsTable() {
 
                         <div className="flex items-center gap-3">
                             <button
-                                onClick={() => refetch?.()}
-                                disabled={graphLoading}
+                                onClick={() => refreshCollections?.()}
+                                disabled={collectionsLoading}
                                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white rounded-lg transition-all duration-300 shadow-sm hover:shadow-md text-sm font-medium"
                                 title="Refresh collections data"
                             >
-                                {graphLoading ? (
+                                {collectionsLoading ? (
                                     <span className="flex items-center gap-2">
                                         <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
                                         Refreshing...
@@ -362,10 +269,10 @@ export function CollectionsTable() {
                                 </th>
                                 <th
                                     className="text-center py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors"
-                                    onClick={() => handleSort('listedItems')}
+                                    onClick={() => handleSort('totalListedNFTs')}
                                 >
                                     <div className="flex items-center justify-center gap-2">
-                                        Listed <SortIcon field="listedItems" />
+                                        Listed / Total <SortIcon field="totalListedNFTs" />
                                     </div>
                                 </th>
                                 <th
@@ -389,7 +296,7 @@ export function CollectionsTable() {
                         <tbody className="divide-y divide-gray-200">
                             {sortedCollections.map((collection, index) => (
                                 <tr
-                                    key={collection.contractAddress}
+                                    key={collection.contractAddress || `unknown-${index}`}
                                     className="hover:bg-gray-50 transition-colors cursor-pointer"
                                     onClick={() => handleCollectionClick(collection.contractAddress)}
                                     style={{
@@ -403,7 +310,7 @@ export function CollectionsTable() {
                                     {/* Mini Gallery - 3 Preview Images */}
                                     <td className="py-4 px-4">
                                         <div className="flex gap-1">
-                                            {collection.previewImages.slice(0, 3).map((imageUrl, imgIndex) => (
+                                            {(collection.previewImages || []).slice(0, 3).map((imageUrl: string, imgIndex: number) => (
                                                 <div key={imgIndex} className="w-12 h-12 rounded-md overflow-hidden bg-gray-100 shadow-sm border border-gray-200 flex-shrink-0 hover:shadow-md transition-shadow">
                                                     <OptimizedNFTImage
                                                         imageUrl={imageUrl}
@@ -437,7 +344,7 @@ export function CollectionsTable() {
                                                 {collection.name}
                                             </div>
                                             <div className="text-xs text-gray-500 font-mono mt-1">
-                                                {collection.contractAddress.slice(0, 6)}...{collection.contractAddress.slice(-4)}
+                                                {(collection.contractAddress || '').slice(0, 6)}...{(collection.contractAddress || '').slice(-4)}
                                             </div>
                                         </div>
                                     </td>
@@ -452,28 +359,48 @@ export function CollectionsTable() {
                                         </div>
                                     </td>
 
-                                    {/* Listed Items */}
+                                    {/* Listed vs Total Items */}
                                     <td className="py-4 px-4 text-center">
                                         <div className="flex flex-col items-center">
+                                            {/* Main numbers with ratio */}
                                             <div className="text-sm font-medium text-gray-900">
-                                                {collection.listedItems}
+                                                <span className="text-green-600">{collection.totalListedNFTs}</span>
+                                                <span className="text-gray-400 mx-1">/</span>
+                                                <span className="text-blue-600">{collection.totalSupply}</span>
                                             </div>
-                                            <div className="text-xs text-gray-500">
+
+                                            {/* Percentage and labels */}
+                                            <div className="text-xs text-gray-500 mt-1">
                                                 {collection.totalSupply > 0
-                                                    ? `${((collection.listedItems / collection.totalSupply) * 100).toFixed(1)}%`
-                                                    : '0%'
+                                                    ? `${((collection.totalListedNFTs / collection.totalSupply) * 100).toFixed(1)}% listed`
+                                                    : '0% listed'
                                                 }
                                             </div>
-                                            {collection.listedItems > 0 && (
-                                                <div className="w-12 bg-gray-200 rounded-full h-1 mt-1">
+
+                                            {/* Visual progress bar */}
+                                            {collection.totalSupply > 0 && (
+                                                <div className="w-16 bg-gray-200 rounded-full h-2 mt-2">
+                                                    {/* Listed portion (green) */}
                                                     <div
-                                                        className="bg-blue-600 h-1 rounded-full transition-all duration-300"
+                                                        className="bg-green-500 h-2 rounded-full transition-all duration-300"
                                                         style={{
-                                                            width: `${Math.min((collection.listedItems / collection.totalSupply) * 100, 100)}%`
+                                                            width: `${Math.min((collection.totalListedNFTs / collection.totalSupply) * 100, 100)}%`
                                                         }}
                                                     ></div>
                                                 </div>
                                             )}
+
+                                            {/* Breakdown labels */}
+                                            <div className="flex items-center gap-3 mt-2 text-xs">
+                                                <div className="flex items-center gap-1">
+                                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                                    <span className="text-gray-600">{collection.totalListedNFTs} listed</span>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                                    <span className="text-gray-600">{collection.totalSupply - collection.totalListedNFTs} unlisted</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </td>
 
@@ -500,7 +427,7 @@ export function CollectionsTable() {
 
                                     {/* Total Value */}
                                     <td className="py-4 px-4 text-right">
-                                        {collection.listedItems > 0 ? (
+                                        {collection.totalListedNFTs > 0 ? (
                                             <CollectionPriceDisplay
                                                 totalValue={collection.totalValue}
                                                 floorPrice={collection.floorPrice}
@@ -533,31 +460,37 @@ export function CollectionsTable() {
                     </div>
                     <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                         <div className="text-2xl font-bold text-green-600">
-                            {collections.reduce((sum, col) => sum + col.totalSupply, 0).toLocaleString()}
+                            {collections.reduce((sum: number, col) => sum + col.totalSupply, 0)}
                         </div>
-                        <div className="text-sm text-gray-600">Total Items</div>
+                        <div className="text-sm text-gray-600">Total NFTs</div>
                     </div>
                     <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                         <div className="text-2xl font-bold text-purple-600">
-                            {collections.reduce((sum, col) => sum + col.listedItems, 0)}
+                            {totalListedNFTs}
                         </div>
                         <div className="text-sm text-gray-600">Listed</div>
                     </div>
                     <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+                        <div className="text-2xl font-bold text-orange-600">
+                            {collections.reduce((sum: number, col) => sum + (col.totalSupply - col.totalListedNFTs), 0)}
+                        </div>
+                        <div className="text-sm text-gray-600">Unlisted</div>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                         <div className="text-2xl font-bold text-red-600">
-                            {collections.reduce((sum, col) => sum + col.totalLikes, 0).toLocaleString()}
+                            {collections.reduce((sum: number, col) => sum + col.totalLikes, 0).toLocaleString()}
                         </div>
                         <div className="text-sm text-gray-600">Total Likes</div>
                     </div>
                     <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                         <div className="text-2xl font-bold text-blue-600">
-                            {collections.reduce((sum, col) => sum + col.totalWatchlist, 0).toLocaleString()}
+                            {collections.reduce((sum: number, col) => sum + col.totalWatchlist, 0).toLocaleString()}
                         </div>
                         <div className="text-sm text-gray-600">Watchlisted</div>
                     </div>
                     <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                         <div className="text-2xl font-bold text-orange-600">
-                            {collections.reduce((sum, col) => sum + parseFloat(col.totalValue), 0).toFixed(4)} ETH
+                            {collections.reduce((sum: number, col) => sum + parseFloat(col.totalValue), 0).toFixed(4)} ETH
                         </div>
                         <div className="text-sm text-gray-600">Total Value</div>
                     </div>

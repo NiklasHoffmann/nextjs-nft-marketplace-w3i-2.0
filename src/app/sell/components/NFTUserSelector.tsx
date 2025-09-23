@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { NFTDetails } from '@/types/01-core';
+import { NFTDetails } from '@/types/01-core/01-core-nft';
 
 interface NFTUserSelectorProps {
     userNFTs: NFTDetails[];
@@ -49,8 +49,8 @@ export function NFTUserSelector({ userNFTs, selectedNFT, onSelect, isLoading }: 
                     key={`${nft.nftAddress}-${nft.tokenId}-${index}`}
                     onClick={() => onSelect(nft)}
                     className={`flex gap-3 p-3 border rounded-lg cursor-pointer transition-all hover:shadow-md ${selectedNFT?.nftAddress === nft.nftAddress && selectedNFT?.tokenId === nft.tokenId
-                            ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                            : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                        : 'border-gray-200 hover:border-gray-300'
                         }`}
                 >
                     <div className="flex-shrink-0">

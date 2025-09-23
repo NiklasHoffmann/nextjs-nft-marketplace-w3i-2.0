@@ -184,7 +184,7 @@ export default function DynamicDescriptionManager({
                         Preview
                     </h4>
                     <div className="flex flex-wrap gap-1">
-                        {descriptions
+                        {(descriptions || [])
                             .filter(desc => desc.trim().length > 0)
                             .slice(0, 3)
                             .map((desc, index) => (

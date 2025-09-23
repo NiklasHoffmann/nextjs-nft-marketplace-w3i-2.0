@@ -4,8 +4,8 @@ import React, { type ErrorInfo } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { ApolloProvider } from "@apollo/client/react";
 import apolloClient from "../../config/apolloClient";
-import { CurrencyProvider } from "@/contexts/OptimizedCurrencyContext";
-import { NFTProvider } from "@/contexts/NFTContext";
+import { CurrencyProvider } from "@/contexts/CurrencyContext";
+import { ModernNFTProvider } from "@/contexts/NFTContext";
 import { NFTStatsProvider } from "@/contexts/NFTStatsContext";
 import Navbar from "./02-core-Navbar";
 import Web3Provider from "./03-core-Web3Provider";
@@ -45,7 +45,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     >
       <Web3Provider>
         <ApolloProvider client={apolloClient}>
-          <NFTProvider>
+          <ModernNFTProvider>
             <NFTStatsProvider>
               <CurrencyProvider>
                 <div>
@@ -54,7 +54,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 </div>
               </CurrencyProvider>
             </NFTStatsProvider>
-          </NFTProvider>
+          </ModernNFTProvider>
         </ApolloProvider>
       </Web3Provider>
     </ErrorBoundary>

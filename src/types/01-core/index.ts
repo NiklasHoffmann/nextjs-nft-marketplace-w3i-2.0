@@ -1,9 +1,17 @@
 /**
- * Core Types - Fundamental data structures
+ * CORE TYPES - Fundamental Data Structures
+ * 
+ * Grundlegende Datenstrukturen für NFT Marketplace:
+ * • Modern: AggregatedNFT, NftCore, ActiveItem (aktuell verwendet)
+ * • Legacy: Deprecated types (verfügbar aber nicht re-exportiert)
+ * • Currency: ETH/USD Conversion, Price Formatting
  */
 
-// NFT and blockchain related core types
-export * from './01-core-nft';
+// === MODERN NFT TYPES (ACTIVE) ===
+export * from './01-core-nft-modern';
 
-// Currency and price related core types  
+// === CURRENCY & PRICE TYPES ===
 export * from './02-core-currency';
+
+// Note: Legacy types in 01-core-nft.ts and 01-core-nft-legacy.ts are deprecated
+// Import directly if needed for migration: import { ... } from '@/types/01-core/01-core-nft'

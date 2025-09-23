@@ -1,11 +1,17 @@
 /**
- * Feature Types - Specific application features
+ * FEATURE TYPES - Specific Application Features
+ * 
+ * Feature-spezifische Type Definitionen:
+ * • NFT Detail: Detail Page, Enhanced Metadata, User Data
+ * • User Interactions: Like, Watchlist, View History
+ * • Insights: Enhanced Descriptions, Project Info, Partnerships
+ * • Personalization: User Preferences, Customizations
  */
 
-// NFT detail page related types
+// === NFT DETAIL PAGE ===
 export * from './01-nft-detail';
 
-// User interactions and personal data (excluding NFTIdentifier to avoid conflicts)
+// === USER INTERACTIONS & PERSONALIZATION ===
 export type {
     UserNFTInteractions,
     CombinedUserInteractionData,
@@ -13,10 +19,10 @@ export type {
     CreateUserNFTInteractionRequest,
     UpdateUserNFTInteractionRequest,
     CombinedUserInteractionsResponse,
-    NFTDetailData
+    NFTDetailWithUserData
 } from './02-user-interactions';
 
-// NFT Insights - Enhanced descriptions and metadata
+// === ENHANCED NFT INSIGHTS ===
 export type {
     NFTProjectDescriptions,
     NFTFunctionalitiesDescriptions,

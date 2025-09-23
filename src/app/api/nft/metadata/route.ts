@@ -1,8 +1,8 @@
 // app/api/nft-metadata/route.ts - Optimized Version
 import { NextRequest, NextResponse } from 'next/server';
 import { LRUCache } from 'lru-cache';
-import { fetchComprehensiveNFTDataNew } from '@/utils/04-blockchain/nft-data-fetcher';
-import { createRobustPublicClient, getTimeoutConfig } from '@/utils/04-blockchain/rpc-config';
+import { fetchComprehensiveNFTDataNew } from '@/utils/04-blockchain/04-blockchain-nft-fetcher';
+import { createRobustPublicClient, getTimeoutConfig } from '@/utils/04-blockchain/05-blockchain-rpc-config';
 
 // Enhanced server-side cache für NFT Metadaten mit größerem TTL und besserer Performance
 const metadataCache = new LRUCache<string, any>({

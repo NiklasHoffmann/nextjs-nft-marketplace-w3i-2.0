@@ -5,7 +5,7 @@
  * Handles all external API calls with robust error handling and fallbacks.
  */
 
-import type { NFTMetadata, AdminNFTInsight, NFTStats } from '@/types';
+import type { NftMeta, AdminNFTInsight, NFTStats } from '@/types';
 
 // ===== API RESPONSE TYPES =====
 
@@ -19,10 +19,11 @@ interface ContractInfo {
 }
 
 interface MetadataApiResponse {
-    metadata: NFTMetadata;
+    metadata: NftMeta;
     imageUrl: string;
     animationUrl?: string;
-    contractInfo?: ContractInfo;
+    blockchain?: ContractInfo; // API returns blockchain object with contract info
+    contractInfo?: ContractInfo; // Keep for backward compatibility
     cached?: boolean;
 }
 

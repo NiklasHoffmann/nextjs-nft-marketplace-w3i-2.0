@@ -346,7 +346,7 @@ export default function TitleDescriptionManager({
                                         </h5>
                                     )}
                                     <div className="space-y-1">
-                                        {pair.descriptions
+                                        {(pair.descriptions || [])
                                             .filter((desc: string) => desc.trim().length > 0)
                                             .slice(0, 2)
                                             .map((desc: string, descIndex: number) => (
@@ -354,9 +354,9 @@ export default function TitleDescriptionManager({
                                                     • {desc.trim()}
                                                 </p>
                                             ))}
-                                        {pair.descriptions.filter((desc: string) => desc.trim().length > 0).length > 2 && (
+                                        {(pair.descriptions || []).filter((desc: string) => desc.trim().length > 0).length > 2 && (
                                             <p className="text-xs text-gray-400">
-                                                ... +{pair.descriptions.filter((desc: string) => desc.trim().length > 0).length - 2} weitere
+                                                ... +{(pair.descriptions || []).filter((desc: string) => desc.trim().length > 0).length - 2} weitere
                                             </p>
                                         )}
                                     </div>

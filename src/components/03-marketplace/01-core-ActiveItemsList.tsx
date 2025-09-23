@@ -52,23 +52,29 @@ export function ActiveItemsList() {
     const { items, marketplaceItems, loading: graphLoading, error: graphError, refetch } = useActiveItems();
     const safeItems = items ?? []; // <- Guard
 
-    // Auto-refresh when page becomes visible (e.g., when returning from detail page)
+    // Restored more responsive auto-refresh
+    const lastRefreshTime = useRef<number>(Date.now());
+    const REFRESH_THROTTLE_MS = 5000; // 5 seconds - more responsive
+    const STATS_THROTTLE_MS = 1000; // 1 second for stats changes
+
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (!document.hidden && refetch) {
-                // Small delay to avoid immediate refresh
-                setTimeout(() => {
+                const now = Date.now();
+                if (now - lastRefreshTime.current > REFRESH_THROTTLE_MS) {
+                    lastRefreshTime.current = now;
                     refetch();
-                }, 500);
+                }
             }
         };
 
         const handleFocus = () => {
             if (refetch) {
-                // Small delay to avoid immediate refresh
-                setTimeout(() => {
+                const now = Date.now();
+                if (now - lastRefreshTime.current > REFRESH_THROTTLE_MS) {
+                    lastRefreshTime.current = now;
                     refetch();
-                }, 500);
+                }
             }
         };
 
@@ -81,16 +87,13 @@ export function ActiveItemsList() {
         };
     }, [refetch]);
 
-    // Auto-refresh when NFT stats change (likes, ratings, etc.)
-    const lastRefreshTime = useRef<number>(Date.now());
+    // More responsive storage change listening
     useEffect(() => {
         const handleStorageChange = (e: StorageEvent) => {
-            // Listen for NFT stats changes via localStorage events
-            if (e.key && e.key.startsWith('nft_stats_') && refetch) {
+            // Respond to both marketplace and NFT stats updates
+            if ((e.key === 'nft-marketplace-update' || (e.key && e.key.startsWith('nft_stats_'))) && refetch) {
                 const now = Date.now();
-                // Throttle refreshes to avoid rapid updates
-                if (now - lastRefreshTime.current > 1000) {
-                    console.log('NFT stats changed, refreshing ActiveItemsList');
+                if (now - lastRefreshTime.current > STATS_THROTTLE_MS) {
                     lastRefreshTime.current = now;
                     refetch();
                 }
@@ -106,7 +109,8 @@ export function ActiveItemsList() {
     // Convert items to filterable format (already enriched with NFT context data)
     const filterableItems: FilterableNFTItem[] = useMemo(() => {
         return safeItems.map((item: any) => ({
-            contractAddress: item.contractAddress,
+            contractAddress: item.nftAddress, // Map nftAddress to contractAddress for filter interface
+            nftAddress: item.nftAddress, // Keep nftAddress for NFTCard
             tokenId: item.tokenId,
             price: item.price,
             isListed: item.isListed,
@@ -140,8 +144,8 @@ export function ActiveItemsList() {
 
     // Performance monitoring for admin
     const performanceData = useNFTPerformance();
-    const cachedCount = performanceData.size || 0;
-    const { memoryUsage, loadingCount } = performanceData;
+    const cachedCount = performanceData.total || 0;
+    const { loadingCount } = performanceData;
 
     useEffect(() => {
         setIsClient(true);
@@ -342,7 +346,7 @@ export function ActiveItemsList() {
                             <div className="text-gray-600">Loading</div>
                         </div>
                         <div className="bg-white p-3 rounded-lg shadow-sm">
-                            <div className="font-semibold text-indigo-600">{memoryUsage}</div>
+                            <div className="font-semibold text-indigo-600">{performanceData.fresh}/{performanceData.total}</div>
                             <div className="text-gray-600">Memory</div>
                         </div>
                     </div>
@@ -423,37 +427,45 @@ export function ActiveItemsList() {
                         overflowY: 'visible'
                     }}
                 >
-                    {visibleItems.map((item: any, index: number) => (
-                        <div
-                            key={item.listingId}
-                            className="flex-shrink-0"
-                            style={{
-                                animationName: 'fadeInUp',
-                                animationDuration: '0.5s',
-                                animationTimingFunction: 'ease-out',
-                                animationFillMode: 'forwards',
-                                animationDelay: `${index * 80}ms`
-                            }}
-                        >
-                            <NFTCard
-                                contractAddress={item.contractAddress}
-                                tokenId={item.tokenId}
-                                listingId={item.listingId}
-                                price={item.price}
-                                seller={item.seller}
-                                buyer={item.buyer}
-                                isListed={item.isListed}
-                                desiredNftAddress={item.desiredNftAddress}
-                                desiredTokenId={item.desiredTokenId}
-                                priority={index < 6}
-                                enableInsights={true} // Enable insights for all NFTs in the active items list
-                            />
-                        </div>
-                    ))}
+                    {visibleItems.map((item: any, index: number) => {
+                        // DEBUG: Log first marketplace item data
+                        if (index === 0) {
+                            console.log('🔍 ActiveItemsList first visibleItem:', item);
+                            console.log('🔍 ContractAddress being passed:', item.contractAddress || item.nftAddress);
+                        }
+
+                        return (
+                            <div
+                                key={item.listingId}
+                                className="flex-shrink-0 w-80"
+                                style={{
+                                    animationName: 'fadeInUp',
+                                    animationDuration: '0.5s',
+                                    animationTimingFunction: 'ease-out',
+                                    animationFillMode: 'forwards',
+                                    animationDelay: `${index * 80}ms`
+                                }}
+                            >
+                                <NFTCard
+                                    contractAddress={item.contractAddress || item.nftAddress}
+                                    tokenId={item.tokenId}
+                                    listingId={item.listingId}
+                                    price={item.price}
+                                    seller={item.seller}
+                                    buyer={item.buyer}
+                                    isListed={item.isListed}
+                                    desiredNftAddress={item.desiredNftAddress}
+                                    desiredTokenId={item.desiredTokenId}
+                                    priority={index < 12} // More images get priority loading
+                                    enableInsights={true} // Enable insights for all NFTs in the active items list
+                                />
+                            </div>
+                        );
+                    })}
 
                     {/* Progressive Loading Indicator */}
                     {visibleCount < filteredItems.length && (
-                        <div className="flex-shrink-0 w-64 h-80 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center">
+                        <div className="flex-shrink-0 w-80 h-96 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center">
                             <div className="text-center">
                                 <div className="animate-spin w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"></div>
                                 <div className="text-sm font-medium text-gray-600">Loading more items...</div>
@@ -466,29 +478,36 @@ export function ActiveItemsList() {
                 </div>
             </div>
 
-            {/* Optimized Performance Summary - Admin Only */}
+            {/* Performance Monitoring Section - Admin Only */}
             {isAdmin && safeItems.length > 0 && (
                 <div className="max-w-7xl mx-auto px-6 mt-8">
                     <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                         <h3 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
-                            🚀 Performance Optimizations Active
+                            ⚡ Performance Optimizations
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                             <div>
-                                <div className="font-medium text-green-700">Active Features:</div>
+                                <div className="font-medium text-green-700">Caching:</div>
                                 <ul className="text-green-600 ml-4 mt-1 space-y-1">
-                                    <li>• The Graph integration for real data</li>
-                                    <li>• NFTContext smart caching</li>
-                                    <li>• Staggered rendering optimization</li>
-                                    <li>• Image preloading & background updates</li>
+                                    <li>• Image preloading & caching</li>
+                                    <li>• NFT data smart caching</li>
+                                    <li>• Intersection Observer lazy loading</li>
                                 </ul>
                             </div>
                             <div>
-                                <div className="font-medium text-blue-700">Live Stats:</div>
+                                <div className="font-medium text-blue-700">Performance:</div>
                                 <ul className="text-blue-600 ml-4 mt-1 space-y-1">
-                                    <li>• {safeItems.length} total items • {cachedCount} cached</li>
-                                    <li>• {visibleCount}/{safeItems.length} rendered • {loadingCount} loading</li>
-                                    <li>• Memory usage: {memoryUsage}</li>
+                                    <li>• Throttled auto-refresh (30s)</li>
+                                    <li>• Optimized glitter effects</li>
+                                    <li>• Progressive loading (first 12 items)</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <div className="font-medium text-purple-700">Data:</div>
+                                <ul className="text-purple-600 ml-4 mt-1 space-y-1">
+                                    <li>• The Graph integration</li>
+                                    <li>• Total items: {filteredItems.length}</li>
+                                    <li>• Visible: {Math.min(visibleCount, filteredItems.length)}</li>
                                 </ul>
                             </div>
                         </div>

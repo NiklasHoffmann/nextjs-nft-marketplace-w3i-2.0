@@ -1,13 +1,7 @@
 import { ObjectId } from 'mongodb';
+import type { NFTIdentifier } from '../01-core/01-core-nft-modern';
 
-// Base interface for NFT identification
-export interface NFTIdentifier {
-    contractAddress: string;
-    tokenId: string;
-    chainId?: number;
-}
-
-// Public NFT Insights - Admin managed, visible to everyone
+// Public NFT Insights - Filtered version for frontend
 export interface PublicNFTInsights extends NFTIdentifier {
     _id?: ObjectId | string;
 

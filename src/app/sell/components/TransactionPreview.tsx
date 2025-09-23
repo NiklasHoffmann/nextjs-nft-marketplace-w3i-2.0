@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { NFTDetails } from '@/types/01-core';
+import { NFTDetails } from '@/types/01-core/01-core-nft';
 
 interface TransactionData {
     type: 'sell' | 'trade';
@@ -254,8 +254,8 @@ export function TransactionPreview({ data, onConfirm, onCancel, isLoading }: Tra
                     onClick={onConfirm}
                     disabled={isLoading}
                     className={`flex-1 py-3 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors font-medium ${type === 'sell'
-                            ? 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500'
-                            : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
+                        ? 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500'
+                        : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
                         } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                     {isLoading ? (

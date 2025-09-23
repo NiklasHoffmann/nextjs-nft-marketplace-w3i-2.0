@@ -1,7 +1,7 @@
 "use client";
 import { memo, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useETHPrice } from "@/contexts/OptimizedCurrencyContext";
+import { useETHPrice } from "@/contexts/CurrencyContext";
 import { formatEther } from "@/utils";
 import OptimizedNFTImage from "./02-utils-OptimizedNFTImage";
 
@@ -100,28 +100,28 @@ const DemoNFTCard = memo(() => {
 
                         {/* Categories */}
                         <div className="flex flex-wrap gap-1 mb-2">
-                            {categories.slice(0, 3).map((cat, index) => (
+                            {(categories || []).slice(0, 3).map((cat, index) => (
                                 <div key={index} className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-white/20 h-6 flex items-center">
                                     <span className="text-xs font-medium text-gray-700">{cat}</span>
                                 </div>
                             ))}
-                            {categories.length > 3 && (
+                            {(categories || []).length > 3 && (
                                 <div className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-white/20 h-6 flex items-center">
-                                    <span className="text-xs font-medium text-gray-500">+{categories.length - 3}</span>
+                                    <span className="text-xs font-medium text-gray-500">+{(categories || []).length - 3}</span>
                                 </div>
                             )}
                         </div>
 
                         {/* Description */}
                         <div className="mb-2 flex flex-wrap gap-1">
-                            {descriptions.slice(0, 2).map((desc, index) => (
+                            {(descriptions || []).slice(0, 2).map((desc, index) => (
                                 <div key={index} className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-white/20 text-xs text-gray-600">
                                     {desc}
                                 </div>
                             ))}
-                            {descriptions.length > 2 && (
+                            {(descriptions || []).length > 2 && (
                                 <div className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-white/20 text-xs text-gray-500">
-                                    +{descriptions.length - 2}
+                                    +{(descriptions || []).length - 2}
                                 </div>
                             )}
                         </div>

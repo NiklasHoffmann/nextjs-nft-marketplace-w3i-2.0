@@ -1,11 +1,5 @@
 import { ObjectId } from 'mongodb';
-
-// Base interface for NFT identification
-export interface NFTIdentifier {
-    contractAddress: string;
-    tokenId: string;
-    chainId?: number;
-}
+import { NFTIdentifier } from '../01-core/01-core-nft-modern';
 
 // User-specific NFT interactions and personal data
 export interface UserNFTInteractions extends NFTIdentifier {
@@ -134,7 +128,7 @@ export interface CombinedUserInteractionsResponse {
 }
 
 // Combined view for NFT detail page
-export interface NFTDetailData {
+export interface NFTDetailWithUserData {
     nftIdentifier: NFTIdentifier;
     publicInsights?: PublicNFTInsights;
     userInteractions?: UserNFTInteractions;

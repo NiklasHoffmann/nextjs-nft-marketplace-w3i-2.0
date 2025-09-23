@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
-import { useNFTDetailData } from '@/contexts/NFTContext';
-import { canEditInsights } from '@/utils';
+import { useModernNFTContext } from '@/contexts/NFTContext';
+import { canPerformAdminActions } from '@/utils';
 import Link from 'next/link';
 
 interface NFTInsightsPanelProps {
@@ -11,14 +11,25 @@ interface NFTInsightsPanelProps {
 
 export default function NFTInsightsPanel({ contractAddress, tokenId }: NFTInsightsPanelProps) {
     const { address, isConnected } = useAccount();
-    const { data: nftData, isLoading: loading, refresh: refetch } = useNFTDetailData(contractAddress, tokenId);
-    const insights = nftData?.insights;
+
+    // MODERNIZED: Use ModernNFTContext
+    const nftContext = useModernNFTContext();
+    const nftData = nftContext.getNFT(contractAddress, tokenId);
+    const loading = !nftData; // Simple loading check
+    const insights = nftData?.insight;
     const error = null; // Context handles errors internally
+
+    // Load data if not available
+    useEffect(() => {
+        if (!nftData) {
+            nftContext.loadNFT(contractAddress, tokenId);
+        }
+    }, [nftContext, contractAddress, tokenId, nftData]);
 
     const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
     // Check access permissions
-    const canEdit = canEditInsights(address);
+    const canEdit = canPerformAdminActions(address);
     // const canView = canViewInsights(address);
 
     const toggleSection = (section: string) => {
@@ -67,7 +78,7 @@ export default function NFTInsightsPanel({ contractAddress, tokenId }: NFTInsigh
                     <span className="text-sm font-medium text-red-800">Error loading insights</span>
                 </div>
                 <button
-                    onClick={refetch}
+                    onClick={() => nftContext.loadNFT(contractAddress, tokenId)}
                     className="text-xs text-red-600 hover:text-red-700 underline"
                 >
                     Try again

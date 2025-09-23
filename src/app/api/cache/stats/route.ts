@@ -1,6 +1,6 @@
 // app/api/cache/stats/route.ts
 import { NextResponse } from 'next/server';
-import { getCacheStats } from '@/utils/04-blockchain/smart-cache';
+import { getCacheStats } from '@/utils/04-blockchain/06-blockchain-smart-cache';
 
 export async function GET() {
     try {

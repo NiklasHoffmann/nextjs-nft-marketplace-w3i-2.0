@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react';
 import { useAccount } from 'wagmi';
 import { CategoryPillsProps } from '@/types';
-import { canEditInsights } from '@/utils';
+import { canPerformAdminActions } from '@/utils';
 import Link from 'next/link';
 
 function CategoryPills({
@@ -18,14 +18,16 @@ function CategoryPills({
     const { address, isConnected } = useAccount();
 
     // Check edit permissions
-    const canEdit = canEditInsights(address);
+    const canEdit = canPerformAdminActions(address);
 
     // Combine metadata categories with insights categories (but NOT tags)
     const allCategories = useMemo(() => {
         const finalCategories = new Set<string>();
 
         // Add metadata categories
-        categories.forEach(cat => finalCategories.add(cat));
+        if (Array.isArray(categories)) {
+            categories.forEach(cat => finalCategories.add(cat));
+        }
 
         // Add insights category if available and not loading (but NOT tags)
         if (!insightsLoading && insights) {
@@ -42,11 +44,13 @@ function CategoryPills({
         const finalTags = new Set<string>();
 
         // Add metadata tags
-        tags.forEach(tag => finalTags.add(tag));
+        if (Array.isArray(tags)) {
+            tags.forEach(tag => finalTags.add(tag));
+        }
 
         // Add insights tags if available and not loading
         if (!insightsLoading && insights) {
-            if (insights.tags && insights.tags.length > 0) {
+            if (insights.tags && Array.isArray(insights.tags) && insights.tags.length > 0) {
                 insights.tags.forEach((tag: string) => finalTags.add(tag));
             }
         }

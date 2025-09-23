@@ -1,9 +1,9 @@
-// utils/04-blockchain/nft-data-fetcher.ts
+// utils/04-blockchain/04-blockchain-nft-fetcher.ts
 import {
     executeCriticalCall,
     executeOptionalCall,
     executeBatchContractCalls
-} from './contract-call-helpers';
+} from './03-blockchain-contract-calls';
 import {
     contractPropertiesCache,
     ownershipCache,
@@ -13,7 +13,7 @@ import {
     type ContractProperties,
     type OwnershipData,
     type TokenMetadata
-} from './smart-cache';
+} from './06-blockchain-smart-cache';
 
 // Comprehensive NFT data interface
 interface BlockchainNFTData {

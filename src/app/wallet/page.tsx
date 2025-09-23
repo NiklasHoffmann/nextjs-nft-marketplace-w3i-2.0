@@ -5,9 +5,8 @@ import { useAccount, useBalance } from 'wagmi';
 import { useRouter } from 'next/navigation';
 import { formatEther as formatEtherViem } from 'viem';
 import Link from 'next/link';
-import Image from 'next/image';
-import { useETHPrice } from '@/contexts/OptimizedCurrencyContext';
-import { useCurrency } from '@/contexts/OptimizedCurrencyContext';
+import { useETHPrice } from '@/contexts/CurrencyContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { useMarketplaceUser } from '@/hooks';
 import { getMarketplaceAddress } from '@/utils';
 import { WalletNFTsList } from '@/components';
@@ -17,14 +16,6 @@ export const dynamic = 'force-dynamic';
 
 // Debug mode - set to false in production
 const DEBUG_MODE = true;
-
-interface UserNFT {
-    contractAddress: string;
-    tokenId: string;
-    name?: string;
-    image?: string;
-    contractName?: string;
-}
 
 export default function WalletDashboard() {
     const [mounted, setMounted] = useState(false);
@@ -74,8 +65,6 @@ function WalletDashboardContent() {
         refetchProceeds
     } = useMarketplaceUser(marketplaceAddress || '');
 
-    const [userNFTs, setUserNFTs] = useState<UserNFT[]>([]);
-    const [isLoadingNFTs, setIsLoadingNFTs] = useState(false);
     const [isWithdrawing, setIsWithdrawing] = useState(false);
 
     // Get converted price for balance
@@ -104,49 +93,7 @@ function WalletDashboardContent() {
 
     // Format address for display
     const formatAddress = (addr: string) => {
-        return `${addr.slice(0, 8)}...${addr.slice(-6)}`;
-    };
-
-    // Mock function to fetch user's NFTs
-    // In a real app, you'd use a service like Alchemy, Moralis, or OpenSea API
-    const fetchUserNFTs = async () => {
-        if (!address) return;
-
-        setIsLoadingNFTs(true);
-        try {
-            // Mock NFT data - replace with actual API call
-            const mockNFTs: UserNFT[] = [
-                {
-                    contractAddress: "0x1234567890abcdef1234567890abcdef12345678",
-                    tokenId: "1",
-                    name: "Cool NFT #1",
-                    image: "/media/Logo-w3i-marketplace.png",
-                    contractName: "Cool Collection"
-                },
-                {
-                    contractAddress: "0x1234567890abcdef1234567890abcdef12345678",
-                    tokenId: "2",
-                    name: "Cool NFT #2",
-                    image: "/media/Logo-w3i-marketplace.png",
-                    contractName: "Cool Collection"
-                },
-                {
-                    contractAddress: "0xabcdef1234567890abcdef1234567890abcdef12",
-                    tokenId: "5",
-                    name: "Awesome NFT #5",
-                    image: "/media/Logo-w3i-marketplace.png",
-                    contractName: "Awesome Collection"
-                }
-            ];
-
-            // Simulate API delay
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            setUserNFTs(mockNFTs);
-        } catch (error) {
-            console.error('Error fetching NFTs:', error);
-        } finally {
-            setIsLoadingNFTs(false);
-        }
+        return `${(addr || '').slice(0, 8)}...${(addr || '').slice(-6)}`;
     };
 
     // Handle withdrawal (mock function)
@@ -172,13 +119,6 @@ function WalletDashboardContent() {
             setIsWithdrawing(false);
         }
     };
-
-    // Load user's NFTs on component mount
-    useEffect(() => {
-        if (isConnected && address) {
-            fetchUserNFTs();
-        }
-    }, [isConnected, address]);
 
     // Auto-refresh balance every 30 seconds
     useEffect(() => {
@@ -210,7 +150,7 @@ function WalletDashboardContent() {
 
     return (
         <div className="min-h-screen bg-gray-50 pt-32">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">Wallet Dashboard</h1>
@@ -413,76 +353,14 @@ function WalletDashboardContent() {
                     </div>
                 </div>
 
-                <WalletNFTsList walletAddress={address} />
-                {/* NFT Collection */}
-                <div className="bg-white rounded-2xl shadow-lg p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-semibold text-gray-900">Your NFT Collection</h2>
-                        <button
-                            onClick={fetchUserNFTs}
-                            disabled={isLoadingNFTs}
-                            className="text-blue-600 hover:text-blue-700 transition-colors flex items-center gap-2"
-                        >
-                            <svg className={`w-4 h-4 ${isLoadingNFTs ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            Refresh
-                        </button>
-                    </div>
-
-                    {isLoadingNFTs ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {[...Array(4)].map((_, i) => (
-                                <div key={i} className="bg-gray-200 rounded-xl aspect-square animate-pulse" />
-                            ))}
-                        </div>
-                    ) : userNFTs.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {userNFTs.map((nft) => (
-                                <Link
-                                    key={`${nft.contractAddress}-${nft.tokenId}`}
-                                    href={`/nft/${nft.contractAddress}/${nft.tokenId}`}
-                                    className="group bg-gray-50 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200"
-                                >
-                                    <div className="aspect-square bg-gray-100 relative">
-                                        <Image
-                                            src={nft.image || '/media/Logo-w3i-marketplace.png'}
-                                            alt={nft.name || `NFT #${nft.tokenId}`}
-                                            fill
-                                            className="object-cover group-hover:scale-105 transition-transform duration-200"
-                                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                                        />
-                                    </div>
-                                    <div className="p-4">
-                                        <h3 className="font-semibold text-gray-900 truncate mb-1">
-                                            {nft.name || `NFT #${nft.tokenId}`}
-                                        </h3>
-                                        <p className="text-sm text-gray-600 truncate">
-                                            {nft.contractName || formatAddress(nft.contractAddress)}
-                                        </p>
-                                        <p className="text-xs text-gray-500 mt-1">
-                                            Token ID: {nft.tokenId}
-                                        </p>
-                                    </div>
-                                </Link>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-12">
-                            <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">No NFTs found</h3>
-                            <p className="text-gray-600 mb-4">You don't have any NFTs in your wallet yet.</p>
-                            <Link
-                                href="/"
-                                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                            >
-                                Browse NFTs
-                            </Link>
-                        </div>
-                    )}
-                </div>
+                {/* Enhanced Wallet NFTs Display */}
+                <WalletNFTsList
+                    walletAddress={address}
+                    title="Your NFT Collection"
+                    includeContext={true}
+                    autoFetch={true}
+                    gridClassName="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-7 gap-6"
+                />
 
                 {/* Debug Information - Remove in production */}
                 {DEBUG_MODE && (

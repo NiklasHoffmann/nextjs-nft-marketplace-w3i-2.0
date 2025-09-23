@@ -1,6 +1,10 @@
 /**
- * UI Types - Component interfaces and props
+ * UI TYPES - Component Interfaces & Props
+ * 
+ * UI-bezogene Type Definitionen:
+ * • Component Props: Button, Card, Modal, etc.
+ * • UI State: Loading, Error, Display States
+ * • Layout: Responsive, Grid, Flex Configurations
  */
 
-// Component props and UI related types
 export * from './01-ui-components';

@@ -1,8 +1,9 @@
 // app/nft/[nftAddress]/page.tsx
 // Server component for Next.js 15+ async params handling
+// NFT Collection Übersichtsseite - zeigt alle NFTs einer Collection
 
 import React from "react";
-import CollectionPageClient from "./CollectionPageClient";
+import CollectionPageClient from "../components/CollectionPageClient";
 
 interface CollectionPageProps {
     params: Promise<{

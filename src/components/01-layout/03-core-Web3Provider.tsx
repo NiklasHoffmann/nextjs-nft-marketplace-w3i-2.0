@@ -6,6 +6,9 @@ import { wagmiConfig } from '@/config/wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { ReactNode, useState, useEffect } from 'react'
+import { ApolloProvider } from '@apollo/client'
+import apolloClient from '@/config/apolloClient'
+import { ApolloErrorBoundary } from './05-apollo-ErrorBoundary'
 
 export default function Web3Provider({ children }: { children: ReactNode }) {
     const [mounted, setMounted] = useState(false)
@@ -49,14 +52,18 @@ export default function Web3Provider({ children }: { children: ReactNode }) {
     return (
         <WagmiProvider config={wagmiConfig}>
             <QueryClientProvider client={queryClient}>
-                <RainbowKitProvider
-                    theme={darkTheme()}
-                    modalSize="compact"
-                    showRecentTransactions={true}
-                    initialChain={wagmiConfig.chains[0]} // Setzt Sepolia als Standard
-                >
-                    {children}
-                </RainbowKitProvider>
+                <ApolloProvider client={apolloClient}>
+                    <ApolloErrorBoundary>
+                        <RainbowKitProvider
+                            theme={darkTheme()}
+                            modalSize="compact"
+                            showRecentTransactions={true}
+                            initialChain={wagmiConfig.chains[0]} // Setzt Sepolia als Standard
+                        >
+                            {children}
+                        </RainbowKitProvider>
+                    </ApolloErrorBoundary>
+                </ApolloProvider>
                 {/* React Query Devtools only in development */}
                 {process.env.NODE_ENV !== "production" && <ReactQueryDevtools initialIsOpen={false} />}
             </QueryClientProvider>

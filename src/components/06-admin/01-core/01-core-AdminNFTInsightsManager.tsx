@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { useAdminNFTInsights } from "@/hooks";
+import { useAdminNFTInsights, useNFTInsightsLegacy } from "@/hooks";
 import { useNFTContext } from "@/contexts/NFTContext";
 import {
     NFTSelector,
@@ -98,19 +98,26 @@ export default function AdminNFTInsightsManager() {
     const nftContext = useNFTContext();
     const [isLoadingNFT, setIsLoadingNFT] = useState(false);
 
-    // Existing insights laden für Edit-Mode
-    const nftData = nftContext.getNFTDetailData(
-        formData.contractAddress || '',
-        formData.tokenId || ''
-    );
-    const existingInsights = nftData?.insights;
+    // Use admin insights hook to get full AdminNFTInsight data
+    const { insights: existingInsights, loading: insightsLoading } = useNFTInsightsLegacy({
+        contractAddress: formData.contractAddress || '',
+        tokenId: formData.tokenId || '',
+        autoFetch: !!(formData.contractAddress && formData.tokenId)
+    });
+
+    // Existing insights laden für Edit-Mode - no longer needed since we use the hook
+    // const nftData = nftContext.getNFT(
+    //     formData.contractAddress || '',
+    //     formData.tokenId || ''
+    // );
+    // const existingInsights = nftData?.insight;
 
     // NFT data laden wenn nötig
     useEffect(() => {
         if (formData.contractAddress && formData.tokenId &&
             !nftContext.isDataFresh(formData.contractAddress, formData.tokenId)) {
             setIsLoadingNFT(true);
-            nftContext.loadNFTData(formData.contractAddress, formData.tokenId)
+            nftContext.loadNFT(formData.contractAddress, formData.tokenId)
                 .finally(() => setIsLoadingNFT(false));
         }
     }, [nftContext, formData.contractAddress, formData.tokenId]);

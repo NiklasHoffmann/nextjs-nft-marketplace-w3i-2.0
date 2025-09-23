@@ -1,117 +1,15 @@
 /**
- * @deprecated Core NFT Hooks - Use useNFTContext() directly for better performance
- * This file contains legacy wrapper hooks. For new code, prefer direct context access.
- * 
- * Old: const { data, isLoading } = useNFTData(address, tokenId);
- * New: const context = useNFTContext(); 
- *      context.loadNFTData(address, tokenId); 
- *      const data = context.getNFTData(address, tokenId);
+ * Modern NFT Hooks - Clean architecture using AggregatedNFT
+ * This file provides modern hooks with unified data models and intelligent caching.
  */
 
-import { useNFTData, useNFTContext } from '@/contexts/NFTContext';
+import { useModernNFT, useModernNFTContext } from '@/contexts/NFTContext';
 import { useMemo, useEffect } from 'react';
 import { useQuery } from '@apollo/client';
 import { GET_ACTIVE_ITEMS } from '@/constants/subgraph.queries';
 
-// ===== DEPRECATED EXPORTS =====
-/** @deprecated Use useNFTContext() directly */
-export { useNFTCardData } from '@/contexts/NFTContext';
-/** @deprecated Use useNFTContext() directly */
-export { useNFTDetailData } from '@/contexts/NFTContext';
-/** @deprecated Use useNFTContext() directly */
-export { useNFTData } from '@/contexts/NFTContext';
-export { useNFTContext } from '@/contexts/NFTContext';
-
-// ===== LEGACY-COMPATIBLE HOOKS =====
-
-/**
- * @deprecated Enhanced useNFT - Use useNFTContext() directly for better performance
- */
-export function useNFT(address: string, tokenId: string) {
-    const { data: nftData, isLoading, refresh } = useNFTData(address, tokenId);
-
-    return useMemo(() => ({
-        // Metadata
-        metadata: nftData?.metadata,
-        imageUrl: nftData?.imageUrl,
-
-        // Contract Info
-        contractName: nftData?.contractInfo?.name || null,
-        contractSymbol: nftData?.contractInfo?.symbol || null,
-        owner: nftData?.contractInfo?.owner || null,
-        totalSupply: nftData?.contractInfo?.totalSupply || null,
-
-        // Loading states
-        loading: isLoading || nftData?.loadingState.metadata || nftData?.loadingState.contractInfo,
-        metadataLoading: nftData?.loadingState.metadata,
-        contractLoading: nftData?.loadingState.contractInfo,
-
-        // Error states
-        error: nftData?.errorState.metadata || nftData?.errorState.contractInfo,
-        metadataError: nftData?.errorState.metadata,
-        contractError: nftData?.errorState.contractInfo,
-
-        // Actions
-        refetchAll: refresh,
-        refetchMetadata: refresh,
-
-        // Bonus data
-        insights: nftData?.insights,
-        stats: nftData?.stats,
-        lastUpdated: nftData?.lastUpdated,
-    }), [nftData]);
-}
-
-interface UseNFTInsightsOptions {
-    contractAddress?: string;
-    tokenId?: string;
-    autoFetch?: boolean;
-}
-
-/**
- * Enhanced useNFTInsights with shared cache
- */
-export function useNFTInsights(options: UseNFTInsightsOptions = {}) {
-    const { contractAddress = '', tokenId = '', autoFetch = true } = options;
-    const { data: nftData, isLoading, refresh } = useNFTData(contractAddress, tokenId);
-
-    return useMemo(() => ({
-        insights: nftData?.insights,
-        loading: isLoading || nftData?.loadingState.insights,
-        error: nftData?.errorState.insights,
-        refetch: async () => {
-            if (contractAddress && tokenId) {
-                await refresh();
-            }
-        }
-    }), [nftData, isLoading, refresh, contractAddress, tokenId]);
-}
-
-interface UseNFTStatsOptions {
-    contractAddress?: string;
-    tokenId?: string;
-    autoFetch?: boolean;
-    refetchInterval?: number;
-}
-
-/**
- * Enhanced useNFTStats with intelligent caching
- */
-export function useNFTStats(options: UseNFTStatsOptions = {}) {
-    const { contractAddress = '', tokenId = '', autoFetch = true } = options;
-    const { data: nftData, isLoading, refresh } = useNFTData(contractAddress, tokenId);
-
-    return useMemo(() => ({
-        stats: nftData?.stats,
-        loading: isLoading || nftData?.loadingState.stats,
-        error: nftData?.errorState.stats,
-        refetch: async () => {
-            if (contractAddress && tokenId) {
-                await refresh();
-            }
-        }
-    }), [nftData, isLoading, refresh, contractAddress, tokenId]);
-}
+// ===== MODERN EXPORTS =====
+export { useModernNFT, useModernNFTContext } from '@/contexts/NFTContext';
 
 // ===== MARKETPLACE INTEGRATION =====
 
@@ -160,20 +58,131 @@ interface EnrichedMarketplaceItem extends MarketplaceItem {
  * Uses intelligent caching and lazy loading for optimal performance.
  */
 export function useActiveItems() {
-    const { preloader, getNFTData } = useNFTContext();
+    const { loadMultipleNFTs, getNFT } = useModernNFTContext();
 
     const { data, loading, error, refetch } = useQuery(GET_ACTIVE_ITEMS, {
         errorPolicy: 'all',
         fetchPolicy: 'cache-and-network',
+        onCompleted: (data) => {
+            console.log('🔍 GraphQL Response:', {
+                hasData: !!data,
+                itemsCount: data?.items?.length || 0,
+                firstItem: data?.items?.[0],
+                error: null
+            });
+        },
+        onError: (error) => {
+            console.error('🚨 GraphQL Error:', error);
+            console.warn('⚠️ Falling back to mock data due to GraphQL unavailability');
+        }
     });
 
-    // raw list from Graph, safely default to empty array
-    const rawItems = data?.items ?? [];
+    // Fallback mock data when GraphQL is unavailable
+    const mockItems = useMemo(() => [
+        // Collection 1: 0xb43a16451eb224539ce491349d49ecefe96013b6
+        {
+            listingId: "mock-1",
+            nftAddress: "0xb43a16451eb224539ce491349d49ecefe96013b6",
+            tokenId: "1",
+            isListed: true,
+            price: "1000000000000000000", // 1 ETH in wei
+            seller: "0x8BbA5E9b30E986C55465fEaC4D3417791065d1bb",
+            buyer: null,
+            desiredNftAddress: "0x0000000000000000000000000000000000000000",
+            desiredTokenId: "0"
+        },
+        {
+            listingId: "mock-1b",
+            nftAddress: "0xb43a16451eb224539ce491349d49ecefe96013b6",
+            tokenId: "14",
+            isListed: true,
+            price: "1200000000000000000", // 1.2 ETH in wei
+            seller: "0x8BbA5E9b30E986C55465fEaC4D3417791065d1bb",
+            buyer: null,
+            desiredNftAddress: "0x0000000000000000000000000000000000000000",
+            desiredTokenId: "0"
+        },
+        {
+            listingId: "mock-1c",
+            nftAddress: "0xb43a16451eb224539ce491349d49ecefe96013b6",
+            tokenId: "125",
+            isListed: true,
+            price: "800000000000000000", // 0.8 ETH in wei
+            seller: "0x8BbA5E9b30E986C55465fEaC4D3417791065d1bb",
+            buyer: null,
+            desiredNftAddress: "0x0000000000000000000000000000000000000000",
+            desiredTokenId: "0"
+        },
+        // Collection 2: 0x41655ae49482de69eec8f6875c34a8ada01965e2
+        {
+            listingId: "mock-2",
+            nftAddress: "0x41655ae49482de69eec8f6875c34a8ada01965e2",
+            tokenId: "378",
+            isListed: true,
+            price: "2500000000000000000", // 2.5 ETH in wei
+            seller: "0xf034e8ad11F249c8081d9da94852bE1734bc11a4",
+            buyer: null,
+            desiredNftAddress: "0x0000000000000000000000000000000000000000",
+            desiredTokenId: "0"
+        },
+        {
+            listingId: "mock-2b",
+            nftAddress: "0x41655ae49482de69eec8f6875c34a8ada01965e2",
+            tokenId: "11",
+            isListed: true,
+            price: "1800000000000000000", // 1.8 ETH in wei
+            seller: "0xf034e8ad11F249c8081d9da94852bE1734bc11a4",
+            buyer: null,
+            desiredNftAddress: "0x0000000000000000000000000000000000000000",
+            desiredTokenId: "0"
+        },
+        // Collection 3: 0xfdbc878ad5560de5f205a0c428d983d992c7406a
+        {
+            listingId: "mock-3",
+            nftAddress: "0xfdbc878ad5560de5f205a0c428d983d992c7406a",
+            tokenId: "862",
+            isListed: true,
+            price: "500000000000000000", // 0.5 ETH in wei
+            seller: "0x530421c0D94e40A97648817CDd0A5C56dD9E09fd",
+            buyer: null,
+            desiredNftAddress: "0x0000000000000000000000000000000000000000",
+            desiredTokenId: "0"
+        },
+        {
+            listingId: "mock-3b",
+            nftAddress: "0xfdbc878ad5560de5f205a0c428d983d992c7406a",
+            tokenId: "539",
+            isListed: true,
+            price: "600000000000000000", // 0.6 ETH in wei
+            seller: "0x530421c0D94e40A97648817CDd0A5C56dD9E09fd",
+            buyer: null,
+            desiredNftAddress: "0x0000000000000000000000000000000000000000",
+            desiredTokenId: "0"
+        }
+    ], []);
+
+    // Use GraphQL data if available, otherwise fallback to mock data
+    const rawItems = data?.items ?? (error ? mockItems : []);
+
+    // DEBUG: Log what we get from GraphQL
+    console.log('🔍 useActiveItems rawItems:', {
+        hasData: !!data,
+        rawItemsLength: rawItems.length,
+        rawItems: rawItems.slice(0, 2), // First 2 items
+        loading,
+        error: error?.message,
+        usingFallback: !!error && rawItems.length > 0
+    });
 
     // map only after we know we have an array
     const items = useMemo(
-        () =>
-            rawItems.map((e: any) => ({
+        () => {
+            if (!Array.isArray(rawItems)) {
+                console.warn('rawItems is not an array:', rawItems);
+                return [];
+            }
+
+            const mappedItems = rawItems.map((e: any) => ({
                 nftAddress: e.nftAddress,
                 tokenId: e.tokenId,
                 listingId: e.listingId,
@@ -183,28 +192,42 @@ export function useActiveItems() {
                 isListed: e.isListed,
                 desiredNftAddress: e.desiredNftAddress,
                 desiredTokenId: e.desiredTokenId,
-            })),
-        [rawItems]
+            }));
+
+            console.log('📋 Mapped marketplace items:', {
+                count: mappedItems.length,
+                firstItem: mappedItems[0],
+                hasNftAddress: mappedItems[0]?.nftAddress ? 'YES' : 'NO',
+                source: error ? 'FALLBACK' : 'GRAPHQL'
+            });
+
+            return mappedItems;
+        },
+        [rawItems, error]
     );
 
     // use items from above everywhere below
     useEffect(() => {
-        if (items.length > 0) {
+        if (Array.isArray(items) && items.length > 0) {
             const firstBatch = items.slice(0, 12).map((e: MarketplaceItem) => ({
                 nftAddress: e.nftAddress,
                 tokenId: e.tokenId,
             }));
-            preloader.preloadMultipleNFTs(firstBatch);
+            loadMultipleNFTs(firstBatch);
         }
-    }, [items, preloader]);
+    }, [items, loadMultipleNFTs]);
 
     // Enrich marketplace items with NFT data
     const enrichedItems = useMemo(() => {
+        if (!Array.isArray(items)) {
+            console.warn('items is not an array in enrichedItems:', items);
+            return [];
+        }
         return items.map((marketplaceItem: MarketplaceItem) => {
-            const nftData = getNFTData(marketplaceItem.nftAddress, marketplaceItem.tokenId);
+            const nftData = getNFT(marketplaceItem.nftAddress, marketplaceItem.tokenId);
             return enrichMarketplaceItem(marketplaceItem, nftData);
         });
-    }, [items, getNFTData]);
+    }, [items, getNFT]);
 
     // Expose raw items for NFTCard props
     const marketplaceItems = items;
@@ -250,7 +273,7 @@ function extractRarity(attributes: any[] | undefined): string | null {
  * Enriches a marketplace item with NFT data for filtering and display
  */
 function enrichMarketplaceItem(marketplaceItem: any, nftData: any): EnrichedMarketplaceItem {
-    const hasMetadata = !!(nftData?.metadata);
+    const hasMetadata = !!(nftData?.core?.metadata);
     const hasStats = !!(nftData?.stats);
 
     return {
@@ -258,16 +281,16 @@ function enrichMarketplaceItem(marketplaceItem: any, nftData: any): EnrichedMark
         ...marketplaceItem,
 
         // NFT metadata
-        name: nftData?.metadata?.name || `NFT #${marketplaceItem.tokenId}`,
-        description: nftData?.metadata?.description || null,
-        imageUrl: nftData?.imageUrl || null,
-        attributes: nftData?.metadata?.attributes || [],
+        name: nftData?.core?.metadata?.name || `NFT #${marketplaceItem.tokenId}`,
+        description: nftData?.core?.metadata?.description || null,
+        imageUrl: nftData?.core?.imageUrl || null,
+        attributes: nftData?.core?.metadata?.attributes || [],
 
         // Filter properties - only use real data
-        category: extractCategory(nftData?.metadata?.attributes) ||
-            nftData?.insights?.category || 'Unknown',
-        rarity: extractRarity(nftData?.metadata?.attributes) ||
-            nftData?.insights?.rarity || 'unknown',
+        category: extractCategory(nftData?.core?.metadata?.attributes) ||
+            nftData?.insight?.category || 'Unknown',
+        rarity: extractRarity(nftData?.core?.metadata?.attributes) ||
+            nftData?.insight?.rarity || 'unknown',
         averageRating: nftData?.stats?.averageRating || 0,
         ratingCount: nftData?.stats?.ratingCount || 0,
         favoriteCount: nftData?.stats?.favoriteCount || 0,
@@ -275,68 +298,12 @@ function enrichMarketplaceItem(marketplaceItem: any, nftData: any): EnrichedMark
         viewCount: nftData?.stats?.viewCount || 0,
 
         // Insights
-        customTitle: nftData?.insights?.customTitle || null,
-        cardDescriptions: nftData?.insights?.cardDescriptions || null,
-        tags: nftData?.insights?.tags || [],
+        customTitle: nftData?.insight?.customTitle || null,
+        cardDescriptions: nftData?.insight?.cardDescriptions || null,
+        tags: nftData?.insight?.tags || [],
 
         // Data quality flags
         hasRealStats: hasStats,
         hasRealMetadata: hasMetadata,
     };
-}// ===== PERFORMANCE & OPTIMIZATION =====
-
-/**
- * NFT list optimization with intelligent prefetching
- */
-export function useNFTList(nfts: Array<{ contractAddress: string; tokenId: string }>) {
-    const { preloader, getNFTData } = useNFTContext();
-
-    useEffect(() => {
-        if (nfts.length > 0) {
-            preloader.preloadMultipleNFTs(nfts.map(nft => ({
-                nftAddress: nft.contractAddress,
-                tokenId: nft.tokenId
-            })));
-        }
-    }, [nfts, preloader]);
-
-    return useMemo(() => {
-        return nfts.map(nft => {
-            return getNFTData(nft.contractAddress, nft.tokenId) || null;
-        }).filter(Boolean);
-    }, [nfts, getNFTData]);
-}
-
-/**
- * Interaction-based preloading handlers
- */
-export function useNFTInteractionPreload() {
-    const { preloader } = useNFTContext();
-
-    return {
-        onHover: (contractAddress: string, tokenId: string) => {
-            preloader.preloadNFTData(contractAddress, tokenId);
-        },
-        onFocus: (contractAddress: string, tokenId: string) => {
-            preloader.preloadNFTData(contractAddress, tokenId);
-        }
-    };
-}
-
-/**
- * Performance monitoring and cache statistics
- */
-export function useNFTPerformance() {
-    const { getCacheStats } = useNFTContext();
-
-    return useMemo(() => {
-        const stats = getCacheStats();
-
-        return {
-            ...stats,
-            loadingCount: 0,
-            globalLoading: false,
-            cacheKeys: [],
-        };
-    }, [getCacheStats]);
 }

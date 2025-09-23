@@ -1,4 +1,4 @@
-// utils/04-blockchain/smart-cache.ts
+// utils/04-blockchain/06-blockchain-smart-cache.ts
 import { LRUCache } from 'lru-cache';
 
 // Multi-Layer Caching für verschiedene Daten-Typen mit unterschiedlichen TTLs

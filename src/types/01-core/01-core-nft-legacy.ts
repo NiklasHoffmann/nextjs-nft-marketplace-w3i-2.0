@@ -1,6 +1,10 @@
 /**
  * NFT Context Type Definitions
  * 
+ * @deprecated This file contains legacy type definitions. 
+ * Modern implementations should use AggregatedNFT and related types from nft-types.ts
+ * This file will be removed in a future version.
+ * 
  * This file contains all type definitions used by the NFT Context system.
  * It provides a clean separation of concerns and improves maintainability.
  */
@@ -90,6 +94,7 @@ export interface NFTData {
 /**
  * Optimized data structure for NFT card display
  * Contains only the essential data needed for card rendering
+ * @deprecated Use AggregatedNFT from nft-types.ts instead
  */
 export interface NFTCardData {
     nftAddress: string;
@@ -119,6 +124,7 @@ export interface NFTCardData {
 
 /**
  * Comprehensive data structure for NFT detail pages
+ * @deprecated Use AggregatedNFT from nft-types.ts instead
  */
 export interface NFTDetailData {
     nftAddress: string;
@@ -182,6 +188,8 @@ export interface AdminHooks {
 
 /**
  * Main NFT Context interface
+ * @deprecated This interface is legacy. Use ModernNFTContextType from contexts/NFTContext.tsx instead.
+ * The modern interface uses loadNFT() instead of loadNFTData() and AggregatedNFT instead of NFTData.
  */
 export interface NFTContextType {
     // ===== DATA ACCESS =====
@@ -189,17 +197,18 @@ export interface NFTContextType {
     // Unified data access
     getNFTData: (nftAddress: string, tokenId: string) => NFTData | null;
 
-    // Granular data access
+    // Granular data access (DEPRECATED - Use AggregatedNFT instead)
     getNFTCardData: (nftAddress: string, tokenId: string) => NFTCardData | null;
     getNFTDetailData: (nftAddress: string, tokenId: string) => NFTDetailData | null;
 
-    // Wallet-based filtering
+    // Wallet-based filtering (DEPRECATED - Use AggregatedNFT instead)  
     getNFTsByWallet: (walletAddress: string) => NFTCardData[];
     getNFTsBySeller: (sellerAddress: string) => NFTCardData[];
 
     // ===== DATA OPERATIONS =====
 
     // Single NFT operations
+    /** @deprecated Use loadNFT() from ModernNFTContextType instead */
     loadNFTData: (nftAddress: string, tokenId: string) => Promise<NFTData>;
     refreshNFTData: (nftAddress: string, tokenId: string) => Promise<void>;
     updateNFTData: (nftAddress: string, tokenId: string, updates: Partial<NFTData>) => void;

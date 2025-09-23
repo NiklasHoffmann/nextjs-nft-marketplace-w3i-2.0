@@ -1,5 +1,5 @@
 import { truncateAddress } from '@/utils';
-import { NFTAttribute } from '@/types';
+import { NFTAttribute } from '@/types/05-features/01-nft-detail';
 import { RoyaltyInfo } from '@/types';
 
 interface TechnicalTabProps {
@@ -37,6 +37,7 @@ export default function TechnicalTab({
 }: TechnicalTabProps) {
 
     console.log('totalSupply Info:', { totalSupply });
+    console.log("blockchain Info:", { blockchain });
     return (
         <div className="space-y-6">
             {/* Contract Information */}

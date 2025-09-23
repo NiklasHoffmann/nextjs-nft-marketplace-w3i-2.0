@@ -2,7 +2,8 @@
  * NFT-specific utility functions
  */
 
-import { RoyaltyInfo, NFTAttribute } from '@/types';
+import { RoyaltyInfo } from '@/types/05-features/01-nft-detail';
+import { NFTAttribute } from '@/types/01-core/01-core-nft';
 
 /**
  * Truncates an address for display

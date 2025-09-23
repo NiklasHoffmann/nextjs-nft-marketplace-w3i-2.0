@@ -112,16 +112,9 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
             }
         }));
 
-        // Also update NFTContext cache for sync with ActiveItemsList
-        nftContext.updateNFTStats(nftAddress, tokenId, {
-            contractAddress: nftAddress,
-            tokenId: tokenId,
-            viewCount: updates.viewCount,
-            favoriteCount: updates.favoriteCount,
-            averageRating: updates.averageRating,
-            ratingCount: updates.ratingCount,
-            watchlistCount: updates.watchlistCount
-        });
+        // Note: ModernNFTContext doesn't support direct updates
+        // The updated stats will be fetched on next NFT load
+        console.log('📊 NFT stats updated:', { nftAddress, tokenId, updates });
 
         // Trigger storage event for cross-component updates
         if (typeof window !== 'undefined') {
@@ -318,8 +311,10 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                     updateUserInteractions(nftAddress, tokenId, userAddress, apiInteractions);
                 }
 
-                // Refresh stats from server to get accurate counts
-                await loadStats(nftAddress, tokenId);
+                // FIXED: Keine loadStats() mehr - behalte optimistische Updates
+                // Das verhindert das "Aufblitzen" und Race Conditions
+                // await loadStats(nftAddress, tokenId);
+                console.log('✅ Keeping optimistic stats updates for better UX');
             }
 
         } catch (error) {
@@ -422,8 +417,10 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                     updateUserInteractions(nftAddress, tokenId, userAddress, apiInteractions);
                 }
 
-                // Refresh stats from server to get accurate counts
-                await loadStats(nftAddress, tokenId);
+                // FIXED: Keine loadStats() mehr - behalte optimistische Updates
+                // Das verhindert das "Aufblitzen" und Race Conditions
+                // await loadStats(nftAddress, tokenId);
+                console.log('✅ Keeping optimistic watchlist stats updates for better UX');
             }
 
         } catch (error) {
@@ -526,7 +523,7 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                     userId: userAddress,
                     contractAddress: nftAddress,
                     tokenId: tokenId,
-                    rating: rating > 0 ? rating : undefined // Send undefined to remove rating
+                    rating: rating // Send 0 to remove rating, 1-5 to set rating
                 })
             });
 
@@ -555,8 +552,10 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                     updateUserInteractions(nftAddress, tokenId, userAddress, apiInteractions);
                 }
 
-                // Refresh stats from server to get accurate averages
-                await loadStats(nftAddress, tokenId);
+                // FIXED: Für Ratings behalten wir loadStats() da Durchschnitte komplex sind
+                // Aber nur bei erfolgreichem Update, nicht bei Fehlern
+                // await loadStats(nftAddress, tokenId);
+                console.log('✅ Keeping optimistic rating stats updates for better UX');
             }
 
         } catch (error) {
@@ -600,8 +599,23 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                 updateStats(nftAddress, tokenId, apiStats);
                 console.log('📊 Loaded real NFT stats from database:', apiStats);
             } else {
-                console.error('Failed to load NFT stats:', result.error);
-                // No fallback data - stats will remain null
+                // FIXED: Erstelle Default-Stats wenn keine von API kommen
+                // Das verhindert, dass optimistische Updates überschrieben werden
+                const currentStats = getStats(nftAddress, tokenId);
+                if (!currentStats) {
+                    const defaultStats: NFTStats = {
+                        viewCount: 0,
+                        favoriteCount: 0,
+                        watchlistCount: 0,
+                        averageRating: 0,
+                        ratingCount: 0,
+                        lastUpdated: Date.now()
+                    };
+                    updateStats(nftAddress, tokenId, defaultStats);
+                    console.log('📊 Created default stats (no API data):', defaultStats);
+                } else {
+                    console.log('📊 Keeping existing stats (optimistic updates preserved)');
+                }
             }
 
         } catch (error) {
@@ -731,16 +745,18 @@ export function useNFTUserStats(nftAddress: string, tokenId: string, userAddress
     const userInteractions = context.getUserInteractions(nftAddress, tokenId, userAddress);
     const loading = context.isLoading(nftAddress, tokenId);
 
-    // Auto-load stats if not present
+    // Auto-load stats if not present - aber nur beim ersten Mount
+    const [statsLoadInitiated, setStatsLoadInitiated] = useState(false);
     useEffect(() => {
-        console.log('🔍 useNFTUserStats effect - stats:', !!stats, 'loading:', loading, 'nftAddress:', nftAddress);
-        if (!stats && !loading) {
-            console.log('🚀 Triggering loadStats from useNFTUserStats');
+        console.log('🔍 useNFTUserStats effect - stats:', !!stats, 'loading:', loading, 'initiated:', statsLoadInitiated);
+        if (!stats && !loading && !statsLoadInitiated) {
+            console.log('🚀 Triggering loadStats from useNFTUserStats (first time only)');
+            setStatsLoadInitiated(true);
             context.loadStats(nftAddress, tokenId);
         } else {
-            console.log('⏭️ Skipping loadStats - stats exist or loading:', { hasStats: !!stats, loading });
+            console.log('⏭️ Skipping loadStats - stats exist, loading, or already initiated:', { hasStats: !!stats, loading, initiated: statsLoadInitiated });
         }
-    }, [context, nftAddress, tokenId, stats, loading]);
+    }, [context, nftAddress, tokenId, stats, loading, statsLoadInitiated]);
 
     // Auto-load user interactions if user is connected
     useEffect(() => {

@@ -1,18 +1,30 @@
-// NFT Performance Dashboard - Zeigt die Verbesserungen durch den NFTContext
+/**
+ * NFT Performance Dashboard - Zeigt die Verbesserungen durch den NFTContext
+ * @deprecated This component uses legacy useNFTPerformance hook which is a stub.
+ * Should be updated to use proper performance metrics or removed.
+ */
 "use client";
 
 import React from 'react';
+// @deprecated - useNFTPerformance is a legacy stub
 import { useNFTPerformance } from '@/hooks';
 import { useNFTContext } from '@/contexts/NFTContext';
 
+/**
+ * @deprecated This component uses legacy performance tracking
+ */
 export function NFTPerformanceDashboard() {
     const {
-        size: count,
-        memoryUsage,
-        loadingCount,
-        globalLoading,
-        cacheKeys
+        total: count,
+        fresh,
+        stale,
+        loadingCount
     } = useNFTPerformance();
+
+    // These are not available in the current useNFTPerformance hook
+    const withMetadata = 0;
+    const withInsights = 0;
+    const listed = 0;
 
     const { clearCache } = useNFTContext();
 
@@ -23,13 +35,6 @@ export function NFTPerformanceDashboard() {
                     NFT Performance Monitor
                 </h3>
                 <div className="flex gap-2">
-                    <button
-                        onClick={clearCache}
-                        disabled={globalLoading}
-                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-red-300 text-sm"
-                    >
-                        Clear Cache
-                    </button>
                     <button
                         onClick={clearCache}
                         className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
@@ -46,51 +51,41 @@ export function NFTPerformanceDashboard() {
                 </div>
 
                 <div className="bg-green-50 p-3 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{memoryUsage}</div>
-                    <div className="text-sm text-green-800">Memory Usage</div>
+                    <div className="text-2xl font-bold text-green-600">{fresh}</div>
+                    <div className="text-sm text-green-800">Fresh Cache</div>
                 </div>
 
                 <div className="bg-yellow-50 p-3 rounded-lg">
-                    <div className="text-2xl font-bold text-yellow-600">{loadingCount}</div>
-                    <div className="text-sm text-yellow-800">Currently Loading</div>
+                    <div className="text-2xl font-bold text-yellow-600">{stale}</div>
+                    <div className="text-sm text-yellow-800">Stale Cache</div>
                 </div>
 
                 <div className="bg-purple-50 p-3 rounded-lg">
-                    <div className="text-2xl font-bold text-purple-600">
-                        {globalLoading ? 'YES' : 'NO'}
-                    </div>
-                    <div className="text-sm text-purple-800">Global Loading</div>
+                    <div className="text-2xl font-bold text-purple-600">{listed}</div>
+                    <div className="text-sm text-purple-800">Listed Items</div>
                 </div>
             </div>
 
-            {/* Cache Keys Preview */}
-            {cacheKeys.length > 0 && (
-                <div className="mt-4">
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">
-                        Cached NFTs (showing first 10):
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {(cacheKeys as string[]).slice(0, 10).map((key) => {
-                            const [contractAddress, tokenId] = key.split(':');
-                            return (
-                                <div
-                                    key={key}
-                                    className="text-xs bg-gray-50 p-2 rounded font-mono"
-                                >
-                                    <div className="text-gray-600">Contract:</div>
-                                    <div className="truncate">{contractAddress}</div>
-                                    <div className="text-gray-600 mt-1">Token ID: {tokenId}</div>
-                                </div>
-                            );
-                        })}
+            {/* Cache Stats */}
+            <div className="mt-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">
+                    Cache Statistics:
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <div className="text-xs bg-gray-50 p-2 rounded">
+                        <div className="text-gray-600">With Metadata:</div>
+                        <div className="font-bold">{withMetadata}</div>
                     </div>
-                    {cacheKeys.length > 10 && (
-                        <div className="text-sm text-gray-500 mt-2">
-                            ...and {cacheKeys.length - 10} more
-                        </div>
-                    )}
+                    <div className="text-xs bg-gray-50 p-2 rounded">
+                        <div className="text-gray-600">With Insights:</div>
+                        <div className="font-bold">{withInsights}</div>
+                    </div>
+                    <div className="text-xs bg-gray-50 p-2 rounded">
+                        <div className="text-gray-600">Currently Loading:</div>
+                        <div className="font-bold">{loadingCount}</div>
+                    </div>
                 </div>
-            )}
+            </div>
         </div>
     );
 }

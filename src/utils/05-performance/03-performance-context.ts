@@ -5,7 +5,7 @@
  * Separated from main context for better organization and testability.
  */
 
-import type { NFTData, NFTLoadingState, NFTErrorState, NFTCache } from '@/types/nft-context';
+import type { NFTData, NFTLoadingState, NFTErrorState, NFTCache } from '@/types/01-core/01-core-nft-legacy';
 
 // ===== KEY GENERATION =====
 
@@ -90,7 +90,7 @@ export const createNFTErrorMessage = (
     const baseMessage = `Failed to load ${dataType}`;
     const identifier = nftAddress && tokenId ? ` for ${nftAddress}:${tokenId}` : '';
     const errorDetails = error?.message || String(error);
-    
+
     return `${baseMessage}${identifier}: ${errorDetails}`;
 };
 
@@ -104,13 +104,13 @@ export const createNFTErrorMessage = (
 export const calculateCacheStats = (cache: NFTCache) => {
     const size = Object.keys(cache).length;
     const memoryUsage = `${Math.round(JSON.stringify(cache).length / 1024)} KB`;
-    
+
     // Calculate hit rate based on fresh data
-    const freshDataCount = Object.values(cache).filter(data => 
+    const freshDataCount = Object.values(cache).filter(data =>
         isDataFresh(data)
     ).length;
     const hitRate = size > 0 ? freshDataCount / size : 0;
-    
+
     return { size, memoryUsage, hitRate };
 };
 
@@ -133,13 +133,13 @@ export const isDataFresh = (nftData: NFTData | undefined, maxAgeMs: number = 5 *
  */
 export const filterCacheByAge = (cache: NFTCache, cutoffTime: number): NFTCache => {
     const filtered: NFTCache = {};
-    
+
     Object.entries(cache).forEach(([key, data]) => {
         if (data.lastUpdated >= cutoffTime) {
             filtered[key] = data;
         }
     });
-    
+
     return filtered;
 };
 
@@ -153,11 +153,11 @@ export const filterCacheByAge = (cache: NFTCache, cutoffTime: number): NFTCache 
  */
 export const createBatches = <T>(items: T[], batchSize: number): T[][] => {
     const batches: T[][] = [];
-    
+
     for (let i = 0; i < items.length; i += batchSize) {
         batches.push(items.slice(i, i + batchSize));
     }
-    
+
     return batches;
 };
 
@@ -166,7 +166,7 @@ export const createBatches = <T>(items: T[], batchSize: number): T[][] => {
  * @param ms - Delay in milliseconds
  * @returns Promise that resolves after the delay
  */
-export const delay = (ms: number): Promise<void> => 
+export const delay = (ms: number): Promise<void> =>
     new Promise(resolve => setTimeout(resolve, ms));
 
 // ===== VALIDATION UTILITIES =====
@@ -181,9 +181,9 @@ export const isValidNFTIdentifier = (nftAddress: string, tokenId: string): boole
     // Check if address looks like an Ethereum address (0x + 40 hex chars)
     const addressPattern = /^0x[a-fA-F0-9]{40}$/;
     if (!addressPattern.test(nftAddress)) return false;
-    
+
     // Check if tokenId is a valid number or string
     if (!tokenId || tokenId.trim() === '') return false;
-    
+
     return true;
 };

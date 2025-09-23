@@ -1,6 +1,12 @@
 "use client";
 
 /**
+ * @deprecated Legacy Performance Hooks - nur noch in Debug-Komponenten verwendet
+ * Hook bietet grundlegende Performance-Überwachung aber wird nicht aktiv genutzt
+ * Migration: Verwende echte Performance-APIs wie Performance Observer oder React DevTools
+ */
+
+/**
  * Performance monitoring React hooks
  */
 

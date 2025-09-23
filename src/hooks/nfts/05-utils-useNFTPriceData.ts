@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from 'react';
-import { useETHPrice, useCurrency } from '@/contexts/OptimizedCurrencyContext';
+import { useETHPrice, useCurrency } from '@/contexts/CurrencyContext';
 import { formatEther } from '@/utils';
 
 /**

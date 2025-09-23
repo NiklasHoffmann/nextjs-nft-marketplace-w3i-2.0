@@ -1,6 +1,11 @@
 /**
- * API Types - Request/Response interfaces
+ * API TYPES - Request/Response Interfaces
+ * 
+ * API-bezogene Type Definitionen:
+ * • Response: Standardisierte API Response Formate
+ * • Request: API Request Parameter Types
+ * • Pagination: Limit, Skip, Sort, Filter
+ * • Error: API Error Response Types
  */
 
-// Clean API response types
 export * from './01-api-responses';

@@ -2,14 +2,20 @@
  * NFT Detail Page specific types and interfaces
  */
 
-import { NFTAttribute, NFTMetadata } from '../01-core/01-core-nft';
+// Modern imports from core types
+import { NftMeta } from '../01-core/01-core-nft-modern';
 import { NFTInsights } from '../04-insights/01-insights-main';
 import { PublicNFTInsights } from '../04-insights/02-insights-public';
 import { AdminNFTInsight, AdminCollectionInsight } from '../03-api/01-api-responses';
 
 export type TabType = 'overview' | 'technical' | 'investment' | 'insights' | 'market-insights' | 'personal' | 'project' | 'functionalities' | 'tokenomics';
 
-// Use NFTAttribute directly - extended if needed
+// Modern attribute type from NftMeta
+export type NFTAttribute = {
+    trait_type?: string;
+    value?: any;
+    display_type?: 'boost_number' | 'boost_percentage' | 'number' | 'date' | string;
+};
 
 export interface RoyaltyInfo {
     percentage?: number | null;
@@ -27,17 +33,17 @@ export interface NFTDetailsPageData {
     buyer?: string;
     desiredNftAddress: string;
     desiredTokenId: string;
-    metadata?: NFTMetadata;
+    metadata?: NftMeta;
 }
 
-export interface NFTMetadataExtended extends NFTMetadata {
+export interface NFTMetadataExtended extends NftMeta {
     // Enhanced metadata from useNFTMetadata hook
     categories: string[];
     tags: string[];
-    animationUrl?: string | null;
+    animationUrl?: string; // overriding to match parent type
     audioUrl?: string | null;
     videoUrl?: string | null;
-    externalUrl?: string | null;
+    externalUrl?: string; // overriding to match parent type
     websiteUrl?: string | null;
     twitterUrl?: string | null;
     creator?: string | null;

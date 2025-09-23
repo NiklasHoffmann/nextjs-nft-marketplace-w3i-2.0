@@ -3,6 +3,21 @@
 import Image from "next/image";
 import { useState, memo, useCallback, useRef, useEffect, useMemo } from "react";
 
+// Simple loading skeleton component
+const ImageSkeleton = memo(({ className, width, height, fill }: {
+    className?: string;
+    width?: number;
+    height?: number;
+    fill?: boolean;
+}) => (
+    <div
+        className={`relative overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 rounded ${className || ''}`}
+        style={fill ? {} : { width, height }}
+    >
+        <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+    </div>
+));
+
 interface OptimizedNFTImageProps {
     imageUrl: string;
     tokenId: string;
@@ -102,7 +117,7 @@ const OptimizedNFTImage = memo(({
     // Get all possible URLs for this image
     const imageUrls = optimizeImageUrl(imageUrl);
 
-    // Check if image might be cached from previous view
+    // Check if image might be cached from previous view - RESTORED ORIGINAL LOGIC
     useEffect(() => {
         if (typeof window !== 'undefined' && imageUrls.length > 0) {
             const cacheKey = imageUrls[0];
@@ -111,23 +126,23 @@ const OptimizedNFTImage = memo(({
             if (cachedResult) {
                 setHasBeenVisible(true);
                 setIsIntersecting(true);
-                setIsLoading(false); // Important: Set loading to false for cached images
+                setIsLoading(false);
                 return;
             }
 
-            // Test image loading with timeout
+            // Test image loading with timeout - RESTORED
             const testImg = new window.Image();
             const timeout = setTimeout(() => {
                 testImg.onload = null;
                 testImg.onerror = null;
-            }, 1000);
+            }, 2000); // Increased timeout for better loading
 
             testImg.onload = () => {
                 clearTimeout(timeout);
                 imageLoadCache.set(cacheKey, true);
                 setHasBeenVisible(true);
                 setIsIntersecting(true);
-                setIsLoading(false); // Set loading to false when preload completes
+                setIsLoading(false);
             };
 
             testImg.onerror = () => {
@@ -139,7 +154,7 @@ const OptimizedNFTImage = memo(({
         }
     }, [imageUrls]);
 
-    // Intersection Observer for lazy loading (unless priority or cached)
+    // Intersection Observer for lazy loading - RESTORED
     useEffect(() => {
         if (priority || hasBeenVisible || !imgRef.current) return;
 
@@ -151,32 +166,22 @@ const OptimizedNFTImage = memo(({
                     observer.disconnect();
                 }
             },
-            { rootMargin: '200px' }
+            { rootMargin: '200px' } // Restored original value
         );
 
         observer.observe(imgRef.current);
-
         return () => observer.disconnect();
     }, [priority, hasBeenVisible]);
 
-    // Preload image when in viewport range
+    // Preload image when in viewport range - RESTORED
     useEffect(() => {
         if (isIntersecting && imageUrls.length > 0 && typeof window !== 'undefined') {
             const img = new window.Image();
-
-            // For background images, use lower resolution preload
-            if (tokenId.includes('-bg')) {
-                // Create a lower resolution version for background preload
-                const bgUrl = imageUrls[0];
-                img.src = bgUrl;
-                // Set smaller dimensions for background preload
-                img.width = 200;
-                img.height = 200;
-            } else {
-                img.src = imageUrls[0];
-            }
+            img.src = imageUrls[0];
         }
-    }, [isIntersecting, imageUrls, tokenId]);
+    }, [isIntersecting, imageUrls]);
+
+    // Removed redundant preload effect - already handled in caching effect above
 
     // Update current image URL when imageUrl prop changes
     useEffect(() => {
@@ -219,27 +224,17 @@ const OptimizedNFTImage = memo(({
     // Check if this is a sharp image (not background) and should have glitter effect
     const isSharpImage = !tokenId.includes('-bg');
 
-    // Calculate glitter effect based on tilt rotation
+    // Simplified glitter effect calculation for better performance
     const glitterIntensity = useMemo(() => {
         if (!isSharpImage) return 0;
 
-        // Calculate intensity based on rotation magnitude
         const rotationMagnitude = Math.sqrt(
             Math.pow(tiltRotation.rotateX, 2) + Math.pow(tiltRotation.rotateY, 2)
         );
 
-        // Normalize to 0-1 range with enhanced threshold for better visibility
-        const rawIntensity = Math.min(rotationMagnitude / 10, 1); // Reduced from 13 to 10 for stronger effect
-
-        // Apply enhanced easing for more dramatic effect
-        // Use cubic easing for stronger ramp-up
-        const easedIntensity = rawIntensity * rawIntensity * rawIntensity;
-
-        // Enhanced base and movement detection for better visibility on light images  
-        const hasMovement = rotationMagnitude > 0.3; // Reduced threshold from 0.5 to 0.3
-        const baseOpacity = hasMovement ? 0.06 : 0; // Slightly reduced from 0.08 to 0.06
-
-        return Math.max(baseOpacity, easedIntensity * 1.0); // Reduced from 1.2 to 1.0
+        // Simple linear calculation instead of complex easing
+        const intensity = Math.min(rotationMagnitude / 15, 0.6); // Reduced max intensity
+        return rotationMagnitude > 0.5 ? intensity : 0;
     }, [isSharpImage, tiltRotation.rotateX, tiltRotation.rotateY]);
 
     // Handle smooth glitter fade-in/fade-out
@@ -270,53 +265,28 @@ const OptimizedNFTImage = memo(({
         };
     }, [glitterIntensity]);
 
-    // Generate glitter position based on rotation
+    // Simplified glitter effect for better performance
     const glitterStyle = useMemo(() => {
-        if (!isSharpImage) return {};
+        if (!isSharpImage || glitterOpacity === 0) return {};
 
-        // Calculate glitter beam direction based on rotation - wider coverage
-        const glitterX = 50 + (tiltRotation.rotateY * 1.5); // More centered range
-        const glitterY = 50 + (tiltRotation.rotateX * -1.5); // More centered range
-
-        // Enhanced intensity modifiers - slightly toned down for better balance
-        const enhancedIntensity = glitterOpacity * 1.0;     // Reduced from 1.2 to 1.0
-        const strongIntensity = glitterOpacity * 0.7;       // Reduced from 0.8 to 0.7
-        const subtleIntensity = glitterOpacity * 0.5;       // Reduced from 0.6 to 0.5
+        const glitterX = 50 + (tiltRotation.rotateY * 1.2);
+        const glitterY = 50 + (tiltRotation.rotateX * -1.2);
 
         return {
             backgroundImage: `
-                radial-gradient(ellipse 180% 180% at ${glitterX}% ${glitterY}%, 
-                    rgba(255, 255, 255, ${0.3 * enhancedIntensity}) 0%, 
-                    rgba(255, 255, 255, ${0.2 * enhancedIntensity}) 25%, 
-                    rgba(255, 255, 255, ${0.1 * enhancedIntensity}) 60%, 
-                    transparent 100%),
-                radial-gradient(ellipse 120% 120% at ${glitterX + 10}% ${glitterY - 10}%, 
-                    rgba(200, 200, 255, ${0.12 * strongIntensity}) 0%, 
-                    rgba(255, 200, 255, ${0.08 * strongIntensity}) 40%, 
+                radial-gradient(ellipse 120% 120% at ${glitterX}% ${glitterY}%, 
+                    rgba(255, 255, 255, ${0.2 * glitterOpacity}) 0%, 
+                    rgba(255, 255, 255, ${0.1 * glitterOpacity}) 50%, 
                     transparent 80%),
-                linear-gradient(${45 + tiltRotation.rotateY * 2}deg, 
-                    rgba(255, 255, 255, ${0.04 * subtleIntensity}) 0%, 
-                    rgba(255, 255, 255, ${0.12 * subtleIntensity}) 30%, 
-                    rgba(255, 255, 255, ${0.28 * enhancedIntensity}) 45%, 
-                    rgba(255, 255, 255, ${0.36 * enhancedIntensity}) 50%, 
-                    rgba(255, 255, 255, ${0.28 * enhancedIntensity}) 55%, 
-                    rgba(255, 255, 255, ${0.12 * subtleIntensity}) 70%, 
-                    rgba(255, 255, 255, ${0.04 * subtleIntensity}) 100%),
-                conic-gradient(from ${tiltRotation.rotateY * 4}deg at ${glitterX}% ${glitterY}%, 
-                    rgba(255, 255, 255, ${0.05 * subtleIntensity}) 0deg, 
-                    rgba(255, 255, 255, ${0.15 * enhancedIntensity}) 45deg, 
-                    rgba(255, 255, 255, ${0.08 * strongIntensity}) 90deg, 
-                    rgba(255, 255, 255, ${0.03 * subtleIntensity}) 135deg, 
-                    rgba(255, 255, 255, ${0.1 * strongIntensity}) 180deg, 
-                    rgba(255, 255, 255, ${0.18 * enhancedIntensity}) 225deg, 
-                    rgba(255, 255, 255, ${0.07 * strongIntensity}) 270deg, 
-                    rgba(255, 255, 255, ${0.12 * enhancedIntensity}) 315deg, 
-                    rgba(255, 255, 255, ${0.05 * subtleIntensity}) 360deg)
+                linear-gradient(${45 + tiltRotation.rotateY}deg, 
+                    rgba(255, 255, 255, ${0.15 * glitterOpacity}) 40%, 
+                    rgba(255, 255, 255, ${0.25 * glitterOpacity}) 50%, 
+                    rgba(255, 255, 255, ${0.15 * glitterOpacity}) 60%, 
+                    transparent 80%)
             `,
-            opacity: Math.min(enhancedIntensity, 0.85), // Reduced max opacity from 1.0 to 0.85
-            transform: `rotate(${tiltRotation.rotateY * 0.3}deg) scale(1.12)`, // Slightly reduced scale from 1.15 to 1.12
-            mixBlendMode: 'overlay' as const, // Changed from 'screen' to 'overlay' for better visibility on light images
-            filter: 'contrast(1.15) brightness(1.05)', // Slightly reduced contrast and brightness
+            opacity: Math.min(glitterOpacity, 0.7),
+            transform: `scale(1.05)`,
+            mixBlendMode: 'soft-light' as const,
         };
     }, [isSharpImage, glitterOpacity, tiltRotation.rotateX, tiltRotation.rotateY]);
 
