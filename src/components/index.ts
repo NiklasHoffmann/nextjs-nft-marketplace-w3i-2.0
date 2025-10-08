@@ -19,3 +19,6 @@ export * from './05-ui';
 
 // Admin Components - Dashboard, Management Tools
 export * from './06-admin';
+
+// Auth Components - AdminGuard, Access Control
+export * from './08-auth';

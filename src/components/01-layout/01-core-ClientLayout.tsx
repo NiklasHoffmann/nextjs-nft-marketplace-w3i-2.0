@@ -7,6 +7,7 @@ import apolloClient from "../../config/apolloClient";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { ModernNFTProvider } from "@/contexts/NFTContext";
 import { NFTStatsProvider } from "@/contexts/NFTStatsContext";
+import { AdminGuard } from "@/components/08-auth";
 import Navbar from "./02-core-Navbar";
 import Web3Provider from "./03-core-Web3Provider";
 
@@ -48,10 +49,12 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           <ModernNFTProvider>
             <NFTStatsProvider>
               <CurrencyProvider>
-                <div>
-                  <Navbar />
-                  <main>{children}</main>
-                </div>
+                <AdminGuard>
+                  <div>
+                    <Navbar />
+                    <main>{children}</main>
+                  </div>
+                </AdminGuard>
               </CurrencyProvider>
             </NFTStatsProvider>
           </ModernNFTProvider>
