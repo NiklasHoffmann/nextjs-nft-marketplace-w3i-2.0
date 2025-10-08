@@ -12,38 +12,37 @@ export default function TokenomicsTab({
     currentOwner
 }: TokenomicsTabProps) {
     return (
-        <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Tokenomics & Economics</h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-blue-600">{formatEther(price)}</div>
-                    <div className="text-sm text-blue-800">Current Price (ETH)</div>
+        <div className="space-y-6">
+            {/* Coming Soon Notice */}
+            <div className="text-center py-12">
+                <div className="mx-auto h-16 w-16 text-gray-300 mb-4">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
                 </div>
-
-                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-green-600">{totalSupply?.toLocaleString() || 'N/A'}</div>
-                    <div className="text-sm text-green-800">Total Supply</div>
-                </div>
-
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-purple-600">{rarityRank || 'N/A'}</div>
-                    <div className="text-sm text-purple-800">Rarity Rank</div>
-                </div>
-
-                {supportsRoyalty && royaltyInfo && (
-                    <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-4 text-center">
-                        <div className="text-2xl font-bold text-yellow-600">{royaltyInfo.percentage?.toFixed(1) || '0'}%</div>
-                        <div className="text-sm text-yellow-800">Royalty Rate</div>
-                    </div>
-                )}
+                <h3 className="text-xl font-medium text-gray-900 mb-2">Tokenomics Analysis Coming Soon</h3>
+                <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                    Advanced tokenomics analysis including supply distribution, market dynamics,
+                    and economic modeling will be available in a future update.
+                </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                    <h4 className="text-md font-semibold text-gray-900">Economic Details</h4>
+            {/* Basic Economic Info - What we DO have */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Basic Economic Information
+                </h3>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-3">
+                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                            <span className="text-sm font-medium text-gray-600">Current Price</span>
+                            <span className="text-sm text-gray-900 font-bold">{formatEther(price)} ETH</span>
+                        </div>
+
                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                             <span className="text-sm font-medium text-gray-600">Token Standard</span>
                             <span className="text-sm text-gray-900 font-semibold">{tokenStandard}</span>
@@ -53,85 +52,27 @@ export default function TokenomicsTab({
                             <span className="text-sm font-medium text-gray-600">Blockchain</span>
                             <span className="text-sm text-gray-900">{blockchain}</span>
                         </div>
+                    </div>
 
+                    <div className="space-y-3">
                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                             <span className="text-sm font-medium text-gray-600">Collection Size</span>
                             <span className="text-sm text-gray-900">{totalSupply?.toLocaleString() || 'Unknown'} items</span>
                         </div>
 
-                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                            <span className="text-sm font-medium text-gray-600">Listing Price</span>
-                            <span className="text-sm text-gray-900 font-bold">{formatEther(price)} ETH</span>
-                        </div>
-
-                        {supportsRoyalty && (
+                        {rarityRank && (
                             <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                                <span className="text-sm font-medium text-gray-600">Creator Royalty</span>
-                                <span className="text-sm text-gray-900">{royaltyInfo?.percentage?.toFixed(2) || '0'}%</span>
+                                <span className="text-sm font-medium text-gray-600">Rarity Rank</span>
+                                <span className="text-sm text-gray-900">#{rarityRank}</span>
                             </div>
                         )}
-                    </div>
-                </div>
 
-                <div className="space-y-4">
-                    <h4 className="text-md font-semibold text-gray-900">Market Analysis</h4>
-
-                    <div className="border-l-4 border-blue-500 pl-4 mb-4">
-                        <h5 className="font-medium text-gray-900">Scarcity</h5>
-                        <p className="text-sm text-gray-600 mt-1">
-                            {totalSupply && totalSupply < 10000
-                                ? `Limited collection of ${totalSupply.toLocaleString()} items`
-                                : totalSupply && totalSupply >= 10000
-                                    ? `Large collection of ${totalSupply.toLocaleString()} items`
-                                    : "Collection size determining uniqueness value"
-                            }
-                        </p>
-                    </div>
-
-                    <div className="border-l-4 border-green-500 pl-4 mb-4">
-                        <h5 className="font-medium text-gray-900">Utility</h5>
-                        <p className="text-sm text-gray-600 mt-1">
-                            {tokenStandard} standard ensures broad wallet and marketplace compatibility
-                        </p>
-                    </div>
-
-                    {supportsRoyalty && (
-                        <div className="border-l-4 border-yellow-500 pl-4">
-                            <h5 className="font-medium text-gray-900">Creator Economy</h5>
-                            <p className="text-sm text-gray-600 mt-1">
-                                Built-in royalty system ensures ongoing creator compensation at {royaltyInfo?.percentage?.toFixed(1)}% per sale
-                            </p>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Ownership Economics */}
-            <div className="border-t pt-6 mt-6">
-                <h4 className="text-md font-semibold text-gray-900 mb-4">Ownership Economics</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-gray-50 rounded-lg p-4">
-                        <h5 className="text-sm font-semibold text-gray-900 mb-2">Current Owner</h5>
-                        <p className="text-xs font-mono text-gray-600 break-all">
-                            {currentOwner || 'Loading...'}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                            Verified on-chain ownership
-                        </p>
-                    </div>
-
-                    <div className="bg-gray-50 rounded-lg p-4">
-                        <h5 className="text-sm font-semibold text-gray-900 mb-2">Transfer Rights</h5>
-                        <p className="text-sm text-gray-600">
-                            Full ownership transfer rights via {tokenStandard} standard
-                        </p>
-                    </div>
-
-                    <div className="bg-gray-50 rounded-lg p-4">
-                        <h5 className="text-sm font-semibold text-gray-900 mb-2">Economic Value</h5>
-                        <p className="text-sm text-gray-600">
-                            Market-determined value through trading and scarcity
-                        </p>
+                        {supportsRoyalty && royaltyInfo && (
+                            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                                <span className="text-sm font-medium text-gray-600">Creator Royalty</span>
+                                <span className="text-sm text-gray-900">{royaltyInfo.percentage?.toFixed(2) || '0'}%</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

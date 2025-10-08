@@ -92,9 +92,10 @@ export function useNFTFilters(
                 return false;
             }
 
-            // Views filter (we don't have direct views, so we'll skip this for now)
+            // Views filter
             if (filters.minViews && filters.minViews > 0) {
                 if (!item.viewCount || item.viewCount < filters.minViews) {
+
                     return false;
                 }
             }
@@ -102,6 +103,7 @@ export function useNFTFilters(
             // Likes filter (updated to use favoriteCount)
             if (filters.minLikes && filters.minLikes > 0) {
                 if (!item.favoriteCount || item.favoriteCount < filters.minLikes) {
+
                     return false;
                 }
             }
@@ -109,6 +111,7 @@ export function useNFTFilters(
             // Watchlist filter
             if (filters.minWatchlistCount && filters.minWatchlistCount > 0) {
                 if (!item.watchlistCount || item.watchlistCount < filters.minWatchlistCount) {
+
                     return false;
                 }
             }
@@ -160,18 +163,20 @@ export function useNFTFilters(
                     break;
 
                 default:
-                    aValue = 0;
-                    bValue = 0;
+                    // Default to price if unknown field
+                    aValue = a.price ? parseFloat(formatEther(a.price)) : 0;
+                    bValue = b.price ? parseFloat(formatEther(b.price)) : 0;
             }
 
             // Handle different data types
+            let comparison: number;
             if (typeof aValue === 'string' && typeof bValue === 'string') {
-                const comparison = aValue.localeCompare(bValue);
-                return sort.direction === 'asc' ? comparison : -comparison;
+                comparison = aValue.localeCompare(bValue);
             } else {
-                const comparison = (aValue || 0) - (bValue || 0);
-                return sort.direction === 'asc' ? comparison : -comparison;
+                comparison = (aValue || 0) - (bValue || 0);
             }
+
+            return sort.direction === 'asc' ? comparison : -comparison;
         });
 
         return result;

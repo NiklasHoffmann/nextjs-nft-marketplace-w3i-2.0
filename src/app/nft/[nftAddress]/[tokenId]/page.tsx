@@ -54,9 +54,7 @@ function NFTDetailPage() {
 
     // OPTIMIZED: Use ModernNFTContext directly for insights
     const nftContext = useModernNFTContext();
-    console.log('🔍 NFT Page Params:', { nftAddress, tokenId, isValidParams });
     const nftContextData = nftContext.getNFT(nftAddress, tokenId);
-    console.log('🔍 NFT Context Data Detail Page:', nftContextData);
     const publicInsights = nftContextData?.insight;
 
     // Load data if not available
@@ -90,10 +88,6 @@ function NFTDetailPage() {
         totalSupply: nftContextData?.core?.totalSupply
     };
 
-    console.log('🖼️ NFT Metadata:', metadata);
-    console.log('🖼️ NFT Image URL:', imageUrl);
-    console.log('🖼️ NFT Contract Info:', contractInfo);
-
     // SIMPLIFIED: Generate mock marketplace data directly with useMemo
     const nftDetails = useMemo(() => {
         if (!isValidParams) return null;
@@ -109,7 +103,7 @@ function NFTDetailPage() {
                 ? String(nftContextData.listing.desiredTokenId)
                 : ""
         };
-    }, [nftAddress, tokenId, isValidParams]);
+    }, [nftAddress, tokenId, isValidParams, nftContextData]);
 
     // Use custom hook for price data
     const priceData = useNFTPriceData(nftDetails?.price || null);
@@ -137,20 +131,7 @@ function NFTDetailPage() {
     // OPTIMIZED: Combined loading and error states
     const isLoading = !nftContextData;
     const error = null; // NFTDetailData doesn't expose errorState - handle via context if needed
-    const hasValidData = isValidParams && nftDetails;
-
-    // Debug: Log NFT data sources to identify image loading issues
-    console.log('🖼️ Image Loading Debug:', {
-        nftContextData: {
-            available: !!nftContextData,
-            imageUrl: nftContextData?.meta?.image,
-            metadata: !!nftContextData?.meta,
-            metadataName: nftContextData?.meta?.name,
-            loading: isLoading
-        },
-        finalImageUrl: imageUrl,
-        isValidParams
-    });    // Use NFTContext data directly
+    const hasValidData = isValidParams && nftDetails;    // Use NFTContext data directly
     const finalImageUrl = imageUrl;
     const finalName = metadata?.name || `Token #${tokenId}`;
 
@@ -167,19 +148,6 @@ function NFTDetailPage() {
     const enhancedToggleWatchlist = statsToggleWatchlist;
     const enhancedToggleFavorite = statsToggleFavorite;
     const enhancedSetRating = statsSetRating;
-
-    // Debug: Log user interactions data (simplified)
-    console.log('🐛 NFT Page Debug (Modernized with Stats):', {
-        nftAddress,
-        tokenId,
-        statsUserInteractions,
-        isWalletConnected,
-        hasValidData,
-        hasToggleFavorite: !!enhancedToggleFavorite,
-        hasToggleWatchlist: !!enhancedToggleWatchlist,
-        hasSetRating: !!enhancedSetRating,
-        statsData: !!statsData
-    });
 
     // Memoize header props to prevent unnecessary re-renders
     // NOTE: Simplified since NFTDetailHeader now uses NFTStatsContext directly
@@ -222,7 +190,7 @@ function NFTDetailPage() {
 
     // Memoize media section props (FIXED: Better fallback logic for images)
     const mediaSectionProps = useMemo(() => {
-        const props = {
+        return {
             imageUrl: finalImageUrl, // Use consolidated image URL
             animationUrl: metadata?.animationUrl, // Use consolidated metadata
             videoUrl: null, // Simplified
@@ -230,11 +198,6 @@ function NFTDetailPage() {
             name: finalName, // Use consolidated name
             tokenId
         };
-
-        // Debug: Log media section props
-        console.log('🎬 Media Section Props:', props);
-
-        return props;
     }, [
         finalImageUrl, metadata?.animationUrl, finalName, tokenId
     ]);

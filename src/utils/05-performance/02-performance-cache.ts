@@ -95,7 +95,6 @@ export class CacheInvalidationManager {
      * Execute immediate cache invalidation
      */
     private executeInvalidation(contractAddress: string, tokenId?: string): void {
-        console.log(`🔄 Executing cache invalidation for ${contractAddress}${tokenId ? `:${tokenId}` : ''}`);
 
         // Invalidate all related queries
         this.invalidateNFTMetadata(contractAddress, tokenId);
@@ -125,7 +124,6 @@ export class CacheInvalidationManager {
      * Process all queued invalidations in batch
      */
     private processBatchInvalidation(): void {
-        console.log(`🔄 Processing batch invalidation for ${this.invalidationQueue.size} items`);
 
         for (const item of this.invalidationQueue) {
             const [contractAddress, tokenId] = item.split(':');

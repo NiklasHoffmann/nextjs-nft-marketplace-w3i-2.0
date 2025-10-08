@@ -13,6 +13,7 @@ export {
     fetchNFTInsights,
     fetchCollectionInsights,
     fetchNFTStats,
+    fetchMarketplaceListing,
     fetchMultipleNFTs,
     checkAPIHealth
 } from './01-api-nft';

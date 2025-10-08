@@ -29,23 +29,28 @@ export function useNFTInsights(options: UseNFTInsightsOptions = {}): UseNFTInsig
     const [error, setError] = useState<string | null>(null);
 
     const fetchInsights = useCallback(async () => {
-        if (!contractAddress || !tokenId) {
-            console.log('🚫 fetchInsights aborted: missing contractAddress or tokenId', { contractAddress, tokenId });
+        // Allow empty tokenId for collection-wide insights
+        if (!contractAddress) {
+
             return;
         }
 
-        console.log('🔄 fetchInsights starting for', { contractAddress, tokenId });
+        // tokenId can be empty string for collection-wide insights
+        if (tokenId === undefined || tokenId === null) {
+
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
         try {
             const params = new URLSearchParams({
                 contractAddress,
-                tokenId,
+                tokenId: tokenId || '', // Ensure empty string is passed for collection-wide
                 limit: '1'
             });
 
-            console.log('📡 Fetching insights with params:', params.toString());
             const response = await fetch(`/api/nft/insights?${params}`, {
                 headers: {
                     'Cache-Control': 'no-cache',
@@ -53,9 +58,7 @@ export function useNFTInsights(options: UseNFTInsightsOptions = {}): UseNFTInsig
                 }
             });
 
-            console.log('📥 Response status:', response.status);
             const result = await response.json();
-            console.log('📋 Response data:', result);
 
             if (!result.success) {
                 throw new Error(result.error || 'Failed to fetch insights');
@@ -63,7 +66,7 @@ export function useNFTInsights(options: UseNFTInsightsOptions = {}): UseNFTInsig
 
             // Set the first result or null if no insights found
             const insightsData = Array.isArray(result.data) && result.data.length > 0 ? result.data[0] : null;
-            console.log('✅ Setting insights data:', insightsData);
+
             setInsights(insightsData);
 
         } catch (err) {
@@ -71,21 +74,16 @@ export function useNFTInsights(options: UseNFTInsightsOptions = {}): UseNFTInsig
             setError(err instanceof Error ? err.message : 'An error occurred');
             setInsights(null);
         } finally {
-            console.log('🏁 fetchInsights finished');
+
             setLoading(false);
         }
     }, [contractAddress, tokenId]);
 
     // Auto-fetch with background refresh
     useEffect(() => {
-        console.log('🔍 useNFTInsights useEffect check:', {
-            autoFetch,
-            contractAddress,
-            tokenId,
-            willFetch: autoFetch && contractAddress && tokenId
-        });
 
-        if (autoFetch && contractAddress && tokenId) {
+        // Allow empty string tokenId for collection-wide insights
+        if (autoFetch && contractAddress && tokenId !== undefined && tokenId !== null) {
             fetchInsights();
 
             // Set up background refresh interval for critical insights data
@@ -360,7 +358,10 @@ export function useCollectionInsights(options: UseCollectionInsightsOptions = {}
     const [error, setError] = useState<string | null>(null);
 
     const fetchInsights = useCallback(async () => {
-        if (!contractAddress) return;
+        if (!contractAddress) {
+
+            return;
+        }
 
         setLoading(true);
         setError(null);
@@ -372,16 +373,19 @@ export function useCollectionInsights(options: UseCollectionInsightsOptions = {}
             });
 
             const response = await fetch(`/api/nft/insights/collections?${params}`);
+
             const result = await response.json();
 
             if (!result.success) {
                 throw new Error(result.error || 'Failed to fetch collection insights');
             }
 
-            setInsights(Array.isArray(result.data) && result.data.length > 0 ? result.data[0] as AdminCollectionInsight : null);
+            const insightsData = Array.isArray(result.data) && result.data.length > 0 ? result.data[0] as AdminCollectionInsight : null;
+
+            setInsights(insightsData);
 
         } catch (err) {
-            console.error('Error fetching collection insights:', err);
+            console.error('❌ useCollectionInsights: Error fetching collection insights:', err);
             setError(err instanceof Error ? err.message : 'An error occurred');
             setInsights(null);
         } finally {

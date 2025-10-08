@@ -39,8 +39,6 @@ async function fetchFromAlchemy(walletAddress: string): Promise<ExternalNFT[]> {
     // Use Sepolia network as configured in your .env.local
     const baseURL = `https://eth-sepolia.g.alchemy.com/nft/v3/${apiKey}`;
 
-    console.log('🔍 Fetching NFTs from Alchemy (Sepolia) for wallet:', walletAddress);
-
     const response = await fetch(
         `${baseURL}/getNFTsForOwner?owner=${walletAddress}&withMetadata=true&pageSize=100`,
         {
@@ -58,7 +56,6 @@ async function fetchFromAlchemy(walletAddress: string): Promise<ExternalNFT[]> {
     }
 
     const data = await response.json();
-    console.log('📊 Alchemy response:', { total: data.totalCount, nfts: data.ownedNfts?.length || 0 });
 
     return data.ownedNfts?.map((nft: any) => ({
         contractAddress: nft.contract.address,
@@ -85,7 +82,6 @@ async function fetchFromMoralis(walletAddress: string): Promise<ExternalNFT[]> {
     // Use Sepolia chain to match your setup
     const chain = process.env.MORALIS_CHAIN || 'sepolia';
 
-    console.log('🔍 Fetching NFTs from Moralis (Sepolia) for wallet:', walletAddress);
 
     const response = await fetch(
         `https://deep-index.moralis.io/api/v2.2/${walletAddress}/nft?chain=${chain}&format=decimal&media_items=true`,
@@ -105,7 +101,6 @@ async function fetchFromMoralis(walletAddress: string): Promise<ExternalNFT[]> {
     }
 
     const data = await response.json();
-    console.log('📊 Moralis response:', { total: data.total, nfts: data.result?.length || 0 });
 
     return data.result?.map((nft: any) => ({
         contractAddress: nft.token_address,
@@ -144,8 +139,6 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        console.log('🔍 Fetching NFTs for wallet:', walletAddress, 'source:', source);
-
         let nfts: ExternalNFT[] = [];
         let usedSource: 'alchemy' | 'moralis' = 'alchemy';
 
@@ -155,9 +148,9 @@ export async function GET(request: NextRequest) {
                 try {
                     nfts = await fetchFromAlchemy(walletAddress);
                     usedSource = 'alchemy';
-                    console.log('✅ Successfully fetched from Alchemy:', nfts.length, 'NFTs');
+
                 } catch (alchemyError) {
-                    console.log('⚠️ Alchemy failed:', alchemyError);
+
                     if (source === 'alchemy') throw alchemyError; // If specifically requested, throw error
                 }
             }
@@ -167,16 +160,16 @@ export async function GET(request: NextRequest) {
                 try {
                     nfts = await fetchFromMoralis(walletAddress);
                     usedSource = 'moralis';
-                    console.log('✅ Successfully fetched from Moralis:', nfts.length, 'NFTs');
+
                 } catch (moralisError) {
-                    console.log('⚠️ Moralis failed:', moralisError);
+
                     if (source === 'moralis') throw moralisError; // If specifically requested, throw error
                 }
             }
 
             // If no NFTs found, that's okay - wallet might be empty
             if (nfts.length === 0) {
-                console.log('ℹ️ No NFTs found in wallet:', walletAddress);
+
             }
 
         } catch (apiError) {
@@ -191,7 +184,6 @@ export async function GET(request: NextRequest) {
             source: usedSource
         };
 
-        console.log('✅ Returning', nfts.length, 'NFTs from', usedSource);
         return NextResponse.json(response);
 
     } catch (error) {

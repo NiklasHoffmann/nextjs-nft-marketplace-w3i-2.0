@@ -98,12 +98,28 @@ export default function AdminNFTInsightsManager() {
     const nftContext = useNFTContext();
     const [isLoadingNFT, setIsLoadingNFT] = useState(false);
 
-    // Use admin insights hook to get full AdminNFTInsight data
+    // Get URL parameters directly (not from formData)
+    const contractAddressParam = searchParams.get('contractAddress') || '';
+    const tokenIdParam = searchParams.get('tokenId') || '';
+
+    // Use admin insights hook to get full AdminNFTInsight data (NFT-specific)
     const { insights: existingInsights, loading: insightsLoading } = useNFTInsightsLegacy({
-        contractAddress: formData.contractAddress || '',
-        tokenId: formData.tokenId || '',
-        autoFetch: !!(formData.contractAddress && formData.tokenId)
+        contractAddress: contractAddressParam,
+        tokenId: tokenIdParam,
+        autoFetch: !!(contractAddressParam && tokenIdParam) // Only fetch NFT-specific when we have both
     });
+
+    // Also fetch collection-wide insights as fallback (empty tokenId = collection-wide)
+    const { insights: collectionInsights, loading: collectionInsightsLoading } = useNFTInsightsLegacy({
+        contractAddress: contractAddressParam,
+        tokenId: '', // Empty tokenId for collection-wide insights
+        autoFetch: !!contractAddressParam // Fetch collection insights as soon as we have contractAddress
+    });
+
+    // Debug logging for insights loading
+    useEffect(() => {
+
+    }, [existingInsights, collectionInsights, insightsLoading, collectionInsightsLoading, formData.contractAddress, formData.tokenId, contractAddressParam, tokenIdParam]);
 
     // Existing insights laden für Edit-Mode - no longer needed since we use the hook
     // const nftData = nftContext.getNFT(
@@ -129,7 +145,6 @@ export default function AdminNFTInsightsManager() {
 
         // Reset form to initial state and load new URL parameters
         if (contractAddress || tokenId) {
-            console.log('🔄 Resetting form for new URL parameters:', { contractAddress, tokenId });
 
             setFormData({
                 ...initialFormData, // Start with fresh form
@@ -148,19 +163,40 @@ export default function AdminNFTInsightsManager() {
 
     // Existierende Insights in Form laden mit Migration
     useEffect(() => {
-        // Only proceed if we have contract address and loading is complete
-        if (!formData.contractAddress || isLoadingNFT) {
+        // Only proceed if we have contract address
+        if (!formData.contractAddress) {
+
             return;
         }
 
-        if (existingInsights) {
-            console.log('📝 Loading existing insights into form:', existingInsights._id);
-            setIsEditMode(true);
+        // Wait for NFT context to finish loading
+        if (isLoadingNFT) {
+
+            return;
+        }
+
+        // Wait for insights to finish loading
+        if (insightsLoading || collectionInsightsLoading) {
+
+            return;
+        }
+
+        // Determine which insights to use: NFT-specific or collection-wide fallback
+        // Priority: 1. NFT-specific (with tokenId), 2. Collection-wide (tokenId="")
+        const insightsToUse = existingInsights || collectionInsights;
+        const isCollectionFallback = !existingInsights && !!collectionInsights;
+        const fallbackSource = !existingInsights
+            ? 'Collection-wide Insights (tokenId="")'
+            : 'NFT-specific Insights';
+
+        if (insightsToUse) {
+            // Only set edit mode if we have NFT-specific insights
+            setIsEditMode(!isCollectionFallback);
 
             // Check if existing insights have the new structure
-            const hasProjectDescriptions = existingInsights.projectDescriptions;
-            const hasFunctionalitiesDescriptions = existingInsights.functionalitiesDescriptions;
-            const hasLegacySpecificDescriptions = existingInsights.specificDescriptions;
+            const hasProjectDescriptions = insightsToUse.projectDescriptions;
+            const hasFunctionalitiesDescriptions = insightsToUse.functionalitiesDescriptions;
+            const hasLegacySpecificDescriptions = insightsToUse.specificDescriptions;
 
             let projectDescriptions: NFTProjectDescriptions;
             let functionalitiesDescriptions: NFTFunctionalitiesDescriptions;
@@ -168,51 +204,56 @@ export default function AdminNFTInsightsManager() {
 
             if (hasProjectDescriptions) {
                 // Use existing enhanced project structure
-                projectDescriptions = existingInsights.projectDescriptions || getDefaultProjectDescriptions();
+                projectDescriptions = insightsToUse.projectDescriptions || getDefaultProjectDescriptions();
             } else if (hasLegacySpecificDescriptions) {
                 // Migrate legacy specificDescriptions to projectDescriptions
-                projectDescriptions = existingInsights.specificDescriptions as NFTProjectDescriptions || getDefaultProjectDescriptions();
+                projectDescriptions = insightsToUse.specificDescriptions as NFTProjectDescriptions || getDefaultProjectDescriptions();
             } else {
                 // Migrate legacy descriptions to new structure
-                legacyDescriptions = existingInsights.descriptions?.length ? existingInsights.descriptions : [''];
+                legacyDescriptions = insightsToUse.descriptions?.length ? insightsToUse.descriptions : [''];
                 projectDescriptions = migrateLegacyDescriptions(legacyDescriptions);
             }
 
             if (hasFunctionalitiesDescriptions) {
                 // Use existing functionalities structure
-                functionalitiesDescriptions = existingInsights.functionalitiesDescriptions || getDefaultFunctionalitiesDescriptions();
+                functionalitiesDescriptions = insightsToUse.functionalitiesDescriptions || getDefaultFunctionalitiesDescriptions();
             } else {
                 // Create default functionalities structure
                 functionalitiesDescriptions = getDefaultFunctionalitiesDescriptions();
             }
 
-            setFormData(prev => ({
-                ...prev,
-                customTitle: existingInsights.customTitle || existingInsights.title || '', // Use customTitle first, fallback to title
-                title: existingInsights.title || '', // Keep legacy support
-                projectDescriptions,
-                functionalitiesDescriptions,
-                cardDescriptions: existingInsights.cardDescriptions || [], // Load card descriptions
-                category: existingInsights.category || '',
-                tags: existingInsights.tags || [],
-                rarity: existingInsights.rarity || 'common',
-                projectWebsite: existingInsights.projectWebsite || '',
-                projectTwitter: existingInsights.projectTwitter || '',
-                projectDiscord: existingInsights.projectDiscord || '',
-                partnerships: existingInsights.partnerships || [],
-                partnershipDetails: existingInsights.partnershipDetails || ''
-            }));
+            setFormData(prev => {
+                const updatedFormData = {
+                    ...prev,
+                    // WICHTIG: contractAddress und tokenId NICHT überschreiben!
+                    // Diese bleiben aus dem URL-Parameter (NFT-spezifisch)
+                    customTitle: insightsToUse.customTitle || insightsToUse.title || '', // Use customTitle first, fallback to title
+                    title: insightsToUse.title || '', // Keep legacy support
+                    projectDescriptions,
+                    functionalitiesDescriptions,
+                    cardDescriptions: (insightsToUse as any).cardDescriptions || [], // Load card descriptions (only for NFT-specific)
+                    category: insightsToUse.category || '',
+                    tags: insightsToUse.tags || [],
+                    rarity: insightsToUse.rarity || 'common',
+                    projectWebsite: insightsToUse.projectWebsite || '',
+                    projectTwitter: insightsToUse.projectTwitter || '',
+                    projectDiscord: insightsToUse.projectDiscord || '',
+                    partnerships: insightsToUse.partnerships || [],
+                    partnershipDetails: insightsToUse.partnershipDetails || ''
+                };
+
+                return updatedFormData;
+            });
         } else {
             // No existing insights found - keep fresh form (already set by URL parameter effect)
-            console.log('🆕 No existing insights found - keeping fresh form');
             setIsEditMode(false);
         }
-    }, [existingInsights, isLoadingNFT, formData.contractAddress, formData.tokenId]);
+    }, [existingInsights, collectionInsights, isLoadingNFT, insightsLoading, collectionInsightsLoading, formData.contractAddress, formData.tokenId]);
 
     // Cleanup effect - reset form when component unmounts for completely fresh start
     useEffect(() => {
         return () => {
-            console.log('🧹 Component unmounting - cleanup complete');
+
         };
     }, []);
 
@@ -264,34 +305,13 @@ export default function AdminNFTInsightsManager() {
                 createdBy: '0x0000000000000000000000000000000000000000' // TODO: Replace with actual admin address
             };
 
-            console.log('🎴 cardDescriptions in requestData:', requestData.cardDescriptions);
-            console.log('🎴 Building final cardDescriptions:', {
-                savedDescriptions: formData.cardDescriptions,
-                currentInput: currentCardInput,
-                maxCharacters: 80
-            });
-
             // Build final card descriptions including current input
             let finalCardDescriptions = [...formData.cardDescriptions];
             if (currentCardInput.trim() && currentCardInput.trim().length <= 80) {
                 finalCardDescriptions.push(currentCardInput.trim());
-                console.log('🎴 Added current input to descriptions:', currentCardInput.trim());
             }
 
             requestData.cardDescriptions = finalCardDescriptions;
-            console.log('🎴 Final cardDescriptions:', finalCardDescriptions);
-
-            console.log('� Token ID Debug Check:', {
-                'Original formData.tokenId': formData.tokenId,
-                'FormData tokenId type': typeof formData.tokenId,
-                'FormData tokenId length': formData.tokenId?.length,
-                'Cleaned tokenId': cleanTokenId,
-                'Cleaned tokenId type': typeof cleanTokenId,
-                'Will create collection-wide insights': cleanTokenId === '',
-                'Request tokenId': requestData.tokenId
-            });
-
-            console.log('�📋 Full requestData being sent:', JSON.stringify(requestData, null, 2));
 
             let result;
             if (isEditMode && existingInsights) {
@@ -313,13 +333,16 @@ export default function AdminNFTInsightsManager() {
     }, [formData, create, update, isEditMode, existingInsights]);
 
     const updateFormData = useCallback((updates: Partial<NFTInsightFormData>) => {
-        console.log('📋 updateFormData called with:', updates);
+
         setFormData(prev => {
             const newData = { ...prev, ...updates };
-            console.log('📋 New formData:', newData);
+
             return newData;
         });
     }, []);
+
+    // Check if we're using collection-wide insights as a template
+    const isUsingCollectionTemplate = !existingInsights && !!collectionInsights && !!formData.contractAddress;
 
     return (
         <div className="bg-white rounded-lg shadow-lg p-6">
@@ -346,6 +369,24 @@ export default function AdminNFTInsightsManager() {
                     <div className="mt-3 text-sm text-gray-500 flex items-center gap-2">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                         Loading existing data...
+                    </div>
+                )}
+                {isUsingCollectionTemplate && (
+                    <div className="mt-4 bg-purple-50 border border-purple-200 rounded-lg p-4">
+                        <div className="flex items-start">
+                            <div className="flex-shrink-0">
+                                <svg className="w-5 h-5 text-purple-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <div className="ml-3">
+                                <h3 className="text-sm font-medium text-purple-800">Collection-weite Insights geladen</h3>
+                                <p className="mt-1 text-sm text-purple-700">
+                                    Für diesen NFT existieren keine spezifischen Insights. Die Felder wurden mit den collection-weiten Insights vorausgefüllt.
+                                    Beim Speichern werden NFT-spezifische Insights erstellt.
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
@@ -383,7 +424,7 @@ export default function AdminNFTInsightsManager() {
                     onProjectDescriptionsChange={(projectDescriptions) => updateFormData({ projectDescriptions })}
                     onFunctionalitiesDescriptionsChange={(functionalitiesDescriptions) => updateFormData({ functionalitiesDescriptions })}
                     onCardDescriptionsChange={(cardDescriptions) => {
-                        console.log('📋 onCardDescriptionsChange called with:', cardDescriptions);
+
                         updateFormData({ cardDescriptions });
                     }}
                     onActiveTabChange={setActiveDescriptionTab}

@@ -1,5 +1,7 @@
 // ===== CORE NFT TYPES =====
 
+import type { NFTProjectDescriptions, NFTFunctionalitiesDescriptions } from '../05-features/03-nft-insights';
+
 // Quellen
 export type ActiveItem = {
     listingId: string
@@ -54,7 +56,23 @@ export type Insight = {
     tags?: string[]
     cardDescription?: string[]
     rarity?: string
+    // Project information (enhanced structure) - using imported types
+    projectDescriptions?: NFTProjectDescriptions
+    functionalitiesDescriptions?: NFTFunctionalitiesDescriptions
+    specificDescriptions?: NFTProjectDescriptions // Legacy support
+    // Legacy description fields
+    descriptions?: string[]
+    description?: string
+    // Social/Project links
+    projectWebsite?: string
+    projectTwitter?: string
+    projectDiscord?: string
+    // Partnerships
+    partnerships?: string[]
+    partnershipDetails?: string
+    // Metadata
     updatedAt: string
+    createdAt?: string
     createdBy?: `0x${string}`
 }
 

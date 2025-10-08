@@ -200,11 +200,9 @@ function NewNFTInfoTabs({
             case 'functionalities':
                 return (
                     <MemoizedFunctionalitiesTab
-                        attributes={attributes}
-                        blockchain={blockchain}
-                        tokenStandard={tokenStandard}
-                        supportsRoyalty={supportsRoyalty}
-                        royaltyInfo={royaltyInfo}
+                        adminInsights={adminInsights as AdminNFTInsight || undefined}
+                        collectionInsights={collectionInsights || undefined}
+                        loading={adminInsightsLoading}
                     />
                 );
             case 'tokenomics':
@@ -249,6 +247,7 @@ function NewNFTInfoTabs({
         effectivePublicInsights,
         userInteractions,
         userWalletAddress,
+        isWalletConnected,
         effectiveInsightsLoading,
         onUpdateUserInteraction,
         // User action handlers

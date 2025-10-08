@@ -60,6 +60,8 @@ export default function TitleDescriptionManager({
         titleDescriptionPairs: hideTitle ? [] : [createEmptyPair()]
     };
 
+    // Debug logging
+
     const addTitleDescriptionPair = useCallback(() => {
         const currentPairs = safeDescriptions?.titleDescriptionPairs || [];
         // For hideTitle mode, check if we're under maxDescriptions limit

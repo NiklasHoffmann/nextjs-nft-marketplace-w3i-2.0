@@ -40,7 +40,6 @@ export async function executeContractCallWithFallback<T>(
 
     for (let i = 0; i < Math.min(clients.length, maxRetries); i++) {
         try {
-            console.log(`🔄 ${functionName}: Trying RPC endpoint ${i + 1}/${clients.length}`);
 
             const timeoutPromise = new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error(`${functionName} timeout after ${timeout}ms`)), timeout)
@@ -56,7 +55,7 @@ export async function executeContractCallWithFallback<T>(
             const result = await Promise.race([callPromise, timeoutPromise]);
 
             if (i > 0) {
-                console.log(`✅ ${functionName}: Fallback successful on endpoint ${i + 1}`);
+
             }
 
             return {
@@ -94,7 +93,6 @@ export async function executeBatchContractCalls(
     successCount: number,
     totalCalls: number
 }> {
-    console.log(`📦 Executing batch of ${calls.length} contract calls`);
 
     const startTime = Date.now();
     const results = await Promise.allSettled(
@@ -116,8 +114,6 @@ export async function executeBatchContractCalls(
     const successCount = finalResults.filter(r => r.success).length;
     const duration = Date.now() - startTime;
 
-    console.log(`📊 Batch completed: ${successCount}/${calls.length} successful in ${duration}ms`);
-
     return {
         results: finalResults,
         successCount,
@@ -138,14 +134,10 @@ export async function executeCriticalCall<T>(
         maxRetries: 5 // Mehr Versuche für kritische Calls
     };
 
-    console.log(`🔑 Executing critical call: ${options.functionName}`);
-
     const result = await executeContractCallWithFallback<T>(criticalOptions);
 
     if (!result.success) {
         console.error(`❌ Critical call ${options.functionName} failed after all retries`);
-    } else {
-        console.log(`✅ Critical call ${options.functionName} succeeded${result.rpcUsed ? ` (RPC ${result.rpcUsed})` : ''}`);
     }
 
     return result;
@@ -170,7 +162,7 @@ export async function executeOptionalCall<T>(
     if (result.success) {
         return result.data || null;
     } else {
-        console.log(`⚠️ Optional call ${options.functionName} failed, using default`);
+
         return defaultValue || null;
     }
 }

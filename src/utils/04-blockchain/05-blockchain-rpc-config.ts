@@ -29,7 +29,6 @@ export function getRPCEndpoints(): string[] {
         'https://sepolia.drpc.org'
     ].filter(Boolean) as string[];
 
-    console.log(`🔗 Available RPC endpoints: ${endpoints.length}`);
     if (endpoints.length === 0) {
         console.warn('⚠️ No RPC endpoints configured! Using fallback.');
         endpoints.push('https://rpc.sepolia.org');
@@ -99,10 +98,10 @@ export async function executeWithFallback<T>(
 
     for (let i = 0; i < Math.min(clients.length, maxRetries); i++) {
         try {
-            console.log(`🔄 Trying RPC endpoint ${i + 1}/${clients.length}`);
+
             const result = await operation(clients[i]);
             if (i > 0) {
-                console.log(`✅ Fallback successful on endpoint ${i + 1}`);
+
             }
             return result;
         } catch (error) {

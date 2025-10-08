@@ -59,22 +59,26 @@ export function ActiveItemsList() {
 
     useEffect(() => {
         const handleVisibilityChange = () => {
-            if (!document.hidden && refetch) {
+            if (!document.hidden) {
+
+                // Only refetch if it's been a significant amount of time (2+ minutes)
+                // Let the stats system handle immediate updates via events
                 const now = Date.now();
-                if (now - lastRefreshTime.current > REFRESH_THROTTLE_MS) {
+                if (now - lastRefreshTime.current > 120000) { // 2 minutes instead of 5 seconds
+
                     lastRefreshTime.current = now;
-                    refetch();
+                    if (refetch) refetch();
                 }
             }
         };
 
         const handleFocus = () => {
-            if (refetch) {
-                const now = Date.now();
-                if (now - lastRefreshTime.current > REFRESH_THROTTLE_MS) {
-                    lastRefreshTime.current = now;
-                    refetch();
-                }
+            // Same logic for focus events - only refetch after long periods
+            const now = Date.now();
+            if (now - lastRefreshTime.current > 120000) { // 2 minutes
+
+                lastRefreshTime.current = now;
+                if (refetch) refetch();
             }
         };
 
@@ -90,14 +94,15 @@ export function ActiveItemsList() {
     // More responsive storage change listening
     useEffect(() => {
         const handleStorageChange = (e: StorageEvent) => {
-            // Respond to both marketplace and NFT stats updates
-            if ((e.key === 'nft-marketplace-update' || (e.key && e.key.startsWith('nft_stats_'))) && refetch) {
+            // Only refresh on wallet-related storage changes
+            if (e.key && (e.key.includes('wallet') || e.key.includes('connect')) && refetch) {
+
                 const now = Date.now();
-                if (now - lastRefreshTime.current > STATS_THROTTLE_MS) {
-                    lastRefreshTime.current = now;
-                    refetch();
-                }
+                lastRefreshTime.current = now;
+                refetch();
             }
+            // For NFT stats updates, let the custom event system handle it
+            // Don't trigger full marketplace refetch for stats changes
         };
 
         window.addEventListener('storage', handleStorageChange);
@@ -108,7 +113,7 @@ export function ActiveItemsList() {
 
     // Convert items to filterable format (already enriched with NFT context data)
     const filterableItems: FilterableNFTItem[] = useMemo(() => {
-        return safeItems.map((item: any) => ({
+        const mapped = safeItems.map((item: any) => ({
             contractAddress: item.nftAddress, // Map nftAddress to contractAddress for filter interface
             nftAddress: item.nftAddress, // Keep nftAddress for NFTCard
             tokenId: item.tokenId,
@@ -133,6 +138,8 @@ export function ActiveItemsList() {
             tags: item.tags,
             imageUrl: item.imageUrl,
         }));
+
+        return mapped;
     }, [safeItems]);
 
     // Apply filters and sorting
@@ -149,6 +156,11 @@ export function ActiveItemsList() {
 
     useEffect(() => {
         setIsClient(true);
+
+        // Mark page as visited to prevent animation on back navigation ⚡
+        if (typeof window !== 'undefined') {
+            sessionStorage.setItem('activeItemsList-visited', 'true');
+        }
     }, []);
 
     // Optimized image URLs for preloading - increase to 12 for better initial UX
@@ -283,6 +295,7 @@ export function ActiveItemsList() {
                 <NFTFilterBar
                     onFiltersChange={setFilters}
                     onSortChange={setSort}
+                    currentSort={sort}
                     totalItems={totalCount}
                     filteredCount={filteredCount}
                 />
@@ -361,11 +374,11 @@ export function ActiveItemsList() {
                 {/* Schatten-Overlay nur rechts */}
                 <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-gray-50 via-gray-50 to-transparent z-10 pointer-events-none" />
 
-                {/* Scroll Buttons */}
+                {/* Scroll Buttons - hidden on mobile */}
                 {canScrollLeft && (
                     <button
                         onClick={scrollLeft}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-20 h-24 bg-primary rounded-lg shadow-lg border-2 border-secondary border border-black flex flex-col items-center justify-center hover:shadow-xl transition-all duration-200 group p-3"
+                        className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 w-20 h-24 bg-primary rounded-lg shadow-lg border-2 border-secondary border border-black flex-col items-center justify-center hover:shadow-xl transition-all duration-200 group p-3"
                         aria-label="Scroll left"
                         style={{
                             border: '2px solid #1273EB',
@@ -391,7 +404,7 @@ export function ActiveItemsList() {
                 {canScrollRight && (
                     <button
                         onClick={scrollRight}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-20 h-24 bg-primary rounded-lg shadow-lg flex flex-col items-center justify-center hover:shadow-xl transition-all duration-200 group p-3"
+                        className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 w-20 h-24 bg-primary rounded-lg shadow-lg flex-col items-center justify-center hover:shadow-xl transition-all duration-200 group p-3"
                         aria-label="Scroll right"
                         style={{
                             border: '2px solid #1273EB',
@@ -430,20 +443,25 @@ export function ActiveItemsList() {
                     {visibleItems.map((item: any, index: number) => {
                         // DEBUG: Log first marketplace item data
                         if (index === 0) {
-                            console.log('🔍 ActiveItemsList first visibleItem:', item);
-                            console.log('🔍 ContractAddress being passed:', item.contractAddress || item.nftAddress);
+
+
                         }
+
+                        // Check if page was already visited (prevent animation on back navigation) ⚡
+                        const wasVisited = typeof window !== 'undefined' && sessionStorage.getItem('activeItemsList-visited') === 'true';
 
                         return (
                             <div
                                 key={item.listingId}
                                 className="flex-shrink-0 w-80"
                                 style={{
-                                    animationName: 'fadeInUp',
-                                    animationDuration: '0.5s',
+                                    // Only animate on FIRST visit, instant on back navigation! 🚀
+                                    animationName: wasVisited ? 'none' : 'fadeInUp',
+                                    animationDuration: wasVisited ? '0s' : '0.5s',
                                     animationTimingFunction: 'ease-out',
                                     animationFillMode: 'forwards',
-                                    animationDelay: `${index * 80}ms`
+                                    animationDelay: wasVisited ? '0ms' : `${index * 80}ms`,
+                                    opacity: wasVisited ? 1 : undefined // Instant opacity if visited
                                 }}
                             >
                                 <NFTCard

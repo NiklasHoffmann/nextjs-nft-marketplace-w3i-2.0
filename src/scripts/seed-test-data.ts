@@ -66,8 +66,6 @@ async function seedTestData() {
             { upsert: true }
         );
 
-        console.log('✅ Test public insights data seeded successfully');
-
         // Test User Interaction Data
         const userInteractionData = {
             contractAddress: "0x8f3D90b0c63ce3b7e6Db95e12F3b10Ab1e3b8c2a",
@@ -103,8 +101,6 @@ async function seedTestData() {
             { upsert: true }
         );
 
-        console.log('✅ Test user interaction data seeded successfully');
-
         return { success: true, message: 'Test data seeded successfully' };
 
     } catch (error) {
@@ -120,7 +116,7 @@ export { seedTestData };
 if (require.main === module) {
     seedTestData()
         .then(result => {
-            console.log('Seed result:', result);
+
             process.exit(result.success ? 0 : 1);
         })
         .catch(error => {

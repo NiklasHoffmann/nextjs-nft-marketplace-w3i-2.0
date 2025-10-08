@@ -65,18 +65,18 @@ const NFTSpecificDescriptionsManager: React.FC<NFTSpecificDescriptionsManagerPro
             <div className="space-y-4">
                 {/* Tab Navigation */}
                 <div className="border-b border-gray-200">
-                    <nav className="-mb-px flex space-x-8">
+                    <nav className="-mb-px flex flex-col sm:flex-row sm:space-x-8 space-y-2 sm:space-y-0">
                         <button
                             type="button"
                             onClick={() => onActiveTabChange('project')}
-                            className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${activeDescriptionTab === 'project'
+                            className={`w-full sm:w-auto whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm ${activeDescriptionTab === 'project'
                                 ? 'border-blue-500 text-blue-600'
                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
-                            <div className="flex items-center">
-                                Projekt-Beschreibungen
-                                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            <div className="flex items-center justify-between sm:justify-start">
+                                <span className="truncate">Projekt-Beschreibungen</span>
+                                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 flex-shrink-0">
                                     {projectDescriptions.titleDescriptionPairs.length}
                                 </span>
                             </div>
@@ -84,14 +84,14 @@ const NFTSpecificDescriptionsManager: React.FC<NFTSpecificDescriptionsManagerPro
                         <button
                             type="button"
                             onClick={() => onActiveTabChange('functionalities')}
-                            className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${activeDescriptionTab === 'functionalities'
+                            className={`w-full sm:w-auto whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm ${activeDescriptionTab === 'functionalities'
                                 ? 'border-green-500 text-green-600'
                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
-                            <div className="flex items-center">
-                                Funktionalitäts-Beschreibungen
-                                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <div className="flex items-center justify-between sm:justify-start">
+                                <span className="truncate">Funktionalitäts-Beschreibungen</span>
+                                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 flex-shrink-0">
                                     {functionalitiesDescriptions.titleDescriptionPairs.length}
                                 </span>
                             </div>
@@ -99,14 +99,14 @@ const NFTSpecificDescriptionsManager: React.FC<NFTSpecificDescriptionsManagerPro
                         <button
                             type="button"
                             onClick={() => onActiveTabChange('cards')}
-                            className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${activeDescriptionTab === 'cards'
+                            className={`w-full sm:w-auto whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm ${activeDescriptionTab === 'cards'
                                 ? 'border-purple-500 text-purple-600'
                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
-                            <div className="flex items-center">
-                                NFT Card Descriptions
-                                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            <div className="flex items-center justify-between sm:justify-start">
+                                <span className="truncate">NFT Card Descriptions</span>
+                                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 flex-shrink-0">
                                     {cardDescriptions.length}
                                 </span>
                             </div>

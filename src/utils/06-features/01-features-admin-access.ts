@@ -110,7 +110,7 @@ export function logAdminAccess(
 
     // Log to console in development
     if (process.env.NODE_ENV === 'development') {
-        console.log('🔐 Admin Access Log:', logEntry);
+
     }
 
     // In production, this could be sent to a monitoring service

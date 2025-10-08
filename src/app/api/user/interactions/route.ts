@@ -48,8 +48,6 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        console.log('🔍 GET /api/user/interactions called with:', { userId, contractAddress, tokenId });
-
         // Fetch from all user collections
         const [favoritesCollection, ratingsCollection, watchlistCollection, personalNotesCollection] = await Promise.all([
             getCollection('user_favorites'),
@@ -112,8 +110,6 @@ export async function GET(request: NextRequest) {
             lastUpdated: new Date().toISOString()
         };
 
-        console.log('✅ Combined user interactions:', combinedData);
-
         const response: CombinedUserInteractionsResponse = {
             success: true,
             data: combinedData
@@ -142,8 +138,6 @@ export async function POST(request: NextRequest) {
                 { status: 400 }
             );
         }
-
-        console.log('🔄 POST /api/user/interactions called with:', { userId, contractAddress, tokenId, updates });
 
         const lowerUserId = userId.toLowerCase();
         const lowerContractAddress = contractAddress.toLowerCase();
@@ -280,8 +274,6 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        console.log('✅ Batch update results:', results);
-
         // Fetch updated data to return to client
         const [favoriteDoc, ratingDoc, watchlistDoc, personalNotesDoc] = await Promise.all([
             favoritesCollection.findOne({
@@ -332,8 +324,6 @@ export async function POST(request: NextRequest) {
 
             lastUpdated: timestamp
         };
-
-        console.log('✅ Returning updated combined data:', combinedData);
 
         return NextResponse.json({
             success: true,

@@ -27,8 +27,6 @@ const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
 if (!projectId) {
     console.warn('⚠️ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ist nicht gesetzt. WalletConnect wird möglicherweise nicht funktionieren.')
     console.warn('📝 Erstelle eine Project ID auf https://cloud.walletconnect.com')
-} else {
-    console.log('✅ WalletConnect Project ID gefunden:', projectId.substring(0, 8) + '...')
 }
 
 // Custom Connector-Konfiguration mit verbesserter Fehlerbehandlung

@@ -51,7 +51,7 @@ const DemoNFTCard = memo(() => {
 
     const handleCardClick = useCallback(() => {
         // Don't navigate for demo card
-        console.log("Demo card clicked - navigation disabled");
+
     }, []);
 
     return (

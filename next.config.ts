@@ -109,6 +109,8 @@ const nextConfig: import('next').NextConfig = {
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days for better caching
     dangerouslyAllowSVG: false,
     contentDispositionType: 'attachment',
+    // CSP only for SVG images (if dangerouslyAllowSVG is enabled)
+    // This is NOT a global CSP - use headers() function for that
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     loader: 'default',
     loaderFile: '',
@@ -132,6 +134,19 @@ const nextConfig: import('next').NextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'origin-when-cross-origin',
+          },
+          {
+            key: 'Content-Security-Policy',
+            // Secure CSP that allows necessary scripts for Web3/React
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // unsafe-eval needed for WalletConnect/Apollo
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: https: blob:",
+              "font-src 'self' data:",
+              "connect-src 'self' https: wss:",
+              "frame-src 'self' https:",
+            ].join('; '),
           },
         ],
       },

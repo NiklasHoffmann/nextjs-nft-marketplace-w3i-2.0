@@ -36,8 +36,6 @@ export default function TechnicalTab({
     rarityScore
 }: TechnicalTabProps) {
 
-    console.log('totalSupply Info:', { totalSupply });
-    console.log("blockchain Info:", { blockchain });
     return (
         <div className="space-y-6">
             {/* Contract Information */}

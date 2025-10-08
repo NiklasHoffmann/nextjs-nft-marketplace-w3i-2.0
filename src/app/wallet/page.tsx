@@ -42,7 +42,7 @@ export default function WalletDashboard() {
 function WalletDashboardContent() {
     const router = useRouter();
     const { address, isConnected, chainId } = useAccount();
-    console.log('WalletDashboard - address:', address, 'isConnected:', isConnected, 'chainId:', chainId);
+
     const { data: balance, isLoading: balanceLoading, error: balanceError, refetch: refetchBalance } = useBalance({
         address: address,
         query: {
@@ -103,7 +103,6 @@ function WalletDashboardContent() {
         setIsWithdrawing(true);
         try {
             // In a real app, you'd call your withdrawal contract here
-            console.log('Withdrawing balance:', formatEtherViem(balance.value), 'ETH');
 
             // Mock withdrawal process
             await new Promise(resolve => setTimeout(resolve, 2000));

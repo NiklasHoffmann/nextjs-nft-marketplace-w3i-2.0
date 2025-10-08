@@ -178,11 +178,9 @@ export interface ProjectTabProps {
 }
 
 export interface FunctionalitiesTabProps {
-    attributes?: any[] | null;
-    blockchain: string;
-    tokenStandard: string;
-    supportsRoyalty: boolean;
-    royaltyInfo?: RoyaltyInfo | null;
+    adminInsights?: AdminNFTInsight;
+    collectionInsights?: AdminCollectionInsight;
+    loading?: boolean;
 }
 
 export interface TokenomicsTabProps {

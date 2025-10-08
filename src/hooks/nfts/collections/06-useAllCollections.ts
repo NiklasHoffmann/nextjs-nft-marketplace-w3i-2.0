@@ -79,7 +79,6 @@ export function useAllCollections({
             }
 
             const data = await response.json();
-            console.log('Insights API response:', data);
 
             if (data.success && Array.isArray(data.collections)) {
                 setInsightsData(data.collections);

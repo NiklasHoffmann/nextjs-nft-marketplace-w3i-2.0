@@ -185,18 +185,6 @@ export function NFTCard(props: NFTCardAllProps) {
   // Direct context access - simpler and more efficient
   const nftContext = useModernNFTContext();
   const contextData = nftContext.getNFT(contractAddress, tokenId);
-  console.log('🔍 NFTCard Input:', { contractAddress, tokenId, propsType: isNewProps(props) ? 'NEW' : 'LEGACY' });
-  console.log('contextData', contextData);
-
-  // DEBUG: Check what we actually have
-  const debugNFT = nftContext.getNFT(contractAddress, tokenId);
-  if (debugNFT && !debugNFT.meta?.image) {
-    console.log(`🔍 NFT ${contractAddress}/${tokenId}:`, {
-      meta: debugNFT.meta,
-      core: debugNFT.core,
-      contextData: contextData?.meta?.image
-    });
-  }
 
   // Load data if not available
   useEffect(() => {

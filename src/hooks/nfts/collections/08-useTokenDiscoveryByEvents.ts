@@ -28,7 +28,6 @@ export function useTokenDiscoveryByEvents() {
         setError(null);
 
         try {
-            console.log(`🔍 Discovering token IDs via Transfer events for: ${contractAddress}`);
 
             // Get all Transfer events from contract creation to now
             // Transfer(address from, address to, uint256 tokenId)
@@ -40,13 +39,10 @@ export function useTokenDiscoveryByEvents() {
             const startBlock = BigInt(0); // Start from genesis or contract deployment
             const chunkSize = BigInt(10000); // Process in 10k block chunks
 
-            console.log(`📊 Scanning blocks ${startBlock} to ${latestBlock} (${latestBlock - startBlock} blocks)`);
-
             for (let fromBlock = startBlock; fromBlock <= latestBlock; fromBlock += chunkSize) {
                 const toBlock = fromBlock + chunkSize - BigInt(1) > latestBlock ? latestBlock : fromBlock + chunkSize - BigInt(1);
 
                 try {
-                    console.log(`🔄 Processing blocks ${fromBlock} to ${toBlock}`);
 
                     const logs = await publicClient.getLogs({
                         address: contractAddress as `0x${string}`,
@@ -54,8 +50,6 @@ export function useTokenDiscoveryByEvents() {
                         fromBlock,
                         toBlock,
                     });
-
-                    console.log(`📄 Found ${logs.length} Transfer events in blocks ${fromBlock}-${toBlock}`);
 
                     // Extract token IDs from Transfer events
                     logs.forEach(log => {
@@ -76,7 +70,6 @@ export function useTokenDiscoveryByEvents() {
             }
 
             const tokenIds = Array.from(allTokenIds).sort((a, b) => parseInt(a) - parseInt(b));
-            console.log(`✅ Discovered ${tokenIds.length} unique token IDs: ${tokenIds.slice(0, 10).join(', ')}${tokenIds.length > 10 ? '...' : ''}`);
 
             return tokenIds;
 
@@ -115,7 +108,6 @@ export function useTokenDiscoveryByOwnership() {
         setError(null);
 
         try {
-            console.log(`🔍 Discovering token IDs via ownership checks for: ${contractAddress}`);
 
             const existingTokenIds: string[] = [];
             const batchSize = 50;
@@ -127,7 +119,6 @@ export function useTokenDiscoveryByOwnership() {
             ];
 
             for (const pattern of patterns) {
-                console.log(`🔢 Trying pattern: ${pattern.start} to ${pattern.end}`);
 
                 for (let i = pattern.start; i <= pattern.end; i += batchSize) {
                     const batch = Array.from(
@@ -163,8 +154,6 @@ export function useTokenDiscoveryByOwnership() {
 
                     existingTokenIds.push(...validTokens);
 
-                    console.log(`📊 Batch ${i}-${i + batchSize - 1}: Found ${validTokens.length} tokens`);
-
                     // Small delay between batches
                     if (i + batchSize <= pattern.end) {
                         await new Promise(resolve => setTimeout(resolve, 200));
@@ -173,7 +162,6 @@ export function useTokenDiscoveryByOwnership() {
             }
 
             const uniqueTokenIds = Array.from(new Set(existingTokenIds)).sort((a, b) => parseInt(a) - parseInt(b));
-            console.log(`✅ Discovered ${uniqueTokenIds.length} existing token IDs via ownership`);
 
             return uniqueTokenIds;
 

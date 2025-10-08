@@ -92,20 +92,6 @@ export default function NFTDetailHeader({
         ratingCount: stats?.ratingCount ?? 0
     };
 
-    // Debug console output to check what we're getting
-    console.log('🔍 DetailHeader Debug:', {
-        nftAddress: nftAddress?.substring(0, 10) + '...',
-        tokenId,
-        isConnected,
-        userAddress: userAddress?.substring(0, 10) + '...',
-        hasStats: !!stats,
-        stats,
-        hasUserInteractions: !!userInteractions,
-        userInteractions,
-        displayStats,
-        hasUserAddress
-    });
-
     const displayUserInteractions = {
         isFavorited: userInteractions?.isFavorited ?? legacyIsFavorited ?? false,
         isWatchlisted: userInteractions?.isWatchlisted ?? false,

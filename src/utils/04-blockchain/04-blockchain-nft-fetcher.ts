@@ -98,14 +98,12 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
         }
 
         const contractAddress = nftAddress as `0x${string}`;
-        console.log(`🔗 Fetching comprehensive NFT data for ${nftAddress}/${tokenId}...`);
 
         // ✨ STEP 1: Check Cache für Contract Properties (Name, Symbol, Total Supply)
         const contractCacheKey = getCacheKeys.contractProperties(nftAddress);
         let contractProperties = contractPropertiesCache.get(contractCacheKey);
 
         if (!contractProperties) {
-            console.log('📦 Contract properties not cached, fetching...');
 
             // Fetch only contract-level properties
             const contractCalls = [
@@ -145,9 +143,9 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
 
             // Cache für 24 Stunden
             contractPropertiesCache.set(contractCacheKey, contractProperties);
-            console.log('💾 Contract properties cached for 24h');
+
         } else {
-            console.log('⚡ Using cached contract properties');
+
             contractProperties.cached = true;
         }
 
@@ -156,7 +154,6 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
         let tokenMetadata = tokenMetadataCache.get(tokenCacheKey);
 
         if (!tokenMetadata) {
-            console.log('📄 Token metadata not cached, fetching tokenURI...');
 
             const tokenURIResult = await executeCriticalCall<string>({
                 address: contractAddress,
@@ -180,9 +177,9 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
 
             // Cache für 12 Stunden
             tokenMetadataCache.set(tokenCacheKey, tokenMetadata);
-            console.log('💾 Token metadata cached for 12h');
+
         } else {
-            console.log('⚡ Using cached token metadata');
+
             tokenMetadata.cached = true;
         }
 
@@ -191,7 +188,6 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
         let ownershipData = ownershipCache.get(ownershipCacheKey);
 
         if (!ownershipData) {
-            console.log('👤 Ownership data not cached, fetching...');
 
             const ownershipCalls = [
                 {
@@ -229,9 +225,9 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
 
             // Cache für 5 Minuten (Owner kann sich ändern)
             ownershipCache.set(ownershipCacheKey, ownershipData);
-            console.log('💾 Ownership data cached for 5min');
+
         } else {
-            console.log('⚡ Using cached ownership data');
+
             ownershipData.cached = true;
         }
 
@@ -240,7 +236,6 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
         let approvedAddress = approvalCache.get(approvalCacheKey);
 
         if (!approvedAddress) {
-            console.log('🔐 Approval status not cached, fetching...');
 
             const approvalResult = await executeOptionalCall<string>({
                 address: contractAddress,
@@ -253,12 +248,7 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
 
             // Cache für 2 Minuten (Approvals ändern sich häufig)
             approvalCache.set(approvalCacheKey, approvedAddress);
-            console.log('💾 Approval status cached for 2min');
-        } else {
-            console.log('⚡ Using cached approval status');
         }
-
-        console.log(`📊 Smart cache results: Contract(${contractProperties.cached ? 'HIT' : 'MISS'}) Token(${tokenMetadata.cached ? 'HIT' : 'MISS'}) Owner(${ownershipData.cached ? 'HIT' : 'MISS'}) Approval(${approvedAddress ? 'HIT' : 'MISS'})`);
 
         return {
             tokenURI: tokenMetadata.tokenURI,

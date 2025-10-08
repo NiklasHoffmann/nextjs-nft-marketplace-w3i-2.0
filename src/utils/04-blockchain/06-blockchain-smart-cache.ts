@@ -91,7 +91,6 @@ export function invalidateAllCaches() {
         ownershipCache.clear();
         tokenMetadataCache.clear();
         approvalCache.clear();
-        console.log('🧹 All caches cleared (development mode)');
     }
 }
 
@@ -102,11 +101,11 @@ export function invalidateNFTCaches(contractAddress: string, tokenId?: string) {
         ownershipCache.delete(getCacheKeys.ownership(contractAddress, tokenId));
         tokenMetadataCache.delete(getCacheKeys.tokenMetadata(contractAddress, tokenId));
         approvalCache.delete(getCacheKeys.approval(contractAddress, tokenId));
-        console.log(`🧹 Invalidated caches for ${contractAddress}:${tokenId}`);
+
     } else {
         // Invalidate entire contract (rare case)
         contractPropertiesCache.delete(getCacheKeys.contractProperties(contractAddress));
-        console.log(`🧹 Invalidated contract cache for ${contractAddress}`);
+
     }
 }
 

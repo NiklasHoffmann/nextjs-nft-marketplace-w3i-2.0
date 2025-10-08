@@ -27,7 +27,7 @@ export function useMarketplaceUser(marketplaceAddress: string) {
     args: address ? [address] : undefined,
     query: {
       enabled: !!address && !!marketplaceAddress,
-      refetchInterval: 10000, // Refetch every 10 seconds
+      refetchInterval: 60000, // Refetch every 60 seconds (only for user proceeds, not marketplace items)
     },
   });
 

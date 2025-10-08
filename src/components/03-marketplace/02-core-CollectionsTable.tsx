@@ -244,8 +244,8 @@ export function CollectionsTable() {
                 </div>
             )}
 
-            {/* Collections Table */}
-            <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+            {/* Collections Table - Desktop Only */}
+            <div className="hidden md:block bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead className="bg-gray-50 border-b border-gray-200">
@@ -446,53 +446,189 @@ export function CollectionsTable() {
                 </div>
             </div>
 
+            {/* Collections Cards - Mobile Only */}
+            <div className="md:hidden space-y-4">
+                {sortedCollections.map((collection, index) => (
+                    <div
+                        key={collection.contractAddress || `unknown-${index}`}
+                        className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
+                        onClick={() => handleCollectionClick(collection.contractAddress)}
+                        style={{
+                            animationName: 'fadeInUp',
+                            animationDuration: '0.5s',
+                            animationTimingFunction: 'ease-out',
+                            animationFillMode: 'forwards',
+                            animationDelay: `${index * 50}ms`
+                        }}
+                    >
+                        {/* Card Header with Preview Images */}
+                        <div className="p-4 bg-gray-50 border-b border-gray-200">
+                            <div className="flex items-start justify-between gap-3">
+                                {/* Collection Info */}
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="font-bold text-gray-900 text-lg truncate">
+                                        {collection.symbol}
+                                    </h3>
+                                    <p className="text-sm text-gray-600 truncate" title={collection.name}>
+                                        {collection.name}
+                                    </p>
+                                    <p className="text-xs text-gray-500 font-mono mt-1">
+                                        {(collection.contractAddress || '').slice(0, 6)}...{(collection.contractAddress || '').slice(-4)}
+                                    </p>
+                                </div>
+
+                                {/* Preview Images */}
+                                <div className="flex gap-1 flex-shrink-0">
+                                    {(collection.previewImages || []).slice(0, 2).map((imageUrl: string, imgIndex: number) => (
+                                        <div key={imgIndex} className="w-16 h-16 rounded-md overflow-hidden bg-gray-100 shadow-sm border border-gray-200">
+                                            <OptimizedNFTImage
+                                                imageUrl={imageUrl}
+                                                tokenId={`preview-mobile-${collection.contractAddress}-${imgIndex}`}
+                                                className="object-cover w-full h-full"
+                                                fill={false}
+                                                width={64}
+                                                height={64}
+                                                priority={index < 3}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Card Body with Stats */}
+                        <div className="p-4 space-y-3">
+                            {/* Supply and Listed */}
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <div className="text-xs text-gray-500 mb-1">Supply</div>
+                                    <div className="text-lg font-bold text-gray-900">
+                                        {collection.totalSupply.toLocaleString()}
+                                    </div>
+                                </div>
+
+                                <div className="text-right">
+                                    <div className="text-xs text-gray-500 mb-1">Listed</div>
+                                    <div className="text-lg font-bold">
+                                        <span className="text-green-600">{collection.totalListedNFTs}</span>
+                                        <span className="text-gray-400 text-sm mx-1">/</span>
+                                        <span className="text-blue-600 text-sm">{collection.totalSupply}</span>
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                        {collection.totalSupply > 0
+                                            ? `${((collection.totalListedNFTs / collection.totalSupply) * 100).toFixed(1)}%`
+                                            : '0%'
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Progress Bar */}
+                            {collection.totalSupply > 0 && (
+                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div
+                                        className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                                        style={{
+                                            width: `${Math.min((collection.totalListedNFTs / collection.totalSupply) * 100, 100)}%`
+                                        }}
+                                    ></div>
+                                </div>
+                            )}
+
+                            {/* Social Metrics */}
+                            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                <div className="flex items-center gap-4">
+                                    {/* Likes */}
+                                    <div className="flex items-center gap-1.5">
+                                        <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                                        </svg>
+                                        <span className="text-sm font-medium text-gray-900">{collection.totalLikes}</span>
+                                    </div>
+                                    {/* Watchlist */}
+                                    <div className="flex items-center gap-1.5">
+                                        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        <span className="text-sm font-medium text-gray-900">{collection.totalWatchlist}</span>
+                                    </div>
+                                </div>
+
+                                {/* Value */}
+                                <div className="text-right">
+                                    {collection.totalListedNFTs > 0 ? (
+                                        <div>
+                                            <div className="text-sm font-bold text-gray-900">
+                                                {collection.totalValue} ETH
+                                            </div>
+                                            {collection.floorPrice && (
+                                                <div className="text-xs text-blue-600">
+                                                    Floor: {collection.floorPrice} ETH
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="text-sm text-gray-500">
+                                            No listings
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
             {/* Summary Stats */}
             {isAdmin && (
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-6 gap-4">
-                    <h2 className="text-2xl font-bold mt-10 mb-4 text-gray-900 flex items-center gap-2">
+                <div className="mt-6">
+                    <h2 className="text-2xl font-bold mb-4 text-gray-900 flex items-center gap-2">
                         Summary Stats
                     </h2>
-                    <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-                        <div className="text-2xl font-bold text-blue-600">
-                            {collections.length}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+                        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+                            <div className="text-2xl font-bold text-blue-600">
+                                {collections.length}
+                            </div>
+                            <div className="text-sm text-gray-600">Collections</div>
                         </div>
-                        <div className="text-sm text-gray-600">Collections</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-                        <div className="text-2xl font-bold text-green-600">
-                            {collections.reduce((sum: number, col) => sum + col.totalSupply, 0)}
+                        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+                            <div className="text-2xl font-bold text-green-600">
+                                {collections.reduce((sum: number, col) => sum + col.totalSupply, 0)}
+                            </div>
+                            <div className="text-sm text-gray-600">Total NFTs</div>
                         </div>
-                        <div className="text-sm text-gray-600">Total NFTs</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-                        <div className="text-2xl font-bold text-purple-600">
-                            {totalListedNFTs}
+                        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+                            <div className="text-2xl font-bold text-purple-600">
+                                {totalListedNFTs}
+                            </div>
+                            <div className="text-sm text-gray-600">Listed</div>
                         </div>
-                        <div className="text-sm text-gray-600">Listed</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-                        <div className="text-2xl font-bold text-orange-600">
-                            {collections.reduce((sum: number, col) => sum + (col.totalSupply - col.totalListedNFTs), 0)}
+                        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+                            <div className="text-2xl font-bold text-orange-600">
+                                {collections.reduce((sum: number, col) => sum + (col.totalSupply - col.totalListedNFTs), 0)}
+                            </div>
+                            <div className="text-sm text-gray-600">Unlisted</div>
                         </div>
-                        <div className="text-sm text-gray-600">Unlisted</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-                        <div className="text-2xl font-bold text-red-600">
-                            {collections.reduce((sum: number, col) => sum + col.totalLikes, 0).toLocaleString()}
+                        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+                            <div className="text-2xl font-bold text-red-600">
+                                {collections.reduce((sum: number, col) => sum + col.totalLikes, 0).toLocaleString()}
+                            </div>
+                            <div className="text-sm text-gray-600">Total Likes</div>
                         </div>
-                        <div className="text-sm text-gray-600">Total Likes</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-                        <div className="text-2xl font-bold text-blue-600">
-                            {collections.reduce((sum: number, col) => sum + col.totalWatchlist, 0).toLocaleString()}
+                        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+                            <div className="text-2xl font-bold text-blue-600">
+                                {collections.reduce((sum: number, col) => sum + col.totalWatchlist, 0).toLocaleString()}
+                            </div>
+                            <div className="text-sm text-gray-600">Watchlisted</div>
                         </div>
-                        <div className="text-sm text-gray-600">Watchlisted</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-                        <div className="text-2xl font-bold text-orange-600">
-                            {collections.reduce((sum: number, col) => sum + parseFloat(col.totalValue), 0).toFixed(4)} ETH
+                        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+                            <div className="text-2xl font-bold text-orange-600">
+                                {collections.reduce((sum: number, col) => sum + parseFloat(col.totalValue), 0).toFixed(4)} ETH
+                            </div>
+                            <div className="text-sm text-gray-600">Total Value</div>
                         </div>
-                        <div className="text-sm text-gray-600">Total Value</div>
                     </div>
                 </div>
             )}

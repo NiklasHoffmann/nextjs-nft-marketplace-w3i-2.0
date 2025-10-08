@@ -113,7 +113,6 @@ export function SellTradePage() {
         try {
             setIsLoading(true);
             // Hier würde die echte Blockchain-Transaktion stattfinden
-            console.log('Processing transaction:', transactionData);
 
             if (transactionData.type === 'sell') {
                 // List NFT for sale
@@ -137,12 +136,12 @@ export function SellTradePage() {
 
     const listNFTForSale = async () => {
         // Marketplace contract interaction
-        console.log('Listing NFT for sale...');
+
     };
 
     const createTradeOffer = async () => {
         // Trade contract interaction
-        console.log('Creating trade offer...');
+
     };
 
     if (!isConnected) {

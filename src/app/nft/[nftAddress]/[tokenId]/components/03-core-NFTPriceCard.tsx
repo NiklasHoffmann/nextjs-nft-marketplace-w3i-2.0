@@ -13,7 +13,6 @@ function NFTPriceCard({
     const formattedPrice = useMemo(() => formatEther(price), [price]);
 
 
-    console.log('NFTPriceCard Rendered with price:', price, 'isListed:', isListed);
     // Memoize status styling
     const statusConfig = useMemo(() => ({
         className: isListed
@@ -25,23 +24,19 @@ function NFTPriceCard({
     // Memoize action handlers
     const handleBuyNow = useCallback(() => {
         // TODO: Implement buy functionality
-        console.log('Buy Now clicked');
-    }, []);
+        }, []);
 
     const handleUpdate = useCallback(() => {
         // TODO: Implement update functionality
-        console.log('Update clicked');
-    }, []);
+        }, []);
 
     const handleCancelListing = useCallback(() => {
         // TODO: Implement cancel listing functionality
-        console.log('Cancel Listing clicked');
-    }, []);
+        }, []);
 
     const handleEditInsights = useCallback(() => {
         // TODO: Implement edit insights functionality
-        console.log('Edit Insights clicked');
-    }, []);
+        }, []);
 
     return (
         <div className="bg-white rounded-2xl shadow-lg p-6">

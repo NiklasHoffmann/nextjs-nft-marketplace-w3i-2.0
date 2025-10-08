@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 // NFT Collection Page Client Component
 // Zeigt alle NFTs einer spezifischen Collection an
@@ -22,20 +22,13 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
     // Filter marketplace items by contract address
     const collectionNFTs = useMemo(() => {
         if (!marketplaceItems || !Array.isArray(marketplaceItems)) {
-            console.log('🔍 No marketplace items available')
+
             return []
         }
 
         const filtered = marketplaceItems.filter((item: any) =>
             item.nftAddress?.toLowerCase() === contractAddress.toLowerCase()
         )
-
-        console.log('🔍 Collection NFTs filter result:', {
-            totalItems: marketplaceItems.length,
-            filteredItems: filtered.length,
-            contractAddress,
-            sampleItem: marketplaceItems[0]
-        })
 
         return filtered
     }, [marketplaceItems, contractAddress])
@@ -70,15 +63,6 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
             setIsLoading(false)
         }
     }, [graphLoading])
-
-    console.log('🔍 CollectionPageClient state:', {
-        contractAddress,
-        isLoading,
-        graphLoading,
-        graphError: graphError?.message,
-        collectionNFTsCount: collectionNFTs.length,
-        collectionStats
-    })
 
     if (isLoading || graphLoading) {
         return (

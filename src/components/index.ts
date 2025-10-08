@@ -19,6 +19,3 @@ export * from './05-ui';
 
 // Admin Components - Dashboard, Management Tools
 export * from './06-admin';
-
-// Debug Components - Nur in Development verfügbar
-export * from './07-debug';

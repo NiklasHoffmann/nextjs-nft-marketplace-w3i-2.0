@@ -6,8 +6,6 @@ import { getCollection } from '@/lib/mongodb';
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
-        console.log('🔍 GET /api/insights/collection called with params:', searchParams.toString());
-
         // Extract query parameters
         const contractAddress = searchParams.get('contractAddress');
         const category = searchParams.get('category');
@@ -18,19 +16,7 @@ export async function GET(request: NextRequest) {
         const sortBy = searchParams.get('sortBy') || 'updatedAt';
         const sortOrder = searchParams.get('sortOrder') === 'asc' ? 1 : -1;
 
-        console.log('📋 Parsed parameters:', {
-            contractAddress,
-            category,
-            tags,
-            createdBy,
-            limit,
-            skip,
-            sortBy,
-            sortOrder
-        });
-
         const collection = await getCollection('admin_collection_insights');
-        console.log('📊 Got collection:', !!collection);
 
         // Build filter object
         const filter: any = {};
@@ -51,8 +37,6 @@ export async function GET(request: NextRequest) {
             filter.createdBy = createdBy.toLowerCase();
         }
 
-        console.log('🔍 Final filter:', filter);
-
         // Build sort object
         const sort: any = {};
         sort[sortBy] = sortOrder;
@@ -65,8 +49,6 @@ export async function GET(request: NextRequest) {
             .limit(limit)
             .toArray();
 
-        console.log(`📄 Query results count: ${results.length}`);
-        console.log('🔍 Sample result:', results.length > 0 ? results[0] : 'No results');
 
         // Check if there are more results
         const totalCount = await collection.countDocuments(filter);
@@ -86,7 +68,6 @@ export async function GET(request: NextRequest) {
             }
         };
 
-        console.log('✅ Returning response:', { success: true, dataCount: results.length, hasMore });
         return NextResponse.json(response);
 
     } catch (error) {
@@ -94,6 +75,6 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(
             { success: false, error: 'Failed to fetch collection insights' },
             { status: 500 }
-        );
+      );
     }
 }

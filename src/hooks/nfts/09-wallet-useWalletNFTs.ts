@@ -247,7 +247,6 @@ export function useWalletNFTs(
 
             setExternalNFTs(result.data || []);
             setDataSource(result.source || null);
-            console.log('✅ Fetched', result.data?.length || 0, 'NFTs from', result.source);
 
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Failed to fetch wallet NFTs';

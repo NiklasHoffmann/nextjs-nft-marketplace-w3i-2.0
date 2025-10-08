@@ -49,12 +49,11 @@ export function useUserInteractions(options: UseUserInteractionsOptions = {}): U
     // Fetch user interactions
     const fetchUserInteractions = useCallback(async () => {
         if (!contractAddress || !tokenId || !userWalletAddress) {
-            console.log('🚫 useUserInteractions: Missing required parameters');
+
             setUserInteractions(null);
             return;
         }
 
-        console.log('🚀 useUserInteractions: Fetching for', { contractAddress, tokenId, userWalletAddress });
         setLoading(true);
         setError(null);
 
@@ -65,7 +64,6 @@ export function useUserInteractions(options: UseUserInteractionsOptions = {}): U
                 userId: userWalletAddress
             });
 
-            console.log('📡 Fetching user interactions with params:', params.toString());
             const response = await fetch(`/api/user/interactions?${params}`, {
                 headers: {
                     'Cache-Control': 'no-cache',
@@ -73,16 +71,14 @@ export function useUserInteractions(options: UseUserInteractionsOptions = {}): U
                 }
             });
 
-            console.log('📥 User interactions response status:', response.status);
             const result = await response.json();
-            console.log('📋 User interactions data:', result);
 
             if (result.success && result.data) {
                 setUserInteractions(result.data);
-                console.log('✅ Set user interactions:', result.data);
+
             } else {
                 setUserInteractions(null);
-                console.log('ℹ️ No user interactions found');
+
             }
 
         } catch (err) {
@@ -90,7 +86,7 @@ export function useUserInteractions(options: UseUserInteractionsOptions = {}): U
             setError(err instanceof Error ? err.message : 'An error occurred');
             setUserInteractions(null);
         } finally {
-            console.log('🏁 fetchUserInteractions finished');
+
             setLoading(false);
         }
     }, [contractAddress, tokenId, userWalletAddress]);
@@ -100,8 +96,6 @@ export function useUserInteractions(options: UseUserInteractionsOptions = {}): U
         if (!contractAddress || !tokenId || !userWalletAddress) {
             throw new Error('Missing required parameters for user interaction update');
         }
-
-        console.log('📝 Updating user interaction:', data);
 
         const updateData = {
             ...data,
@@ -126,7 +120,6 @@ export function useUserInteractions(options: UseUserInteractionsOptions = {}): U
 
         // Update local state
         setUserInteractions(result.data);
-        console.log('✅ Updated user interaction:', result.data);
 
         // Trigger stats refresh (with small delay to allow backend to update)
         setTimeout(() => {
@@ -145,8 +138,6 @@ export function useUserInteractions(options: UseUserInteractionsOptions = {}): U
         if (!contractAddress || !tokenId || !userWalletAddress) {
             throw new Error('Missing required parameters for user interaction creation');
         }
-
-        console.log('📝 Creating user interaction:', data);
 
         const createData = {
             ...data,
@@ -171,7 +162,6 @@ export function useUserInteractions(options: UseUserInteractionsOptions = {}): U
 
         // Update local state
         setUserInteractions(result.data);
-        console.log('✅ Created user interaction:', result.data);
 
         // Trigger stats refresh (with small delay to allow backend to update)
         setTimeout(() => {
@@ -229,7 +219,7 @@ export function useUserInteractions(options: UseUserInteractionsOptions = {}): U
                     userId: userWalletAddress
                 })
             });
-            console.log('✅ Recorded view');
+
         } catch (err) {
             console.error('❌ Error recording view:', err);
         }
@@ -237,13 +227,6 @@ export function useUserInteractions(options: UseUserInteractionsOptions = {}): U
 
     // Auto-fetch data
     useEffect(() => {
-        console.log('🔍 useUserInteractions useEffect check:', {
-            autoFetch,
-            contractAddress,
-            tokenId,
-            userWalletAddress,
-            willFetch: autoFetch && contractAddress && tokenId && userWalletAddress
-        });
 
         if (autoFetch && contractAddress && tokenId && userWalletAddress) {
             fetchUserInteractions();

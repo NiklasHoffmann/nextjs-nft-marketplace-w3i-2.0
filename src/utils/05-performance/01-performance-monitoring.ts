@@ -141,7 +141,8 @@ export const logPerformanceSummary = () => {
     console.group('🏃‍♂️ Performance Summary');
 
     Object.entries(summary).forEach(([name, stats]) => {
-        console.log(`${name}:`, {
+        console.table({
+            name,
             count: stats.count,
             avg: `${Math.round(stats.avg)}ms`,
             min: `${Math.round(stats.min)}ms`,
@@ -151,7 +152,7 @@ export const logPerformanceSummary = () => {
 
     const memory = getMemoryUsage();
     if (memory) {
-        console.log('Memory Usage:', {
+        console.table({
             used: `${Math.round(memory.usedJSHeapSize / 1024 / 1024)}MB`,
             total: `${Math.round(memory.totalJSHeapSize / 1024 / 1024)}MB`,
             limit: `${Math.round(memory.jsHeapSizeLimit / 1024 / 1024)}MB`,

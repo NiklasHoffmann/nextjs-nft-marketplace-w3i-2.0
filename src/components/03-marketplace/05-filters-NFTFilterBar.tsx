@@ -33,6 +33,7 @@ export interface NFTSortOptions {
 interface NFTFilterBarProps {
     onFiltersChange: (filters: NFTFilters) => void;
     onSortChange: (sort: NFTSortOptions) => void;
+    currentSort: NFTSortOptions;
     totalItems: number;
     filteredCount: number;
 }
@@ -58,6 +59,7 @@ const SORT_OPTIONS = [
 export function NFTFilterBar({
     onFiltersChange,
     onSortChange,
+    currentSort,
     totalItems,
     filteredCount
 }: NFTFilterBarProps) {
@@ -66,10 +68,7 @@ export function NFTFilterBar({
         rarities: [],
     });
 
-    const [sort, setSort] = useState<NFTSortOptions>({
-        field: 'price',
-        direction: 'desc'
-    });
+
 
     const [showFilters, setShowFilters] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -79,20 +78,19 @@ export function NFTFilterBar({
         onFiltersChange(filters);
     }, [filters, onFiltersChange]);
 
-    // Update parent when sort changes
-    useEffect(() => {
-        onSortChange(sort);
-    }, [sort, onSortChange]);
+    // Sort is now managed by parent component
+    // No need for useEffect to sync sort changes
 
     const updateFilters = (updates: Partial<NFTFilters>) => {
         setFilters(prev => ({ ...prev, ...updates }));
     };
 
     const updateSort = (field: NFTSortOptions['field']) => {
-        setSort(prev => ({
+        const newSort = {
             field,
-            direction: prev.field === field && prev.direction === 'desc' ? 'asc' : 'desc'
-        }));
+            direction: currentSort.field === field && currentSort.direction === 'desc' ? 'asc' as const : 'desc' as const
+        };
+        onSortChange(newSort);
     };
 
     const clearAllFilters = () => {
@@ -100,7 +98,7 @@ export function NFTFilterBar({
             categories: [],
             rarities: [],
         });
-        setSort({ field: 'price', direction: 'desc' });
+        onSortChange({ field: 'price', direction: 'desc' });
     };
 
     const toggleCategory = (category: string) => {
@@ -158,11 +156,11 @@ export function NFTFilterBar({
 
                     {/* Center: Quick Sort Buttons */}
                     <div className="hidden sm:flex items-center gap-1">
-                        {SORT_OPTIONS.slice(0, 4).map((option) => (
+                        {SORT_OPTIONS.slice(0, 5).map((option) => (
                             <button
                                 key={option.field}
                                 onClick={() => updateSort(option.field)}
-                                className={`px-2 py-1.5 text-xs rounded-md transition-all duration-200 flex items-center gap-1 ${sort.field === option.field
+                                className={`px-2 py-1.5 text-xs rounded-md transition-all duration-200 flex items-center gap-1 ${currentSort.field === option.field
                                     ? 'bg-blue-600 text-white shadow-sm'
                                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                     }`}
@@ -170,9 +168,9 @@ export function NFTFilterBar({
                             >
                                 <span className="text-xs">{option.icon}</span>
                                 <span className="hidden lg:inline">{option.label}</span>
-                                {sort.field === option.field && (
+                                {currentSort.field === option.field && (
                                     <svg
-                                        className={`w-3 h-3 transition-transform duration-200 ${sort.direction === 'asc' ? 'rotate-180' : ''}`}
+                                        className={`w-3 h-3 transition-transform duration-200 ${currentSort.direction === 'asc' ? 'rotate-180' : ''}`}
                                         fill="none"
                                         stroke="currentColor"
                                         viewBox="0 0 24 24"
@@ -280,10 +278,10 @@ export function NFTFilterBar({
                             {/* All Sort Options for Mobile */}
                             <div className="sm:hidden">
                                 <select
-                                    value={`${sort.field}-${sort.direction}`}
+                                    value={`${currentSort.field}-${currentSort.direction}`}
                                     onChange={(e) => {
                                         const [field, direction] = e.target.value.split('-') as [NFTSortOptions['field'], 'asc' | 'desc'];
-                                        setSort({ field, direction });
+                                        onSortChange({ field, direction });
                                     }}
                                     className="text-xs border border-gray-300 rounded px-2 py-1"
                                 >

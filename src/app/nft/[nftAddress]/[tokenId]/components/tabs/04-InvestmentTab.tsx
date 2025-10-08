@@ -33,68 +33,12 @@ export default function InvestmentTab({
     return (
         <div className="space-y-6">
             {/* Price Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4">
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 text-center">
                     <div className="text-3xl font-bold text-blue-600 mb-2">{formatEther(price)}</div>
                     <div className="text-sm text-blue-800 font-medium">Current Listing Price</div>
                     <div className="text-xs text-blue-600 mt-1">
                         {isListed ? '💰 Listed for Sale' : '🔒 Not Listed'}
-                    </div>
-                </div>
-
-                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 text-center">
-                    <div className="text-3xl font-bold text-green-600 mb-2">1.8</div>
-                    <div className="text-sm text-green-800 font-medium">Collection Floor</div>
-                    <div className="text-xs text-green-600 mt-1">ETH</div>
-                </div>
-
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 text-center">
-                    <div className="text-3xl font-bold text-purple-600 mb-2">2.8</div>
-                    <div className="text-sm text-purple-800 font-medium">Collection High</div>
-                    <div className="text-xs text-purple-600 mt-1">ETH</div>
-                </div>
-            </div>
-
-            {/* General Market Analysis */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                    Market Performance Analysis
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                            <h4 className="text-md font-medium text-gray-900 mb-2">24h Price Movement</h4>
-                            <div className="text-2xl font-bold text-green-600 mb-1">+12.5%</div>
-                            <div className="text-sm text-gray-600">↗ Trending Up</div>
-                            <div className="text-xs text-green-600 mt-1">Volume: 45.2 ETH</div>
-                        </div>
-
-                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                            <h4 className="text-md font-medium text-gray-900 mb-2">7-Day Performance</h4>
-                            <div className="text-2xl font-bold text-blue-600 mb-1">+3.2%</div>
-                            <div className="text-sm text-gray-600">📈 Stable Growth</div>
-                            <div className="text-xs text-blue-600 mt-1">Avg. Volume: 124.8 ETH</div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-4">
-                        <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                            <h4 className="text-md font-medium text-gray-900 mb-2">30-Day Trend</h4>
-                            <div className="text-2xl font-bold text-purple-600 mb-1">+28.7%</div>
-                            <div className="text-sm text-gray-600">🚀 Strong Momentum</div>
-                            <div className="text-xs text-purple-600 mt-1">Peak: 2.8 ETH</div>
-                        </div>
-
-                        <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                            <h4 className="text-md font-medium text-gray-900 mb-2">Collection Floor</h4>
-                            <div className="text-2xl font-bold text-orange-600 mb-1">1.8 ETH</div>
-                            <div className="text-sm text-gray-600">📊 Floor Price</div>
-                            <div className="text-xs text-orange-600 mt-1">24h change: +5.2%</div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -165,36 +109,13 @@ export default function InvestmentTab({
                             </div>
                         )}
 
-                        <div className="bg-gray-50 rounded-lg p-4">
-                            <h4 className="font-medium text-gray-900 mb-2">Market Sentiment</h4>
-                            <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">Community Confidence:</span>
-                                    <div className="flex items-center">
-                                        <div className="w-20 bg-gray-200 rounded-full h-2 mr-2">
-                                            <div className="bg-green-600 h-2 rounded-full" style={{ width: '72%' }}></div>
-                                        </div>
-                                        <span className="text-sm font-medium text-green-600">72%</span>
-                                    </div>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">Trading Activity:</span>
-                                    <span className="text-sm font-medium text-blue-600">High</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">Market Outlook:</span>
-                                    <span className="text-sm font-medium text-green-600">Bullish</span>
-                                </div>
-                            </div>
-                        </div>
-
                         {!insights?.marketAnalysis && (
                             <div className="bg-gray-50 rounded-lg p-4 text-center">
                                 <svg className="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                                 </svg>
-                                <p className="text-sm text-gray-600 mb-2">General market analysis available</p>
-                                <p className="text-xs text-gray-500">Based on community and trading data</p>
+                                <p className="text-sm text-gray-600 mb-2">No market analysis available</p>
+                                <p className="text-xs text-gray-500">Market insights are created by the community</p>
                             </div>
                         )}
                     </div>
@@ -268,25 +189,17 @@ export default function InvestmentTab({
                                     <span className="font-medium">{insights.quality}/10</span>
                                 </div>
                             )}
-                            <div className="flex justify-between">
-                                <span>Community Rating:</span>
-                                <span className="flex">
-                                    {[1, 2, 3, 4, 5].map(star => (
-                                        <span key={star} className="text-xs text-yellow-400">★</span>
-                                    ))}
-                                    <span className="ml-1 text-xs">4.2/5</span>
-                                </span>
-                            </div>
                             {rarityScore && (
                                 <div className="flex justify-between">
                                     <span>Rarity Score:</span>
                                     <span className="font-medium">{rarityScore}</span>
                                 </div>
                             )}
-                            <div className="flex justify-between">
-                                <span>Market Confidence:</span>
-                                <span className="font-medium text-green-600">High</span>
-                            </div>
+                            {!insights?.quality && !rarityScore && (
+                                <div className="text-center py-2">
+                                    <p className="text-xs text-gray-500">No quality indicators available</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

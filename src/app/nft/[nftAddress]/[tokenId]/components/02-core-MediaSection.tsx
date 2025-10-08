@@ -48,13 +48,13 @@ function NFTMediaSection({
 
         if (mediaConfig.hasImage) {
             return (
-                <div className="bg-gray-100 rounded-2xl shadow-lg flex items-center justify-center">
+                <div className="bg-gray-100 rounded-2xl shadow-lg flex items-center justify-center w-full h-full">
                     <Image
                         src={imageUrl!}
                         alt={mediaConfig.displayName}
                         width={400}
                         height={400}
-                        className="max-w-full max-h-full w-auto h-auto object-contain rounded-2xl"
+                        className="w-full h-full object-contain rounded-2xl"
                         sizes="(max-width: 768px) 90vw, (max-width: 1200px) 40vw, 30vw"
                         priority={true}
                         quality={90}

@@ -64,28 +64,41 @@ class ImageCache {
 
 const imageLoadCache = new ImageCache();
 
-// Convert IPFS URLs to use faster gateways
+// Extract IPFS hash from various URL formats
+const extractIPFSHash = (url: string): string | null => {
+    if (!url) return null;
+
+    // ipfs:// protocol
+    if (url.startsWith('ipfs://')) {
+        return url.replace('ipfs://', '').split('/')[0];
+    }
+
+    // HTTP IPFS gateway URLs
+    if (url.includes('/ipfs/')) {
+        return url.split('/ipfs/')[1]?.split('/')[0] || null;
+    }
+
+    return null;
+};
+
+// Convert IPFS URLs to use our SERVER-SIDE IMAGE PROXY! ⚡
 const optimizeImageUrl = (url: string): string[] => {
     if (!url) return [];
 
-    // If it's already an HTTP URL, use it as is
+    // Extract IPFS hash
+    const ipfsHash = extractIPFSHash(url);
+
+    // If it's an IPFS URL, use our server proxy for INSTANT caching! 🚀
+    if (ipfsHash) {
+        return [`/api/nft/image/${ipfsHash}`];
+    }
+
+    // If it's already a non-IPFS HTTP URL, use it directly
     if (url.startsWith('http')) {
-        // If it's an IPFS gateway URL, also provide fallbacks
-        if (url.includes('/ipfs/')) {
-            const hash = url.split('/ipfs/')[1]?.split('/')[0];
-            if (hash) {
-                return [url, ...IPFS_GATEWAYS.map(gateway => `${gateway}${hash}`)];
-            }
-        }
         return [url];
     }
 
-    // Handle ipfs:// protocol
-    if (url.startsWith('ipfs://')) {
-        const hash = url.replace('ipfs://', '');
-        return IPFS_GATEWAYS.map(gateway => `${gateway}${hash}`);
-    }
-
+    // Fallback to original URL
     return [url];
 };
 
@@ -100,22 +113,29 @@ const OptimizedNFTImage = memo(({
     priority = false,
     tiltRotation = { rotateX: 0, rotateY: 0 },
 }: OptimizedNFTImageProps) => {
-    const [isLoading, setIsLoading] = useState(true);
+    // Get all possible URLs for this image
+    const imageUrls = optimizeImageUrl(imageUrl);
+
+    // Check if image is likely cached BEFORE setting initial loading state ⚡
+    const isCachedInitially = useMemo(() => {
+        if (typeof window === 'undefined' || imageUrls.length === 0) return false;
+        const cacheKey = imageUrls[0];
+        return imageLoadCache.get(cacheKey) === true;
+    }, [imageUrls]);
+
+    const [isLoading, setIsLoading] = useState(!isCachedInitially); // Start as loaded if cached!
     const [hasError, setHasError] = useState(false);
     const [currentImageUrl, setCurrentImageUrl] = useState(imageUrl);
     const [fallbackIndex, setFallbackIndex] = useState(0);
     const [aspectRatio, setAspectRatio] = useState<number | null>(null);
-    const [isIntersecting, setIsIntersecting] = useState(priority);
-    const [hasBeenVisible, setHasBeenVisible] = useState(false);
+    const [isIntersecting, setIsIntersecting] = useState(priority || isCachedInitially);
+    const [hasBeenVisible, setHasBeenVisible] = useState(isCachedInitially);
     const imgRef = useRef<HTMLDivElement>(null);
 
     // New state for smooth glitter fade-out
     const [displayGlitter, setDisplayGlitter] = useState(false);
     const [glitterOpacity, setGlitterOpacity] = useState(0);
     const fadeOutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-    // Get all possible URLs for this image
-    const imageUrls = optimizeImageUrl(imageUrl);
 
     // Check if image might be cached from previous view - RESTORED ORIGINAL LOGIC
     useEffect(() => {
@@ -173,22 +193,44 @@ const OptimizedNFTImage = memo(({
         return () => observer.disconnect();
     }, [priority, hasBeenVisible]);
 
-    // Preload image when in viewport range - RESTORED
+    // Preload image when in viewport range with BROWSER-LEVEL PRELOADING ⚡
     useEffect(() => {
-        if (isIntersecting && imageUrls.length > 0 && typeof window !== 'undefined') {
+        if ((isIntersecting || priority) && imageUrls.length > 0 && typeof window !== 'undefined') {
+            const imageUrl = imageUrls[0];
+
+            // Browser-level preload via <link rel="preload"> for instant cache hit
+            const existingPreload = document.querySelector(`link[href="${imageUrl}"]`);
+            if (!existingPreload) {
+                const link = document.createElement('link');
+                link.rel = 'preload';
+                link.as = 'image';
+                link.href = imageUrl;
+                document.head.appendChild(link);
+
+                // Removed: console.log - too much spam in production
+            }
+
+            // Also preload via Image() for cache warming
             const img = new window.Image();
-            img.src = imageUrls[0];
+            img.src = imageUrl;
         }
-    }, [isIntersecting, imageUrls]);
+    }, [isIntersecting, imageUrls, priority]);
 
     // Removed redundant preload effect - already handled in caching effect above
 
-    // Update current image URL when imageUrl prop changes
+    // Update current image URL when imageUrl prop changes - OPTIMIZED FOR CACHE
     useEffect(() => {
+        const newUrls = optimizeImageUrl(imageUrl);
+        const isCached = newUrls.length > 0 && imageLoadCache.get(newUrls[0]) === true;
+
         setCurrentImageUrl(imageUrl);
         setFallbackIndex(0);
         setHasError(false);
-        setIsLoading(true);
+
+        // Don't set loading state if image is already cached! ⚡
+        if (!isCached) {
+            setIsLoading(true);
+        }
     }, [imageUrl]);
 
     const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {

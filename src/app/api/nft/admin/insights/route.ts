@@ -37,16 +37,6 @@ interface AdminNFTInsight {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
-    console.log('🔍 POST /api/nft/admin/insights - Received data:', JSON.stringify(data, null, 2));
-    console.log('🎯 Token ID Debug - API side:', {
-      'Received tokenId': data.tokenId,
-      'Type': typeof data.tokenId,
-      'Length': data.tokenId?.length,
-      'Is empty string': data.tokenId === '',
-      'Is undefined': data.tokenId === undefined,
-      'Is null': data.tokenId === null,
-      'Will be collection-wide': (data.tokenId || '') === ''
-    });
 
     // TODO: Add admin authentication check here
 
@@ -96,9 +86,6 @@ export async function POST(request: NextRequest) {
 
     const result = await collection.insertOne(insight);
     const created = await collection.findOne({ _id: result.insertedId });
-
-    console.log('✅ Created insight in database:', JSON.stringify(created, null, 2));
-
     return NextResponse.json({
       success: true,
       data: created
@@ -117,8 +104,6 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const data = await request.json();
-    console.log('🔍 PUT /api/nft/admin/insights - Received data:', JSON.stringify(data, null, 2));
-
     // TODO: Add admin authentication check here
 
     // Validation - only contractAddress is required for updates
@@ -183,8 +168,6 @@ export async function PUT(request: NextRequest) {
       contractAddress: data.contractAddress.toLowerCase(),
       tokenId: data.tokenId
     });
-
-    console.log('✅ Updated insight in database:', JSON.stringify(updated, null, 2));
 
     return NextResponse.json({
       success: true,

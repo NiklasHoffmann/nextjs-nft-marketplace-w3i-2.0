@@ -5,7 +5,7 @@
  * Handles all external API calls with robust error handling and fallbacks.
  */
 
-import type { NftMeta, AdminNFTInsight, NFTStats } from '@/types';
+import type { NftMeta, AdminNFTInsight, NFTStats, ActiveItem } from '@/types';
 
 // ===== API RESPONSE TYPES =====
 
@@ -51,7 +51,7 @@ export const fetchNFTMetadata = async (contractAddress: string, tokenId: string)
         throw new Error(`Failed to fetch NFT metadata: ${response.status}`);
     }
     const data = await response.json();
-    console.log('Fetched NFT Metadata:', data);
+
     return data;
 };
 
@@ -84,26 +84,22 @@ export const fetchNFTInsights = async (contractAddress: string, tokenId: string)
         const nftResult: InsightsApiResponse = await nftResponse.json();
 
         if (nftResult.success && Array.isArray(nftResult.data) && nftResult.data.length > 0) {
-            console.log(`✅ Found NFT-specific insight for ${contractAddress}/${tokenId}`);
+
             return nftResult.data[0];
         }
 
         // 2. Try to fetch collection-wide insights using the separate function
-        console.log(`🔍 No NFT-specific insight found for ${contractAddress}/${tokenId}, trying collection-wide insights...`);
+
         const collectionInsight = await fetchCollectionInsights(contractAddress);
 
         if (collectionInsight) {
-            console.log(`📋 Found collection-wide insight for ${contractAddress}, applying to token ${tokenId}`);
             // Adapt collection insight to specific NFT by adding tokenId
             return { ...collectionInsight, tokenId };
         }
 
-        console.log(`❌ No insights found for ${contractAddress}/${tokenId} (neither NFT-specific nor collection-wide)`);
         return null;
 
     } catch (error) {
-        // Return null instead of throwing errors for missing data
-        console.warn(`❌ No insights found for NFT ${contractAddress}/${tokenId}:`, error);
         return null;
     }
 };
@@ -136,14 +132,12 @@ export const fetchCollectionInsights = async (contractAddress: string): Promise<
             );
 
             if (collectionInsight) {
-                console.log(`📋 Found true collection-wide insight for ${contractAddress} (no tokenId)`);
                 return collectionInsight;
-            } else {
-                console.log(`⚠️ No collection-wide insight found for ${contractAddress}. Found ${result.data.length} NFT-specific documents only.`);
-                // Log a sample to help debug
-                if (result.data.length > 0) {
-                    console.log(`📝 Sample document tokenIds:`, result.data.slice(0, 3).map(d => d.tokenId));
-                }
+            }
+
+            // Log a sample to help debug
+            if (result.data.length > 0) {
+                return result.data[0];
             }
         }
 
@@ -178,6 +172,40 @@ export const fetchNFTStats = async (contractAddress: string, tokenId: string): P
     return result.data || null;
 };
 
+// ===== MARKETPLACE/LISTING API =====
+
+/**
+ * Fetches marketplace listing data from server-side API
+ * The API route queries TheGraph to bypass CSP restrictions
+ * 
+ * @param contractAddress - The NFT contract address
+ * @param tokenId - The NFT token ID
+ * @returns Promise resolving to ActiveItem or null if not listed
+ */
+export const fetchMarketplaceListing = async (contractAddress: string, tokenId: string): Promise<ActiveItem | null> => {
+    try {
+        const response = await fetch(`/api/marketplace/listing/${contractAddress}/${tokenId}`);
+
+        if (!response.ok) {
+            console.warn(`Failed to fetch marketplace listing for ${contractAddress}/${tokenId}:`, response.status);
+            return null;
+        }
+
+        const data = await response.json();
+
+        if (!data.listing) {
+
+            return null;
+        }
+
+        return data.listing;
+
+    } catch (error) {
+        console.warn(`❌ Failed to fetch marketplace listing for ${contractAddress}/${tokenId}:`, error);
+        return null;
+    }
+};
+
 // ===== BATCH API OPERATIONS =====
 
 /**
@@ -187,10 +215,11 @@ export const fetchNFTStats = async (contractAddress: string, tokenId: string): P
  */
 export const fetchMultipleNFTs = async (nfts: Array<{ contractAddress: string; tokenId: string }>) => {
     const promises = nfts.map(async (nft) => {
-        const [metadataResult, insightsResult, statsResult] = await Promise.allSettled([
+        const [metadataResult, insightsResult, statsResult, listingResult] = await Promise.allSettled([
             fetchNFTMetadata(nft.contractAddress, nft.tokenId),
             fetchNFTInsights(nft.contractAddress, nft.tokenId),
             fetchNFTStats(nft.contractAddress, nft.tokenId),
+            fetchMarketplaceListing(nft.contractAddress, nft.tokenId),
         ]);
 
         return {
@@ -198,10 +227,12 @@ export const fetchMultipleNFTs = async (nfts: Array<{ contractAddress: string; t
             metadata: metadataResult.status === 'fulfilled' ? metadataResult.value : null,
             insights: insightsResult.status === 'fulfilled' ? insightsResult.value : null,
             stats: statsResult.status === 'fulfilled' ? statsResult.value : null,
+            listing: listingResult.status === 'fulfilled' ? listingResult.value : null,
             errors: {
                 metadata: metadataResult.status === 'rejected' ? metadataResult.reason : null,
                 insights: insightsResult.status === 'rejected' ? insightsResult.reason : null,
                 stats: statsResult.status === 'rejected' ? statsResult.reason : null,
+                listing: listingResult.status === 'rejected' ? listingResult.reason : null,
             }
         };
     });
