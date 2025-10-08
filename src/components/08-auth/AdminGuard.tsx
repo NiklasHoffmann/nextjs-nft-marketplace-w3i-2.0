@@ -4,6 +4,7 @@ import { useAccount } from 'wagmi';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAdminAddress, APP_LOCK_ENABLED } from '@/config/admin';
+import { Web3ConnectButton } from '@/components/01-layout/04-features-Web3ConnectButton';
 
 interface AdminGuardProps {
     children: React.ReactNode;
@@ -92,11 +93,14 @@ export function AdminGuard({
                                 ? 'Please connect your wallet to continue.'
                                 : 'This area is restricted to authorized admin wallets only.'}
                         </p>
+
+                        {/* Wallet Connect Button */}
                         {!isConnected && (
-                            <p className="mt-4 text-sm text-gray-500">
-                                Connect your wallet using the button in the navigation bar.
-                            </p>
+                            <div className="mt-6">
+                                <Web3ConnectButton />
+                            </div>
                         )}
+
                         {isConnected && (
                             <div className="mt-4 p-3 bg-gray-100 rounded-md">
                                 <p className="text-xs text-gray-500 font-mono break-all">
