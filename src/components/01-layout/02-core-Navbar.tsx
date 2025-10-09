@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useAccount, useBalance } from 'wagmi';
 import { Web3ConnectButton } from "./04-features-Web3ConnectButton";
 import CurrencySelector from "../03-marketplace/02-features-CurrencySelector";
@@ -12,13 +13,47 @@ export default function Navbar() {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
     const dropdownRef = useRef<HTMLDivElement>(null);
     const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
 
     // Wait for hydration before using wagmi hooks
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Sync search term with URL
+    useEffect(() => {
+        const search = searchParams?.get('search') || '';
+        setSearchTerm(search);
+    }, [searchParams]);
+
+    // Handle search
+    const handleSearch = (value: string) => {
+        setSearchTerm(value);
+
+        // Only navigate to home if not already there
+        if (pathname !== '/') {
+            router.push(`/?search=${encodeURIComponent(value)}`);
+        } else {
+            // Update URL without navigation
+            const params = new URLSearchParams(searchParams?.toString() || '');
+            if (value) {
+                params.set('search', value);
+            } else {
+                params.delete('search');
+            }
+            router.replace(`/?${params.toString()}`, { scroll: false });
+        }
+    };
+
+    const clearSearch = () => {
+        handleSearch('');
+    };
 
     // Wallet connection state - only after mounted
     const { address, isConnected } = useAccount();
@@ -104,13 +139,31 @@ export default function Navbar() {
 
                 {/* Spacer for mobile to push button to the right */}
                 <div className="flex-1 md:hidden"></div>
-                {/* Center Searchbar - hidden on mobile */}
+                {/* Center Searchbar - Desktop only */}
                 <div className="flex-1 hidden md:flex justify-center">
-                    <input
-                        type="text"
-                        placeholder="Suche NFTs..."
-                        className="w-full max-w-md px-4 py-2 border rounded focus:outline-none focus:ring"
-                    />
+                    <div className="relative w-full max-w-md">
+                        <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input
+                            type="text"
+                            placeholder="Suche NFTs..."
+                            value={searchTerm}
+                            onChange={(e) => handleSearch(e.target.value)}
+                            className="w-full px-4 pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                        {searchTerm && (
+                            <button
+                                onClick={clearSearch}
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                aria-label="Clear search"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        )}
+                    </div>
                 </div>
                 {/* Right Section - hidden on mobile */}
                 <div className="hidden md:flex items-center gap-4 ml-6">
@@ -288,11 +341,29 @@ export default function Navbar() {
                     <div className="flex-1 overflow-y-auto">
                         {/* Search Bar */}
                         <div className="p-6 border-b border-gray-200">
-                            <input
-                                type="text"
-                                placeholder="Suche NFTs..."
-                                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
+                            <div className="relative">
+                                <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                <input
+                                    type="text"
+                                    placeholder="Suche NFTs..."
+                                    value={searchTerm}
+                                    onChange={(e) => handleSearch(e.target.value)}
+                                    className="w-full px-4 pl-11 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                                {searchTerm && (
+                                    <button
+                                        onClick={clearSearch}
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                        aria-label="Clear search"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         {/* Navigation Links */}

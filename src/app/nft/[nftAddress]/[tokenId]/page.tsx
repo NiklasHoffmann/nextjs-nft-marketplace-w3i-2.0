@@ -307,6 +307,11 @@ function NFTDetailPage() {
 
             <MemoizedCategoryPills {...categoryPillsProps} />
 
+            {/* Mobile Only - NFT Image directly under CategoryPills */}
+            <div className="lg:hidden max-w-7xl mx-auto px-4 sm:px-6 py-4">
+                <MemoizedNFTMediaSection {...mediaSectionProps} />
+            </div>
+
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-4">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Left Side - NFT Information & Details (2/3 width) */}
@@ -315,18 +320,30 @@ function NFTDetailPage() {
                             <MemoizedNewNFTInfoTabs {...infoTabsProps} />
                         )}
 
-
+                        {/* Mobile Only - Price Card & Swap Info before Collection Items */}
+                        <div className="lg:hidden space-y-6">
+                            <MemoizedNFTPriceCard {...priceCardProps} />
+                            <MemoizedSwapTargetInfo {...swapTargetProps} />
+                        </div>
 
                         <MemoizedCollectionItemsList {...collectionItemsProps} />
                     </div>
 
-                    {/* Right Side - Media & Price (1/3 width) */}
+                    {/* Right Side - Media & Price (1/3 width) - Desktop Only */}
                     <div className="lg:col-span-1 space-y-6">
-                        <MemoizedNFTMediaSection {...mediaSectionProps} />
+                        {/* Desktop Only - NFT Image */}
+                        <div className="hidden lg:block">
+                            <MemoizedNFTMediaSection {...mediaSectionProps} />
+                        </div>
 
-                        <MemoizedNFTPriceCard {...priceCardProps} />
+                        {/* Desktop Only - Price Card & Swap Info */}
+                        <div className="hidden lg:block">
+                            <MemoizedNFTPriceCard {...priceCardProps} />
+                        </div>
 
-                        <MemoizedSwapTargetInfo {...swapTargetProps} />
+                        <div className="hidden lg:block">
+                            <MemoizedSwapTargetInfo {...swapTargetProps} />
+                        </div>
 
                         {/* Manual Refresh Controls - Show in development or for admin users */}
                         {process.env.NODE_ENV === 'development' && (

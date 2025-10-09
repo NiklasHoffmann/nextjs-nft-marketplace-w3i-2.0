@@ -11,6 +11,7 @@ export interface FilterableNFTItem {
     imageUrl?: string | null;
     name?: string | null;
     customTitle?: string | null;
+    symbol?: string | null;
     category?: string | null;
     cardDescriptions?: string[] | null;
     rarity?: string | null;
@@ -47,10 +48,28 @@ export function useNFTFilters(
                 const searchableText = [
                     item.name,
                     item.customTitle,
+                    item.symbol,
+                    item.category,
                     item.contractAddress,
                     item.tokenId,
                     ...(item.cardDescriptions || [])
                 ].join(' ').toLowerCase();
+
+                // DEBUG: Log search details for first item
+                if (filters.searchTerm && result.indexOf(item) === 0) {
+                    console.log('🔍 SEARCH DEBUG:', {
+                        searchTerm: filters.searchTerm,
+                        name: item.name,
+                        customTitle: item.customTitle,
+                        symbol: item.symbol,
+                        category: item.category,
+                        contractAddress: item.contractAddress?.slice(0, 10),
+                        tokenId: item.tokenId,
+                        cardDescriptions: item.cardDescriptions,
+                        searchableText: searchableText.slice(0, 100) + '...',
+                        matches: searchableText.includes(searchLower)
+                    });
+                }
 
                 if (!searchableText.includes(searchLower)) {
                     return false;

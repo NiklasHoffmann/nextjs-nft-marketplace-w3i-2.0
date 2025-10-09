@@ -13,7 +13,7 @@ export default function Home() {
         </div>
 
         {/* CollectionsTable - Mit normalem Container */}
-        <div className="w-full max-w-[98vw] px-4 mx-auto mt-8">
+        <div className="w-full max-w-[98vw] px-4 mx-auto mt-2">
           <CollectionsTable />
         </div>
       </main>

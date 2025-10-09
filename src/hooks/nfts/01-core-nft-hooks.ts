@@ -232,15 +232,35 @@ function extractRarity(attributes: any[] | undefined): string | null {
 function enrichMarketplaceItem(marketplaceItem: any, nftData: any, realStats?: any): EnrichedMarketplaceItem {
     const hasMetadata = !!(nftData?.core?.metadata);
 
+    // DEBUG: Log nftData structure for first item
+    if (marketplaceItem.tokenId === "359") {
+        console.log('🔍 NFT DATA STRUCTURE for token 359:', {
+            hasNftData: !!nftData,
+            contractInfo: nftData?.contractInfo,
+            meta: nftData?.meta,
+            social: nftData?.social,
+            core_full: nftData?.core,
+            core_name: nftData?.core?.name,
+            core_metadata_name: nftData?.core?.metadata?.name,
+            meta_name: nftData?.meta?.name,
+            core_contractSymbol: nftData?.core?.contractSymbol,
+            insight: nftData?.insight,
+            allKeys: nftData ? Object.keys(nftData) : []
+        });
+    }
+
     return {
         // Marketplace data
         ...marketplaceItem,
 
-        // NFT metadata
-        name: nftData?.core?.metadata?.name || `NFT #${marketplaceItem.tokenId}`,
+        // NFT metadata - use same path as NFTCard
+        name: nftData?.meta?.name || nftData?.core?.name || nftData?.core?.metadata?.name || `NFT #${marketplaceItem.tokenId}`,
         description: nftData?.core?.metadata?.description || null,
         imageUrl: nftData?.core?.imageUrl || null,
         attributes: nftData?.core?.metadata?.attributes || [],
+
+        // Contract info - correct path!
+        symbol: nftData?.core?.contractSymbol || nftData?.insight?.symbol || nftData?.meta?.symbol || null,
 
         // Filter properties - use real stats from NFTStatsContext first, then fallback
         category: extractCategory(nftData?.core?.metadata?.attributes) ||

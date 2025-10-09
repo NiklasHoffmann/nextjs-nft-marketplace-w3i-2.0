@@ -206,7 +206,7 @@ export function CollectionsTable() {
     return (
         <div className="py-8">
             {/* Header */}
-            {isAdmin && (
+            {!isAdmin && (
                 <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         <div>
@@ -446,142 +446,143 @@ export function CollectionsTable() {
                 </div>
             </div>
 
-            {/* Collections Cards - Mobile Only */}
-            <div className="md:hidden space-y-4">
-                {sortedCollections.map((collection, index) => (
-                    <div
-                        key={collection.contractAddress || `unknown-${index}`}
-                        className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
-                        onClick={() => handleCollectionClick(collection.contractAddress)}
-                        style={{
-                            animationName: 'fadeInUp',
-                            animationDuration: '0.5s',
-                            animationTimingFunction: 'ease-out',
-                            animationFillMode: 'forwards',
-                            animationDelay: `${index * 50}ms`
-                        }}
-                    >
-                        {/* Card Header with Preview Images */}
-                        <div className="p-4 bg-gray-50 border-b border-gray-200">
-                            <div className="flex items-start justify-between gap-3">
-                                {/* Collection Info */}
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="font-bold text-gray-900 text-lg truncate">
+            {/* Collections Cards - Mobile Only (Horizontal Scroll) */}
+            <div className="md:hidden relative">
+                <div
+                    className="flex gap-4 pb-8"
+                    style={{
+                        overflowX: 'auto',
+                        overflowY: 'visible',
+                        scrollSnapType: 'x mandatory',
+                        WebkitOverflowScrolling: 'touch',
+                        scrollbarWidth: 'none',
+                        msOverflowStyle: 'none',
+                    }}
+                >
+                    {sortedCollections.map((collection, index) => (
+                        <div
+                            key={collection.contractAddress || `unknown-${index}`}
+                            className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-2xl transition-all duration-300 flex-shrink-0 w-60"
+                            onClick={() => handleCollectionClick(collection.contractAddress)}
+                            style={{
+                                scrollSnapAlign: 'start',
+                                animationName: 'fadeInUp',
+                                animationDuration: '0.5s',
+                                animationTimingFunction: 'ease-out',
+                                animationFillMode: 'forwards',
+                                animationDelay: `${index * 50}ms`
+                            }}
+                        >
+                            {/* Card Header - Symbol & Name */}
+                            <div className="p-3 bg-gradient-to-br from-blue-50 to-purple-50 border-b border-gray-200">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="font-bold text-gray-900 text-base truncate flex-1">
                                         {collection.symbol}
                                     </h3>
-                                    <p className="text-sm text-gray-600 truncate" title={collection.name}>
-                                        {collection.name}
-                                    </p>
-                                    <p className="text-xs text-gray-500 font-mono mt-1">
-                                        {(collection.contractAddress || '').slice(0, 6)}...{(collection.contractAddress || '').slice(-4)}
-                                    </p>
-                                </div>
-
-                                {/* Preview Images */}
-                                <div className="flex gap-1 flex-shrink-0">
-                                    {(collection.previewImages || []).slice(0, 2).map((imageUrl: string, imgIndex: number) => (
-                                        <div key={imgIndex} className="w-16 h-16 rounded-md overflow-hidden bg-gray-100 shadow-sm border border-gray-200">
-                                            <OptimizedNFTImage
-                                                imageUrl={imageUrl}
-                                                tokenId={`preview-mobile-${collection.contractAddress}-${imgIndex}`}
-                                                className="object-cover w-full h-full"
-                                                fill={false}
-                                                width={64}
-                                                height={64}
-                                                priority={index < 3}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Card Body with Stats */}
-                        <div className="p-4 space-y-3">
-                            {/* Supply and Listed */}
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <div className="text-xs text-gray-500 mb-1">Supply</div>
-                                    <div className="text-lg font-bold text-gray-900">
-                                        {collection.totalSupply.toLocaleString()}
+                                    <div className="flex items-center gap-1">
+                                        {[1, 2, 3, 4, 5].map((star) => (
+                                            <svg key={star} className="w-3 h-3 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                            </svg>
+                                        ))}
                                     </div>
                                 </div>
-
-                                <div className="text-right">
-                                    <div className="text-xs text-gray-500 mb-1">Listed</div>
-                                    <div className="text-lg font-bold">
-                                        <span className="text-green-600">{collection.totalListedNFTs}</span>
-                                        <span className="text-gray-400 text-sm mx-1">/</span>
-                                        <span className="text-blue-600 text-sm">{collection.totalSupply}</span>
-                                    </div>
-                                    <div className="text-xs text-gray-500 mt-1">
-                                        {collection.totalSupply > 0
-                                            ? `${((collection.totalListedNFTs / collection.totalSupply) * 100).toFixed(1)}%`
-                                            : '0%'
-                                        }
-                                    </div>
-                                </div>
+                                <p className="text-xs text-gray-600 truncate" title={collection.name}>
+                                    {collection.name}
+                                </p>
                             </div>
 
-                            {/* Progress Bar */}
-                            {collection.totalSupply > 0 && (
-                                <div className="w-full bg-gray-200 rounded-full h-2">
-                                    <div
-                                        className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                                        style={{
-                                            width: `${Math.min((collection.totalListedNFTs / collection.totalSupply) * 100, 100)}%`
-                                        }}
-                                    ></div>
-                                </div>
-                            )}
-
-                            {/* Social Metrics */}
-                            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                                <div className="flex items-center gap-4">
-                                    {/* Likes */}
-                                    <div className="flex items-center gap-1.5">
-                                        <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-                                        </svg>
-                                        <span className="text-sm font-medium text-gray-900">{collection.totalLikes}</span>
-                                    </div>
-                                    {/* Watchlist */}
-                                    <div className="flex items-center gap-1.5">
-                                        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                        </svg>
-                                        <span className="text-sm font-medium text-gray-900">{collection.totalWatchlist}</span>
-                                    </div>
-                                </div>
-
-                                {/* Value */}
-                                <div className="text-right">
-                                    {collection.totalListedNFTs > 0 ? (
-                                        <div>
-                                            <div className="text-sm font-bold text-gray-900">
-                                                {collection.totalValue} ETH
+                            {/* Card Image - Preview NFTs */}
+                            <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200">
+                                {collection.previewImages && collection.previewImages.length > 0 ? (
+                                    <div className="grid grid-cols-2 gap-1 h-full p-2">
+                                        {collection.previewImages.slice(0, 4).map((imageUrl: string, imgIndex: number) => (
+                                            <div key={imgIndex} className="rounded-lg overflow-hidden bg-white shadow-sm">
+                                                <OptimizedNFTImage
+                                                    imageUrl={imageUrl}
+                                                    tokenId={`preview-mobile-${collection.contractAddress}-${imgIndex}`}
+                                                    className="object-cover w-full h-full"
+                                                    fill={false}
+                                                    width={112}
+                                                    height={112}
+                                                    priority={index < 3}
+                                                />
                                             </div>
-                                            {collection.floorPrice && (
-                                                <div className="text-xs text-blue-600">
-                                                    Floor: {collection.floorPrice} ETH
-                                                </div>
-                                            )}
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center justify-center h-full">
+                                        <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Card Footer - Stats */}
+                            <div className="p-3 bg-white space-y-2">
+                                {/* Supply & Listed */}
+                                <div className="flex items-center justify-between text-xs">
+                                    <div>
+                                        <span className="text-gray-500">Supply: </span>
+                                        <span className="font-bold text-gray-900">{collection.totalSupply.toLocaleString()}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500">Listed: </span>
+                                        <span className="font-bold text-green-600">{collection.totalListedNFTs}</span>
+                                    </div>
+                                </div>
+
+                                {/* Progress Bar */}
+                                {collection.totalSupply > 0 && (
+                                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                        <div
+                                            className="bg-gradient-to-r from-green-500 to-blue-500 h-1.5 rounded-full transition-all duration-300"
+                                            style={{
+                                                width: `${Math.min((collection.totalListedNFTs / collection.totalSupply) * 100, 100)}%`
+                                            }}
+                                        ></div>
+                                    </div>
+                                )}
+
+                                {/* Floor Price */}
+                                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                    {collection.floorPrice ? (
+                                        <div className="flex-1">
+                                            <div className="text-xs text-gray-500">Floor Price</div>
+                                            <div className="text-sm font-bold text-blue-600">
+                                                {collection.floorPrice} ETH
+                                            </div>
                                         </div>
                                     ) : (
-                                        <div className="text-sm text-gray-500">
-                                            No listings
-                                        </div>
+                                        <div className="text-xs text-gray-500">No floor price</div>
                                     )}
+
+                                    {/* Social Metrics */}
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-1">
+                                            <svg className="w-3.5 h-3.5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                                            </svg>
+                                            <span className="text-xs font-medium text-gray-900">{collection.totalLikes}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            <span className="text-xs font-medium text-gray-900">{collection.totalWatchlist}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
 
             {/* Summary Stats */}
-            {isAdmin && (
+            {!isAdmin && (
                 <div className="mt-6">
                     <h2 className="text-2xl font-bold mb-4 text-gray-900 flex items-center gap-2">
                         Summary Stats

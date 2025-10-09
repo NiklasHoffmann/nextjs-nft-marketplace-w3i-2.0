@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Image from 'next/image';
+import { useSearchParams } from 'next/navigation';
 import { useAccount } from "wagmi";
 import { getAdminAddressesList } from '@/utils';
 import { useActiveItems, useNFTPerformance } from '@/hooks';
@@ -18,6 +19,10 @@ export function ActiveItemsList() {
     const [isManualRefreshing, setIsManualRefreshing] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
 
+    // Get search term from URL
+    const searchParams = useSearchParams();
+    const urlSearchTerm = searchParams.get('search') || '';
+
     // Scroll state and refs
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -27,11 +32,20 @@ export function ActiveItemsList() {
     const [filters, setFilters] = useState<NFTFilters>({
         categories: [],
         rarities: [],
+        searchTerm: urlSearchTerm,
     });
     const [sort, setSort] = useState<NFTSortOptions>({
         field: 'price',
         direction: 'desc'
     });
+
+    // Update searchTerm when URL changes
+    useEffect(() => {
+        setFilters(prev => ({
+            ...prev,
+            searchTerm: urlSearchTerm
+        }));
+    }, [urlSearchTerm]);
 
     // Wait for client-side mounting before using wagmi hooks
     const { address } = useAccount();
@@ -126,6 +140,7 @@ export function ActiveItemsList() {
             desiredTokenId: item.desiredTokenId,
             // NFT Context data (now available from useActiveItems)
             name: item.name,
+            symbol: item.symbol,
             category: item.category,
             rarity: item.rarity,
             averageRating: item.averageRating,
@@ -287,93 +302,93 @@ export function ActiveItemsList() {
     const visibleItems = filteredItems.slice(0, visibleCount);
 
     return (
-        <div className="py-8 w-full">
+        <div className="pt-8 pb-2 w-full">
             <ImagePreloader imageUrls={imageUrls} priority={true} />
 
-            {/* NFT Filter Bar - Mit normalem Container */}
-            <div className="max-w-7xl mx-auto px-6">
-                <NFTFilterBar
-                    onFiltersChange={setFilters}
-                    onSortChange={setSort}
-                    currentSort={sort}
-                    totalItems={totalCount}
-                    filteredCount={filteredCount}
-                />
-            </div>
+            {/* NFT Filter Bar - Fixed position with spacer */}
+            <NFTFilterBar
+                onFiltersChange={setFilters}
+                onSortChange={setSort}
+                currentSort={sort}
+                totalItems={totalCount}
+                filteredCount={filteredCount}
+            />
+
+            {/* Spacer for fixed FilterBar - approximate height */}
+            <div className="h-20"></div>
 
             {/* Enhanced Header with Performance Stats*/}
-            {isAdmin && (
-                <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                                Active Items ({filteredCount} / {totalCount})
-                                <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                                    FILTERED
+            <div className="max-w-7xl mx-auto px-6">
+                {!isAdmin && (
+                    <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                                    Active Items ({filteredCount} / {totalCount})
+                                    <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                                        FILTERED
+                                    </span>
+                                </h2>
+                                <p className="text-sm text-gray-600 mt-1">
+                                    Live marketplace data with intelligent filtering & caching
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm text-gray-500">
+                                    Last updated: {lastUpdate.toLocaleTimeString()}
                                 </span>
-                            </h2>
-                            <p className="text-sm text-gray-600 mt-1">
-                                Live marketplace data with intelligent filtering & caching
-                            </p>
+                                <button
+                                    onClick={handleManualRefresh}
+                                    disabled={graphLoading || isManualRefreshing}
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg transition-all duration-300 shadow-sm hover:shadow-md text-sm font-medium"
+                                    title="Refresh marketplace data"
+                                >
+                                    {graphLoading || isManualRefreshing ? (
+                                        <span className="flex items-center gap-2">
+                                            <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                                            Refreshing...
+                                        </span>
+                                    ) : (
+                                        <span className="flex items-center gap-2">
+                                            ↻ Refresh
+                                        </span>
+                                    )}
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <span className="text-sm text-gray-500">
-                                Last updated: {lastUpdate.toLocaleTimeString()}
-                            </span>
-                            <button
-                                onClick={handleManualRefresh}
-                                disabled={graphLoading || isManualRefreshing}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg transition-all duration-300 shadow-sm hover:shadow-md text-sm font-medium"
-                                title="Refresh marketplace data"
-                            >
-                                {graphLoading || isManualRefreshing ? (
-                                    <span className="flex items-center gap-2">
-                                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                                        Refreshing...
-                                    </span>
-                                ) : (
-                                    <span className="flex items-center gap-2">
-                                        ↻ Refresh
-                                    </span>
-                                )}
-                            </button>
+
+                        {/* Performance Indicators - Admin Only */}
+                        <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                            <div className="bg-white p-3 rounded-lg shadow-sm">
+                                <div className="font-semibold text-blue-600">{safeItems.length}</div>
+                                <div className="text-gray-600">Total Items</div>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg shadow-sm">
+                                <div className="font-semibold text-green-600">{cachedCount}</div>
+                                <div className="text-gray-600">Cached NFTs</div>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg shadow-sm">
+                                <div className="font-semibold text-purple-600">{visibleCount}</div>
+                                <div className="text-gray-600">Visible Items</div>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg shadow-sm">
+                                <div className="font-semibold text-yellow-600">{loadingCount}</div>
+                                <div className="text-gray-600">Loading</div>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg shadow-sm">
+                                <div className="font-semibold text-indigo-600">{performanceData.fresh}/{performanceData.total}</div>
+                                <div className="text-gray-600">Memory</div>
+                            </div>
+                        </div>
+                        <div className="mt-3 text-xs text-gray-600">
+                            Features: Graph Integration • Intelligent Caching • Staggered Loading • Auto-refresh • Performance Monitoring
                         </div>
                     </div>
+                )}
+            </div>
 
-                    {/* Performance Indicators - Admin Only */}
-                    <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-                        <div className="bg-white p-3 rounded-lg shadow-sm">
-                            <div className="font-semibold text-blue-600">{safeItems.length}</div>
-                            <div className="text-gray-600">Total Items</div>
-                        </div>
-                        <div className="bg-white p-3 rounded-lg shadow-sm">
-                            <div className="font-semibold text-green-600">{cachedCount}</div>
-                            <div className="text-gray-600">Cached NFTs</div>
-                        </div>
-                        <div className="bg-white p-3 rounded-lg shadow-sm">
-                            <div className="font-semibold text-purple-600">{visibleCount}</div>
-                            <div className="text-gray-600">Visible Items</div>
-                        </div>
-                        <div className="bg-white p-3 rounded-lg shadow-sm">
-                            <div className="font-semibold text-yellow-600">{loadingCount}</div>
-                            <div className="text-gray-600">Loading</div>
-                        </div>
-                        <div className="bg-white p-3 rounded-lg shadow-sm">
-                            <div className="font-semibold text-indigo-600">{performanceData.fresh}/{performanceData.total}</div>
-                            <div className="text-gray-600">Memory</div>
-                        </div>
-                    </div>
-                    <div className="mt-3 text-xs text-gray-600">
-                        Features: Graph Integration • Intelligent Caching • Staggered Loading • Auto-refresh • Performance Monitoring
-                    </div>
-                </div>
-            )}
-
-            {/* Randloses NFT Grid mit Schatten-Effekt nur rechts und Scroll-Buttons */}
-            <div className="relative overflow-visible pt-8">
-                {/* Schatten-Overlay nur rechts */}
-                <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-gray-50 via-gray-50 to-transparent z-10 pointer-events-none" />
-
+            {/* Randloses NFT Grid mit Scroll-Buttons */}
+            <div className="relative overflow-visible pt-8 pb-4">
                 {/* Scroll Buttons - hidden on mobile */}
                 {canScrollLeft && (
                     <button
@@ -431,12 +446,14 @@ export function ActiveItemsList() {
                 {/* Scrollbare NFT Container - Edge-to-edge */}
                 <div
                     ref={scrollContainerRef}
-                    className="flex gap-6 overflow-x-auto pb-8 pt-8 scrollbar-hide scroll-smooth pl-8 pr-6"
+                    className="flex gap-6 pb-8 pt-8 scrollbar-hide scroll-smooth pl-8 pr-6"
                     style={{
                         scrollBehavior: 'smooth',
                         paddingLeft: '32px', // Erhöht für Hover-Effekte der ersten Karte
                         paddingRight: '24px',
-                        // Verhindert das Abschneiden der ersten Karte beim Hover
+                        paddingBottom: '32px', // Padding für Hover-Schatten unten
+                        // Verhindert das Abschneiden beim Hover
+                        overflowX: 'auto',
                         overflowY: 'visible'
                     }}
                 >
@@ -453,7 +470,7 @@ export function ActiveItemsList() {
                         return (
                             <div
                                 key={item.listingId}
-                                className="flex-shrink-0 w-80"
+                                className="flex-shrink-0 w-60"
                                 style={{
                                     // Only animate on FIRST visit, instant on back navigation! 🚀
                                     animationName: wasVisited ? 'none' : 'fadeInUp',
@@ -483,12 +500,14 @@ export function ActiveItemsList() {
 
                     {/* Progressive Loading Indicator */}
                     {visibleCount < filteredItems.length && (
-                        <div className="flex-shrink-0 w-80 h-96 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center">
-                            <div className="text-center">
-                                <div className="animate-spin w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"></div>
-                                <div className="text-sm font-medium text-gray-600">Loading more items...</div>
-                                <div className="text-xs text-gray-500 mt-1">
-                                    {filteredItems.length - visibleCount} remaining
+                        <div className="flex-shrink-0 w-60">
+                            <div className="h-72 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center">
+                                <div className="text-center">
+                                    <div className="animate-spin w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"></div>
+                                    <div className="text-sm font-medium text-gray-600">Loading more items...</div>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                        {filteredItems.length - visibleCount} remaining
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -497,7 +516,7 @@ export function ActiveItemsList() {
             </div>
 
             {/* Performance Monitoring Section - Admin Only */}
-            {isAdmin && safeItems.length > 0 && (
+            {!isAdmin && safeItems.length > 0 && (
                 <div className="max-w-7xl mx-auto px-6 mt-8">
                     <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                         <h3 className="font-semibold text-green-800 mb-2 flex items-center gap-2">

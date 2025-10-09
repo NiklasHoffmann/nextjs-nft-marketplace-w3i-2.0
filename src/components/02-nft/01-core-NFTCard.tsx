@@ -186,9 +186,21 @@ export function NFTCard(props: NFTCardAllProps) {
   const nftContext = useModernNFTContext();
   const contextData = nftContext.getNFT(contractAddress, tokenId);
 
+  // Track if we ever had data to prevent skeleton flickering on refresh
+  const hadDataRef = useRef(false);
+  const isLoadingRef = useRef(false);
+
+  useEffect(() => {
+    if (contextData) {
+      hadDataRef.current = true;
+      isLoadingRef.current = false;
+    }
+  }, [contextData]);
+
   // Load data if not available
   useEffect(() => {
     if (!contextData && !nftContext.isDataFresh(contractAddress, tokenId)) {
+      isLoadingRef.current = true;
       nftContext.loadNFT(contractAddress, tokenId);
     }
   }, [nftContext, contractAddress, tokenId, contextData]);
@@ -196,6 +208,7 @@ export function NFTCard(props: NFTCardAllProps) {
   // Simple hover preloading
   const handleHover = useCallback(() => {
     if (!contextData) {
+      isLoadingRef.current = true;
       nftContext.loadNFT(contractAddress, tokenId);
     }
   }, [nftContext, contractAddress, tokenId, contextData]);
@@ -238,8 +251,9 @@ export function NFTCard(props: NFTCardAllProps) {
     watchlistCount: contextData?.social?.watchlistCount || null,
     averageRating: contextData?.social?.averageRating || null,
 
-    // Loading state - simplified
-    isLoading: !contextData,
+    // Loading state - show skeleton only when actively loading and never had data before
+    // OR when we're reloading after data was lost
+    isLoading: !contextData && (!hadDataRef.current || isLoadingRef.current),
   }), [
     contractAddress, tokenId, listingId, price, seller,
     buyer, isListed, desiredNftAddress, desiredTokenId,
@@ -464,11 +478,50 @@ export function NFTCard(props: NFTCardAllProps) {
   if (displayData.isLoading) {
     return (
       <div className={`group cursor-pointer transform-gpu ${className}`}>
-        <div className="hover:scale-102 hover:-translate-y-1 hover:z-50 transition-all duration-200 ease-out rounded-xl shadow-lg flex flex-col gap-2 w-full h-96 relative will-change-transform origin-center animate-pulse">
-          <div className="aspect-square bg-gray-200 rounded-xl"></div>
-          <div className="p-4 space-y-3">
-            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-            <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+        <div className="hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] transition-all duration-300 ease-out rounded-lg shadow-xl flex flex-col gap-2 w-full h-72 relative overflow-hidden border border-black bg-gray-100 animate-pulse">
+          {/* Content container matching real card */}
+          <div className="absolute inset-2 shadow-lg bg-gray-200 rounded-md overflow-hidden flex flex-col h-[calc(100%-16px)]">
+            <div className="relative z-10 flex flex-col h-full p-2 min-h-0">
+              {/* Header skeleton */}
+              <div className="flex-shrink-0 mb-2">
+                <div className="bg-white/95 p-2 rounded-md shadow-xl border border-gray-200/60">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      {/* Symbol skeleton */}
+                      <div className="h-3.5 bg-gray-300 rounded w-20 animate-pulse"></div>
+                      {/* Name skeleton */}
+                      <div className="h-3 bg-gray-300 rounded w-32 animate-pulse"></div>
+                    </div>
+                    {/* Rating skeleton */}
+                    <div className="bg-white/95 px-2 py-1 rounded-md h-6 flex items-center gap-1 ml-2">
+                      <div className="flex items-center gap-0.5">
+                        {Array.from({ length: 5 }, (_, i) => (
+                          <div key={i} className="w-2.5 h-2.5 bg-gray-300 rounded-full"></div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Image skeleton */}
+              <div className="flex-1 flex justify-center items-center px-2 mt-2 mb-2 min-h-0">
+                <div className="rounded-xl shadow-2xl border-2 border-white/50 overflow-hidden w-full h-full bg-gray-300 animate-pulse"></div>
+              </div>
+
+              {/* Price skeleton at bottom */}
+              <div className="flex-shrink-0 mt-auto">
+                <div className="bg-white/95 p-2 rounded-md shadow-xl border border-gray-200/60">
+                  <div className="flex justify-between items-center">
+                    <div className="space-y-1 flex-1">
+                      <div className="h-4 bg-gray-300 rounded w-24 animate-pulse"></div>
+                      <div className="h-3 bg-gray-300 rounded w-16 animate-pulse"></div>
+                    </div>
+                    <div className="bg-gray-300 px-3 py-1 rounded-full h-6 w-12 animate-pulse"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -502,7 +555,7 @@ export function NFTCard(props: NFTCardAllProps) {
       onTouchEnd={handleTouchEnd}
       style={tiltStyle}
     >
-      <div className={`hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] hover:scale-[1.02] transition-all duration-300 ease-out rounded-lg shadow-xl flex flex-col flex-end gap-2 w-full h-96 relative will-change-transform origin-center overflow-hidden border border-black ${getRarityBackground}`}>
+      <div className={`hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] hover:scale-[1.02] transition-all duration-300 ease-out rounded-lg shadow-xl flex flex-col flex-end gap-2 w-full h-72 relative will-change-transform origin-center overflow-hidden border border-black ${getRarityBackground}`}>
         {/* Content container with bg-secondary and rounded corners */}
         <div className="absolute inset-2 shadow-lg bg-secondary rounded-md overflow-hidden flex flex-col h-[calc(100%-16px)]">
           {/* Blurred Background Image */}
@@ -537,11 +590,9 @@ export function NFTCard(props: NFTCardAllProps) {
                       {displayData.contractInfo?.name || displayData.customTitle || displayData.name}
                     </p>
                   </div>
-                  {/* Contract Info and Rarity indicators */}
-                  <div className="flex flex-col items-end gap-1 ml-2">
-
-
-                    {/* Rarity Indicator */}
+                  {/* Contract Info and Rarity indicators 
+                  <div className="flex flex-col items-end gap-1 ml-2">*/}
+                  {/* Rarity Indicator 
                     {enableInsights && contextData?.insight?.rarity && (
                       <div className={`px-1.5 py-0.5 rounded text-xs font-medium ${contextData.insight.rarity === 'legendary' ? 'bg-yellow-100 text-yellow-700' :
                         contextData.insight.rarity === 'epic' ? 'bg-purple-100 text-purple-700' :
@@ -552,8 +603,7 @@ export function NFTCard(props: NFTCardAllProps) {
                         {contextData.insight.rarity.charAt(0).toUpperCase()}
                       </div>
                     )}
-                  </div>
-
+                  </div>*/}
                   {/* Average Rating Stars - enhanced styling */}
                   {contextData?.social?.averageRating && contextData.social.averageRating > 0 && (
                     <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-md border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center gap-1 ml-2">
@@ -582,7 +632,7 @@ export function NFTCard(props: NFTCardAllProps) {
                   <OptimizedNFTImage
                     imageUrl={displayData.imageUrl}
                     tokenId={tokenId}
-                    className="object-contain max-h-32 w-auto"
+                    className="object-contain max-h-24 w-auto"
                     fill={false}
                     width={240}
                     height={240}
@@ -596,7 +646,7 @@ export function NFTCard(props: NFTCardAllProps) {
             )}
 
             {/* Bottom content section - everything above price */}
-            <div className="flex-shrink-0">
+            <div className="flex-shrink-0 mt-2">
               {/* Categories and Social Stats */}
               <div className="flex items-center gap-2 mb-2">
                 {/* Categories - left side */}
@@ -624,14 +674,14 @@ export function NFTCard(props: NFTCardAllProps) {
                         </span>
                       </div>
                     )}
-                    {/* Insights indicator badge */}
+                    {/* Insights indicator badge 
                     {enableInsights && (contextData?.insight?.customTitle || contextData?.insight?.category || contextData?.insight?.cardDescription || contextData?.insight?.rarity) && (
                       <div className="bg-purple-500/90 backdrop-blur-sm px-1.5 py-0.5 rounded-md shadow-sm border border-purple-400/40 h-6 flex items-center">
                         <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                         </svg>
                       </div>
-                    )}
+                    )}*/}
                   </div>
                 )}
 
@@ -663,7 +713,7 @@ export function NFTCard(props: NFTCardAllProps) {
                 </div>
               </div>
 
-              {/* Description - directly above price */}
+              {/* Description - directly above price 
               {descriptions.length > 0 && (
                 <div className="mb-2">
                   <div className="flex-flex-1 flex-wrap gap-1">
@@ -679,7 +729,7 @@ export function NFTCard(props: NFTCardAllProps) {
                     )}
                   </div>
                 </div>
-              )}
+              )}*/}
 
               {/* Price Display - always at bottom */}
               <div className="flex-shrink-0">
