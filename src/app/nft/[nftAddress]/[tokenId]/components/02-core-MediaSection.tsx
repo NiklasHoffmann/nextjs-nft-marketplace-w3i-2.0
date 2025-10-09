@@ -48,14 +48,14 @@ function NFTMediaSection({
 
         if (mediaConfig.hasImage) {
             return (
-                <div className="bg-gray-100 rounded-2xl shadow-lg flex items-center justify-center w-full h-full">
+                <div className="bg-gray-100 rounded-2xl shadow-lg overflow-hidden w-full">
                     <Image
                         src={imageUrl!}
                         alt={mediaConfig.displayName}
-                        width={400}
-                        height={400}
-                        className="w-full h-full object-contain rounded-2xl"
-                        sizes="(max-width: 768px) 90vw, (max-width: 1200px) 40vw, 30vw"
+                        width={800}
+                        height={800}
+                        className="w-full h-auto object-contain"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 40vw, 33vw"
                         priority={true}
                         quality={90}
                         placeholder="blur"
@@ -79,8 +79,8 @@ function NFTMediaSection({
 
     return (
         <div className="space-y-6">
-            {/* Main Media */}
-            <div className="aspect-square bg-primary rounded-2xl shadow-lg relative p-4 flex items-center justify-center">
+            {/* Main Media - Width fest, Höhe flexibel */}
+            <div className="bg-primary rounded-2xl shadow-lg w-full">
                 {mainMediaContent}
             </div>
 
