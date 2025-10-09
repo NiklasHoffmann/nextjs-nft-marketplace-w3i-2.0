@@ -121,13 +121,6 @@ export default function AdminNFTInsightsManager() {
 
     }, [existingInsights, collectionInsights, insightsLoading, collectionInsightsLoading, formData.contractAddress, formData.tokenId, contractAddressParam, tokenIdParam]);
 
-    // Existing insights laden für Edit-Mode - no longer needed since we use the hook
-    // const nftData = nftContext.getNFT(
-    //     formData.contractAddress || '',
-    //     formData.tokenId || ''
-    // );
-    // const existingInsights = nftData?.insight;
-
     // NFT data laden wenn nötig
     useEffect(() => {
         if (formData.contractAddress && formData.tokenId &&

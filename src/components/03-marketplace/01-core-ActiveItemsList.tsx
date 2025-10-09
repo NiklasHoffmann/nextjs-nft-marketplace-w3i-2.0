@@ -458,13 +458,7 @@ export function ActiveItemsList() {
                     }}
                 >
                     {visibleItems.map((item: any, index: number) => {
-                        // DEBUG: Log first marketplace item data
-                        if (index === 0) {
-
-
-                        }
-
-                        // Check if page was already visited (prevent animation on back navigation) ⚡
+                        // Check if page was already visited (prevent animation on back navigation)
                         const wasVisited = typeof window !== 'undefined' && sessionStorage.getItem('activeItemsList-visited') === 'true';
 
                         return (

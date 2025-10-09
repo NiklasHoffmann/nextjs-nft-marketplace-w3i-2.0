@@ -55,22 +55,6 @@ export function useNFTFilters(
                     ...(item.cardDescriptions || [])
                 ].join(' ').toLowerCase();
 
-                // DEBUG: Log search details for first item
-                if (filters.searchTerm && result.indexOf(item) === 0) {
-                    console.log('🔍 SEARCH DEBUG:', {
-                        searchTerm: filters.searchTerm,
-                        name: item.name,
-                        customTitle: item.customTitle,
-                        symbol: item.symbol,
-                        category: item.category,
-                        contractAddress: item.contractAddress?.slice(0, 10),
-                        tokenId: item.tokenId,
-                        cardDescriptions: item.cardDescriptions,
-                        searchableText: searchableText.slice(0, 100) + '...',
-                        matches: searchableText.includes(searchLower)
-                    });
-                }
-
                 if (!searchableText.includes(searchLower)) {
                     return false;
                 }

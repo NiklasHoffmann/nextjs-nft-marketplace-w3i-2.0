@@ -270,21 +270,6 @@ export function useWalletNFTs(
         // For now, only return external NFTs to avoid type conflicts
         // Context NFTs (AggregatedNFT[]) can be accessed separately via nftContext.getNFTsByOwner()
         return external;
-
-        // TODO: Create proper conversion between AggregatedNFT and EnhancedNFTCardData
-        // if (!includeContext) {
-        //     return external;
-        // }
-
-        // const externalMap = new Map(
-        //     external.map(nft => [`${nft.nftAddress}-${nft.tokenId}`, nft])
-        // );
-
-        // const contextOnly = contextNFTs.filter(nft =>
-        //     !externalMap.has(`${nft.nftAddress}-${nft.tokenId}`)
-        // );
-
-        // return [...external, ...contextOnly];
     }, [externalNFTs, convertToCardData]);
 
     // Auto-fetch on mount and when wallet changes

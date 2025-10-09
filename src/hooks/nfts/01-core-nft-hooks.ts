@@ -232,23 +232,6 @@ function extractRarity(attributes: any[] | undefined): string | null {
 function enrichMarketplaceItem(marketplaceItem: any, nftData: any, realStats?: any): EnrichedMarketplaceItem {
     const hasMetadata = !!(nftData?.core?.metadata);
 
-    // DEBUG: Log nftData structure for first item
-    if (marketplaceItem.tokenId === "359") {
-        console.log('🔍 NFT DATA STRUCTURE for token 359:', {
-            hasNftData: !!nftData,
-            contractInfo: nftData?.contractInfo,
-            meta: nftData?.meta,
-            social: nftData?.social,
-            core_full: nftData?.core,
-            core_name: nftData?.core?.name,
-            core_metadata_name: nftData?.core?.metadata?.name,
-            meta_name: nftData?.meta?.name,
-            core_contractSymbol: nftData?.core?.contractSymbol,
-            insight: nftData?.insight,
-            allKeys: nftData ? Object.keys(nftData) : []
-        });
-    }
-
     return {
         // Marketplace data
         ...marketplaceItem,
