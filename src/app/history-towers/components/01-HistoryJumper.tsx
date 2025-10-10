@@ -332,7 +332,7 @@ export default function HistoryJumper() {
         ctx.shadowBlur = 0
         ctx.shadowOffsetY = 0
 
-        // Plattform-Nummern auf ALLE Plattformen zeichnen
+        // Level-Anzeige nur auf goldenen Plattformen
         ctx.save()
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
@@ -348,15 +348,8 @@ export default function HistoryJumper() {
                 ctx.lineWidth = 3
                 ctx.strokeText(`LEVEL ${levelNum}`, p.x + p.w / 2, p.y + p.h / 2)
                 ctx.fillText(`LEVEL ${levelNum}`, p.x + p.w / 2, p.y + p.h / 2)
-            } else {
-                // Plattform-Nummer auf normale Plattformen
-                ctx.font = 'bold 14px ui-sans-serif, system-ui'
-                ctx.fillStyle = '#1273EB'  // Blauer Text auf cream Plattform
-                ctx.strokeStyle = '#FFFFFF'
-                ctx.lineWidth = 2
-                ctx.strokeText(`${p.number}`, p.x + p.w / 2, p.y + p.h / 2)
-                ctx.fillText(`${p.number}`, p.x + p.w / 2, p.y + p.h / 2)
             }
+            // Normale Plattformen haben keine Nummer mehr
         }
         ctx.restore()
 
@@ -776,29 +769,34 @@ export default function HistoryJumper() {
 
                         {/* In-Game UI */}
                         {running && (
-                            <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
-                                <div className="flex gap-2">
-                                    <div className="bg-white/90 backdrop-blur-sm rounded-xl px-4 py-2 shadow-lg">
-                                        <p className="text-xs text-gray-600 font-medium">Score</p>
-                                        <p className="text-2xl font-bold text-gray-900">{Math.floor(score)}</p>
-                                    </div>
-                                    <div className="bg-white/90 backdrop-blur-sm rounded-xl px-4 py-2 shadow-lg">
-                                        <p className="text-xs text-gray-600 font-medium">Level</p>
-                                        <p className="text-2xl font-bold text-blue-600">{Math.floor(stateRef.current.highestPlatformNumber / 50) + 1}</p>
-                                    </div>
+                            <div className="absolute top-4 left-4 right-4 flex items-start justify-between">
+                                {/* Level - ganz links */}
+                                <div className="bg-white/90 backdrop-blur-sm rounded-xl px-4 py-2 shadow-lg min-w-[80px] h-[56px] flex flex-col justify-center">
+                                    <p className="text-xs text-gray-600 font-medium leading-none">Level</p>
+                                    <p className="text-2xl font-bold text-blue-600 leading-tight">{Math.floor(stateRef.current.highestPlatformNumber / 50) + 1}</p>
                                 </div>
+
+                                {/* Score - mittig mit fester Breite */}
+                                <div className="bg-white/90 backdrop-blur-sm rounded-xl px-4 py-2 shadow-lg w-[140px] text-center h-[56px] flex flex-col justify-center">
+                                    <p className="text-xs text-gray-600 font-medium leading-none">Score</p>
+                                    <p className="text-2xl font-bold text-gray-900 tabular-nums leading-tight">{Math.floor(score)}</p>
+                                </div>
+
+                                {/* Buttons - ganz rechts */}
                                 <div className="flex gap-2">
                                     <button
                                         onClick={handlePause}
-                                        className="bg-white/90 backdrop-blur-sm hover:bg-white text-gray-900 font-semibold px-3 md:px-4 py-2 rounded-xl shadow-lg transition-all text-sm md:text-base"
+                                        className="bg-white/90 backdrop-blur-sm hover:bg-white text-gray-900 font-semibold px-4 rounded-xl shadow-lg transition-all flex items-center justify-center text-2xl h-[56px] w-[56px]"
+                                        title="Pause"
                                     >
-                                        Pause
+                                        ⏸
                                     </button>
                                     <button
                                         onClick={handleStart}
-                                        className="bg-white/90 backdrop-blur-sm hover:bg-white text-gray-900 font-semibold px-3 md:px-4 py-2 rounded-xl shadow-lg transition-all text-sm md:text-base"
+                                        className="bg-white/90 backdrop-blur-sm hover:bg-white text-gray-900 font-semibold px-4 rounded-xl shadow-lg transition-all flex items-center justify-center text-2xl h-[56px] w-[56px]"
+                                        title="Neustart"
                                     >
-                                        Neustart
+                                        ↻
                                     </button>
                                 </div>
                             </div>
