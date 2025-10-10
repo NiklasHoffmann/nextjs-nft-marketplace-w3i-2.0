@@ -168,113 +168,118 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
             </div>
 
             {/* Scores List */}
-            {scores.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                    <p className="text-lg mb-2">
-                        {filter === 'week' && '📅 Keine Scores in den letzten 7 Tagen'}
-                        {filter === 'my-scores' && '🎮 Du hast noch keine Scores'}
-                        {filter === 'all-time' && '🎮 Noch keine Scores. Sei der Erste!'}
-                    </p>
-                    <p className="text-sm">
-                        {filter !== 'all-time' && 'Spiele eine Runde und speichere deinen Score!'}
-                    </p>
-                </div>
-            ) : (
-                <div className="space-y-2">
-                    {/* Desktop: Table View */}
-                    <div className="hidden md:block overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="border-b-2 border-gray-200">
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Rank</th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Player</th>
-                                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-600">Score</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Level</th>
-                                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-600">Date</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {scores.map((score, index) => (
-                                    <tr
-                                        key={score._id}
-                                        className={`border-b border-gray-100 transition ${isOwnScore(score)
-                                            ? 'bg-blue-50 font-semibold'
-                                            : 'hover:bg-gray-50'
-                                            }`}
-                                    >
-                                        <td className="px-4 py-4">
-                                            <div className="flex items-center">
-                                                {index === 0 && <span className="text-2xl mr-2">🥇</span>}
-                                                {index === 1 && <span className="text-2xl mr-2">🥈</span>}
-                                                {index === 2 && <span className="text-2xl mr-2">🥉</span>}
-                                                <span className="text-lg">{index + 1}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <span>{getDisplayName(score)}</span>
-                                                {isOwnScore(score) && (
-                                                    <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded">You</span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4 text-right font-mono font-semibold text-lg">
-                                            {score.score.toLocaleString()}
-                                        </td>
-                                        <td className="px-4 py-4 text-center">
-                                            <span className="inline-block bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-semibold">
-                                                {score.level}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-4 text-right text-sm text-gray-600">
-                                            {formatDate(score.createdAt)}
-                                        </td>
+            <div className="max-h-[600px] overflow-y-auto pr-2" style={{
+                scrollbarWidth: 'thin',
+                scrollbarColor: '#CBD5E1 #F1F5F9'
+            }}>
+                {scores.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                        <p className="text-lg mb-2">
+                            {filter === 'week' && '📅 Keine Scores in den letzten 7 Tagen'}
+                            {filter === 'my-scores' && '🎮 Du hast noch keine Scores'}
+                            {filter === 'all-time' && '🎮 Noch keine Scores. Sei der Erste!'}
+                        </p>
+                        <p className="text-sm">
+                            {filter !== 'all-time' && 'Spiele eine Runde und speichere deinen Score!'}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        {/* Desktop: Table View */}
+                        <div className="hidden md:block overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="border-b-2 border-gray-200">
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Rank</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Player</th>
+                                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-600">Score</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Level</th>
+                                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-600">Date</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {scores.map((score, index) => (
+                                        <tr
+                                            key={score._id}
+                                            className={`border-b border-gray-100 transition ${isOwnScore(score)
+                                                ? 'bg-blue-50 font-semibold'
+                                                : 'hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center">
+                                                    {index === 0 && <span className="text-2xl mr-2">🥇</span>}
+                                                    {index === 1 && <span className="text-2xl mr-2">🥈</span>}
+                                                    {index === 2 && <span className="text-2xl mr-2">🥉</span>}
+                                                    <span className="text-lg">{index + 1}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <span>{getDisplayName(score)}</span>
+                                                    {isOwnScore(score) && (
+                                                        <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded">You</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-4 text-right font-mono font-semibold text-lg">
+                                                {score.score.toLocaleString()}
+                                            </td>
+                                            <td className="px-4 py-4 text-center">
+                                                <span className="inline-block bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-semibold">
+                                                    {score.level}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-4 text-right text-sm text-gray-600">
+                                                {formatDate(score.createdAt)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Mobile: Card View */}
+                        <div className="md:hidden space-y-3">
+                            {scores.map((score, index) => (
+                                <div
+                                    key={score._id}
+                                    className={`rounded-lg p-4 ${isOwnScore(score)
+                                        ? 'bg-blue-50 border-2 border-blue-500'
+                                        : 'bg-gray-50 border border-gray-200'
+                                        }`}
+                                >
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                            {index === 0 && <span className="text-2xl">🥇</span>}
+                                            {index === 1 && <span className="text-2xl">🥈</span>}
+                                            {index === 2 && <span className="text-2xl">🥉</span>}
+                                            <span className="text-lg font-bold">#{index + 1}</span>
+                                        </div>
+                                        {isOwnScore(score) && (
+                                            <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded">You</span>
+                                        )}
+                                    </div>
+
+                                    <div className="mb-2">
+                                        <p className="font-semibold text-gray-800">{getDisplayName(score)}</p>
+                                    </div>
+
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <p className="text-2xl font-bold font-mono">{score.score.toLocaleString()}</p>
+                                            <p className="text-sm text-gray-600">Level {score.level}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-xs text-gray-500">{formatDate(score.createdAt)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-
-                    {/* Mobile: Card View */}
-                    <div className="md:hidden space-y-3">
-                        {scores.map((score, index) => (
-                            <div
-                                key={score._id}
-                                className={`rounded-lg p-4 ${isOwnScore(score)
-                                    ? 'bg-blue-50 border-2 border-blue-500'
-                                    : 'bg-gray-50 border border-gray-200'
-                                    }`}
-                            >
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                        {index === 0 && <span className="text-2xl">🥇</span>}
-                                        {index === 1 && <span className="text-2xl">🥈</span>}
-                                        {index === 2 && <span className="text-2xl">🥉</span>}
-                                        <span className="text-lg font-bold">#{index + 1}</span>
-                                    </div>
-                                    {isOwnScore(score) && (
-                                        <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded">You</span>
-                                    )}
-                                </div>
-
-                                <div className="mb-2">
-                                    <p className="font-semibold text-gray-800">{getDisplayName(score)}</p>
-                                </div>
-
-                                <div className="flex justify-between items-center">
-                                    <div>
-                                        <p className="text-2xl font-bold font-mono">{score.score.toLocaleString()}</p>
-                                        <p className="text-sm text-gray-600">Level {score.level}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-xs text-gray-500">{formatDate(score.createdAt)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 }

@@ -275,29 +275,37 @@ export default function HistoryJumper() {
             // Jede 50. Plattform ist eine sichere Level-Plattform (Plattform 50, 100, 150, etc.)
             const isSafePlatform = platformNumber % 50 === 0
 
-            // Prüfe ob die nächste oder vorherige Plattform eine Level-Plattform ist
-            const isNearLevelPlatform = (platformNumber % 50) <= 2 || (platformNumber % 50) >= 48
+            // Position im 50er-Zyklus
+            const positionInCycle = platformNumber % 50
 
             // Berechne Schwierigkeit basierend auf der PLATTFORM-NUMMER
-            // ABER: Für den Abstand verwende die vorherige Plattform, um Sprünge zu vermeiden
-            const prevPlatformNumber = s.totalPlatformsSpawned - 1
             const { spacing, platformMinW, platformMaxW, horizontalSpeed, platformFallSpeed } = getDifficulty(platformNumber)
-
-            // Verwende den Abstand der VORHERIGEN Plattform für smoothere Übergänge
-            const spacingForThisPlatform = prevPlatformNumber > 0 ? getDifficulty(prevPlatformNumber).spacing : spacing
 
             // Safe platforms sind volle Breite und mittig
             const w = isSafePlatform ? WIDTH - 20 : rand(platformMinW, platformMaxW)
             const x = isSafePlatform ? 10 : rand(10, WIDTH - w - 10)
 
-            // Verwende konsistenteren Abstand bei Level-Übergängen
-            let useSpacing = spacingForThisPlatform
-            let variance = 0.2 // Standard Varianz (0.8 - 1.2)
+            // Spacing-Logik für sanfte Level-Übergänge:
+            // - Plattformen 48, 49 vor goldener Plattform: Verwende alten Level-Spacing
+            // - Goldene Plattform (0): Durchschnitt zwischen alt und neu
+            // - Plattformen 1, 2, 3 nach goldener Plattform: Verwende alten Level-Spacing
+            // - Ab Plattform 4: Normaler neuer Level-Spacing
+            let useSpacing = spacing
+            let variance = 0.2 // Standard Varianz (±20%)
 
-            if (isSafePlatform || isNearLevelPlatform) {
-                // Bei Level-Plattformen: Verwende den Durchschnitt und reduziere Varianz
-                useSpacing = (spacing + spacingForThisPlatform) / 2
-                variance = 0.1 // Geringere Varianz (0.9 - 1.1)
+            if (isSafePlatform) {
+                // Goldene Plattform: Durchschnitt zwischen vorherigem und neuem Level
+                const prevLevelSpacing = getDifficulty(platformNumber - 1).spacing
+                useSpacing = (prevLevelSpacing + spacing) / 2
+                variance = 0.05 // Sehr geringe Varianz (±5%)
+            } else if (positionInCycle >= 1 && positionInCycle <= 3) {
+                // Plattformen 1, 2, 3 nach goldener Plattform: Verwende vorherigen Level
+                // um sanften Übergang zum neuen Schwierigkeitsgrad zu ermöglichen
+                useSpacing = getDifficulty(platformNumber - positionInCycle).spacing
+                variance = 0.1 // Reduzierte Varianz (±10%)
+            } else if (positionInCycle >= 48) {
+                // Plattformen 48, 49 vor goldener Plattform
+                variance = 0.1 // Reduzierte Varianz (±10%)
             }
 
             const y = (minY === Infinity ? s.nextSpawnY : minY) - rand(useSpacing * (1 - variance), useSpacing * (1 + variance))
@@ -751,7 +759,7 @@ export default function HistoryJumper() {
 
     return (
         <div className="flex w-full justify-center h-full">
-            <div className="relative w-full h-full flex flex-col">
+            <div className="relative w-full max-w-2xl flex flex-col">
                 {/* Game Card */}
                 <div className="bg-white md:bg-white h-full md:rounded-2xl md:shadow-2xl md:border md:border-gray-200 overflow-hidden flex flex-col md:max-h-full">
                     {/* Spacer for Mobile Navbar */}
@@ -763,7 +771,7 @@ export default function HistoryJumper() {
                             ref={canvasRef}
                             width={WIDTH}
                             height={HEIGHT}
-                            className="cursor-pointer w-full h-full md:max-w-full md:max-h-full object-contain"
+                            className="cursor-pointer w-full h-full object-contain"
                             onClick={!running ? handleStart : undefined}
                         />
 
