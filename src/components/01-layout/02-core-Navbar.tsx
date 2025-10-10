@@ -170,6 +170,23 @@ export default function Navbar() {
                     {/* Links */}
                     <Link href="/sell" className="text-gray-700 hover:text-blue-600 font-medium">Sell</Link>
                     <Link href="/sell" className="text-gray-700 hover:text-blue-600 font-medium">Trade</Link>
+
+                    {/* Game Link with Figure */}
+                    <Link
+                        href="/history-towers"
+                        className="flex items-center gap-2 px-3 py-1 rounded-lg hover:bg-blue-50 transition-colors group"
+                        title="Spiel spielen"
+                    >
+                        <Image
+                            src="/media/game/Figur2.svg"
+                            alt="Zum Spiel"
+                            width={32}
+                            height={32}
+                            className="h-8 w-auto transition-transform group-hover:scale-110"
+                        />
+                        <span className="text-gray-700 group-hover:text-blue-600 font-medium">Spiel</span>
+                    </Link>
+
                     {/* Currency Selector */}
                     <CurrencySelector />
                     {/* Wallet Section */}
@@ -399,6 +416,22 @@ export default function Navbar() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                                 </svg>
                                 <span className="text-gray-700 font-medium">Trade</span>
+                            </Link>
+
+                            {/* Game Link with Figure */}
+                            <Link
+                                href="/history-towers"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors border border-blue-200"
+                            >
+                                <Image
+                                    src="/media/game/Figur2.svg"
+                                    alt="Zum Spiel"
+                                    width={20}
+                                    height={20}
+                                    className="w-5 h-5"
+                                />
+                                <span className="text-blue-700 font-medium">Spiel spielen</span>
                             </Link>
                         </div>
 
