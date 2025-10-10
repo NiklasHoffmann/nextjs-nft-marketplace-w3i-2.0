@@ -808,35 +808,40 @@ export default function HistoryJumper() {
                     {/* Touch Controls */}
                     <div className="bg-primary p-4">
                         <div className="flex items-center justify-between gap-3">
-                            <button
-                                onMouseDown={() => handleTouchButton('left', true)}
-                                onMouseUp={() => handleTouchButton('left', false)}
-                                onMouseLeave={() => handleTouchButton('left', false)}
-                                onTouchStart={() => handleTouchButton('left', true)}
-                                onTouchEnd={() => handleTouchButton('left', false)}
-                                className="flex-1 h-16 select-none rounded-xl bg-secondary hover:bg-secondary/90 text-3xl font-bold text-primary shadow-md active:scale-95 transition-transform"
-                            >
-                                ←
-                            </button>
+                            {/* Links/Rechts Buttons auf der linken Seite */}
+                            <div className="flex gap-2 flex-1">
+                                <button
+                                    onMouseDown={() => handleTouchButton('left', true)}
+                                    onMouseUp={() => handleTouchButton('left', false)}
+                                    onMouseLeave={() => handleTouchButton('left', false)}
+                                    onTouchStart={() => handleTouchButton('left', true)}
+                                    onTouchEnd={() => handleTouchButton('left', false)}
+                                    className="flex-1 h-16 select-none rounded-xl bg-secondary hover:bg-secondary/90 text-3xl font-bold text-primary shadow-md active:scale-95 transition-transform"
+                                >
+                                    ←
+                                </button>
+                                <button
+                                    onMouseDown={() => handleTouchButton('right', true)}
+                                    onMouseUp={() => handleTouchButton('right', false)}
+                                    onMouseLeave={() => handleTouchButton('right', false)}
+                                    onTouchStart={() => handleTouchButton('right', true)}
+                                    onTouchEnd={() => handleTouchButton('right', false)}
+                                    className="flex-1 h-16 select-none rounded-xl bg-secondary hover:bg-secondary/90 text-3xl font-bold text-primary shadow-md active:scale-95 transition-transform"
+                                >
+                                    →
+                                </button>
+                            </div>
+
+                            {/* Jump Button auf der rechten Seite */}
                             <button
                                 onMouseDown={() => handleTouchButton('jump', true)}
                                 onMouseUp={() => handleTouchButton('jump', false)}
                                 onMouseLeave={() => handleTouchButton('jump', false)}
                                 onTouchStart={() => handleTouchButton('jump', true)}
                                 onTouchEnd={() => handleTouchButton('jump', false)}
-                                className="flex-[2] h-16 select-none rounded-xl bg-secondary hover:bg-secondary/90 text-lg font-bold text-primary shadow-lg active:scale-95 transition-transform"
+                                className="flex-1 h-16 select-none rounded-xl bg-secondary hover:bg-secondary/90 text-lg font-bold text-primary shadow-lg active:scale-95 transition-transform"
                             >
                                 JUMP
-                            </button>
-                            <button
-                                onMouseDown={() => handleTouchButton('right', true)}
-                                onMouseUp={() => handleTouchButton('right', false)}
-                                onMouseLeave={() => handleTouchButton('right', false)}
-                                onTouchStart={() => handleTouchButton('right', true)}
-                                onTouchEnd={() => handleTouchButton('right', false)}
-                                className="flex-1 h-16 select-none rounded-xl bg-secondary hover:bg-secondary/90 text-3xl font-bold text-primary shadow-md active:scale-95 transition-transform"
-                            >
-                                →
                             </button>
                         </div>
                     </div>
