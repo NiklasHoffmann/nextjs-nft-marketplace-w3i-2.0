@@ -275,13 +275,32 @@ export default function HistoryJumper() {
             // Jede 50. Plattform ist eine sichere Level-Plattform (Plattform 50, 100, 150, etc.)
             const isSafePlatform = platformNumber % 50 === 0
 
-            // Berechne Schwierigkeit basierend auf der PLATTFORM-NUMMER, nicht platformsClimbed
+            // Prüfe ob die nächste oder vorherige Plattform eine Level-Plattform ist
+            const isNearLevelPlatform = (platformNumber % 50) <= 2 || (platformNumber % 50) >= 48
+
+            // Berechne Schwierigkeit basierend auf der PLATTFORM-NUMMER
+            // ABER: Für den Abstand verwende die vorherige Plattform, um Sprünge zu vermeiden
+            const prevPlatformNumber = s.totalPlatformsSpawned - 1
             const { spacing, platformMinW, platformMaxW, horizontalSpeed, platformFallSpeed } = getDifficulty(platformNumber)
+
+            // Verwende den Abstand der VORHERIGEN Plattform für smoothere Übergänge
+            const spacingForThisPlatform = prevPlatformNumber > 0 ? getDifficulty(prevPlatformNumber).spacing : spacing
 
             // Safe platforms sind volle Breite und mittig
             const w = isSafePlatform ? WIDTH - 20 : rand(platformMinW, platformMaxW)
             const x = isSafePlatform ? 10 : rand(10, WIDTH - w - 10)
-            const y = (minY === Infinity ? s.nextSpawnY : minY) - rand(spacing * 0.9, spacing * 1.3)
+
+            // Verwende konsistenteren Abstand bei Level-Übergängen
+            let useSpacing = spacingForThisPlatform
+            let variance = 0.2 // Standard Varianz (0.8 - 1.2)
+
+            if (isSafePlatform || isNearLevelPlatform) {
+                // Bei Level-Plattformen: Verwende den Durchschnitt und reduziere Varianz
+                useSpacing = (spacing + spacingForThisPlatform) / 2
+                variance = 0.1 // Geringere Varianz (0.9 - 1.1)
+            }
+
+            const y = (minY === Infinity ? s.nextSpawnY : minY) - rand(useSpacing * (1 - variance), useSpacing * (1 + variance))
             const direction = Math.random() > 0.5 ? 1 : -1
 
             s.platforms.push({

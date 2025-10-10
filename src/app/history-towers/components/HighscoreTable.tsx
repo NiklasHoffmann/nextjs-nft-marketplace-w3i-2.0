@@ -13,11 +13,16 @@ type FilterType = 'all-time' | 'week' | 'my-scores';
 export default function HighscoreTable({ walletAddress, refreshTrigger }: HighscoreTableProps) {
     const [scores, setScores] = useState<GameScore[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState('');
     const [filter, setFilter] = useState<FilterType>('all-time');
 
-    const fetchScores = async () => {
-        setLoading(true);
+    const fetchScores = async (showLoader = false) => {
+        if (showLoader) {
+            setLoading(true);
+        } else {
+            setIsRefreshing(true);
+        }
         setError('');
 
         try {
@@ -51,11 +56,13 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
             console.error('Error fetching scores:', err);
         } finally {
             setLoading(false);
+            setIsRefreshing(false);
         }
     };
 
     useEffect(() => {
-        fetchScores();
+        // Nur beim ersten Laden den vollen Loader zeigen
+        fetchScores(loading);
     }, [filter, walletAddress, refreshTrigger]);
 
     const formatDate = (date: Date | string) => {
@@ -100,7 +107,7 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
                 <div className="text-center text-red-600">
                     <p className="text-lg font-semibold">⚠️ {error}</p>
                     <button
-                        onClick={fetchScores}
+                        onClick={() => fetchScores(true)}
                         className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
                     >
                         Retry
@@ -117,12 +124,12 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-2xl font-bold text-gray-800">🏆 Leaderboard</h2>
                     <button
-                        onClick={fetchScores}
-                        disabled={loading}
+                        onClick={() => fetchScores(false)}
+                        disabled={loading || isRefreshing}
                         className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition text-sm font-medium disabled:opacity-50 flex items-center gap-1"
                         title="Aktualisieren"
                     >
-                        <span>🔄</span>
+                        <span className={isRefreshing ? 'animate-spin' : ''}>🔄</span>
                         <span className="hidden sm:inline">Refresh</span>
                     </button>
                 </div>
@@ -144,7 +151,7 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
                     >
-                        This Week
+                        Letzte 7 Tage
                     </button>
                     {walletAddress && (
                         <button
@@ -163,7 +170,14 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
             {/* Scores List */}
             {scores.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
-                    <p className="text-lg">No scores yet. Be the first! 🎮</p>
+                    <p className="text-lg mb-2">
+                        {filter === 'week' && '📅 Keine Scores in den letzten 7 Tagen'}
+                        {filter === 'my-scores' && '🎮 Du hast noch keine Scores'}
+                        {filter === 'all-time' && '🎮 Noch keine Scores. Sei der Erste!'}
+                    </p>
+                    <p className="text-sm">
+                        {filter !== 'all-time' && 'Spiele eine Runde und speichere deinen Score!'}
+                    </p>
                 </div>
             ) : (
                 <div className="space-y-2">
