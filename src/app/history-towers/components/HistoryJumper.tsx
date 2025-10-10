@@ -1,8 +1,13 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
+import { useAccount } from 'wagmi'
+import HighscoreDialog from './HighscoreDialog'
+import HighscoreTable from './HighscoreTable'
+import type { ScoreSubmitResponse } from '@/types/game'
 
 export default function HistoryJumper() {
+    const { address } = useAccount()
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
     function drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r = 6) {
         ctx.beginPath()
@@ -123,11 +128,10 @@ export default function HistoryJumper() {
     const [paused, setPaused] = useState(false)
     const [gameOver, setGameOver] = useState(false)
     const [score, setScore] = useState(0)
-    const [best, setBest] = useState<number>(() => {
-        if (typeof window === 'undefined') return 0
-        const b = Number(localStorage.getItem('historyjumper_best') || '0')
-        return Number.isFinite(b) ? b : 0
-    })
+    const [best, setBest] = useState<number>(0)
+    const [showHighscoreDialog, setShowHighscoreDialog] = useState(false)
+    const [showLeaderboard, setShowLeaderboard] = useState(false)
+    const [leaderboardRefresh, setLeaderboardRefresh] = useState(0)
 
     const WIDTH = 360
     const HEIGHT = 640
@@ -517,12 +521,65 @@ export default function HistoryJumper() {
         setPaused(false)
         const finalScore = Math.floor(stateRef.current.distanceClimbed)
         setScore(finalScore)
-        setBest(prev => {
-            const b = Math.max(prev, finalScore)
-            if (typeof window !== 'undefined') localStorage.setItem('historyjumper_best', String(b))
-            return b
-        })
+        // Best wird jetzt aus der Datenbank geholt, nicht mehr aus localStorage
+        // Zeige Highscore-Dialog an
+        setShowHighscoreDialog(true)
     }
+
+    // Load personal best from database
+    useEffect(() => {
+        const fetchPersonalBest = async () => {
+            try {
+                let url = '/api/game/scores?type=top&limit=1'
+
+                // Wenn Wallet verbunden ist, hole den persönlichen Highscore
+                if (address) {
+                    url = `/api/game/scores?type=user&address=${address}&limit=1`
+                }
+
+                // Verhindere Browser-Caching
+                const response = await fetch(url, {
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                })
+                const data = await response.json()
+
+                if (data.success && data.scores && data.scores.length > 0) {
+                    setBest(data.scores[0].score)
+                } else if (address) {
+                    // Wenn keine Scores für diese Wallet, hole globalen Top-Score
+                    const globalResponse = await fetch('/api/game/scores?type=top&limit=1', {
+                        cache: 'no-store',
+                        headers: {
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache',
+                            'Expires': '0'
+                        }
+                    })
+                    const globalData = await globalResponse.json()
+                    if (globalData.success && globalData.scores && globalData.scores.length > 0) {
+                        setBest(globalData.scores[0].score)
+                    } else {
+                        // Keine Scores in DB - setze auf 0
+                        setBest(0)
+                    }
+                } else {
+                    // Keine Scores in DB - setze auf 0
+                    setBest(0)
+                }
+            } catch (error) {
+                console.error('Error fetching personal best:', error)
+                // Bei Fehler auf 0 setzen
+                setBest(0)
+            }
+        }
+
+        fetchPersonalBest()
+    }, [address, leaderboardRefresh]) // Aktualisiere wenn Wallet sich ändert oder neuer Score submitted
 
     useEffect(() => {
         // Load random player image
@@ -848,10 +905,52 @@ export default function HistoryJumper() {
                     <div className="bg-primary px-6 py-3 text-center">
                         <p className="text-xs text-gray-600 font-medium">
                             <span className="hidden sm:inline">Tastatur: ← → bewegen, ␣ springen • </span>
-                            {best > 0 && <span className="text-emerald-600 font-bold">Highscore: {best}</span>}
+                            {best > 0 && (
+                                <span className="text-emerald-600 font-bold">
+                                    {address ? 'Dein Highscore' : 'Globaler Highscore'}: {best.toLocaleString()}
+                                </span>
+                            )}
                         </p>
                     </div>
+
+                    {/* Leaderboard Toggle Button */}
+                    <div className="px-6 py-3">
+                        <button
+                            onClick={() => setShowLeaderboard(!showLeaderboard)}
+                            className="w-full px-4 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg hover:from-yellow-600 hover:to-orange-600 transition font-bold shadow-lg flex items-center justify-center gap-2"
+                        >
+                            <span>🏆</span>
+                            <span>{showLeaderboard ? 'Leaderboard verstecken' : 'Leaderboard anzeigen'}</span>
+                        </button>
+                    </div>
+
+                    {/* Leaderboard Section */}
+                    {showLeaderboard && (
+                        <div className="px-6 pb-6">
+                            <HighscoreTable
+                                walletAddress={address}
+                                refreshTrigger={leaderboardRefresh}
+                            />
+                        </div>
+                    )}
                 </div>
+
+                {/* Highscore Dialog */}
+                {showHighscoreDialog && (
+                    <HighscoreDialog
+                        score={score}
+                        level={Math.floor(stateRef.current.highestPlatformNumber / 50) + 1}
+                        platformsClimbed={stateRef.current.platformsClimbed}
+                        walletAddress={address}
+                        onClose={() => setShowHighscoreDialog(false)}
+                        onSubmitSuccess={(response: ScoreSubmitResponse) => {
+                            if (response.isTopScore) {
+                                // Aktualisiere Leaderboard
+                                setLeaderboardRefresh(prev => prev + 1)
+                            }
+                        }}
+                    />
+                )}
             </div>
         </div>
     )

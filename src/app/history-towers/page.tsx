@@ -1,4 +1,4 @@
-import HistoryJumper from "./components/01-HistoryJumper";
+import { HistoryJumper } from "./components";
 
 export default function HistoryTowersPage() {
     return (
