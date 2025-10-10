@@ -535,7 +535,7 @@ export default function HistoryJumper() {
         // Load random player image
         const randomCharacter = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)]
         playerCharacterPath.current = randomCharacter  // Speichere den Pfad
-        
+
         const img = new Image()
         img.src = randomCharacter
         img.onload = () => {
