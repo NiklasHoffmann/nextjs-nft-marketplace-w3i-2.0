@@ -132,6 +132,8 @@ export default function HistoryJumper() {
     const [showHighscoreDialog, setShowHighscoreDialog] = useState(false)
     const [showLeaderboard, setShowLeaderboard] = useState(false)
     const [leaderboardRefresh, setLeaderboardRefresh] = useState(0)
+    const [motionEnabled, setMotionEnabled] = useState(false)
+    const [motionPermission, setMotionPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt')
 
     const WIDTH = 360
     const HEIGHT = 640
@@ -705,6 +707,40 @@ export default function HistoryJumper() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [running])
 
+    // Device Motion Control (Gyro/Accelerometer)
+    useEffect(() => {
+        if (!motionEnabled) return
+
+        const handleMotion = (event: DeviceOrientationEvent) => {
+            const s = stateRef.current
+            if (event.gamma === null) return
+
+            // gamma: Rotation um die Y-Achse (-90 bis 90)
+            // Negativ = nach links kippen, Positiv = nach rechts kippen
+            const tilt = event.gamma
+
+            // Schwellenwerte für Bewegung (kleinere Werte = sensibler)
+            const threshold = 8 // Grad
+
+            if (tilt < -threshold) {
+                s.left = true
+                s.right = false
+            } else if (tilt > threshold) {
+                s.right = true
+                s.left = false
+            } else {
+                // Neutralzone - keine Bewegung
+                s.left = false
+                s.right = false
+            }
+        }
+
+        window.addEventListener('deviceorientation', handleMotion)
+        return () => {
+            window.removeEventListener('deviceorientation', handleMotion)
+        }
+    }, [motionEnabled])
+
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             const s = stateRef.current
@@ -755,6 +791,40 @@ export default function HistoryJumper() {
     const handleResume = () => {
         setRunning(true)
         setPaused(false)
+    }
+
+    const requestMotionPermission = async () => {
+        // Check if on iOS 13+ which requires permission
+        if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+            try {
+                const permission = await (DeviceOrientationEvent as any).requestPermission()
+                if (permission === 'granted') {
+                    setMotionEnabled(true)
+                    setMotionPermission('granted')
+                } else {
+                    setMotionPermission('denied')
+                }
+            } catch (error) {
+                console.error('Error requesting motion permission:', error)
+                setMotionPermission('denied')
+            }
+        } else {
+            // Not iOS 13+ or permission not needed
+            setMotionEnabled(true)
+            setMotionPermission('granted')
+        }
+    }
+
+    const toggleMotionControl = () => {
+        if (motionEnabled) {
+            setMotionEnabled(false)
+        } else {
+            if (motionPermission === 'granted') {
+                setMotionEnabled(true)
+            } else {
+                requestMotionPermission()
+            }
+        }
     }
 
     return (
@@ -889,9 +959,25 @@ export default function HistoryJumper() {
 
                     {/* Touch Controls */}
                     <div className="bg-primary p-4">
+                        {/* Motion Control Toggle - nur auf Mobile */}
+                        <div className="mb-3 md:hidden">
+                            <button
+                                onClick={toggleMotionControl}
+                                className={`w-full px-4 py-2 rounded-lg font-medium transition flex items-center justify-center gap-2 ${motionEnabled
+                                        ? 'bg-green-500 text-white'
+                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                    }`}
+                            >
+                                <span className="text-xl">{motionEnabled ? '📱' : '🎮'}</span>
+                                <span className="text-sm">
+                                    {motionEnabled ? 'Bewegungssteuerung AN' : 'Bewegungssteuerung (kippen)'}
+                                </span>
+                            </button>
+                        </div>
+
                         <div className="flex items-center justify-between gap-3">
-                            {/* Links/Rechts Buttons auf der linken Seite */}
-                            <div className="flex gap-2 flex-1">
+                            {/* Links/Rechts Buttons auf der linken Seite - versteckt wenn Motion aktiv */}
+                            <div className={`flex gap-2 flex-1 transition-opacity ${motionEnabled ? 'opacity-30 pointer-events-none' : ''}`}>
                                 <button
                                     onMouseDown={() => handleTouchButton('left', true)}
                                     onMouseUp={() => handleTouchButton('left', false)}
