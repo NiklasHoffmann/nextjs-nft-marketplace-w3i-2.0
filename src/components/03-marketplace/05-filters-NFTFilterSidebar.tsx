@@ -119,7 +119,7 @@ export function NFTFilterSidebar({
     // Update parent when filters change
     useEffect(() => {
         onFiltersChange(filters);
-    }, [filters, onFiltersChange]);
+    }, [filters]); // Removed onFiltersChange from dependencies to prevent infinite loop
 
     const updateFilters = (updates: Partial<NFTFilters>) => {
         setFilters(prev => ({ ...prev, ...updates }));
@@ -224,8 +224,8 @@ export function NFTFilterSidebar({
                         key={option.field}
                         onClick={() => updateSort(option.field)}
                         className={`w-12 h-12 flex items-center justify-center rounded-lg transition-all duration-200 hover:scale-110 relative ${currentSort.field === option.field
-                                ? 'bg-blue-500 text-white shadow-md'
-                                : 'bg-gray-50 hover:bg-gray-100'
+                            ? 'bg-blue-500 text-white shadow-md'
+                            : 'bg-gray-50 hover:bg-gray-100'
                             }`}
                         title={`${option.label} ${currentSort.field === option.field ? (currentSort.direction === 'desc' ? '↓' : '↑') : ''}`}
                     >
@@ -325,8 +325,8 @@ export function NFTFilterSidebar({
                                         key={category}
                                         onClick={() => toggleCategory(category)}
                                         className={`w-full px-4 py-2.5 rounded-lg text-left transition-all text-sm ${filters.categories.includes(category)
-                                                ? 'bg-blue-500 text-white shadow-md'
-                                                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                                            ? 'bg-blue-500 text-white shadow-md'
+                                            : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
                                             }`}
                                     >
                                         <span className="font-medium">{category}</span>
@@ -489,8 +489,8 @@ export function NFTFilterSidebar({
                                             key={rarity}
                                             onClick={() => toggleRarity(rarity)}
                                             className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all capitalize ${filters.rarities.includes(rarity)
-                                                    ? getRarityColor(rarity)
-                                                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                                ? getRarityColor(rarity)
+                                                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                                                 }`}
                                         >
                                             {rarity}
@@ -524,8 +524,8 @@ export function NFTFilterSidebar({
                                         key={option.field}
                                         onClick={() => updateSort(option.field)}
                                         className={`w-full px-4 py-2 rounded-lg text-left transition-all flex items-center justify-between ${currentSort.field === option.field
-                                                ? 'bg-blue-500 text-white'
-                                                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                                            ? 'bg-blue-500 text-white'
+                                            : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
                                             }`}
                                     >
                                         <span className="flex items-center gap-2">

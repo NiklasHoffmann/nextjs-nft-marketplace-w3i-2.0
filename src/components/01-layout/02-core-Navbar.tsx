@@ -129,9 +129,9 @@ export default function Navbar() {
 
     return (
         <>
-            <header className="w-full fixed bg-primary shadow flex items-center justify-between px-6 md:pl-16 md:pr-6 py-3 z-[60]">
+            <header className="w-full fixed bg-primary shadow flex items-center justify-between px-6 md:pr-6 py-3 z-[60]">
                 {/* Left Logo - hidden on mobile */}
-                <div className="hidden md:flex items-center mr-6">
+                <div className="hidden md:flex items-center flex-shrink-0 mr-6">
                     <Link href="/" className="flex items-center">
                         <Image src="/media/Logo-w3i-marketplace.png" alt="Logo" className="h-10 w-auto" width={256} height={64} />
                     </Link>

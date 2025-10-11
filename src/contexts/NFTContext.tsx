@@ -421,16 +421,20 @@ export function ModernNFTProvider({
     const storeRef = useRef(new NFTCacheStore());
     const store = storeRef.current;
 
+    // Store cacheExpiration in ref to avoid useCallback dependencies
+    const cacheExpirationRef = useRef(cacheExpiration);
+    cacheExpirationRef.current = cacheExpiration;
+
     // ===== HELPER FUNCTIONS =====
 
     const isDataFreshInternal = useCallback((entry: CacheEntry): boolean => {
-        return Date.now() - entry.timestamp < cacheExpiration;
-    }, [cacheExpiration]);
+        return Date.now() - entry.timestamp < cacheExpirationRef.current;
+    }, []); // no dependencies - use ref
 
     const isDataStale = useCallback((entry: CacheEntry): boolean => {
         const age = Date.now() - entry.timestamp;
-        return age > cacheExpiration && age < STALE_EXPIRATION_MS;
-    }, [cacheExpiration]);
+        return age > cacheExpirationRef.current && age < STALE_EXPIRATION_MS;
+    }, []); // no dependencies - use ref
 
     // ===== CORE LOADING FUNCTION =====
 
@@ -613,7 +617,7 @@ export function ModernNFTProvider({
                 throw error;
             }
         });
-    }, [store, isDataFreshInternal, isDataStale]);
+    }, []); // no dependencies - store and helpers are stable via refs
 
     // ===== PUBLIC API =====
 
@@ -621,41 +625,41 @@ export function ModernNFTProvider({
         const nftKey = createNFTKey(nftAddress, tokenId);
         const entry = store.get(nftKey);
         return entry?.data || null;
-    }, [store]);
+    }, []); // store is a ref, always stable
 
     const getAllNFTs = useCallback((): AggregatedNFT[] => {
         return store.getAll().map(entry => entry.data);
-    }, [store]);
+    }, []); // store is a ref, always stable
 
     const getNFTsByOwner = useCallback((ownerAddress: string): AggregatedNFT[] => {
-        const allNFTs = getAllNFTs();
+        const allNFTs = store.getAll().map(entry => entry.data);
         return filterByOwner(allNFTs, ownerAddress);
-    }, [getAllNFTs]);
+    }, []); // use store directly, not getAllNFTs
 
     const getNFTsBySeller = useCallback((sellerAddress: string): AggregatedNFT[] => {
-        const allNFTs = getAllNFTs();
+        const allNFTs = store.getAll().map(entry => entry.data);
         return filterBySeller(allNFTs, sellerAddress);
-    }, [getAllNFTs]);
+    }, []); // use store directly, not getAllNFTs
 
     const getListedNFTs = useCallback((): AggregatedNFT[] => {
-        const allNFTs = getAllNFTs();
+        const allNFTs = store.getAll().map(entry => entry.data);
         return filterListed(allNFTs);
-    }, [getAllNFTs]);
+    }, []); // use store directly, not getAllNFTs
 
     const loadNFT = useCallback((nftAddress: string, tokenId: string): Promise<AggregatedNFT> => {
         return loadNFTInternal(nftAddress, tokenId, false);
-    }, [loadNFTInternal]);
+    }, []); // loadNFTInternal is stable
 
     const loadMultipleNFTs = useCallback(async (
         identifiers: Array<{ nftAddress: string, tokenId: string }>
     ): Promise<AggregatedNFT[]> => {
 
         const promises = identifiers.map(({ nftAddress, tokenId }) =>
-            loadNFT(nftAddress, tokenId)
+            loadNFTInternal(nftAddress, tokenId, false)
         );
 
         return Promise.all(promises);
-    }, [loadNFT]);
+    }, []); // use loadNFTInternal directly
 
     const loadAllNFTs = useCallback(async (): Promise<AggregatedNFT[]> => {
 
@@ -714,32 +718,32 @@ export function ModernNFTProvider({
             // Don't throw - preloading failure shouldn't break the app
             return [];
         }
-    }, [loadMultipleNFTs]);
+    }, []); // use loadNFTInternal directly, no dependencies
 
     const refreshNFT = useCallback((nftAddress: string, tokenId: string): Promise<AggregatedNFT> => {
 
         return loadNFTInternal(nftAddress, tokenId, true);
-    }, [loadNFTInternal]);
+    }, []); // loadNFTInternal is stable
 
     const clearCache = useCallback(() => {
 
         store.clear();
-    }, [store]);
+    }, []); // store is a ref, always stable
 
     const clearExpiredCache = useCallback(() => {
 
         store.clearExpired(STALE_EXPIRATION_MS);
-    }, [store]);
+    }, []); // store is a ref, always stable
 
     const getCacheStats = useCallback(() => {
         return store.getStats();
-    }, [store]);
+    }, []); // store is a ref, always stable
 
     const isDataFresh = useCallback((nftAddress: string, tokenId: string): boolean => {
         const nftKey = createNFTKey(nftAddress, tokenId);
         const entry = store.get(nftKey);
         return entry ? isDataFreshInternal(entry) : false;
-    }, [store, isDataFreshInternal]);
+    }, []); // store and isDataFreshInternal are stable
 
     const getDisplayDataHelper = useCallback((nft: AggregatedNFT) => {
         return getDisplayData(nft);
@@ -754,11 +758,11 @@ export function ModernNFTProvider({
     useEffect(() => {
         // Clear expired cache every 5 minutes
         const interval = setInterval(() => {
-            clearExpiredCache();
+            store.clearExpired(STALE_EXPIRATION_MS);
         }, 5 * 60 * 1000);
 
         return () => clearInterval(interval);
-    }, [clearExpiredCache]);
+    }, []); // store is stable, no need for clearExpiredCache dependency
 
     // ===== LOCALSTORAGE PERSISTENCE =====
 

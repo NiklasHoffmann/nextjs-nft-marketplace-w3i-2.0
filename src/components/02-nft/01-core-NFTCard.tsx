@@ -748,4 +748,5 @@ export function NFTCard(props: NFTCardAllProps) {
   );
 }
 
-export default NFTCard;
+// Memoize component to prevent unnecessary re-renders
+export default memo(NFTCard);
