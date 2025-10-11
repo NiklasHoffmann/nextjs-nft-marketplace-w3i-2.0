@@ -9,7 +9,7 @@ import { useActiveItems, useNFTPerformance } from '@/hooks';
 import { useNFTFilters } from '@/hooks/nfts/08-utils-useNFTFilters';
 import { useNFTContext } from '@/contexts/NFTContext';
 import { NFTCard, ImagePreloader } from '@/components';
-import { NFTFilterBar } from './05-filters-NFTFilterBar';
+import { NFTFilterSidebar } from './05-filters-NFTFilterSidebar';
 import type { NFTFilters, NFTSortOptions } from './05-filters-NFTFilterBar';
 import type { FilterableNFTItem } from '@/hooks/nfts/08-utils-useNFTFilters';
 
@@ -307,8 +307,8 @@ export function ActiveItemsList() {
         <div className="pt-8 pb-2 w-full">
             <ImagePreloader imageUrls={imageUrls} priority={true} />
 
-            {/* NFT Filter Bar - Fixed position with spacer */}
-            <NFTFilterBar
+            {/* NFT Filter Sidebar - Slide-out from left */}
+            <NFTFilterSidebar
                 onFiltersChange={setFilters}
                 onSortChange={setSort}
                 currentSort={sort}
@@ -316,232 +316,232 @@ export function ActiveItemsList() {
                 filteredCount={filteredCount}
             />
 
-            {/* Spacer for fixed FilterBar - approximate height */}
-            <div className="h-20"></div>
-
-            {/* Enhanced Header with Performance Stats*/}
-            <div className="max-w-7xl mx-auto px-6">
-                {!isAdmin && (
-                    <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                            <div>
-                                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                                    Active Items ({filteredCount} / {totalCount})
-                                    <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                                        FILTERED
-                                    </span>
-                                </h2>
-                                <p className="text-sm text-gray-600 mt-1">
-                                    Live marketplace data with intelligent filtering & caching
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <span className="text-sm text-gray-500">
-                                    Last updated: {lastUpdate.toLocaleTimeString()}
-                                </span>
-                                <button
-                                    onClick={handleManualRefresh}
-                                    disabled={graphLoading || isManualRefreshing}
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg transition-all duration-300 shadow-sm hover:shadow-md text-sm font-medium"
-                                    title="Refresh marketplace data"
-                                >
-                                    {graphLoading || isManualRefreshing ? (
-                                        <span className="flex items-center gap-2">
-                                            <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                                            Refreshing...
+            {/* Main Content - mit Left Padding für Sidebar nur auf Desktop */}
+            <div className="md:pl-16">
+                {/* Enhanced Header with Performance Stats*/}
+                <div className="max-w-7xl mx-auto px-6">
+                    {!isAdmin && (
+                        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                                        Active Items ({filteredCount} / {totalCount})
+                                        <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                                            FILTERED
                                         </span>
-                                    ) : (
-                                        <span className="flex items-center gap-2">
-                                            ↻ Refresh
-                                        </span>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Performance Indicators - Admin Only */}
-                        <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-                            <div className="bg-white p-3 rounded-lg shadow-sm">
-                                <div className="font-semibold text-blue-600">{safeItems.length}</div>
-                                <div className="text-gray-600">Total Items</div>
-                            </div>
-                            <div className="bg-white p-3 rounded-lg shadow-sm">
-                                <div className="font-semibold text-green-600">{cachedCount}</div>
-                                <div className="text-gray-600">Cached NFTs</div>
-                            </div>
-                            <div className="bg-white p-3 rounded-lg shadow-sm">
-                                <div className="font-semibold text-purple-600">{visibleCount}</div>
-                                <div className="text-gray-600">Visible Items</div>
-                            </div>
-                            <div className="bg-white p-3 rounded-lg shadow-sm">
-                                <div className="font-semibold text-yellow-600">{loadingCount}</div>
-                                <div className="text-gray-600">Loading</div>
-                            </div>
-                            <div className="bg-white p-3 rounded-lg shadow-sm">
-                                <div className="font-semibold text-indigo-600">{performanceData.fresh}/{performanceData.total}</div>
-                                <div className="text-gray-600">Memory</div>
-                            </div>
-                        </div>
-                        <div className="mt-3 text-xs text-gray-600">
-                            Features: Graph Integration • Intelligent Caching • Staggered Loading • Auto-refresh • Performance Monitoring
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Randloses NFT Grid ohne seitliche Scroll-Buttons */}
-            <div className="relative overflow-visible pt-8 pb-4">
-                {/* Scrollbare NFT Container - Edge-to-edge */}
-                <div
-                    ref={scrollContainerRef}
-                    className="flex gap-6 pb-8 pt-8 scrollbar-hide scroll-smooth pl-8 pr-6"
-                    style={{
-                        scrollBehavior: 'smooth',
-                        paddingBottom: '32px', // Padding für Hover-Schatten unten
-                        // Verhindert das Abschneiden beim Hover
-                        overflowX: 'auto',
-                        overflowY: 'visible'
-                    }}
-                >
-                    {visibleItems.map((item: any, index: number) => {
-                        // Check if page was already visited (prevent animation on back navigation)
-                        const wasVisited = typeof window !== 'undefined' && sessionStorage.getItem('activeItemsList-visited') === 'true';
-
-                        return (
-                            <div
-                                key={item.listingId}
-                                className="flex-shrink-0 w-60"
-                                style={{
-                                    // Only animate on FIRST visit, instant on back navigation! 🚀
-                                    animationName: wasVisited ? 'none' : 'fadeInUp',
-                                    animationDuration: wasVisited ? '0s' : '0.5s',
-                                    animationTimingFunction: 'ease-out',
-                                    animationFillMode: 'forwards',
-                                    animationDelay: wasVisited ? '0ms' : `${index * 80}ms`,
-                                    opacity: wasVisited ? 1 : undefined // Instant opacity if visited
-                                }}
-                            >
-                                <NFTCard
-                                    contractAddress={item.contractAddress || item.nftAddress}
-                                    tokenId={item.tokenId}
-                                    listingId={item.listingId}
-                                    price={item.price}
-                                    seller={item.seller}
-                                    buyer={item.buyer}
-                                    isListed={item.isListed}
-                                    desiredNftAddress={item.desiredNftAddress}
-                                    desiredTokenId={item.desiredTokenId}
-                                    priority={index < 12} // More images get priority loading
-                                    enableInsights={true} // Enable insights for all NFTs in the active items list
-                                />
-                            </div>
-                        );
-                    })}
-
-                    {/* Progressive Loading Indicator */}
-                    {visibleCount < filteredItems.length && (
-                        <div className="flex-shrink-0 w-60">
-                            <div className="h-72 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center">
-                                <div className="text-center">
-                                    <div className="animate-spin w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"></div>
-                                    <div className="text-sm font-medium text-gray-600">Loading more items...</div>
-                                    <div className="text-xs text-gray-500 mt-1">
-                                        {filteredItems.length - visibleCount} remaining
-                                    </div>
+                                    </h2>
+                                    <p className="text-sm text-gray-600 mt-1">
+                                        Live marketplace data with intelligent filtering & caching
+                                    </p>
                                 </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-sm text-gray-500">
+                                        Last updated: {lastUpdate.toLocaleTimeString()}
+                                    </span>
+                                    <button
+                                        onClick={handleManualRefresh}
+                                        disabled={graphLoading || isManualRefreshing}
+                                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg transition-all duration-300 shadow-sm hover:shadow-md text-sm font-medium"
+                                        title="Refresh marketplace data"
+                                    >
+                                        {graphLoading || isManualRefreshing ? (
+                                            <span className="flex items-center gap-2">
+                                                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                                                Refreshing...
+                                            </span>
+                                        ) : (
+                                            <span className="flex items-center gap-2">
+                                                ↻ Refresh
+                                            </span>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Performance Indicators - Admin Only */}
+                            <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                                <div className="bg-white p-3 rounded-lg shadow-sm">
+                                    <div className="font-semibold text-blue-600">{safeItems.length}</div>
+                                    <div className="text-gray-600">Total Items</div>
+                                </div>
+                                <div className="bg-white p-3 rounded-lg shadow-sm">
+                                    <div className="font-semibold text-green-600">{cachedCount}</div>
+                                    <div className="text-gray-600">Cached NFTs</div>
+                                </div>
+                                <div className="bg-white p-3 rounded-lg shadow-sm">
+                                    <div className="font-semibold text-purple-600">{visibleCount}</div>
+                                    <div className="text-gray-600">Visible Items</div>
+                                </div>
+                                <div className="bg-white p-3 rounded-lg shadow-sm">
+                                    <div className="font-semibold text-yellow-600">{loadingCount}</div>
+                                    <div className="text-gray-600">Loading</div>
+                                </div>
+                                <div className="bg-white p-3 rounded-lg shadow-sm">
+                                    <div className="font-semibold text-indigo-600">{performanceData.fresh}/{performanceData.total}</div>
+                                    <div className="text-gray-600">Memory</div>
+                                </div>
+                            </div>
+                            <div className="mt-3 text-xs text-gray-600">
+                                Features: Graph Integration • Intelligent Caching • Staggered Loading • Auto-refresh • Performance Monitoring
                             </div>
                         </div>
                     )}
                 </div>
 
-                {/* Scroll Buttons unter der Liste - hidden on mobile */}
-                <div className="hidden md:flex justify-center gap-6 mt-6">
-                    <button
-                        onClick={scrollLeft}
-                        disabled={!canScrollLeft}
-                        className="flex items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
-                        aria-label="Scroll left"
+                {/* Randloses NFT Grid ohne seitliche Scroll-Buttons */}
+                <div className="relative overflow-visible pt-8 pb-4">
+                    {/* Scrollbare NFT Container - Edge-to-edge */}
+                    <div
+                        ref={scrollContainerRef}
+                        className="flex gap-6 pb-8 pt-8 scrollbar-hide scroll-smooth pl-8 pr-6"
+                        style={{
+                            scrollBehavior: 'smooth',
+                            paddingBottom: '32px', // Padding für Hover-Schatten unten
+                            // Verhindert das Abschneiden beim Hover
+                            overflowX: 'auto',
+                            overflowY: 'visible'
+                        }}
                     >
-                        {/* Pfeil links */}
-                        <svg className="w-5 h-5 text-gray-600 group-hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                        {/* Lightbulb Icon - 270° (90° + 180°) nach links leuchtend */}
-                        <div className="group-hover:drop-shadow-[0_0_16px_rgba(255,215,0,1)] transition-all duration-200">
-                            <Image
-                                src="/media/only-lightbulb.png"
-                                alt="Lightbulb"
-                                width={24}
-                                height={24}
-                                className="group-hover:scale-110 transition-transform duration-200"
-                                style={{ transform: 'rotate(270deg)' }}
-                                priority
-                            />
-                        </div>
-                    </button>
+                        {visibleItems.map((item: any, index: number) => {
+                            // Check if page was already visited (prevent animation on back navigation)
+                            const wasVisited = typeof window !== 'undefined' && sessionStorage.getItem('activeItemsList-visited') === 'true';
 
-                    <button
-                        onClick={scrollRight}
-                        disabled={!canScrollRight}
-                        className="flex items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
-                        aria-label="Scroll right"
-                    >
-                        {/* Lightbulb Icon - 90° nach rechts leuchtend */}
-                        <div className="group-hover:drop-shadow-[0_0_16px_rgba(255,215,0,1)] transition-all duration-200">
-                            <Image
-                                src="/media/only-lightbulb.png"
-                                alt="Lightbulb"
-                                width={24}
-                                height={24}
-                                className="group-hover:scale-110 transition-transform duration-200"
-                                style={{ transform: 'rotate(90deg)' }}
-                                priority
-                            />
-                        </div>
-                        {/* Pfeil rechts */}
-                        <svg className="w-5 h-5 text-gray-600 group-hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
+                            return (
+                                <div
+                                    key={item.listingId}
+                                    className="flex-shrink-0 w-60"
+                                    style={{
+                                        // Only animate on FIRST visit, instant on back navigation! 🚀
+                                        animationName: wasVisited ? 'none' : 'fadeInUp',
+                                        animationDuration: wasVisited ? '0s' : '0.5s',
+                                        animationTimingFunction: 'ease-out',
+                                        animationFillMode: 'forwards',
+                                        animationDelay: wasVisited ? '0ms' : `${index * 80}ms`,
+                                        opacity: wasVisited ? 1 : undefined // Instant opacity if visited
+                                    }}
+                                >
+                                    <NFTCard
+                                        contractAddress={item.contractAddress || item.nftAddress}
+                                        tokenId={item.tokenId}
+                                        listingId={item.listingId}
+                                        price={item.price}
+                                        seller={item.seller}
+                                        buyer={item.buyer}
+                                        isListed={item.isListed}
+                                        desiredNftAddress={item.desiredNftAddress}
+                                        desiredTokenId={item.desiredTokenId}
+                                        priority={index < 12} // More images get priority loading
+                                        enableInsights={true} // Enable insights for all NFTs in the active items list
+                                    />
+                                </div>
+                            );
+                        })}
+
+                        {/* Progressive Loading Indicator */}
+                        {visibleCount < filteredItems.length && (
+                            <div className="flex-shrink-0 w-60">
+                                <div className="h-72 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center">
+                                    <div className="text-center">
+                                        <div className="animate-spin w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"></div>
+                                        <div className="text-sm font-medium text-gray-600">Loading more items...</div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                            {filteredItems.length - visibleCount} remaining
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Scroll Buttons unter der Liste - hidden on mobile */}
+                    <div className="hidden md:flex justify-center gap-6 mt-6">
+                        <button
+                            onClick={scrollLeft}
+                            disabled={!canScrollLeft}
+                            className="flex items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
+                            aria-label="Scroll left"
+                        >
+                            {/* Pfeil links */}
+                            <svg className="w-5 h-5 text-gray-600 group-hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                            {/* Lightbulb Icon - 270° (90° + 180°) nach links leuchtend */}
+                            <div className="group-hover:drop-shadow-[0_0_16px_rgba(255,215,0,1)] transition-all duration-200">
+                                <Image
+                                    src="/media/only-lightbulb.png"
+                                    alt="Lightbulb"
+                                    width={24}
+                                    height={24}
+                                    className="group-hover:scale-110 transition-transform duration-200"
+                                    style={{ transform: 'rotate(270deg)' }}
+                                    priority
+                                />
+                            </div>
+                        </button>
+
+                        <button
+                            onClick={scrollRight}
+                            disabled={!canScrollRight}
+                            className="flex items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
+                            aria-label="Scroll right"
+                        >
+                            {/* Lightbulb Icon - 90° nach rechts leuchtend */}
+                            <div className="group-hover:drop-shadow-[0_0_16px_rgba(255,215,0,1)] transition-all duration-200">
+                                <Image
+                                    src="/media/only-lightbulb.png"
+                                    alt="Lightbulb"
+                                    width={24}
+                                    height={24}
+                                    className="group-hover:scale-110 transition-transform duration-200"
+                                    style={{ transform: 'rotate(90deg)' }}
+                                    priority
+                                />
+                            </div>
+                            {/* Pfeil rechts */}
+                            <svg className="w-5 h-5 text-gray-600 group-hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            {/* Performance Monitoring Section - Admin Only */}
-            {!isAdmin && safeItems.length > 0 && (
-                <div className="max-w-7xl mx-auto px-6 mt-8">
-                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                        <h3 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
-                            ⚡ Performance Optimizations
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                            <div>
-                                <div className="font-medium text-green-700">Caching:</div>
-                                <ul className="text-green-600 ml-4 mt-1 space-y-1">
-                                    <li>• Image preloading & caching</li>
-                                    <li>• NFT data smart caching</li>
-                                    <li>• Intersection Observer lazy loading</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <div className="font-medium text-blue-700">Performance:</div>
-                                <ul className="text-blue-600 ml-4 mt-1 space-y-1">
-                                    <li>• Throttled auto-refresh (30s)</li>
-                                    <li>• Optimized glitter effects</li>
-                                    <li>• Progressive loading (first 12 items)</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <div className="font-medium text-purple-700">Data:</div>
-                                <ul className="text-purple-600 ml-4 mt-1 space-y-1">
-                                    <li>• The Graph integration</li>
-                                    <li>• Total items: {filteredItems.length}</li>
-                                    <li>• Visible: {Math.min(visibleCount, filteredItems.length)}</li>
-                                </ul>
+                {/* Performance Monitoring Section - Admin Only */}
+                {!isAdmin && safeItems.length > 0 && (
+                    <div className="max-w-7xl mx-auto px-6 mt-8">
+                        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                            <h3 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
+                                ⚡ Performance Optimizations
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                <div>
+                                    <div className="font-medium text-green-700">Caching:</div>
+                                    <ul className="text-green-600 ml-4 mt-1 space-y-1">
+                                        <li>• Image preloading & caching</li>
+                                        <li>• NFT data smart caching</li>
+                                        <li>• Intersection Observer lazy loading</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <div className="font-medium text-blue-700">Performance:</div>
+                                    <ul className="text-blue-600 ml-4 mt-1 space-y-1">
+                                        <li>• Throttled auto-refresh (30s)</li>
+                                        <li>• Optimized glitter effects</li>
+                                        <li>• Progressive loading (first 12 items)</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <div className="font-medium text-purple-700">Data:</div>
+                                    <ul className="text-purple-600 ml-4 mt-1 space-y-1">
+                                        <li>• The Graph integration</li>
+                                        <li>• Total items: {filteredItems.length}</li>
+                                        <li>• Visible: {Math.min(visibleCount, filteredItems.length)}</li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div> {/* Closing div for pl-20 wrapper */}
 
             {/* Optimized CSS Animation Styles */}
             <style jsx>{`

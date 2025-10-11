@@ -12,8 +12,8 @@ export default function Home() {
           <ActiveItemsList />
         </div>
 
-        {/* CollectionsTable - Mit normalem Container */}
-        <div className="w-full max-w-[98vw] px-4 mx-auto mt-2">
+        {/* CollectionsTable - Mit normalem Container + Sidebar Padding auf Desktop */}
+        <div className="w-full max-w-[98vw] px-4 md:pl-20 mx-auto mt-2">
           <CollectionsTable />
         </div>
       </main>

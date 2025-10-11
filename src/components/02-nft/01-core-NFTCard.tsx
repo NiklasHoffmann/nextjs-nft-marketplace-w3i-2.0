@@ -203,7 +203,7 @@ export function NFTCard(props: NFTCardAllProps) {
       isLoadingRef.current = true;
       nftContext.loadNFT(contractAddress, tokenId);
     }
-  }, [nftContext, contractAddress, tokenId, contextData]);
+  }, [contractAddress, tokenId, contextData]); // Removed nftContext from dependencies
 
   // Simple hover preloading
   const handleHover = useCallback(() => {
@@ -211,7 +211,7 @@ export function NFTCard(props: NFTCardAllProps) {
       isLoadingRef.current = true;
       nftContext.loadNFT(contractAddress, tokenId);
     }
-  }, [nftContext, contractAddress, tokenId, contextData]);
+  }, [contractAddress, tokenId, contextData]); // Removed nftContext from dependencies
 
   // Hybrid data approach: props override context data
   const displayData = useMemo(() => ({
@@ -555,7 +555,7 @@ export function NFTCard(props: NFTCardAllProps) {
       onTouchEnd={handleTouchEnd}
       style={tiltStyle}
     >
-      <div className={`hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] hover:scale-[1.02] transition-all duration-300 ease-out rounded-lg shadow-xl flex flex-col flex-end gap-2 w-full h-72 relative will-change-transform origin-center overflow-hidden border border-black ${getRarityBackground}`}>
+      <div className={`hover:shadow-[0_15px_30px_-8px_rgba(0,0,0,0.4)] hover:scale-[1.02] transition-all duration-300 ease-out rounded-lg shadow-xl flex flex-col flex-end gap-2 w-full h-72 relative will-change-transform origin-center border border-black ${getRarityBackground}`}>
         {/* Content container with bg-secondary and rounded corners */}
         <div className="absolute inset-2 shadow-lg bg-secondary rounded-md overflow-hidden flex flex-col h-[calc(100%-16px)]">
           {/* Blurred Background Image */}
