@@ -215,13 +215,15 @@ export function ActiveItemsList() {
 
     const scrollLeft = useCallback(() => {
         if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollBy({ left: -400, behavior: 'smooth' });
+            // 3 Karten: w-60 (240px) + gap-6 (24px) = 264px pro Karte × 3 = 792px
+            scrollContainerRef.current.scrollBy({ left: -792, behavior: 'smooth' });
         }
     }, []);
 
     const scrollRight = useCallback(() => {
         if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollBy({ left: 400, behavior: 'smooth' });
+            // 3 Karten: w-60 (240px) + gap-6 (24px) = 264px pro Karte × 3 = 792px
+            scrollContainerRef.current.scrollBy({ left: 792, behavior: 'smooth' });
         }
     }, []);
 
@@ -387,70 +389,14 @@ export function ActiveItemsList() {
                 )}
             </div>
 
-            {/* Randloses NFT Grid mit Scroll-Buttons */}
+            {/* Randloses NFT Grid ohne seitliche Scroll-Buttons */}
             <div className="relative overflow-visible pt-8 pb-4">
-                {/* Scroll Buttons - hidden on mobile */}
-                {canScrollLeft && (
-                    <button
-                        onClick={scrollLeft}
-                        className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 w-20 h-24 bg-primary rounded-lg shadow-lg border-2 border-secondary border border-black flex-col items-center justify-center hover:shadow-xl transition-all duration-200 group p-3"
-                        aria-label="Scroll left"
-                        style={{
-                            border: '2px solid #1273EB',
-                            outline: '1px solid black'
-                        }}
-                    >
-                        {/* Lightbulb Icon oben */}
-                        <Image
-                            src="/media/only-lightbulb.png"
-                            alt="Lightbulb"
-                            width={32}
-                            height={32}
-                            className="mb-2 group-hover:scale-110 transition-transform duration-200"
-                            priority
-                        />
-                        {/* Pfeil unten */}
-                        <svg className="w-6 h-6 text-black group-hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
-                )}
-
-                {canScrollRight && (
-                    <button
-                        onClick={scrollRight}
-                        className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 w-20 h-24 bg-primary rounded-lg shadow-lg flex-col items-center justify-center hover:shadow-xl transition-all duration-200 group p-3"
-                        aria-label="Scroll right"
-                        style={{
-                            border: '2px solid #1273EB',
-                            outline: '1px solid black'
-                        }}
-                    >
-                        {/* Lightbulb Icon oben */}
-                        <Image
-                            src="/media/only-lightbulb.png"
-                            alt="Lightbulb"
-                            width={32}
-                            height={32
-                            }
-                            className="mb-2 group-hover:scale-110 transition-transform duration-200"
-                            priority
-                        />
-                        {/* Pfeil unten */}
-                        <svg className="w-6 h-6 text-black group-hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
-                )}
-
                 {/* Scrollbare NFT Container - Edge-to-edge */}
                 <div
                     ref={scrollContainerRef}
                     className="flex gap-6 pb-8 pt-8 scrollbar-hide scroll-smooth pl-8 pr-6"
                     style={{
                         scrollBehavior: 'smooth',
-                        paddingLeft: '32px', // Erhöht für Hover-Effekte der ersten Karte
-                        paddingRight: '24px',
                         paddingBottom: '32px', // Padding für Hover-Schatten unten
                         // Verhindert das Abschneiden beim Hover
                         overflowX: 'auto',
@@ -506,6 +452,57 @@ export function ActiveItemsList() {
                             </div>
                         </div>
                     )}
+                </div>
+
+                {/* Scroll Buttons unter der Liste - hidden on mobile */}
+                <div className="hidden md:flex justify-center gap-6 mt-6">
+                    <button
+                        onClick={scrollLeft}
+                        disabled={!canScrollLeft}
+                        className="flex items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
+                        aria-label="Scroll left"
+                    >
+                        {/* Pfeil links */}
+                        <svg className="w-5 h-5 text-gray-600 group-hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                        {/* Lightbulb Icon - 270° (90° + 180°) nach links leuchtend */}
+                        <div className="group-hover:drop-shadow-[0_0_16px_rgba(255,215,0,1)] transition-all duration-200">
+                            <Image
+                                src="/media/only-lightbulb.png"
+                                alt="Lightbulb"
+                                width={24}
+                                height={24}
+                                className="group-hover:scale-110 transition-transform duration-200"
+                                style={{ transform: 'rotate(270deg)' }}
+                                priority
+                            />
+                        </div>
+                    </button>
+
+                    <button
+                        onClick={scrollRight}
+                        disabled={!canScrollRight}
+                        className="flex items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
+                        aria-label="Scroll right"
+                    >
+                        {/* Lightbulb Icon - 90° nach rechts leuchtend */}
+                        <div className="group-hover:drop-shadow-[0_0_16px_rgba(255,215,0,1)] transition-all duration-200">
+                            <Image
+                                src="/media/only-lightbulb.png"
+                                alt="Lightbulb"
+                                width={24}
+                                height={24}
+                                className="group-hover:scale-110 transition-transform duration-200"
+                                style={{ transform: 'rotate(90deg)' }}
+                                priority
+                            />
+                        </div>
+                        {/* Pfeil rechts */}
+                        <svg className="w-5 h-5 text-gray-600 group-hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
                 </div>
             </div>
 

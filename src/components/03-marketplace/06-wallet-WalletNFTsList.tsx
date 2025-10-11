@@ -188,9 +188,9 @@ export function WalletNFTsList({
         }
 
         return (
-            <div className={gridClassName}>
+            <div className={`${gridClassName} overflow-y-auto max-h-[calc(100vh-200px)] p-1`} style={{ scrollSnapType: 'y mandatory' }}>
                 {nftList.map((nft: any) => (
-                    <div key={`${nft.nftAddress}-${nft.tokenId}`} className="relative">
+                    <div key={`${nft.nftAddress}-${nft.tokenId}`} className="relative" style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}>
                         <NFTCard
                             contractAddress={nft.nftAddress}
                             tokenId={nft.tokenId}
