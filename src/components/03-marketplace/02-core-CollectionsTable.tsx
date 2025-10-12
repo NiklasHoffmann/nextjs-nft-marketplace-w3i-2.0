@@ -282,11 +282,11 @@ export function CollectionsTable({ currentSort, onSortChange, filters }: Collect
 
                 {/* Collections Grid mit Horizontal Scroll */}
                 <div className="relative overflow-visible pb-4">
-                    {/* Left Scroll Button - Overlay */}
+                    {/* Left Scroll Button - Overlay - Hidden on Mobile */}
                     {canScrollLeft && (
                         <button
                             onClick={() => scroll('left')}
-                            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 flex items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
+                            className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
                             aria-label="Nach links scrollen"
                         >
                             {/* Pfeil links */}
@@ -308,11 +308,11 @@ export function CollectionsTable({ currentSort, onSortChange, filters }: Collect
                         </button>
                     )}
 
-                    {/* Right Scroll Button - Overlay */}
+                    {/* Right Scroll Button - Overlay - Hidden on Mobile */}
                     {canScrollRight && (
                         <button
                             onClick={() => scroll('right')}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 flex items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
+                            className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
                             aria-label="Nach rechts scrollen"
                         >
                             {/* Lightbulb Icon - 90° nach rechts leuchtend */}
