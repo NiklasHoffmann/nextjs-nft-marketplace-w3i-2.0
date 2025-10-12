@@ -1,20 +1,46 @@
 // app/page.tsx
 'use client'
-import React from "react";
-import { ActiveItemsList, CollectionsTable } from "@/components";
+import React, { useState } from "react";
+import { ActiveItemsList, CollectionsTable, NFTFilterSidebar } from "@/components";
+import type { NFTFilters, NFTSortOptions } from "@/components/03-marketplace/05-filters-NFTFilterBar";
 
 export default function Home() {
+  const [filters, setFilters] = useState<NFTFilters>({
+    categories: [],
+    rarities: [],
+  });
+  const [sort, setSort] = useState<NFTSortOptions>({
+    field: 'price',
+    direction: 'desc'
+  });
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <main className="flex-1 flex flex-col py-8">
+      {/* NFTFilterSidebar - Einmalig für beide Listen */}
+      <NFTFilterSidebar
+        onFiltersChange={setFilters}
+        onSortChange={setSort}
+        currentSort={sort}
+        totalItems={0}
+        filteredCount={0}
+      />
+
+      <main className="flex-1 flex flex-col pt-[66px] py-8">
         {/* ActiveItemsList - Edge-to-edge ohne Container */}
         <div className="w-full">
-          <ActiveItemsList />
+          <ActiveItemsList
+            externalFilters={filters}
+            externalSort={sort}
+          />
         </div>
 
         {/* CollectionsTable - Mit normalem Container + Sidebar Padding auf Desktop */}
-        <div className="w-full max-w-[98vw] px-4 md:pl-20 mx-auto mt-2">
-          <CollectionsTable />
+        <div className="w-full">
+          <CollectionsTable
+            currentSort={sort}
+            onSortChange={setSort}
+            filters={filters}
+          />
         </div>
       </main>
       <footer className="w-full py-4 text-center text-gray-400 border-t mt-auto">

@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import Image from 'next/image';
 import { useAccount } from "wagmi";
 import { useRouter } from 'next/navigation';
 import { getAdminAddressesList } from '@/utils';
 import { useAllCollections } from '@/hooks';
 import { useETHPrice } from "@/contexts/CurrencyContext";
 import OptimizedNFTImage from '../02-nft/02-utils-OptimizedNFTImage';
+import type { NFTSortOptions, NFTFilters } from './05-filters-NFTFilterBar';
 
 interface CollectionData {
     contractAddress: string;
@@ -22,6 +24,12 @@ interface CollectionData {
     totalLikes: number; // Sum of all likes in collection
     totalWatchlist: number; // Sum of all watchlist entries
     items: any[];
+}
+
+interface CollectionsTableProps {
+    currentSort: NFTSortOptions;
+    onSortChange: (sort: NFTSortOptions) => void;
+    filters?: NFTFilters;
 }
 
 // Price display component for collections
@@ -58,11 +66,14 @@ const CollectionPriceDisplay = React.memo(({
 
 CollectionPriceDisplay.displayName = 'CollectionPriceDisplay';
 
-export function CollectionsTable() {
+export function CollectionsTable({ currentSort, onSortChange, filters }: CollectionsTableProps) {
     const [isClient, setIsClient] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
-    const [sortBy, setSortBy] = useState<'name' | 'totalSupply' | 'totalOwnedNFTs' | 'totalListedNFTs' | 'totalValue' | 'totalLikes' | 'totalWatchlist'>('totalValue');
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+    // Scroll state
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(false);
 
     // Router for navigation
     const router = useRouter();
@@ -93,33 +104,41 @@ export function CollectionsTable() {
         autoFetch: true
     });
 
-    // Sort collections
+    // Sort collections based on sidebar sort
     const sortedCollections = useMemo(() => {
         return [...collections].sort((a, b) => {
             let aValue: any, bValue: any;
 
-            switch (sortBy) {
+            switch (currentSort.field) {
                 case 'name':
                     aValue = a.name.toLowerCase();
                     bValue = b.name.toLowerCase();
                     break;
-                case 'totalSupply':
-                    aValue = a.totalSupply;
-                    bValue = b.totalSupply;
-                    break;
-                case 'totalListedNFTs':
-                    aValue = a.totalListedNFTs;
-                    bValue = b.totalListedNFTs;
-                    break;
-                case 'totalValue':
+                case 'price':
+                    // Map price to totalValue for collections
                     aValue = parseFloat(a.totalValue);
                     bValue = parseFloat(b.totalValue);
                     break;
-                case 'totalLikes':
+                case 'created':
+                    // Map created to totalSupply for collections
+                    aValue = a.totalSupply;
+                    bValue = b.totalSupply;
+                    break;
+                case 'rating':
+                    // Map rating to totalListedNFTs (Listed)
+                    aValue = a.totalListedNFTs;
+                    bValue = b.totalListedNFTs;
+                    break;
+                case 'views':
+                    // Map views to unlisted (totalSupply - totalListedNFTs)
+                    aValue = a.totalSupply - a.totalListedNFTs;
+                    bValue = b.totalSupply - b.totalListedNFTs;
+                    break;
+                case 'likes':
                     aValue = a.totalLikes;
                     bValue = b.totalLikes;
                     break;
-                case 'totalWatchlist':
+                case 'watchlistCount':
                     aValue = a.totalWatchlist;
                     bValue = b.totalWatchlist;
                     break;
@@ -127,43 +146,84 @@ export function CollectionsTable() {
                     return 0;
             }
 
-            if (sortDirection === 'asc') {
+            if (currentSort.direction === 'asc') {
                 return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
             } else {
                 return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
             }
         });
-    }, [collections, sortBy, sortDirection]);
+    }, [collections, currentSort]);
 
-    // Handle sorting
-    const handleSort = useCallback((field: typeof sortBy) => {
-        if (sortBy === field) {
-            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortBy(field);
-            setSortDirection('desc');
-        }
-    }, [sortBy]);
+    // Apply filters to collections
+    const filteredCollections = useMemo(() => {
+        if (!filters) return sortedCollections;
+
+        return sortedCollections.filter((collection) => {
+            // Min Supply filter
+            if (filters.minSupply !== undefined && collection.totalSupply < filters.minSupply) {
+                return false;
+            }
+
+            // Min Listed Items filter
+            if (filters.minListedItems !== undefined && collection.totalListedNFTs < filters.minListedItems) {
+                return false;
+            }
+
+            // Min Floor Price filter
+            if (filters.minFloorPrice !== undefined && collection.floorPrice) {
+                const floorPrice = parseFloat(collection.floorPrice);
+                if (floorPrice < filters.minFloorPrice) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }, [sortedCollections, filters]);
 
     // Handle collection click
     const handleCollectionClick = useCallback((contractAddress: string) => {
         router.push(`/nft/${contractAddress}`);
     }, [router]);
 
-    // Sort icon component
-    const SortIcon = ({ field }: { field: typeof sortBy }) => {
-        if (sortBy !== field) {
-            return <span className="text-gray-400">↕</span>;
-        }
-        return (
-            <span className="text-blue-600">
-                {sortDirection === 'asc' ? '↑' : '↓'}
-            </span>
-        );
-    };
-
     useEffect(() => {
         setIsClient(true);
+    }, []);
+
+    // Check scroll position
+    const checkScrollPosition = useCallback(() => {
+        if (!scrollContainerRef.current) return;
+
+        const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+        setCanScrollLeft(scrollLeft > 0);
+        setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+    }, []);
+
+    useEffect(() => {
+        checkScrollPosition();
+        const container = scrollContainerRef.current;
+        if (container) {
+            container.addEventListener('scroll', checkScrollPosition);
+            window.addEventListener('resize', checkScrollPosition);
+            return () => {
+                container.removeEventListener('scroll', checkScrollPosition);
+                window.removeEventListener('resize', checkScrollPosition);
+            };
+        }
+    }, [checkScrollPosition, filteredCollections]);
+
+    // Scroll functions
+    const scroll = useCallback((direction: 'left' | 'right') => {
+        if (!scrollContainerRef.current) return;
+        const scrollAmount = 400;
+        const newScrollLeft = direction === 'left'
+            ? scrollContainerRef.current.scrollLeft - scrollAmount
+            : scrollContainerRef.current.scrollLeft + scrollAmount;
+
+        scrollContainerRef.current.scrollTo({
+            left: newScrollLeft,
+            behavior: 'smooth'
+        });
     }, []);
 
     // Don't render on server
@@ -204,450 +264,196 @@ export function CollectionsTable() {
     }
 
     return (
-        <div className="py-8">
-            {/* Header */}
-            {!isAdmin && (
-                <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                                Collections ({collections.length})
-                                <span className="text-sm bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
-                                    OVERVIEW
-                                </span>
-                            </h2>
-                            <p className="text-sm text-gray-600 mt-1">
-                                Collection overview with marketplace statistics
-                            </p>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => refreshCollections?.()}
-                                disabled={collectionsLoading}
-                                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white rounded-lg transition-all duration-300 shadow-sm hover:shadow-md text-sm font-medium"
-                                title="Refresh collections data"
-                            >
-                                {collectionsLoading ? (
-                                    <span className="flex items-center gap-2">
-                                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                                        Refreshing...
-                                    </span>
-                                ) : (
-                                    <span className="flex items-center gap-2">
-                                        ↻ Refresh
-                                    </span>
-                                )}
-                            </button>
-                        </div>
-                    </div>
+        <div className="pt-8 pb-2 w-full">
+            {/* Main Content - mit Left Padding für Sidebar */}
+            <div className="md:pl-16 pl-10">
+                {/* Page Title */}
+                <div className="max-w-7xl mx-auto px-12 mb-6">
+                    <h1 className="text-4xl font-bold text-gray-900">
+                        Collections
+                    </h1>
+                    <p className="text-sm text-gray-600 pl-2 mt-2">
+                        {filteredCollections.length} {filteredCollections.length === 1 ? 'Collection' : 'Collections'} gefunden
+                        {filters && filteredCollections.length !== collections.length && (
+                            <span className="text-blue-600"> (von {collections.length} total)</span>
+                        )}
+                    </p>
                 </div>
-            )}
 
-            {/* Collections Table - Desktop Only */}
-            <div className="hidden md:block bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                            <tr>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Preview</th>
-                                <th
-                                    className="text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors"
-                                    onClick={() => handleSort('name')}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        Collection <SortIcon field="name" />
-                                    </div>
-                                </th>
-                                <th
-                                    className="text-center py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors"
-                                    onClick={() => handleSort('totalSupply')}
-                                >
-                                    <div className="flex items-center justify-center gap-2">
-                                        Supply <SortIcon field="totalSupply" />
-                                    </div>
-                                </th>
-                                <th
-                                    className="text-center py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors"
-                                    onClick={() => handleSort('totalListedNFTs')}
-                                >
-                                    <div className="flex items-center justify-center gap-2">
-                                        Listed / Total <SortIcon field="totalListedNFTs" />
-                                    </div>
-                                </th>
-                                <th
-                                    className="text-center py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors"
-                                    onClick={() => handleSort('totalLikes')}
-                                >
-                                    <div className="flex items-center justify-center gap-2">
-                                        Social <SortIcon field="totalLikes" />
-                                    </div>
-                                </th>
-                                <th
-                                    className="text-right py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors"
-                                    onClick={() => handleSort('totalValue')}
-                                >
-                                    <div className="flex items-center justify-end gap-2">
-                                        Value <SortIcon field="totalValue" />
-                                    </div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {sortedCollections.map((collection, index) => (
-                                <tr
-                                    key={collection.contractAddress || `unknown-${index}`}
-                                    className="hover:bg-gray-50 transition-colors cursor-pointer"
-                                    onClick={() => handleCollectionClick(collection.contractAddress)}
-                                    style={{
-                                        animationName: 'fadeInUp',
-                                        animationDuration: '0.5s',
-                                        animationTimingFunction: 'ease-out',
-                                        animationFillMode: 'forwards',
-                                        animationDelay: `${index * 50}ms`
-                                    }}
-                                >
-                                    {/* Mini Gallery - 3 Preview Images */}
-                                    <td className="py-4 px-4">
-                                        <div className="flex gap-1">
-                                            {(collection.previewImages || []).slice(0, 3).map((imageUrl: string, imgIndex: number) => (
-                                                <div key={imgIndex} className="w-12 h-12 rounded-md overflow-hidden bg-gray-100 shadow-sm border border-gray-200 flex-shrink-0 hover:shadow-md transition-shadow">
-                                                    <OptimizedNFTImage
-                                                        imageUrl={imageUrl}
-                                                        tokenId={`preview-${collection.contractAddress}-${imgIndex}`}
-                                                        className="object-cover w-full h-full"
-                                                        fill={false}
-                                                        width={48}
-                                                        height={48}
-                                                        priority={index < 5}
-                                                    />
-                                                </div>
-                                            ))}
-                                            {/* Fill empty slots with placeholders */}
-                                            {Array.from({ length: 3 - collection.previewImages.length }).map((_, emptyIndex) => (
-                                                <div key={`empty-${emptyIndex}`} className="w-12 h-12 rounded-md bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-200 flex items-center justify-center flex-shrink-0">
-                                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                    </svg>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </td>
+                {/* Collections Grid mit Horizontal Scroll */}
+                <div className="relative overflow-visible pb-4">
+                    {/* Left Scroll Button - Overlay */}
+                    {canScrollLeft && (
+                        <button
+                            onClick={() => scroll('left')}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 flex items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
+                            aria-label="Nach links scrollen"
+                        >
+                            {/* Pfeil links */}
+                            <svg className="w-5 h-5 text-gray-600 group-hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                            {/* Lightbulb Icon - 270° nach links leuchtend */}
+                            <div className="group-hover:drop-shadow-[0_0_16px_rgba(255,215,0,1)] transition-all duration-200">
+                                <Image
+                                    src="/media/only-lightbulb.png"
+                                    alt="Lightbulb"
+                                    width={24}
+                                    height={24}
+                                    className="group-hover:scale-110 transition-transform duration-200"
+                                    style={{ transform: 'rotate(270deg)' }}
+                                    priority
+                                />
+                            </div>
+                        </button>
+                    )}
 
-                                    {/* Collection Name & Symbol */}
-                                    <td className="py-4 px-4">
-                                        <div className="flex flex-col">
-                                            <div className="font-semibold text-gray-900 text-sm hover:text-blue-600 transition-colors">
+                    {/* Right Scroll Button - Overlay */}
+                    {canScrollRight && (
+                        <button
+                            onClick={() => scroll('right')}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 flex items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
+                            aria-label="Nach rechts scrollen"
+                        >
+                            {/* Lightbulb Icon - 90° nach rechts leuchtend */}
+                            <div className="group-hover:drop-shadow-[0_0_16px_rgba(255,215,0,1)] transition-all duration-200">
+                                <Image
+                                    src="/media/only-lightbulb.png"
+                                    alt="Lightbulb"
+                                    width={24}
+                                    height={24}
+                                    className="group-hover:scale-110 transition-transform duration-200"
+                                    style={{ transform: 'rotate(90deg)' }}
+                                    priority
+                                />
+                            </div>
+                            {/* Pfeil rechts */}
+                            <svg className="w-5 h-5 text-gray-600 group-hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    )}
+
+                    {/* Scrollbare Collection Container */}
+                    <div
+                        ref={scrollContainerRef}
+                        className="flex gap-6 pb-4 pt-4 scrollbar-hide scroll-smooth pl-8 pr-6"
+                        style={{
+                            scrollBehavior: 'smooth',
+                            paddingBottom: '50px',
+                            overflowX: 'auto',
+                            overflowY: 'visible',
+                        }}
+                    >
+                        {filteredCollections.map((collection, index) => (
+                            <div
+                                key={collection.contractAddress || `unknown-${index}`}
+                                className="group cursor-pointer transform-gpu flex-shrink-0 w-80"
+                                onClick={() => handleCollectionClick(collection.contractAddress)}
+                            >
+                                <div className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden hover:shadow-[0_15px_30px_-8px_rgba(0,0,0,0.4)] hover:scale-[1.02] transition-all duration-300 ease-out">
+                                    {/* Card Header - Symbol & Name */}
+                                    <div className="p-4 bg-gradient-to-br from-purple-50 to-indigo-50 border-b border-gray-200">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h3 className="font-bold text-gray-900 text-lg truncate flex-1">
                                                 {collection.symbol}
-                                            </div>
-                                            <div className="text-xs text-gray-600 truncate max-w-[150px]" title={collection.name}>
-                                                {collection.name}
-                                            </div>
-                                            <div className="text-xs text-gray-500 font-mono mt-1">
-                                                {(collection.contractAddress || '').slice(0, 6)}...{(collection.contractAddress || '').slice(-4)}
-                                            </div>
+                                            </h3>
                                         </div>
-                                    </td>
+                                        <p className="text-sm text-gray-600 truncate" title={collection.name}>
+                                            {collection.name}
+                                        </p>
+                                    </div>
 
-                                    {/* Total Supply */}
-                                    <td className="py-4 px-4 text-center">
-                                        <div className="text-sm font-medium text-gray-900">
-                                            {collection.totalSupply.toLocaleString()}
-                                        </div>
-                                        <div className="text-xs text-gray-500">
-                                            items
-                                        </div>
-                                    </td>
-
-                                    {/* Listed vs Total Items */}
-                                    <td className="py-4 px-4 text-center">
-                                        <div className="flex flex-col items-center">
-                                            {/* Main numbers with ratio */}
-                                            <div className="text-sm font-medium text-gray-900">
-                                                <span className="text-green-600">{collection.totalListedNFTs}</span>
-                                                <span className="text-gray-400 mx-1">/</span>
-                                                <span className="text-blue-600">{collection.totalSupply}</span>
+                                    {/* Card Image - Preview NFTs */}
+                                    <div className="relative h-64 bg-gradient-to-br from-gray-100 to-gray-200">
+                                        {collection.previewImages && collection.previewImages.length > 0 ? (
+                                            <div className="grid grid-cols-2 gap-1 h-full p-2">
+                                                {collection.previewImages.slice(0, 4).map((imageUrl: string, imgIndex: number) => (
+                                                    <div key={imgIndex} className="rounded-lg overflow-hidden bg-white shadow-sm">
+                                                        <OptimizedNFTImage
+                                                            imageUrl={imageUrl}
+                                                            tokenId={`${collection.contractAddress}-preview-${imgIndex}`}
+                                                            alt={`${collection.name} Preview ${imgIndex + 1}`}
+                                                            className="w-full h-full object-cover"
+                                                            width={150}
+                                                            height={150}
+                                                        />
+                                                    </div>
+                                                ))}
                                             </div>
-
-                                            {/* Percentage and labels */}
-                                            <div className="text-xs text-gray-500 mt-1">
-                                                {collection.totalSupply > 0
-                                                    ? `${((collection.totalListedNFTs / collection.totalSupply) * 100).toFixed(1)}% listed`
-                                                    : '0% listed'
-                                                }
+                                        ) : (
+                                            <div className="flex items-center justify-center h-full text-gray-400">
+                                                <svg className="w-20 h-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
                                             </div>
+                                        )}
+                                    </div>
 
-                                            {/* Visual progress bar */}
-                                            {collection.totalSupply > 0 && (
-                                                <div className="w-16 bg-gray-200 rounded-full h-2 mt-2">
-                                                    {/* Listed portion (green) */}
-                                                    <div
-                                                        className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                                                        style={{
-                                                            width: `${Math.min((collection.totalListedNFTs / collection.totalSupply) * 100, 100)}%`
-                                                        }}
-                                                    ></div>
-                                                </div>
-                                            )}
-
-                                            {/* Breakdown labels */}
-                                            <div className="flex items-center gap-3 mt-2 text-xs">
-                                                <div className="flex items-center gap-1">
-                                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                                    <span className="text-gray-600">{collection.totalListedNFTs} listed</span>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                                                    <span className="text-gray-600">{collection.totalSupply - collection.totalListedNFTs} unlisted</span>
-                                                </div>
-                                            </div>
+                                    {/* Card Stats */}
+                                    <div className="p-4 space-y-3">
+                                        {/* Supply & Listed */}
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-gray-600">Supply:</span>
+                                            <span className="font-semibold text-gray-900">{collection.totalSupply}</span>
                                         </div>
-                                    </td>
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-gray-600">Listed:</span>
+                                            <span className="font-semibold text-green-600">{collection.totalListedNFTs}</span>
+                                        </div>
 
-                                    {/* Social Metrics */}
-                                    <td className="py-4 px-4 text-center">
-                                        <div className="flex flex-col items-center gap-1">
-                                            {/* Likes */}
-                                            <div className="flex items-center gap-1 text-xs">
-                                                <svg className="w-3 h-3 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                                        {/* Social Metrics */}
+                                        <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                                            <div className="flex items-center gap-1">
+                                                <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 24 24">
                                                     <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
                                                 </svg>
-                                                <span className="font-medium text-gray-900">{collection.totalLikes}</span>
+                                                <span className="font-medium text-gray-900 text-sm">{collection.totalLikes}</span>
                                             </div>
-                                            {/* Watchlist */}
-                                            <div className="flex items-center gap-1 text-xs">
-                                                <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <div className="flex items-center gap-1">
+                                                <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                 </svg>
-                                                <span className="font-medium text-gray-900">{collection.totalWatchlist}</span>
+                                                <span className="font-medium text-gray-900 text-sm">{collection.totalWatchlist}</span>
                                             </div>
                                         </div>
-                                    </td>
 
-                                    {/* Total Value */}
-                                    <td className="py-4 px-4 text-right">
+                                        {/* Price Info */}
                                         {collection.totalListedNFTs > 0 ? (
-                                            <CollectionPriceDisplay
-                                                totalValue={collection.totalValue}
-                                                floorPrice={collection.floorPrice}
-                                                averagePrice={collection.averagePrice}
-                                            />
+                                            <div className="pt-2 border-t border-gray-200">
+                                                <CollectionPriceDisplay
+                                                    totalValue={collection.totalValue}
+                                                    floorPrice={collection.floorPrice}
+                                                    averagePrice={collection.averagePrice}
+                                                />
+                                            </div>
                                         ) : (
-                                            <div className="text-sm text-gray-500">
+                                            <div className="pt-2 border-t border-gray-200 text-sm text-gray-500 text-center">
                                                 No listings
                                             </div>
                                         )}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {/* Collections Cards - Mobile Only (Horizontal Scroll) */}
-            <div className="md:hidden relative">
-                <div
-                    className="flex gap-4 pb-8"
-                    style={{
-                        overflowX: 'auto',
-                        overflowY: 'visible',
-                        scrollSnapType: 'x mandatory',
-                        WebkitOverflowScrolling: 'touch',
-                        scrollbarWidth: 'none',
-                        msOverflowStyle: 'none',
-                    }}
-                >
-                    {sortedCollections.map((collection, index) => (
-                        <div
-                            key={collection.contractAddress || `unknown-${index}`}
-                            className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-2xl transition-all duration-300 flex-shrink-0 w-60"
-                            onClick={() => handleCollectionClick(collection.contractAddress)}
-                            style={{
-                                scrollSnapAlign: 'start',
-                                animationName: 'fadeInUp',
-                                animationDuration: '0.5s',
-                                animationTimingFunction: 'ease-out',
-                                animationFillMode: 'forwards',
-                                animationDelay: `${index * 50}ms`
-                            }}
-                        >
-                            {/* Card Header - Symbol & Name */}
-                            <div className="p-3 bg-gradient-to-br from-blue-50 to-purple-50 border-b border-gray-200">
-                                <div className="flex items-center justify-between mb-2">
-                                    <h3 className="font-bold text-gray-900 text-base truncate flex-1">
-                                        {collection.symbol}
-                                    </h3>
-                                    <div className="flex items-center gap-1">
-                                        {[1, 2, 3, 4, 5].map((star) => (
-                                            <svg key={star} className="w-3 h-3 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                            </svg>
-                                        ))}
-                                    </div>
-                                </div>
-                                <p className="text-xs text-gray-600 truncate" title={collection.name}>
-                                    {collection.name}
-                                </p>
-                            </div>
-
-                            {/* Card Image - Preview NFTs */}
-                            <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200">
-                                {collection.previewImages && collection.previewImages.length > 0 ? (
-                                    <div className="grid grid-cols-2 gap-1 h-full p-2">
-                                        {collection.previewImages.slice(0, 4).map((imageUrl: string, imgIndex: number) => (
-                                            <div key={imgIndex} className="rounded-lg overflow-hidden bg-white shadow-sm">
-                                                <OptimizedNFTImage
-                                                    imageUrl={imageUrl}
-                                                    tokenId={`preview-mobile-${collection.contractAddress}-${imgIndex}`}
-                                                    className="object-cover w-full h-full"
-                                                    fill={false}
-                                                    width={112}
-                                                    height={112}
-                                                    priority={index < 3}
-                                                />
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center justify-center h-full">
-                                        <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Card Footer - Stats */}
-                            <div className="p-3 bg-white space-y-2">
-                                {/* Supply & Listed */}
-                                <div className="flex items-center justify-between text-xs">
-                                    <div>
-                                        <span className="text-gray-500">Supply: </span>
-                                        <span className="font-bold text-gray-900">{collection.totalSupply.toLocaleString()}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-gray-500">Listed: </span>
-                                        <span className="font-bold text-green-600">{collection.totalListedNFTs}</span>
-                                    </div>
-                                </div>
-
-                                {/* Progress Bar */}
-                                {collection.totalSupply > 0 && (
-                                    <div className="w-full bg-gray-200 rounded-full h-1.5">
-                                        <div
-                                            className="bg-gradient-to-r from-green-500 to-blue-500 h-1.5 rounded-full transition-all duration-300"
-                                            style={{
-                                                width: `${Math.min((collection.totalListedNFTs / collection.totalSupply) * 100, 100)}%`
-                                            }}
-                                        ></div>
-                                    </div>
-                                )}
-
-                                {/* Floor Price */}
-                                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                                    {collection.floorPrice ? (
-                                        <div className="flex-1">
-                                            <div className="text-xs text-gray-500">Floor Price</div>
-                                            <div className="text-sm font-bold text-blue-600">
-                                                {collection.floorPrice} ETH
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="text-xs text-gray-500">No floor price</div>
-                                    )}
-
-                                    {/* Social Metrics */}
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex items-center gap-1">
-                                            <svg className="w-3.5 h-3.5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
-                                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-                                            </svg>
-                                            <span className="text-xs font-medium text-gray-900">{collection.totalLikes}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                            </svg>
-                                            <span className="text-xs font-medium text-gray-900">{collection.totalWatchlist}</span>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* Summary Stats */}
-            {!isAdmin && (
-                <div className="mt-6">
-                    <h2 className="text-2xl font-bold mb-4 text-gray-900 flex items-center gap-2">
-                        Summary Stats
-                    </h2>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
-                        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-                            <div className="text-2xl font-bold text-blue-600">
-                                {collections.length}
-                            </div>
-                            <div className="text-sm text-gray-600">Collections</div>
-                        </div>
-                        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-                            <div className="text-2xl font-bold text-green-600">
-                                {collections.reduce((sum: number, col) => sum + col.totalSupply, 0)}
-                            </div>
-                            <div className="text-sm text-gray-600">Total NFTs</div>
-                        </div>
-                        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-                            <div className="text-2xl font-bold text-purple-600">
-                                {totalListedNFTs}
-                            </div>
-                            <div className="text-sm text-gray-600">Listed</div>
-                        </div>
-                        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-                            <div className="text-2xl font-bold text-orange-600">
-                                {collections.reduce((sum: number, col) => sum + (col.totalSupply - col.totalListedNFTs), 0)}
-                            </div>
-                            <div className="text-sm text-gray-600">Unlisted</div>
-                        </div>
-                        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-                            <div className="text-2xl font-bold text-red-600">
-                                {collections.reduce((sum: number, col) => sum + col.totalLikes, 0).toLocaleString()}
-                            </div>
-                            <div className="text-sm text-gray-600">Total Likes</div>
-                        </div>
-                        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-                            <div className="text-2xl font-bold text-blue-600">
-                                {collections.reduce((sum: number, col) => sum + col.totalWatchlist, 0).toLocaleString()}
-                            </div>
-                            <div className="text-sm text-gray-600">Watchlisted</div>
-                        </div>
-                        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-                            <div className="text-2xl font-bold text-orange-600">
-                                {collections.reduce((sum: number, col) => sum + parseFloat(col.totalValue), 0).toFixed(4)} ETH
-                            </div>
-                            <div className="text-sm text-gray-600">Total Value</div>
-                        </div>
+                        ))}
                     </div>
                 </div>
-            )}
-            {/* CSS Animation Styles */}
+            </div>
+
+            {/* CSS für scrollbar-hide */}
             <style jsx>{`
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(15px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
+                .scrollbar-hide::-webkit-scrollbar {
+                    display: none;
+                }
+                .scrollbar-hide {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+            `}</style>
         </div>
     );
 }
 
 export default CollectionsTable;
+

@@ -112,6 +112,7 @@ export function NFTFilterSidebar({
         rating: false,
         stats: false,
         rarity: false,
+        collections: false,
         sort: false,
         search: false,
     });
@@ -179,41 +180,75 @@ export function NFTFilterSidebar({
 
     const activeFiltersCount = filters.categories.length + filters.rarities.length;
 
-    // Öffne Panel bei Hover über Icon-Streifen oder Panel
-    const handleMouseEnter = () => {
-        setIsHovering(true);
-        setIsOpen(true);
+    // Öffne Panel bei Hover über Filter Button (nur Desktop)
+    const handleFilterButtonMouseEnter = () => {
+        // Nur auf Desktop (größer als md breakpoint)
+        if (window.innerWidth >= 768) {
+            setIsHovering(true);
+            setIsOpen(true);
+        }
     };
 
-    const handleMouseLeave = () => {
-        setIsHovering(false);
-        // Kleine Verzögerung bevor Panel schließt
-        setTimeout(() => {
-            setIsHovering(prev => {
-                if (!prev) setIsOpen(false);
-                return prev;
-            });
-        }, 300);
+    const handleFilterButtonMouseLeave = () => {
+        // Nur auf Desktop
+        if (window.innerWidth >= 768) {
+            setIsHovering(false);
+            // Kleine Verzögerung bevor Panel schließt
+            setTimeout(() => {
+                setIsHovering(prev => {
+                    if (!prev) setIsOpen(false);
+                    return prev;
+                });
+            }, 300);
+        }
+    };
+
+    const handlePanelMouseEnter = () => {
+        if (window.innerWidth >= 768) {
+            setIsHovering(true);
+        }
+    };
+
+    const handlePanelMouseLeave = () => {
+        if (window.innerWidth >= 768) {
+            setIsHovering(false);
+            setTimeout(() => {
+                setIsHovering(prev => {
+                    if (!prev) setIsOpen(false);
+                    return prev;
+                });
+            }, 300);
+        }
+    };
+
+    // Mobile: Nur auf Click
+    const handleFilterButtonClick = () => {
+        setIsOpen(!isOpen);
     };
 
     return (
         <>
-            {/* Collapsed Sidebar - Kompletter linker Streifen - nur Desktop */}
+            {/* Icon-Strip Sidebar - Immer sichtbar (Desktop + Mobile) */}
             <div
-                className="hidden md:flex fixed left-0 top-0 h-full w-16 bg-white border-r border-gray-200 shadow-lg z-[56] flex-col items-center py-4 gap-3"
-                onMouseEnter={handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
+                className="fixed left-0 top-[65px] bottom-0 w-16 bg-white border-r border-gray-200 z-[56] flex flex-col items-center pt-2 gap-3 overflow-y-auto"
             >
-                {/* Logo/Lightbulb - oben */}
-                <div className="w-12 h-12 flex items-center justify-center mb-2">
-                    <Image
-                        src="/media/only-lightbulb-favicone.ico"
-                        alt="W3I"
-                        width={40}
-                        height={40}
-                        className="object-contain"
-                    />
-                </div>
+                {/* Filter Button - Öffnet die Sidebar (oben, mit gleichem Abstand wie links) */}
+                <button
+                    onClick={handleFilterButtonClick}
+                    onMouseEnter={handleFilterButtonMouseEnter}
+                    onMouseLeave={handleFilterButtonMouseLeave}
+                    className="w-12 h-12 flex items-center justify-center rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-all relative"
+                    title="Filter öffnen"
+                >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                    {activeFiltersCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                            {activeFiltersCount}
+                        </span>
+                    )}
+                </button>
 
                 {/* Divider */}
                 <div className="w-10 h-px bg-gray-300"></div>
@@ -246,55 +281,31 @@ export function NFTFilterSidebar({
                     </button>
                 ))}
 
-                {/* Spacer */}
+                {/* Spacer - drückt alles nach oben, kein Icon unten mehr */}
                 <div className="flex-1"></div>
-
-                {/* Filter Icon - zeigt aktive Filter */}
-                <div className="w-12 h-12 flex items-center justify-center rounded-lg bg-gray-50 relative">
-                    <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                    </svg>
-                    {activeFiltersCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-                            {activeFiltersCount}
-                        </span>
-                    )}
-                </div>
             </div>
 
-            {/* Slide-out Filter Panel */}
+            {/* Slide-out Filter Panel - auf Mobile und Desktop */}
             <div
-                className={`fixed left-16 top-0 h-full w-80 bg-white shadow-2xl z-[55] transform transition-transform duration-300 ease-in-out overflow-y-auto ${isOpen ? 'translate-x-0' : '-translate-x-full'
+                className={`fixed left-[63px] top-[65px] bottom-0 w-80 bg-white z-[55] transform transition-transform duration-300 ease-in-out overflow-y-auto ${isOpen ? 'translate-x-0' : '-translate-x-full'
                     }`}
-                onMouseEnter={handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
+                onMouseEnter={handlePanelMouseEnter}
+                onMouseLeave={handlePanelMouseLeave}
             >
-                {/* Header mit Logo */}
+                {/* Header */}
                 <div className="sticky top-0 bg-white border-b border-gray-200 p-4 z-10">
-                    <div className="flex items-center justify-center mb-3">
-                        {/* Logo */}
-                        <Image
-                            src="/media/Logo-w3i-marketplace.png"
-                            alt="W3I Marketplace"
-                            width={180}
-                            height={45}
-                            className="h-8 w-auto"
-                        />
-                    </div>
-                    <div className="border-t border-gray-200 pt-3">
-                        <h3 className="text-sm font-bold text-gray-900">Filter & Sortierung</h3>
-                        <p className="text-xs text-gray-600 mt-1">
-                            {filteredCount} von {totalItems} NFTs
-                        </p>
-                        {activeFiltersCount > 0 && (
-                            <button
-                                onClick={clearAllFilters}
-                                className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                            >
-                                Alle Filter zurücksetzen
-                            </button>
-                        )}
-                    </div>
+                    <h3 className="text-sm font-bold text-gray-900">Filter & Sortierung</h3>
+                    <p className="text-xs text-gray-600 mt-1">
+                        {filteredCount} von {totalItems} NFTs
+                    </p>
+                    {activeFiltersCount > 0 && (
+                        <button
+                            onClick={clearAllFilters}
+                            className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                            Alle Filter zurücksetzen
+                        </button>
+                    )}
                 </div>
 
                 {/* Content */}
@@ -306,7 +317,6 @@ export function NFTFilterSidebar({
                             className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
                         >
                             <h4 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                                <span>🏷️</span>
                                 Kategorien
                             </h4>
                             <svg
@@ -496,6 +506,175 @@ export function NFTFilterSidebar({
                                             {rarity}
                                         </button>
                                     ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Collections */}
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                        <button
+                            onClick={() => toggleSection('collections')}
+                            className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
+                        >
+                            <h4 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                                Collections
+                            </h4>
+                            <svg
+                                className={`w-5 h-5 transition-transform ${expandedSections.collections ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {expandedSections.collections && (
+                            <div className="p-3 space-y-2 bg-white">
+                                <p className="text-xs text-gray-500 mb-3">Collection-Sortierung</p>
+
+                                {/* Collection-spezifische Sortieroptionen */}
+                                <button
+                                    onClick={() => updateSort('price')}
+                                    className={`w-full px-4 py-2 rounded-lg text-left transition-all duration-200 flex items-center justify-between border ${currentSort.field === 'price'
+                                        ? 'bg-purple-500 text-white border-purple-600 shadow-md'
+                                        : 'bg-white/50 backdrop-blur-sm text-gray-700 border-gray-200 hover:bg-white/80 hover:border-gray-300 hover:scale-[1.02] shadow-sm'
+                                        }`}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <svg className={`w-5 h-5 ${currentSort.field === 'price' ? 'text-white' : 'text-green-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span className="text-sm font-medium">Total Value</span>
+                                    </span>
+                                    {currentSort.field === 'price' && (
+                                        <span className="text-lg">
+                                            {currentSort.direction === 'desc' ? '↓' : '↑'}
+                                        </span>
+                                    )}
+                                </button>
+
+                                <button
+                                    onClick={() => updateSort('created')}
+                                    className={`w-full px-4 py-2 rounded-lg text-left transition-all duration-200 flex items-center justify-between border ${currentSort.field === 'created'
+                                        ? 'bg-purple-500 text-white border-purple-600 shadow-md'
+                                        : 'bg-white/50 backdrop-blur-sm text-gray-700 border-gray-200 hover:bg-white/80 hover:border-gray-300 hover:scale-[1.02] shadow-sm'
+                                        }`}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <svg className={`w-5 h-5 ${currentSort.field === 'created' ? 'text-white' : 'text-indigo-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                        </svg>
+                                        <span className="text-sm font-medium">Total Supply</span>
+                                    </span>
+                                    {currentSort.field === 'created' && (
+                                        <span className="text-lg">
+                                            {currentSort.direction === 'desc' ? '↓' : '↑'}
+                                        </span>
+                                    )}
+                                </button>
+
+                                <button
+                                    onClick={() => updateSort('rating')}
+                                    className={`w-full px-4 py-2 rounded-lg text-left transition-all duration-200 flex items-center justify-between border ${currentSort.field === 'rating'
+                                        ? 'bg-purple-500 text-white border-purple-600 shadow-md'
+                                        : 'bg-white/50 backdrop-blur-sm text-gray-700 border-gray-200 hover:bg-white/80 hover:border-gray-300 hover:scale-[1.02] shadow-sm'
+                                        }`}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <svg className={`w-5 h-5 ${currentSort.field === 'rating' ? 'text-white' : 'text-blue-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                        </svg>
+                                        <span className="text-sm font-medium">Listed</span>
+                                    </span>
+                                    {currentSort.field === 'rating' && (
+                                        <span className="text-lg">
+                                            {currentSort.direction === 'desc' ? '↓' : '↑'}
+                                        </span>
+                                    )}
+                                </button>
+
+                                <button
+                                    onClick={() => updateSort('views')}
+                                    className={`w-full px-4 py-2 rounded-lg text-left transition-all duration-200 flex items-center justify-between border ${currentSort.field === 'views'
+                                        ? 'bg-purple-500 text-white border-purple-600 shadow-md'
+                                        : 'bg-white/50 backdrop-blur-sm text-gray-700 border-gray-200 hover:bg-white/80 hover:border-gray-300 hover:scale-[1.02] shadow-sm'
+                                        }`}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <svg className={`w-5 h-5 ${currentSort.field === 'views' ? 'text-white' : 'text-orange-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                        </svg>
+                                        <span className="text-sm font-medium">Unlisted</span>
+                                    </span>
+                                    {currentSort.field === 'views' && (
+                                        <span className="text-lg">
+                                            {currentSort.direction === 'desc' ? '↓' : '↑'}
+                                        </span>
+                                    )}
+                                </button>
+
+                                <button
+                                    onClick={() => updateSort('name')}
+                                    className={`w-full px-4 py-2 rounded-lg text-left transition-all duration-200 flex items-center justify-between border ${currentSort.field === 'name'
+                                        ? 'bg-purple-500 text-white border-purple-600 shadow-md'
+                                        : 'bg-white/50 backdrop-blur-sm text-gray-700 border-gray-200 hover:bg-white/80 hover:border-gray-300 hover:scale-[1.02] shadow-sm'
+                                        }`}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <svg className={`w-5 h-5 ${currentSort.field === 'name' ? 'text-white' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                                        </svg>
+                                        <span className="text-sm font-medium">Name</span>
+                                    </span>
+                                    {currentSort.field === 'name' && (
+                                        <span className="text-lg">
+                                            {currentSort.direction === 'desc' ? '↓' : '↑'}
+                                        </span>
+                                    )}
+                                </button>                                {/* Divider */}
+                                <div className="border-t border-gray-200 my-3"></div>
+
+                                <p className="text-xs text-gray-500 mb-2">Collection Stats Filter</p>
+
+                                {/* Min Supply Filter */}
+                                <div>
+                                    <label className="text-xs text-gray-600 mb-1 block">Min Supply</label>
+                                    <input
+                                        type="number"
+                                        placeholder="0"
+                                        min="0"
+                                        value={filters.minSupply || ''}
+                                        onChange={(e) => updateFilters({ minSupply: e.target.value ? parseInt(e.target.value) : undefined })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    />
+                                </div>
+
+                                {/* Min Listed Items Filter */}
+                                <div>
+                                    <label className="text-xs text-gray-600 mb-1 block">Min Listed Items</label>
+                                    <input
+                                        type="number"
+                                        placeholder="0"
+                                        min="0"
+                                        value={filters.minListedItems || ''}
+                                        onChange={(e) => updateFilters({ minListedItems: e.target.value ? parseInt(e.target.value) : undefined })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    />
+                                </div>
+
+                                {/* Min Floor Price Filter */}
+                                <div>
+                                    <label className="text-xs text-gray-600 mb-1 block">Min Floor Price (ETH)</label>
+                                    <input
+                                        type="number"
+                                        placeholder="0.0"
+                                        step="0.01"
+                                        min="0"
+                                        value={filters.minFloorPrice || ''}
+                                        onChange={(e) => updateFilters({ minFloorPrice: e.target.value ? parseFloat(e.target.value) : undefined })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    />
                                 </div>
                             </div>
                         )}

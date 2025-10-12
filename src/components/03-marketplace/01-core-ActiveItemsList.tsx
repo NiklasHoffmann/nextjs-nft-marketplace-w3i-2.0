@@ -9,11 +9,15 @@ import { useActiveItems, useNFTPerformance } from '@/hooks';
 import { useNFTFilters } from '@/hooks/nfts/08-utils-useNFTFilters';
 import { useNFTContext } from '@/contexts/NFTContext';
 import { NFTCard, ImagePreloader } from '@/components';
-import { NFTFilterSidebar } from './05-filters-NFTFilterSidebar';
 import type { NFTFilters, NFTSortOptions } from './05-filters-NFTFilterBar';
 import type { FilterableNFTItem } from '@/hooks/nfts/08-utils-useNFTFilters';
 
-export function ActiveItemsList() {
+interface ActiveItemsListProps {
+    externalFilters?: NFTFilters;
+    externalSort?: NFTSortOptions;
+}
+
+export function ActiveItemsList({ externalFilters, externalSort }: ActiveItemsListProps = {}) {
     const [isClient, setIsClient] = useState(false);
     const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
     const [isManualRefreshing, setIsManualRefreshing] = useState(false);
@@ -28,20 +32,24 @@ export function ActiveItemsList() {
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
 
-    // Filter and sort state
-    const [filters, setFilters] = useState<NFTFilters>({
+    // Filter and sort state - use external if provided
+    const [localFilters, setLocalFilters] = useState<NFTFilters>({
         categories: [],
         rarities: [],
         searchTerm: urlSearchTerm,
     });
-    const [sort, setSort] = useState<NFTSortOptions>({
+    const [localSort, setLocalSort] = useState<NFTSortOptions>({
         field: 'price',
         direction: 'desc'
     });
 
+    // Use external filters/sort if provided, otherwise use local
+    const filters = externalFilters || localFilters;
+    const sort = externalSort || localSort;
+
     // Update searchTerm when URL changes
     useEffect(() => {
-        setFilters(prev => ({
+        setLocalFilters(prev => ({
             ...prev,
             searchTerm: urlSearchTerm
         }));
@@ -303,21 +311,64 @@ export function ActiveItemsList() {
 
     const visibleItems = filteredItems.slice(0, visibleCount);
 
+    // Generate dynamic title based on filters
+    const getPageTitle = () => {
+        const parts: string[] = [];
+
+        // Categories
+        if (filters.categories && filters.categories.length > 0) {
+            if (filters.categories.length === 1) {
+                parts.push(`${filters.categories[0]}`);
+            } else {
+                parts.push(`${filters.categories.map(c => c).join(', ')}`);
+            }
+        }
+
+        // Rarities
+        if (filters.rarities && filters.rarities.length > 0) {
+            if (filters.rarities.length === 1) {
+                const rarityMap: Record<string, string> = {
+                    'common': 'COMMON',
+                    'uncommon': 'UNCOMMON',
+                    'rare': 'RARE',
+                    'epic': 'EPIC',
+                    'legendary': 'LEGENDARY'
+                };
+                parts.push(`Seltenheit: ${rarityMap[filters.rarities[0]] || filters.rarities[0].toUpperCase()}`);
+            } else {
+                parts.push(`Seltenheiten: ${filters.rarities.map(r => r.toUpperCase()).join(', ')}`);
+            }
+        }
+
+        // Search term
+        if (filters.searchTerm && filters.searchTerm.trim()) {
+            parts.push(`Suche: "${filters.searchTerm}"`);
+        }
+
+        // Default if no filters
+        if (parts.length === 0) {
+            return 'Recently Listed';
+        }
+
+        return parts.join(' • ');
+    };
+
     return (
         <div className="pt-8 pb-2 w-full">
             <ImagePreloader imageUrls={imageUrls} priority={true} />
 
-            {/* NFT Filter Sidebar - Slide-out from left */}
-            <NFTFilterSidebar
-                onFiltersChange={setFilters}
-                onSortChange={setSort}
-                currentSort={sort}
-                totalItems={totalCount}
-                filteredCount={filteredCount}
-            />
-
             {/* Main Content - mit Left Padding für Sidebar nur auf Desktop */}
-            <div className="md:pl-16">
+            <div className="md:pl-16 pl-10">
+                {/* Dynamic Page Title */}
+                <div className="max-w-7xl mx-auto px-12 mb-2">
+                    <h1 className="text-4xl font-bold text-gray-900">
+                        {getPageTitle()}
+                    </h1>
+                    <p className="text-sm text-gray-600 pl-2 mt-2">
+                        {filteredCount} {filteredCount === 1 ? 'NFT' : 'NFTs'} gefunden
+                    </p>
+                </div>
+
                 {/* Enhanced Header with Performance Stats*/}
                 <div className="max-w-7xl mx-auto px-6">
                     {!isAdmin && (
@@ -388,15 +439,67 @@ export function ActiveItemsList() {
                     )}
                 </div>
 
-                {/* Randloses NFT Grid ohne seitliche Scroll-Buttons */}
-                <div className="relative overflow-visible pt-8 pb-4">
+                {/* Randloses NFT Grid mit seitlichen Scroll-Buttons */}
+                <div className="relative overflow-visible pb-4">
+                    {/* Left Scroll Button - Overlay */}
+                    {canScrollLeft && (
+                        <button
+                            onClick={scrollLeft}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 flex items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
+                            aria-label="Nach links scrollen"
+                        >
+                            {/* Pfeil links */}
+                            <svg className="w-5 h-5 text-gray-600 group-hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                            {/* Lightbulb Icon - 270° nach links leuchtend */}
+                            <div className="group-hover:drop-shadow-[0_0_16px_rgba(255,215,0,1)] transition-all duration-200">
+                                <Image
+                                    src="/media/only-lightbulb.png"
+                                    alt="Lightbulb"
+                                    width={24}
+                                    height={24}
+                                    className="group-hover:scale-110 transition-transform duration-200"
+                                    style={{ transform: 'rotate(270deg)' }}
+                                    priority
+                                />
+                            </div>
+                        </button>
+                    )}
+
+                    {/* Right Scroll Button - Overlay */}
+                    {canScrollRight && (
+                        <button
+                            onClick={scrollRight}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 flex items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
+                            aria-label="Nach rechts scrollen"
+                        >
+                            {/* Lightbulb Icon - 90° nach rechts leuchtend */}
+                            <div className="group-hover:drop-shadow-[0_0_16px_rgba(255,215,0,1)] transition-all duration-200">
+                                <Image
+                                    src="/media/only-lightbulb.png"
+                                    alt="Lightbulb"
+                                    width={24}
+                                    height={24}
+                                    className="group-hover:scale-110 transition-transform duration-200"
+                                    style={{ transform: 'rotate(90deg)' }}
+                                    priority
+                                />
+                            </div>
+                            {/* Pfeil rechts */}
+                            <svg className="w-5 h-5 text-gray-600 group-hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    )}
+
                     {/* Scrollbare NFT Container - Edge-to-edge */}
                     <div
                         ref={scrollContainerRef}
-                        className="flex gap-6 pb-8 pt-8 scrollbar-hide scroll-smooth pl-8 pr-6"
+                        className="flex gap-6 pb-4 pt-4 scrollbar-hide scroll-smooth pl-8 pr-6"
                         style={{
                             scrollBehavior: 'smooth',
-                            paddingBottom: '32px', // Padding für Hover-Schatten unten
+                            paddingBottom: '50px', // Padding für Hover-Schatten unten
                             // Verhindert das Abschneiden beim Hover
                             overflowX: 'auto',
                             overflowY: 'visible'
@@ -451,57 +554,6 @@ export function ActiveItemsList() {
                                 </div>
                             </div>
                         )}
-                    </div>
-
-                    {/* Scroll Buttons unter der Liste - hidden on mobile */}
-                    <div className="hidden md:flex justify-center gap-6 mt-6">
-                        <button
-                            onClick={scrollLeft}
-                            disabled={!canScrollLeft}
-                            className="flex items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
-                            aria-label="Scroll left"
-                        >
-                            {/* Pfeil links */}
-                            <svg className="w-5 h-5 text-gray-600 group-hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                            </svg>
-                            {/* Lightbulb Icon - 270° (90° + 180°) nach links leuchtend */}
-                            <div className="group-hover:drop-shadow-[0_0_16px_rgba(255,215,0,1)] transition-all duration-200">
-                                <Image
-                                    src="/media/only-lightbulb.png"
-                                    alt="Lightbulb"
-                                    width={24}
-                                    height={24}
-                                    className="group-hover:scale-110 transition-transform duration-200"
-                                    style={{ transform: 'rotate(270deg)' }}
-                                    priority
-                                />
-                            </div>
-                        </button>
-
-                        <button
-                            onClick={scrollRight}
-                            disabled={!canScrollRight}
-                            className="flex items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
-                            aria-label="Scroll right"
-                        >
-                            {/* Lightbulb Icon - 90° nach rechts leuchtend */}
-                            <div className="group-hover:drop-shadow-[0_0_16px_rgba(255,215,0,1)] transition-all duration-200">
-                                <Image
-                                    src="/media/only-lightbulb.png"
-                                    alt="Lightbulb"
-                                    width={24}
-                                    height={24}
-                                    className="group-hover:scale-110 transition-transform duration-200"
-                                    style={{ transform: 'rotate(90deg)' }}
-                                    priority
-                                />
-                            </div>
-                            {/* Pfeil rechts */}
-                            <svg className="w-5 h-5 text-gray-600 group-hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                        </button>
                     </div>
                 </div>
 

@@ -23,6 +23,11 @@ export interface NFTFilters {
 
     // Rarity filter
     rarities: string[];
+
+    // Collection-specific filters
+    minSupply?: number;
+    minListedItems?: number;
+    minFloorPrice?: number;
 }
 
 export interface NFTSortOptions {

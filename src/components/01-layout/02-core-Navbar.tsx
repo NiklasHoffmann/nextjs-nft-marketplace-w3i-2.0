@@ -16,6 +16,7 @@ export default function Navbar() {
     const [searchTerm, setSearchTerm] = useState('');
     const dropdownRef = useRef<HTMLDivElement>(null);
     const mobileMenuRef = useRef<HTMLDivElement>(null);
+    const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
 
     const router = useRouter();
     const pathname = usePathname();
@@ -104,7 +105,11 @@ export default function Navbar() {
     // Close mobile menu when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
+            const target = event.target as Node;
+            const isOutsideMenu = mobileMenuRef.current && !mobileMenuRef.current.contains(target);
+            const isOutsideButton = mobileMenuButtonRef.current && !mobileMenuButtonRef.current.contains(target);
+
+            if (isOutsideMenu && isOutsideButton) {
                 setIsMobileMenuOpen(false);
             }
         };
@@ -129,7 +134,7 @@ export default function Navbar() {
 
     return (
         <>
-            <header className="w-full fixed bg-primary shadow flex items-center justify-between px-6 md:pr-6 py-3 z-[60]">
+            <header className="w-full fixed h-[66px] bg-primary shadow flex items-center justify-between px-6 z-[60] left-0 right-0 top-0">
                 {/* Left Logo - hidden on mobile */}
                 <div className="hidden md:flex items-center flex-shrink-0 mr-6">
                     <Link href="/" className="flex items-center">
@@ -302,33 +307,46 @@ export default function Navbar() {
 
                 {/* Mobile Menu Button (only visible on mobile) - moved to the right */}
                 <button
-                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                    className="md:hidden flex-shrink-0 h-10 flex items-center"
+                    ref={mobileMenuButtonRef}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('Lightbulb clicked, current state:', isMobileMenuOpen);
+                        setIsMobileMenuOpen(!isMobileMenuOpen);
+                    }}
+                    className="md:hidden flex-shrink-0 h-10 flex items-center relative z-[61] pointer-events-auto"
                     aria-label="Toggle Mobile Menu"
+                    style={{ pointerEvents: 'auto' }}
                 >
                     <Image
                         src="/media/only-lightbulb.png"
                         alt="Menu"
                         width={40}
                         height={40}
-                        className="h-10 w-auto object-contain"
+                        className="h-10 w-auto object-contain pointer-events-none"
                     />
                 </button>
             </header>
 
-            {/* Mobile Menu Overlay */}
+            {/* Mobile Menu Overlay - starts below navbar */}
             {isMobileMenuOpen && (
                 <div
-                    className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="fixed top-[66px] left-0 right-0 bottom-0 bg-black bg-opacity-50 z-[58] md:hidden pointer-events-auto"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsMobileMenuOpen(false);
+                    }}
                 />
             )}
 
             {/* Mobile Menu Sidebar - slides in from the right */}
             <div
                 ref={mobileMenuRef}
-                className={`fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out md:hidden ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
+                className={`fixed top-0 right-0 h-full w-80 bg-white z-[59] transform transition-transform duration-300 ease-in-out md:hidden overflow-hidden ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
                     }`}
+                style={{
+                    boxShadow: isMobileMenuOpen ? '-4px 0 6px -1px rgba(0, 0, 0, 0.1)' : 'none',
+                    pointerEvents: isMobileMenuOpen ? 'auto' : 'none'
+                }}
             >
                 <div className="flex flex-col h-full">
                     {/* Mobile Menu Header */}
