@@ -189,11 +189,13 @@ export function NFTCard(props: NFTCardAllProps) {
   // Track if we ever had data to prevent skeleton flickering on refresh
   const hadDataRef = useRef(false);
   const isLoadingRef = useRef(false);
+  const loadAttemptedRef = useRef(false);
 
   useEffect(() => {
     if (contextData) {
       hadDataRef.current = true;
       isLoadingRef.current = false;
+      loadAttemptedRef.current = false;
     }
   }, [contextData]);
 
@@ -201,6 +203,7 @@ export function NFTCard(props: NFTCardAllProps) {
   useEffect(() => {
     if (!contextData && !nftContext.isDataFresh(contractAddress, tokenId)) {
       isLoadingRef.current = true;
+      loadAttemptedRef.current = true;
       nftContext.loadNFT(contractAddress, tokenId);
     }
   }, [contractAddress, tokenId, contextData]); // Removed nftContext from dependencies
@@ -209,6 +212,7 @@ export function NFTCard(props: NFTCardAllProps) {
   const handleHover = useCallback(() => {
     if (!contextData) {
       isLoadingRef.current = true;
+      loadAttemptedRef.current = true;
       nftContext.loadNFT(contractAddress, tokenId);
     }
   }, [contractAddress, tokenId, contextData]); // Removed nftContext from dependencies
@@ -251,9 +255,9 @@ export function NFTCard(props: NFTCardAllProps) {
     watchlistCount: contextData?.social?.watchlistCount || null,
     averageRating: contextData?.social?.averageRating || null,
 
-    // Loading state - show skeleton only when actively loading and never had data before
-    // OR when we're reloading after data was lost
-    isLoading: !contextData && (!hadDataRef.current || isLoadingRef.current),
+    // Loading state - show skeleton when actively loading OR when we attempted to load but don't have data yet
+    // Don't show error immediately if we're still trying to load
+    isLoading: !contextData && (isLoadingRef.current || !loadAttemptedRef.current),
   }), [
     contractAddress, tokenId, listingId, price, seller,
     buyer, isListed, desiredNftAddress, desiredTokenId,
@@ -529,13 +533,18 @@ export function NFTCard(props: NFTCardAllProps) {
   }
 
   // Error state - simplified since context handles errors internally
-  if (!contextData && !displayData.isLoading) {
+  // Only show error if we attempted to load but still don't have data and aren't loading
+  if (!contextData && !displayData.isLoading && loadAttemptedRef.current) {
     return (
       <div className={`bg-red-50 border border-red-200 rounded-xl p-4 ${className}`}>
         <p className="text-red-600 text-sm">Failed to load NFT</p>
         <button
-          onClick={() => window.location.reload()}
-          className="mt-2 text-red-700 hover:text-red-900 text-sm underline"
+          onClick={() => {
+            loadAttemptedRef.current = false;
+            isLoadingRef.current = true;
+            nftContext.refreshNFT(contractAddress, tokenId); // Force refresh
+          }}
+          className="mt-2 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm transition-colors"
         >
           Retry
         </button>
@@ -576,9 +585,9 @@ export function NFTCard(props: NFTCardAllProps) {
           )}
 
           {/* Content overlay with fixed layout */}
-          <div className="relative z-10 flex flex-col h-full p-2 min-h-0">
+          <div className="relative z-10 flex flex-col h-full p-1 gap-1">
             {/* NFT Name Header at top - enhanced with better shadows and borders */}
-            <div className="flex-shrink-0 mb-2">
+            <div className="flex-shrink-0">
               <div className="bg-white/95 backdrop-blur-md p-2 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
@@ -625,30 +634,44 @@ export function NFTCard(props: NFTCardAllProps) {
               </div>
             </div>
 
-            {/* Sharp Image after header - takes flexible space in center */}
-            {displayData.imageUrl && (
-              <div className="flex-1 flex justify-center items-center px-2 mt-2 mb-2 min-h-0">
-                <div className="rounded-xl shadow-2xl border-2 border-white/50 backdrop-blur-sm overflow-hidden max-w-full">
-                  <OptimizedNFTImage
-                    imageUrl={displayData.imageUrl}
-                    tokenId={tokenId}
-                    className="object-contain max-h-24 w-auto"
-                    fill={false}
-                    width={240}
-                    height={240}
-                    priority={priority}
-                    tiltRotation={currentRotation}
-                  />
-                  {/* Subtle inner glow */}
-                  <div className="absolute inset-0 rounded-xl ring-1 ring-white/20 pointer-events-none"></div>
+            {/* Sharp Image and Description side by side - 50/50 split */}
+            <div className="flex-1 flex gap-1 min-h-0">
+              {/* Left: Image - 50% - full height, auto width, center-aligned */}
+              {displayData.imageUrl && (
+                <div className="w-1/2 flex justify-center items-stretch overflow-hidden">
+                  <div className="rounded-md border-2 border-white/50 overflow-hidden relative h-full">
+                    <OptimizedNFTImage
+                      imageUrl={displayData.imageUrl}
+                      tokenId={tokenId}
+                      className="object-contain h-full w-auto"
+                      fill={false}
+                      width={240}
+                      height={240}
+                      priority={priority}
+                      tiltRotation={currentRotation}
+                    />
+                    {/* Subtle inner glow */}
+                    <div className="absolute inset-0 rounded-md ring-1 ring-white/20 pointer-events-none"></div>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Bottom content section - everything above price */}
-            <div className="flex-shrink-0 mt-2">
-              {/* Categories and Social Stats */}
-              <div className="flex items-center gap-2 mb-2">
+              {/* Right: Description - 50% - fills available space */}
+              {descriptions.length > 0 && (
+                <div className="w-1/2">
+                  <div
+                    className="bg-white/95 backdrop-blur-sm p-1 rounded-md shadow-md border border-gray-200/60 ring-1 ring-gray-300/20 text-xs text-gray-600 h-full overflow-hidden text-right break-words hyphens-auto"
+                    lang="de"
+                  >
+                    {descriptions[0]}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Categories and Social Stats */}
+            <div className="flex-shrink-0">
+              <div className="flex items-center gap-1">
                 {/* Categories - left side */}
                 {categories.length > 0 && (
                   <div className="flex flex-wrap gap-1 min-w-0">
@@ -712,34 +735,16 @@ export function NFTCard(props: NFTCardAllProps) {
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Description - directly above price 
-              {descriptions.length > 0 && (
-                <div className="mb-2">
-                  <div className="flex-flex-1 flex-wrap gap-1">
-                    {descriptions.slice(0, 2).map((desc, index) => (
-                      <div key={index} className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-md border border-gray-200/60 ring-1 ring-gray-300/20 text-xs text-gray-600">
-                        {desc}
-                      </div>
-                    ))}
-                    {descriptions.length > 2 && (
-                      <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-md border border-gray-200/60 ring-1 ring-gray-300/20 text-xs text-gray-500">
-                        +{descriptions.length - 2}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}*/}
-
-              {/* Price Display - always at bottom */}
-              <div className="flex-shrink-0">
-                {displayData.isListed && displayData.price && (
-                  <PriceDisplay
-                    price={displayData.price}
-                    desiredNftAddress={displayData.desiredNftAddress}
-                  />
-                )}
-              </div>
+            {/* Price Display - always at bottom */}
+            <div className="flex-shrink-0">
+              {displayData.isListed && displayData.price && (
+                <PriceDisplay
+                  price={displayData.price}
+                  desiredNftAddress={displayData.desiredNftAddress}
+                />
+              )}
             </div>
           </div>
         </div>

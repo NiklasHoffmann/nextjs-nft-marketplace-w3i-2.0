@@ -27,15 +27,20 @@ export default function Home() {
 
       <main className="flex-1 flex flex-col pt-[66px] py-8">
         {/* ActiveItemsList - Edge-to-edge ohne Container */}
-        <div className="w-full">
+        <div className="w-full pt-4">  {/* Nur 4 padding-top für etwas Abstand zum Header */}
           <ActiveItemsList
             externalFilters={filters}
             externalSort={sort}
           />
         </div>
 
-        {/* CollectionsTable - Mit normalem Container + Sidebar Padding auf Desktop */}
+        {/* Trennlinie zwischen Listen */}
         <div className="w-full">
+          <hr className="border-t border-gray-300" />
+        </div>
+
+        {/* CollectionsTable - Mit normalem Container + Sidebar Padding auf Desktop */}
+        <div className="w-full pt-4">
           <CollectionsTable
             currentSort={sort}
             onSortChange={setSort}

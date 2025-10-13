@@ -90,8 +90,8 @@ interface ModernNFTContextType {
 
 // ===== CONSTANTS =====
 
-const CACHE_EXPIRATION_MS = 5 * 60 * 1000; // 5 minutes - fresh data
-const STALE_EXPIRATION_MS = 30 * 60 * 1000; // 30 minutes - stale data (still show, but revalidate)
+const CACHE_EXPIRATION_MS = 15 * 60 * 1000; // 15 minutes - fresh data (erhöht von 5 auf 15)
+const STALE_EXPIRATION_MS = 60 * 60 * 1000; // 60 minutes - stale data (erhöht von 30 auf 60)
 const LOADING_TIMEOUT_MS = 30 * 1000; // 30 seconds max for loading
 const LOCALSTORAGE_KEY = 'nft-cache-v2'; // Version key for localStorage
 const LOCALSTORAGE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days max age for localStorage

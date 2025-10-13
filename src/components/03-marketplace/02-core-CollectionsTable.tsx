@@ -273,7 +273,7 @@ export function CollectionsTable({ currentSort, onSortChange, filters }: Collect
                         Collections
                     </h1>
                     <p className="text-sm text-gray-600 pl-2 mt-2">
-                        {filteredCollections.length} {filteredCollections.length === 1 ? 'Collection' : 'Collections'} gefunden
+                        {filteredCollections.length} {filteredCollections.length === 1 ? 'Collection' : 'Collections'}
                         {filters && filteredCollections.length !== collections.length && (
                             <span className="text-blue-600"> (von {collections.length} total)</span>
                         )}
