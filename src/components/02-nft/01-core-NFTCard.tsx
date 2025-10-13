@@ -639,7 +639,7 @@ export function NFTCard(props: NFTCardAllProps) {
               {/* Left: Image - 50% - full height, auto width, center-aligned */}
               {displayData.imageUrl && (
                 <div className="w-1/2 flex justify-center items-stretch overflow-hidden">
-                  <div className="rounded-md border-2 border-white/50 overflow-hidden relative h-full">
+                  <div className="rounded-md border-2 border-white/50 backdrop-blur-sm overflow-hidden relative h-full">
                     <OptimizedNFTImage
                       imageUrl={displayData.imageUrl}
                       tokenId={tokenId}
