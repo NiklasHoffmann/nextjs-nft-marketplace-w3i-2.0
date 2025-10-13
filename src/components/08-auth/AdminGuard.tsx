@@ -24,7 +24,7 @@ export function AdminGuard({
     const { address, isConnected } = useAccount();
     const router = useRouter();
     const { signMessageAsync } = useSignMessage();
-    
+
     const [isChecking, setIsChecking] = useState(true);
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [isSigning, setIsSigning] = useState(false);
@@ -186,8 +186,8 @@ export function AdminGuard({
                             {!isConnected
                                 ? 'Please connect your wallet to continue.'
                                 : isPotentialAdmin
-                                ? 'Please sign the message to verify your identity.'
-                                : 'This area is restricted to authorized admin wallets only.'}
+                                    ? 'Please sign the message to verify your identity.'
+                                    : 'This area is restricted to authorized admin wallets only.'}
                         </p>
 
                         {/* Wallet Connect Button */}

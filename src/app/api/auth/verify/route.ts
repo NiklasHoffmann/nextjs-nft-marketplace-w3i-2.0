@@ -16,12 +16,12 @@ function createToken(payload: any): string {
         iat: Date.now(),
         exp: Date.now() + (24 * 60 * 60 * 1000) // 24h
     })).toString('base64url');
-    
+
     const signature = crypto
         .createHmac('sha256', JWT_SECRET)
         .update(`${header}.${body}`)
         .digest('base64url');
-    
+
     return `${header}.${body}.${signature}`;
 }
 
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 
         // Prüfe ob Admin-Adresse
         const isAdmin = isAdminAddress(address);
-        
+
         if (!isAdmin) {
             return NextResponse.json(
                 { error: 'Not an admin address' },

@@ -10,10 +10,10 @@ export async function GET(request: NextRequest) {
         // Generiere eindeutige Challenge
         const nonce = crypto.randomBytes(16).toString('hex');
         const timestamp = Date.now();
-        
+
         // Challenge-Nachricht die signiert werden muss
         const message = `Sign this message to authenticate as admin.\n\nNonce: ${nonce}\nTimestamp: ${timestamp}`;
-        
+
         return NextResponse.json({
             message,
             nonce,
