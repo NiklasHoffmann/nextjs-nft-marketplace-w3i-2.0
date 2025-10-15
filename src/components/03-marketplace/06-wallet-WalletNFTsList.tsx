@@ -2,9 +2,14 @@ import * as React from 'react';
 import { useAccount } from 'wagmi';
 import { formatEther } from 'viem';
 
-import { NFTCard } from '../02-nft/01-core-NFTCard';
+import { NFTScrollList } from './08-ui-NFTScrollList';
+import type { NFTScrollItem } from './08-ui-NFTScrollList';
 import { useWalletNFTs } from '../../hooks/nfts/09-wallet-useWalletNFTs';
+import { useNFTFilters } from '../../hooks/nfts/08-utils-useNFTFilters';
 import { useETHPrice } from '@/contexts/CurrencyContext';
+import type { NFTFilters, NFTSortOptions } from './05-filters-NFTFilterBar';
+import type { FilterableNFTItem } from '@/hooks/nfts/08-utils-useNFTFilters';
+import type { AggregatedNFT } from '@/types/01-core/01-core-nft-modern';
 
 export interface WalletNFTsListProps {
     /** The wallet address to display NFTs for. If not provided, uses connected wallet */
@@ -15,14 +20,16 @@ export interface WalletNFTsListProps {
     separateSections?: boolean;
     /** Limit number of NFTs per section when using separateSections */
     limitPerSection?: number;
-    /** Custom grid CSS classes for NFT display */
-    gridClassName?: string;
     /** Whether to automatically fetch NFTs when component mounts */
     autoFetch?: boolean;
     /** Whether to include marketplace context data enhancement */
     includeContext?: boolean;
     /** Preferred data source for fetching NFTs */
     source?: 'auto' | 'alchemy' | 'moralis';
+    /** Filter settings */
+    filters?: NFTFilters;
+    /** Sort settings */
+    sort?: NFTSortOptions;
 }
 
 /**
@@ -50,10 +57,11 @@ export function WalletNFTsList({
     title,
     separateSections = true,
     limitPerSection,
-    gridClassName = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-6",
     autoFetch = true,
     includeContext = true,
-    source = 'auto'
+    source = 'auto',
+    filters,
+    sort
 }: WalletNFTsListProps) {
     const { address: connectedWallet } = useAccount();
 
@@ -67,19 +75,59 @@ export function WalletNFTsList({
         source
     });
 
-    // Split NFTs into listed and unlisted
+    // Convert NFTs to filterable format
+    // Note: useWalletNFTs returns EnhancedAggregatedNFT[] with social stats in different structure than marketplace items
+    const filterableItems: FilterableNFTItem[] = React.useMemo(() => {
+        return nfts.map((nft) => ({
+            contractAddress: nft.nftAddress,
+            nftAddress: nft.nftAddress,
+            tokenId: nft.tokenId,
+            price: (nft as any).marketplaceData?.price,
+            isListed: nft.listed,
+            listingId: (nft as any).marketplaceData?.listingId,
+            seller: (nft as any).marketplaceData?.seller,
+            buyer: (nft as any).marketplaceData?.buyer,
+            desiredNftAddress: (nft as any).marketplaceData?.desiredNftAddress,
+            desiredTokenId: (nft as any).marketplaceData?.desiredTokenId,
+            name: nft.meta?.name || nft.core?.name || `NFT #${nft.tokenId}`,
+            symbol: nft.core?.symbol || nft.core?.contractSymbol,
+            category: nft.insight?.category || null,
+            categories: nft.insight?.category ? [nft.insight.category] : [],
+            description: nft.meta?.description || null,
+            imageUrl: nft.meta?.image || null,
+            rarity: nft.insight?.rarity || null,
+            customTitle: nft.insight?.customTitle || null,
+            cardDescriptions: nft.insight?.cardDescription || null, // Already an array
+            tags: nft.insight?.tags || null,
+            // Map from AggregatedNFT.social to FilterableNFTItem (note: social uses likeCount, not favoriteCount!)
+            averageRating: nft.social?.averageRating || 0,
+            ratingCount: nft.social?.ratingCount || 0,
+            viewCount: nft.social?.viewCount || 0,
+            favoriteCount: nft.social?.likeCount || 0, // AggregatedNFT uses likeCount in social field
+            watchlistCount: nft.social?.watchlistCount || 0,
+        }));
+    }, [nfts]);
+
+    // Apply filters and sorting if provided
+    const { filteredItems: filteredNFTs, totalCount, filteredCount } = useNFTFilters(
+        filterableItems,
+        filters || { categories: [], rarities: [], searchTerm: '' },
+        sort || { field: 'price', direction: 'desc' }
+    );
+
+    // Split NFTs into listed and unlisted (using filtered NFTs)
     const { listedNFTs, unlistedNFTs, totalListedValue } = React.useMemo(() => {
-        const listed = nfts.filter((nft: any) => nft.listed);
-        const unlisted = nfts.filter((nft: any) => !nft.listed);
+        const listed = filteredNFTs.filter((nft: FilterableNFTItem) => nft.isListed);
+        const unlisted = filteredNFTs.filter((nft: FilterableNFTItem) => !nft.isListed);
 
         // Calculate total value of listed NFTs
-        const totalValue = listed.reduce((sum: number, nft: any) => {
-            if (nft.marketplaceData?.price) {
+        const totalValue = listed.reduce((sum: number, nft: FilterableNFTItem) => {
+            if (nft.price) {
                 try {
                     // Ensure price is converted to bigint if it's a string
-                    const price = typeof nft.marketplaceData.price === 'string'
-                        ? BigInt(nft.marketplaceData.price)
-                        : nft.marketplaceData.price;
+                    const price = typeof nft.price === 'string'
+                        ? BigInt(nft.price)
+                        : nft.price;
                     return sum + parseFloat(formatEther(price));
                 } catch (e) {
                     return sum;
@@ -93,7 +141,7 @@ export function WalletNFTsList({
             unlistedNFTs: limitPerSection ? unlisted.slice(0, limitPerSection) : unlisted,
             totalListedValue: totalValue
         };
-    }, [nfts, limitPerSection]);
+    }, [filteredNFTs, limitPerSection]);
 
     // Convert total value to USD
     const { convertedPrice: totalListedValueUSD, loading: ethPriceLoading } = useETHPrice(totalListedValue);
@@ -118,11 +166,11 @@ export function WalletNFTsList({
                 <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-medium text-gray-900">{displayTitle}</h3>
                 </div>
-                <div className={gridClassName}>
-                    {Array.from({ length: 8 }).map((_, i) => (
-                        <div key={i} className="bg-gray-200 rounded-xl aspect-square animate-pulse" />
-                    ))}
-                </div>
+                <NFTScrollList
+                    items={[]}
+                    loading={true}
+                    loadingCount={8}
+                />
                 <div className="text-center mt-4">
                     <p className="text-gray-500">Loading NFTs from {source}...</p>
                 </div>
@@ -172,71 +220,45 @@ export function WalletNFTsList({
         );
     }
 
-    // Helper function to render NFT grid
-    const renderNFTGrid = (nftList: typeof nfts, sectionTitle: string, badgeColor: string) => {
-        if (nftList.length === 0) {
+    // Helper function to convert NFTs to NFTScrollItem format
+    const convertToScrollItems = (nftList: FilterableNFTItem[]): NFTScrollItem[] => {
+        return nftList.map((nft: FilterableNFTItem) => ({
+            nftAddress: nft.contractAddress,
+            tokenId: nft.tokenId,
+            price: nft.price || undefined,
+            isListed: nft.isListed,
+            listingId: nft.listingId,
+            seller: nft.seller,
+            buyer: nft.buyer || undefined,
+            desiredNftAddress: nft.desiredNftAddress,
+            desiredTokenId: nft.desiredTokenId,
+        }));
+    };
+
+    // Secondary badge for data source indicator
+    const renderDataSourceBadge = (item: NFTScrollItem) => {
+        if (item.hasContextData && item.hasExternalData) {
             return (
-                <div className="text-center py-12 bg-gray-50 rounded-lg">
-                    <div className="text-gray-400 mb-2">
-                        <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                    </div>
-                    <p className="text-gray-500">No {sectionTitle.toLowerCase()} NFTs</p>
-                </div>
+                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                    Enhanced
+                </span>
             );
         }
-
-        return (
-            <div className={`${gridClassName} overflow-y-auto max-h-[calc(100vh-200px)] p-1`} style={{ scrollSnapType: 'y mandatory' }}>
-                {nftList.map((nft: any) => (
-                    <div key={`${nft.nftAddress}-${nft.tokenId}`} className="relative" style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}>
-                        <NFTCard
-                            contractAddress={nft.nftAddress}
-                            tokenId={nft.tokenId}
-                            // Marketplace data from enhanced context
-                            price={nft.marketplaceData?.price || undefined}
-                            isListed={nft.listed}
-                            listingId={nft.marketplaceData?.listingId || undefined}
-                            seller={nft.marketplaceData?.seller || undefined}
-                            buyer={nft.marketplaceData?.buyer || undefined}
-                            desiredNftAddress={nft.marketplaceData?.desiredNftAddress || undefined}
-                            desiredTokenId={nft.marketplaceData?.desiredTokenId || undefined}
-                            // Display options
-                            enableInsights={true}
-                            showStats={true}
-                            priority={false}
-                        />
-
-                        {/* Listing Status Badge - Top Right */}
-                        <div className="absolute top-2 right-2 z-10">
-                            <span className={`${badgeColor} text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg`}>
-                                {nft.listed ? 'Listed' : 'Not Listed'}
-                            </span>
-                        </div>
-
-                        {/* Data source indicator - Top Left */}
-                        <div className="absolute top-2 left-2 z-10">
-                            {nft.hasContextData && nft.hasExternalData && (
-                                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-                                    Enhanced
-                                </span>
-                            )}
-                            {nft.hasExternalData && !nft.hasContextData && (
-                                <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                                    External
-                                </span>
-                            )}
-                            {nft.hasContextData && !nft.hasExternalData && (
-                                <span className="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">
-                                    Cached
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                ))}
-            </div>
-        );
+        if (item.hasExternalData && !item.hasContextData) {
+            return (
+                <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                    External
+                </span>
+            );
+        }
+        if (item.hasContextData && !item.hasExternalData) {
+            return (
+                <span className="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">
+                    Cached
+                </span>
+            );
+        }
+        return null;
     };
 
     if (!separateSections) {
@@ -282,7 +304,14 @@ export function WalletNFTsList({
                     </button>
                 </div>
 
-                {renderNFTGrid(nfts, 'All', 'bg-blue-500')}
+                <NFTScrollList
+                    items={convertToScrollItems(filteredNFTs)}
+                    badge={{ text: 'All NFTs', color: 'bg-blue-500' }}
+                    enableInsights={true}
+                    showStats={true}
+                    priority={false}
+                    emptyMessage="No NFTs found in this wallet"
+                />
             </div>
         );
     }
@@ -310,7 +339,7 @@ export function WalletNFTsList({
                 <button
                     onClick={refresh}
                     disabled={loading}
-                    className="text-blue-600 hover:text-blue-700 transition-colors flex items-center gap-2 text-sm disabled:opacity-50"
+                    className="text-blue-600 hover:text-blue-700 transition-colors flex items-center gap-2 text-sm disabled:opacity-50 pr-4"
                 >
                     <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -335,14 +364,33 @@ export function WalletNFTsList({
                                 </span>
                                 {!ethPriceLoading && totalListedValueUSD && (
                                     <span className="text-gray-500">
-                                        (${totalListedValueUSD})
+                                        ({totalListedValueUSD})
                                     </span>
                                 )}
                             </div>
                         )}
                     </div>
                 </div>
-                {renderNFTGrid(listedNFTs, 'Listed', 'bg-green-500')}
+
+                <NFTScrollList
+                    items={convertToScrollItems(listedNFTs)}
+                    secondaryBadge={renderDataSourceBadge}
+                    enableInsights={true}
+                    showStats={true}
+                    priority={false}
+                    emptyMessage="No listed NFTs"
+                    enableViewAll={true}
+                    emptyComponent={
+                        <div className="text-center py-12 bg-gray-50 rounded-lg">
+                            <div className="text-gray-400 mb-2">
+                                <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <p className="text-gray-500">No listed NFTs</p>
+                        </div>
+                    }
+                />
             </div>
 
             {/* Unlisted NFTs Section */}
@@ -353,7 +401,26 @@ export function WalletNFTsList({
                         Not Listed ({unlistedNFTs.length})
                     </h4>
                 </div>
-                {renderNFTGrid(unlistedNFTs, 'Not Listed', 'bg-gray-500')}
+
+                <NFTScrollList
+                    items={convertToScrollItems(unlistedNFTs)}
+                    secondaryBadge={renderDataSourceBadge}
+                    enableInsights={true}
+                    showStats={true}
+                    priority={false}
+                    emptyMessage="No unlisted NFTs"
+                    enableViewAll={true}
+                    emptyComponent={
+                        <div className="text-center py-12 bg-gray-50 rounded-lg">
+                            <div className="text-gray-400 mb-2">
+                                <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <p className="text-gray-500">No unlisted NFTs</p>
+                        </div>
+                    }
+                />
             </div>
         </div>
     );

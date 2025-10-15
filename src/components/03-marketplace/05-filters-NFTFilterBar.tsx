@@ -31,7 +31,7 @@ export interface NFTFilters {
 }
 
 export interface NFTSortOptions {
-    field: 'price' | 'rating' | 'views' | 'likes' | 'watchlistCount' | 'name' | 'created';
+    field: 'price' | 'rating' | 'views' | 'likes' | 'watchlistCount' | 'name' | 'created' | 'tokenId' | 'rarity';
     direction: 'asc' | 'desc';
 }
 

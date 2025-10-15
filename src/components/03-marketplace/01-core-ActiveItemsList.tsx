@@ -8,7 +8,8 @@ import { getAdminAddressesList } from '@/utils';
 import { useActiveItems, useNFTPerformance } from '@/hooks';
 import { useNFTFilters } from '@/hooks/nfts/08-utils-useNFTFilters';
 import { useNFTContext } from '@/contexts/NFTContext';
-import { NFTCard, ImagePreloader } from '@/components';
+import { ImagePreloader, NFTScrollList } from '@/components';
+import type { NFTScrollItem } from './08-ui-NFTScrollList';
 import type { NFTFilters, NFTSortOptions } from './05-filters-NFTFilterBar';
 import type { FilterableNFTItem } from '@/hooks/nfts/08-utils-useNFTFilters';
 
@@ -26,11 +27,6 @@ export function ActiveItemsList({ externalFilters, externalSort }: ActiveItemsLi
     // Get search term from URL
     const searchParams = useSearchParams();
     const urlSearchTerm = searchParams.get('search') || '';
-
-    // Scroll state and refs
-    const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const [canScrollLeft, setCanScrollLeft] = useState(false);
-    const [canScrollRight, setCanScrollRight] = useState(false);
 
     // Filter and sort state - use external if provided
     const [localFilters, setLocalFilters] = useState<NFTFilters>({
@@ -212,49 +208,20 @@ export function ActiveItemsList({ externalFilters, externalSort }: ActiveItemsLi
         }
     }, [refetch, isManualRefreshing]);
 
-    // Scroll functions
-    const checkScrollButtons = useCallback(() => {
-        if (scrollContainerRef.current) {
-            const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
-            setCanScrollLeft(scrollLeft > 0);
-            setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
-        }
+    // Convert items to NFTScrollItem format
+    const convertToScrollItems = useCallback((items: any[]): NFTScrollItem[] => {
+        return items.map((item: any) => ({
+            nftAddress: item.contractAddress || item.nftAddress,
+            tokenId: item.tokenId,
+            price: item.price,
+            isListed: item.isListed,
+            listingId: item.listingId,
+            seller: item.seller,
+            buyer: item.buyer,
+            desiredNftAddress: item.desiredNftAddress,
+            desiredTokenId: item.desiredTokenId
+        }));
     }, []);
-
-    const scrollLeft = useCallback(() => {
-        if (scrollContainerRef.current) {
-            // 3 Karten: w-60 (240px) + gap-6 (24px) = 264px pro Karte × 3 = 792px
-            scrollContainerRef.current.scrollBy({ left: -792, behavior: 'smooth' });
-        }
-    }, []);
-
-    const scrollRight = useCallback(() => {
-        if (scrollContainerRef.current) {
-            // 3 Karten: w-60 (240px) + gap-6 (24px) = 264px pro Karte × 3 = 792px
-            scrollContainerRef.current.scrollBy({ left: 792, behavior: 'smooth' });
-        }
-    }, []);
-
-    // Monitor scroll position
-    useEffect(() => {
-        const container = scrollContainerRef.current;
-        if (container) {
-            checkScrollButtons();
-            container.addEventListener('scroll', checkScrollButtons);
-            window.addEventListener('resize', checkScrollButtons);
-
-            return () => {
-                container.removeEventListener('scroll', checkScrollButtons);
-                window.removeEventListener('resize', checkScrollButtons);
-            };
-        }
-    }, [checkScrollButtons, visibleCount]);
-
-    // Check scroll buttons when content changes
-    useEffect(() => {
-        const timer = setTimeout(checkScrollButtons, 100);
-        return () => clearTimeout(timer);
-    }, [visibleCount, checkScrollButtons]);
 
     useEffect(() => {
         if (filteredItems.length > 0 && visibleCount < filteredItems.length) {
@@ -437,123 +404,16 @@ export function ActiveItemsList({ externalFilters, externalSort }: ActiveItemsLi
                 )}
             </div>
 
-            {/* Randloses NFT Grid mit seitlichen Scroll-Buttons */}
-            <div className="relative overflow-visible">
-                {/* Left Scroll Button - Overlay - Hidden on Mobile */}
-                {canScrollLeft && (
-                    <button
-                        onClick={scrollLeft}
-                        className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
-                        aria-label="Nach links scrollen"
-                    >
-                        {/* Pfeil links */}
-                        <svg className="w-5 h-5 text-gray-600 group-hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                        {/* Lightbulb Icon - 270° nach links leuchtend */}
-                        <div className="group-hover:drop-shadow-[0_0_16px_rgba(255,215,0,1)] transition-all duration-200">
-                            <Image
-                                src="/media/only-lightbulb.png"
-                                alt="Lightbulb"
-                                width={24}
-                                height={24}
-                                className="group-hover:scale-110 transition-transform duration-200"
-                                style={{ transform: 'rotate(270deg)' }}
-                                priority
-                            />
-                        </div>
-                    </button>
-                )}
-
-                {/* Right Scroll Button - Overlay - Hidden on Mobile */}
-                {canScrollRight && (
-                    <button
-                        onClick={scrollRight}
-                        className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-lg hover:bg-white/70 hover:scale-105 transition-all duration-200 group border border-gray-200"
-                        aria-label="Nach rechts scrollen"
-                    >
-                        {/* Lightbulb Icon - 90° nach rechts leuchtend */}
-                        <div className="group-hover:drop-shadow-[0_0_16px_rgba(255,215,0,1)] transition-all duration-200">
-                            <Image
-                                src="/media/only-lightbulb.png"
-                                alt="Lightbulb"
-                                width={24}
-                                height={24}
-                                className="group-hover:scale-110 transition-transform duration-200"
-                                style={{ transform: 'rotate(90deg)' }}
-                                priority
-                            />
-                        </div>
-                        {/* Pfeil rechts */}
-                        <svg className="w-5 h-5 text-gray-600 group-hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
-                )}
-
-                {/* Scrollbare NFT Container - Edge-to-edge */}
-                <div
-                    ref={scrollContainerRef}
-                    className="flex gap-6 pb-4 pt-4 scrollbar-hide scroll-smooth pl-8 pr-6"
-                    style={{
-                        scrollBehavior: 'smooth',
-                        paddingBottom: '50px', // Padding für Hover-Schatten unten
-                        // Verhindert das Abschneiden beim Hover
-                        overflowX: 'auto',
-                        overflowY: 'visible'
-                    }}
-                >
-                    {visibleItems.map((item: any, index: number) => {
-                        // Check if page was already visited (prevent animation on back navigation)
-                        const wasVisited = typeof window !== 'undefined' && sessionStorage.getItem('activeItemsList-visited') === 'true';
-
-                        return (
-                            <div
-                                key={item.listingId}
-                                className="flex-shrink-0 w-60"
-                                style={{
-                                    // Only animate on FIRST visit, instant on back navigation! 🚀
-                                    animationName: wasVisited ? 'none' : 'fadeInUp',
-                                    animationDuration: wasVisited ? '0s' : '0.5s',
-                                    animationTimingFunction: 'ease-out',
-                                    animationFillMode: 'forwards',
-                                    animationDelay: wasVisited ? '0ms' : `${index * 80}ms`,
-                                    opacity: wasVisited ? 1 : undefined // Instant opacity if visited
-                                }}
-                            >
-                                <NFTCard
-                                    contractAddress={item.contractAddress || item.nftAddress}
-                                    tokenId={item.tokenId}
-                                    listingId={item.listingId}
-                                    price={item.price}
-                                    seller={item.seller}
-                                    buyer={item.buyer}
-                                    isListed={item.isListed}
-                                    desiredNftAddress={item.desiredNftAddress}
-                                    desiredTokenId={item.desiredTokenId}
-                                    priority={index < 12} // More images get priority loading
-                                    enableInsights={true} // Enable insights for all NFTs in the active items list
-                                />
-                            </div>
-                        );
-                    })}
-
-                    {/* Progressive Loading Indicator */}
-                    {visibleCount < filteredItems.length && (
-                        <div className="flex-shrink-0 w-60">
-                            <div className="h-72 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center">
-                                <div className="text-center">
-                                    <div className="animate-spin w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"></div>
-                                    <div className="text-sm font-medium text-gray-600">Loading more items...</div>
-                                    <div className="text-xs text-gray-500 mt-1">
-                                        {filteredItems.length - visibleCount} remaining
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
+            {/* NFT Scroll List with View All */}
+            <NFTScrollList
+                items={convertToScrollItems(visibleItems)}
+                enableInsights={true}
+                showStats={true}
+                priority={false}
+                enableViewAll={true}
+                padding="pl-8 pr-6 pb-4 pt-4"
+                emptyMessage="No NFTs found"
+            />
 
             {/* Performance Monitoring Section - Admin Only */}
             {!isAdmin && safeItems.length > 0 && (
