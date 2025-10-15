@@ -196,8 +196,8 @@ export function useAllCollections({
                     }
                 }
 
-                // Collect preview images from NFT data
-                if (nftData?.meta?.image && collection.previewImages.length < 3) {
+                // Collect preview images from NFT data (up to 4 images)
+                if (nftData?.meta?.image && collection.previewImages.length < 4) {
                     if (!collection.previewImages.includes(nftData.meta.image)) {
                         collection.previewImages.push(nftData.meta.image);
                     }

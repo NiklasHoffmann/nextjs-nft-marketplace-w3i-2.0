@@ -69,19 +69,18 @@ export function useActiveItems() {
 
     // Listen for stats updates from detail pages
     useEffect(() => {
-        const handleStatsUpdate = (event: CustomEvent) => {
-
-
+        const handleStatsUpdate = (event: WindowEventMap['nft-stats-updated']) => {
+            // Increment refresh counter to trigger re-render with latest stats
             setRefreshCounter(prev => prev + 1);
         };
 
-        window.addEventListener('nft-stats-updated', handleStatsUpdate as EventListener);
-        return () => window.removeEventListener('nft-stats-updated', handleStatsUpdate as EventListener);
+        window.addEventListener('nft-stats-updated', handleStatsUpdate);
+        return () => window.removeEventListener('nft-stats-updated', handleStatsUpdate);
     }, []);
 
     const { data, loading, error, refetch } = useQuery(GET_ACTIVE_ITEMS, {
         errorPolicy: 'all',
-        fetchPolicy: 'cache-and-network',
+        fetchPolicy: 'cache-first', // CHANGED: Use cache first to avoid 429 errors (was 'cache-and-network')
         onCompleted: (data) => {
 
         },
@@ -150,7 +149,7 @@ export function useActiveItems() {
         const indicator = items.reduce((acc, item) => {
             const stats = statsContext.getStats(item.nftAddress, item.tokenId);
             if (stats) {
-                return acc + stats.lastUpdated + stats.favoriteCount + stats.viewCount + stats.averageRating + stats.watchlistCount;
+                return acc + (stats.lastUpdated || 0) + stats.favoriteCount + stats.viewCount + stats.averageRating + stats.watchlistCount;
             }
             return acc;
         }, 0);

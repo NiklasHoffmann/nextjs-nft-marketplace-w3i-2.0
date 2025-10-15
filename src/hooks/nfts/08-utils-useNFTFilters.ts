@@ -129,9 +129,10 @@ export function useNFTFilters(
 
             switch (sort.field) {
                 case 'price':
-                    // Convert price to number for comparison
-                    aValue = a.price ? parseFloat(formatEther(a.price)) : 0;
-                    bValue = b.price ? parseFloat(formatEther(b.price)) : 0;
+                    // Convert price to number for comparison (handle both listed and unlisted)
+                    // Unlisted items get value 0 and are sorted to the end when desc
+                    aValue = (a.isListed && a.price) ? parseFloat(formatEther(a.price)) : -Infinity;
+                    bValue = (b.isListed && b.price) ? parseFloat(formatEther(b.price)) : -Infinity;
                     break;
 
                 case 'rating':
@@ -160,15 +161,29 @@ export function useNFTFilters(
                     break;
 
                 case 'created':
-                    // Sort by tokenId as proxy for creation order
+                case 'tokenId':
+                    // Sort by tokenId numerically (not as string)
                     aValue = parseInt(a.tokenId) || 0;
                     bValue = parseInt(b.tokenId) || 0;
                     break;
 
+                case 'rarity':
+                    // Sort by rarity (legendary > epic > rare > uncommon > common)
+                    const rarityOrder: { [key: string]: number } = {
+                        'legendary': 5,
+                        'epic': 4,
+                        'rare': 3,
+                        'uncommon': 2,
+                        'common': 1
+                    };
+                    aValue = rarityOrder[a.rarity?.toLowerCase() || ''] || 0;
+                    bValue = rarityOrder[b.rarity?.toLowerCase() || ''] || 0;
+                    break;
+
                 default:
                     // Default to price if unknown field
-                    aValue = a.price ? parseFloat(formatEther(a.price)) : 0;
-                    bValue = b.price ? parseFloat(formatEther(b.price)) : 0;
+                    aValue = (a.isListed && a.price) ? parseFloat(formatEther(a.price)) : -Infinity;
+                    bValue = (b.isListed && b.price) ? parseFloat(formatEther(b.price)) : -Infinity;
             }
 
             // Handle different data types
@@ -179,7 +194,17 @@ export function useNFTFilters(
                 comparison = (aValue || 0) - (bValue || 0);
             }
 
-            return sort.direction === 'asc' ? comparison : -comparison;
+            // Apply direction
+            const result = sort.direction === 'asc' ? comparison : -comparison;
+
+            // Secondary sort by tokenId for stability (wenn Werte gleich sind)
+            if (result === 0) {
+                const aTokenId = parseInt(a.tokenId) || 0;
+                const bTokenId = parseInt(b.tokenId) || 0;
+                return sort.direction === 'asc' ? aTokenId - bTokenId : bTokenId - aTokenId;
+            }
+
+            return result;
         });
 
         return result;
