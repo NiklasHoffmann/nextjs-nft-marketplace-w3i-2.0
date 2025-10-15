@@ -41,8 +41,8 @@ import {
 import {
     fetchNFTMetadata,
     fetchNFTInsights,
-    fetchNFTStats,
-    fetchMarketplaceListing
+    fetchNFTStats
+    // fetchMarketplaceListing removed - listing data comes from useActiveItems to prevent duplicate API calls
 } from '@/utils';
 
 // ===== TYPES =====
@@ -490,28 +490,29 @@ export function ModernNFTProvider({
             });
 
             try {
-                // Fetch all data in parallel
+                // Fetch metadata, insights, and stats in parallel
+                // NOTE: Listing data is NOT fetched here - it comes from useActiveItems hook!
+                // This prevents duplicate GraphQL requests and 429 rate limit errors.
 
-                const [metadataResult, insightsResult, statsResult, listingResult] = await Promise.allSettled([
+                const [metadataResult, insightsResult, statsResult] = await Promise.allSettled([
                     fetchNFTMetadata(nftAddress, tokenId),
                     fetchNFTInsights(nftAddress, tokenId),
-                    fetchNFTStats(nftAddress, tokenId),
-                    fetchMarketplaceListing(nftAddress, tokenId)
+                    fetchNFTStats(nftAddress, tokenId)
                 ]);
 
                 // Extract results
                 const metadata = metadataResult.status === 'fulfilled' ? metadataResult.value : null;
                 const insights = insightsResult.status === 'fulfilled' ? insightsResult.value : null;
                 const stats = statsResult.status === 'fulfilled' ? statsResult.value : null;
-                const listing = listingResult.status === 'fulfilled' ? listingResult.value : null;
 
 
 
                 // Convert API responses to AggregatedNFT format
                 const updates: Partial<AggregatedNFT> = {
-                    // Listing status from TheGraph
-                    listed: listing?.isListed || false,
-                    listing: listing || undefined,
+                    // Listing data is NOT set here - it comes from component props (useActiveItems)
+                    // This prevents redundant API calls to /api/marketplace/listing/...
+                    listed: false, // Will be overridden by component props if listed
+                    listing: undefined, // Will be overridden by component props if listed
 
                     // Core blockchain data
                     core: {
@@ -579,7 +580,7 @@ export function ModernNFTProvider({
                     sources: {
                         blockchain: !!metadata?.blockchain,
                         metadata: !!metadata?.metadata,
-                        marketplace: !!listing,
+                        marketplace: false, // Will be set to true by component props if listed (from useActiveItems)
                         social: !!stats,
                         insights: !!insights
                     },
@@ -679,6 +680,7 @@ export function ModernNFTProvider({
                 }
             }`;
 
+            // Direct GraphQL request (no rate limiter needed - cache-first strategy prevents excessive requests)
             const response = await fetch(process.env.NEXT_PUBLIC_SUBGRAPH_URL || 'http://localhost:8000/subgraphs/name/nftmarketplace', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -784,7 +786,11 @@ export function ModernNFTProvider({
     }, [store]);
 
     // ===== PRELOADING =====
+    // DISABLED: Auto-preloading causes 429 rate limit errors
+    // NFTs will be loaded on-demand by components (useActiveItems, etc.)
+    // This prevents making unnecessary GraphQL requests on every page load
 
+    /*
     useEffect(() => {
         // 🚀 Preload all NFTs on mount for instant UX
 
@@ -798,6 +804,7 @@ export function ModernNFTProvider({
             console.error('❌ Failed to preload NFTs:', err);
         });
     }, [loadAllNFTs, getCacheStats, store]);
+    */
 
     // ===== CONTEXT VALUE (STABLE REFERENCE!) =====
 

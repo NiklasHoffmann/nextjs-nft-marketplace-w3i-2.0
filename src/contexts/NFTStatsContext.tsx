@@ -14,21 +14,19 @@ import React, {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     ReactNode
 } from 'react';
 
 import { useNFTContext } from './NFTContext';
+import { devLog } from '@/utils/devLog';
+import type { NFTStatsWithMeta } from '@/types/events';
+import { dispatchNFTStatsUpdate as emitStatsUpdate } from '@/types/events';
 
 // ===== TYPES =====
 
-export interface NFTStats {
-    viewCount: number;
-    favoriteCount: number;
-    watchlistCount: number;
-    averageRating: number;
-    ratingCount: number;
-    lastUpdated: number;
-}
+// Re-export the stats type with metadata
+export type NFTStats = NFTStatsWithMeta;
 
 export interface UserInteractionState {
     isFavorited: boolean;
@@ -96,37 +94,49 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
     const updateStats = useCallback((nftAddress: string, tokenId: string, updates: Partial<NFTStats>) => {
         const nftKey = createNFTKey(nftAddress, tokenId);
 
-        setStatsCache(prev => ({
-            ...prev,
-            [nftKey]: {
-                ...(prev[nftKey] || {
-                    viewCount: 0,
-                    favoriteCount: 0,
-                    watchlistCount: 0,
-                    averageRating: 0,
-                    ratingCount: 0,
+        setStatsCache(prev => {
+            const updated = {
+                ...prev,
+                [nftKey]: {
+                    ...(prev[nftKey] || {
+                        viewCount: 0,
+                        favoriteCount: 0,
+                        watchlistCount: 0,
+                        averageRating: 0,
+                        ratingCount: 0,
+                        lastUpdated: Date.now()
+                    }),
+                    ...updates,
                     lastUpdated: Date.now()
-                }),
-                ...updates,
-                lastUpdated: Date.now()
-            }
-        }));
-
-        // Note: ModernNFTContext doesn't support direct updates
-        // The updated stats will be fetched on next NFT load
-
-        // Trigger custom event for cross-component updates
-        if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('nft-stats-updated', {
-                detail: {
-                    nftAddress,
-                    tokenId,
-                    updates,
-                    timestamp: Date.now()
                 }
-            }));
+            };
 
-        }
+            const newStats = updated[nftKey];
+
+            devLog.cache('Stats cache updated:', {
+                nftKey,
+                favoriteCount: newStats.favoriteCount,
+                watchlistCount: newStats.watchlistCount,
+                viewCount: newStats.viewCount
+            });
+
+            // Trigger event AFTER state update with the actual new stats
+            // This ensures components receive the correct updated values
+            if (typeof window !== 'undefined') {
+                setTimeout(() => {
+                    emitStatsUpdate({
+                        nftAddress,
+                        tokenId,
+                        stats: newStats,
+                        timestamp: Date.now(),
+                        source: 'api' // Can be customized by caller
+                    });
+                    devLog.event('Event dispatched for', `${nftAddress}/${tokenId}`, 'with stats:', newStats);
+                }, 0);
+            }
+
+            return updated;
+        });
     }, [nftContext]);
 
     const updateUserInteractions = useCallback((
@@ -186,18 +196,11 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
 
     const incrementViewCount = useCallback(async (nftAddress: string, tokenId: string) => {
         try {
-            // Optimistic update
-            const currentStats = getStats(nftAddress, tokenId) || {
-                viewCount: 0,
-                favoriteCount: 0,
-                watchlistCount: 0,
-                averageRating: 0,
-                ratingCount: 0,
-                lastUpdated: Date.now()
-            };
-            updateStats(nftAddress, tokenId, {
-                viewCount: currentStats.viewCount + 1
-            });
+            // DON'T do optimistic update for viewCount!
+            // We need to load the real count from DB first to avoid overwriting with wrong values
+            // (e.g. cache shows 0, but DB has 475 views)
+
+            devLog.api('Recording view for NFT:', { nftAddress, tokenId });
 
             // Record view in database
             const response = await fetch('/api/nft/stats', {
@@ -214,235 +217,168 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
 
             const result = await response.json();
             if (!result.success) {
-                console.error('Failed to record view:', result.error);
-                // Revert optimistic update on API failure
-                updateStats(nftAddress, tokenId, {
-                    viewCount: currentStats.viewCount
-                });
+                devLog.error('Failed to record view:', result.error);
             } else {
+                // Load fresh stats from server to get the updated viewCount
+                // This ensures we always show the correct value from DB
+                const statsResponse = await fetch(`/api/nft/stats?contractAddress=${nftAddress}&tokenId=${tokenId}`);
+                const statsResult = await statsResponse.json();
 
+                if (statsResult.success && statsResult.data) {
+                    devLog.success('View recorded, stats updated:', {
+                        nft: `${nftAddress}/${tokenId}`,
+                        viewCount: statsResult.data.viewCount
+                    });
+                    updateStats(nftAddress, tokenId, {
+                        viewCount: statsResult.data.viewCount || 0,
+                        favoriteCount: statsResult.data.favoriteCount || 0,
+                        watchlistCount: statsResult.data.watchlistCount || 0,
+                        averageRating: statsResult.data.averageRating || 0,
+                        ratingCount: statsResult.data.ratingCount || 0,
+                    });
+                } else {
+                    devLog.fail('Failed to load stats after view:', statsResult);
+                }
             }
         } catch (error) {
-            console.error('Error incrementing view count:', error);
-            // Revert optimistic update on error
-            const currentStats = getStats(nftAddress, tokenId);
-            if (currentStats) {
-                updateStats(nftAddress, tokenId, {
-                    viewCount: Math.max(0, currentStats.viewCount - 1)
-                });
-            }
+            devLog.error('Error incrementing view count:', error);
         }
-    }, [getStats, updateStats]);
+    }, [updateStats]);
+
+    // ===== USER INTERACTION OPERATIONS =====
+
+    /**
+     * Generic toggle function for user interactions (favorite/watchlist)
+     * Handles optimistic updates, API calls, and error recovery
+     */
+    const toggleUserInteraction = useCallback(async (
+        nftAddress: string,
+        tokenId: string,
+        userAddress: string,
+        interactionType: 'favorite' | 'watchlist'
+    ) => {
+        const isFavorite = interactionType === 'favorite';
+        const stateField = isFavorite ? 'isFavorited' : 'isWatchlisted';
+        const apiField = isFavorite ? 'isFavorite' : 'isWatchlisted';
+        const actionName = isFavorite ? 'favorite' : 'watchlist';
+
+        devLog.info(`toggle${isFavorite ? 'Favorite' : 'Watchlist'} called:`, { nftAddress, tokenId, userAddress });
+
+        try {
+            setLoading(nftAddress, tokenId, true);
+
+            const currentInteractions = getUserInteractions(nftAddress, tokenId, userAddress) || {
+                isFavorited: false,
+                isWatchlisted: false,
+                userRating: 0,
+                hasViewed: false
+            };
+
+            const currentState = currentInteractions[stateField];
+            const newState = !currentState;
+
+            devLog.debug('Current state:', {
+                type: actionName,
+                current: currentState,
+                new: newState
+            });
+
+            // Optimistic update ONLY for user interaction (not for counts!)
+            // This gives instant visual feedback for the icon
+            updateUserInteractions(nftAddress, tokenId, userAddress, {
+                [stateField]: newState
+            } as Partial<UserInteractionState>);
+
+            // Call API to persist state
+            const response = await fetch('/api/user/interactions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userId: userAddress,
+                    contractAddress: nftAddress,
+                    tokenId: tokenId,
+                    [apiField]: newState
+                })
+            });
+
+            const result = await response.json();
+            if (!result.success) {
+                devLog.error(`Failed to toggle ${actionName}:`, result.error);
+                // Revert optimistic update on API failure
+                updateUserInteractions(nftAddress, tokenId, userAddress, {
+                    [stateField]: currentState
+                } as Partial<UserInteractionState>);
+                throw new Error(result.error || `Failed to update ${actionName}`);
+            }
+
+            // Update user interactions with actual API response data
+            if (result.data) {
+                const apiInteractions: UserInteractionState = {
+                    isFavorited: result.data.isFavorite || false,
+                    isWatchlisted: result.data.isWatchlisted || false,
+                    userRating: result.data.rating || 0,
+                    hasViewed: true
+                };
+                updateUserInteractions(nftAddress, tokenId, userAddress, apiInteractions);
+            }
+
+            // Load real stats from server immediately after successful update
+            try {
+                const statsResponse = await fetch(`/api/nft/stats?contractAddress=${nftAddress}&tokenId=${tokenId}`);
+                const statsResult = await statsResponse.json();
+                if (statsResult.success && statsResult.data) {
+                    devLog.success(`${isFavorite ? 'Favorite' : 'Watchlist'} toggle complete:`, {
+                        nft: `${nftAddress}/${tokenId}`,
+                        favoriteCount: statsResult.data.favoriteCount,
+                        watchlistCount: statsResult.data.watchlistCount,
+                        newState
+                    });
+                    // Don't touch viewCount to avoid race conditions
+                    updateStats(nftAddress, tokenId, {
+                        favoriteCount: statsResult.data.favoriteCount || 0,
+                        watchlistCount: statsResult.data.watchlistCount || 0,
+                        averageRating: statsResult.data.averageRating || 0,
+                        ratingCount: statsResult.data.ratingCount || 0,
+                    });
+                } else {
+                    devLog.fail('Failed to load stats:', statsResult);
+                }
+            } catch (error) {
+                devLog.error('Error loading stats after toggle:', error);
+                // Keep optimistic update if stats load fails
+            }
+
+        } catch (error) {
+            devLog.error(`Error toggling ${actionName}:`, error);
+            // Revert user interaction on error
+            const currentInteractions = getUserInteractions(nftAddress, tokenId, userAddress);
+            if (currentInteractions) {
+                updateUserInteractions(nftAddress, tokenId, userAddress, {
+                    [stateField]: !currentInteractions[stateField]
+                } as Partial<UserInteractionState>);
+            }
+        } finally {
+            setLoading(nftAddress, tokenId, false);
+        }
+    }, [getUserInteractions, getStats, updateUserInteractions, updateStats, setLoading]);
 
     const toggleFavorite = useCallback(async (
         nftAddress: string,
         tokenId: string,
         userAddress: string
     ) => {
-        try {
-            setLoading(nftAddress, tokenId, true);
-
-            const currentInteractions = getUserInteractions(nftAddress, tokenId, userAddress) || {
-                isFavorited: false,
-                isWatchlisted: false,
-                userRating: 0,
-                hasViewed: false
-            };
-            const currentStats = getStats(nftAddress, tokenId) || {
-                viewCount: 0,
-                favoriteCount: 0,
-                watchlistCount: 0,
-                averageRating: 0,
-                ratingCount: 0,
-                lastUpdated: Date.now()
-            };
-
-            const newFavoriteState = !currentInteractions.isFavorited;
-
-            // Optimistic updates
-            updateUserInteractions(nftAddress, tokenId, userAddress, {
-                isFavorited: newFavoriteState
-            });
-
-            updateStats(nftAddress, tokenId, {
-                favoriteCount: newFavoriteState
-                    ? currentStats.favoriteCount + 1
-                    : Math.max(0, currentStats.favoriteCount - 1)
-            });
-
-            // Call API to persist favorite state
-            const response = await fetch('/api/user/interactions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    userId: userAddress,
-                    contractAddress: nftAddress,
-                    tokenId: tokenId,
-                    isFavorite: newFavoriteState // API expects 'isFavorite'
-                })
-            });
-
-            const result = await response.json();
-            if (!result.success) {
-                console.error('Failed to toggle favorite:', result.error);
-                // Revert optimistic updates on API failure
-                updateUserInteractions(nftAddress, tokenId, userAddress, {
-                    isFavorited: !newFavoriteState
-                });
-                updateStats(nftAddress, tokenId, {
-                    favoriteCount: !newFavoriteState
-                        ? currentStats.favoriteCount + 1
-                        : Math.max(0, currentStats.favoriteCount - 1)
-                });
-            } else {
-
-                // Update user interactions with actual API response data
-                if (result.data) {
-                    const apiInteractions: UserInteractionState = {
-                        isFavorited: result.data.isFavorite || false,
-                        isWatchlisted: result.data.isWatchlisted || false,
-                        userRating: result.data.rating || 0,
-                        hasViewed: true
-                    };
-                    updateUserInteractions(nftAddress, tokenId, userAddress, apiInteractions);
-                }
-
-                // FIXED: Keine loadStats() mehr - behalte optimistische Updates
-                // Das verhindert das "Aufblitzen" und Race Conditions
-                // await loadStats(nftAddress, tokenId);
-
-            }
-
-        } catch (error) {
-            console.error('Error toggling favorite:', error);
-            // Revert on error
-            const currentInteractions = getUserInteractions(nftAddress, tokenId, userAddress);
-            const currentStats = getStats(nftAddress, tokenId);
-
-            if (currentInteractions) {
-                updateUserInteractions(nftAddress, tokenId, userAddress, {
-                    isFavorited: !currentInteractions.isFavorited
-                });
-            }
-
-            if (currentStats) {
-                updateStats(nftAddress, tokenId, {
-                    favoriteCount: currentInteractions?.isFavorited
-                        ? currentStats.favoriteCount + 1
-                        : Math.max(0, currentStats.favoriteCount - 1)
-                });
-            }
-        } finally {
-            setLoading(nftAddress, tokenId, false);
-        }
-    }, [getUserInteractions, getStats, updateUserInteractions, updateStats, setLoading]);
+        await toggleUserInteraction(nftAddress, tokenId, userAddress, 'favorite');
+    }, [toggleUserInteraction]);
 
     const toggleWatchlist = useCallback(async (
         nftAddress: string,
         tokenId: string,
         userAddress: string
     ) => {
-        try {
-            setLoading(nftAddress, tokenId, true);
-
-            const currentInteractions = getUserInteractions(nftAddress, tokenId, userAddress) || {
-                isFavorited: false,
-                isWatchlisted: false,
-                userRating: 0,
-                hasViewed: false
-            };
-            const currentStats = getStats(nftAddress, tokenId) || {
-                viewCount: 0,
-                favoriteCount: 0,
-                watchlistCount: 0,
-                averageRating: 0,
-                ratingCount: 0,
-                lastUpdated: Date.now()
-            };
-
-            const newWatchlistState = !currentInteractions.isWatchlisted;
-
-            // Optimistic updates
-            updateUserInteractions(nftAddress, tokenId, userAddress, {
-                isWatchlisted: newWatchlistState
-            });
-
-            updateStats(nftAddress, tokenId, {
-                watchlistCount: newWatchlistState
-                    ? currentStats.watchlistCount + 1
-                    : Math.max(0, currentStats.watchlistCount - 1)
-            });
-
-            // Call API to persist watchlist state
-            const response = await fetch('/api/user/interactions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    userId: userAddress,
-                    contractAddress: nftAddress,
-                    tokenId: tokenId,
-                    isWatchlisted: newWatchlistState
-                })
-            });
-
-            const result = await response.json();
-            if (!result.success) {
-                console.error('Failed to toggle watchlist:', result.error);
-                // Revert optimistic updates on API failure
-                updateUserInteractions(nftAddress, tokenId, userAddress, {
-                    isWatchlisted: !newWatchlistState
-                });
-                updateStats(nftAddress, tokenId, {
-                    watchlistCount: !newWatchlistState
-                        ? currentStats.watchlistCount + 1
-                        : Math.max(0, currentStats.watchlistCount - 1)
-                });
-            } else {
-
-                // Update user interactions with actual API response data
-                if (result.data) {
-                    const apiInteractions: UserInteractionState = {
-                        isFavorited: result.data.isFavorite || false,
-                        isWatchlisted: result.data.isWatchlisted || false,
-                        userRating: result.data.rating || 0,
-                        hasViewed: true
-                    };
-                    updateUserInteractions(nftAddress, tokenId, userAddress, apiInteractions);
-                }
-
-                // FIXED: Keine loadStats() mehr - behalte optimistische Updates
-                // Das verhindert das "Aufblitzen" und Race Conditions
-                // await loadStats(nftAddress, tokenId);
-
-            }
-
-        } catch (error) {
-            console.error('Error toggling watchlist:', error);
-            // Revert on error
-            const currentInteractions = getUserInteractions(nftAddress, tokenId, userAddress);
-            const currentStats = getStats(nftAddress, tokenId);
-
-            if (currentInteractions) {
-                updateUserInteractions(nftAddress, tokenId, userAddress, {
-                    isWatchlisted: !currentInteractions.isWatchlisted
-                });
-            }
-
-            if (currentStats) {
-                updateStats(nftAddress, tokenId, {
-                    watchlistCount: currentInteractions?.isWatchlisted
-                        ? currentStats.watchlistCount + 1
-                        : Math.max(0, currentStats.watchlistCount - 1)
-                });
-            }
-        } finally {
-            setLoading(nftAddress, tokenId, false);
-        }
-    }, [getUserInteractions, getStats, updateUserInteractions, updateStats, setLoading]);
+        await toggleUserInteraction(nftAddress, tokenId, userAddress, 'watchlist');
+    }, [toggleUserInteraction]);
 
     const setUserRating = useCallback(async (
         nftAddress: string,
@@ -500,15 +436,13 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                 }
             }
 
-            // Optimistic updates
+            // Optimistic update ONLY for user's rating (not for aggregate stats!)
             updateUserInteractions(nftAddress, tokenId, userAddress, {
                 userRating: rating
             });
 
-            updateStats(nftAddress, tokenId, {
-                averageRating: newAverageRating,
-                ratingCount: newRatingCount
-            });
+            // DON'T do optimistic update for averageRating/ratingCount
+            // These are calculated server-side from all user ratings
 
             // Call API to persist rating
             const response = await fetch('/api/user/interactions', {
@@ -526,44 +460,51 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
 
             const result = await response.json();
             if (!result.success) {
-                console.error('Failed to set rating:', result.error);
-                // Revert optimistic updates on API failure
+                devLog.error('Failed to set rating:', result.error);
+                // Revert optimistic user rating update on API failure
                 updateUserInteractions(nftAddress, tokenId, userAddress, {
                     userRating: oldRating
                 });
-                updateStats(nftAddress, tokenId, {
-                    averageRating: currentStats.averageRating,
-                    ratingCount: currentStats.ratingCount
-                });
-            } else {
+                throw new Error(result.error || 'Failed to update rating');
+            }
 
-                // Update user interactions with actual API response data
-                if (result.data) {
-                    const apiInteractions: UserInteractionState = {
-                        isFavorited: result.data.isFavorite || false,
-                        isWatchlisted: result.data.isWatchlisted || false,
-                        userRating: result.data.rating || 0,
-                        hasViewed: true
-                    };
-                    updateUserInteractions(nftAddress, tokenId, userAddress, apiInteractions);
+            // Update user interactions with actual API response data
+            if (result.data) {
+                const apiInteractions: UserInteractionState = {
+                    isFavorited: result.data.isFavorite || false,
+                    isWatchlisted: result.data.isWatchlisted || false,
+                    userRating: result.data.rating || 0,
+                    hasViewed: true
+                };
+                updateUserInteractions(nftAddress, tokenId, userAddress, apiInteractions);
+            }
+
+            // Load real stats from server to get updated averageRating and ratingCount
+            try {
+                const statsResponse = await fetch(`/api/nft/stats?contractAddress=${nftAddress}&tokenId=${tokenId}`);
+                const statsResult = await statsResponse.json();
+                if (statsResult.success && statsResult.data) {
+                    // Only update rating-related stats - don't touch viewCount
+                    updateStats(nftAddress, tokenId, {
+                        favoriteCount: statsResult.data.favoriteCount || 0,
+                        watchlistCount: statsResult.data.watchlistCount || 0,
+                        averageRating: statsResult.data.averageRating || 0,
+                        ratingCount: statsResult.data.ratingCount || 0,
+                    });
                 }
-
-                // FIXED: Für Ratings behalten wir loadStats() da Durchschnitte komplex sind
-                // Aber nur bei erfolgreichem Update, nicht bei Fehlern
-                // await loadStats(nftAddress, tokenId);
-
+            } catch (error) {
+                devLog.error('Error loading stats after rating:', error);
             }
 
         } catch (error) {
-            console.error('Error setting user rating:', error);
-            // Revert on error
+            devLog.error('Error setting user rating:', error);
+            // Revert user rating on error (stats will be correct from server)
             const currentInteractions = getUserInteractions(nftAddress, tokenId, userAddress);
             if (currentInteractions) {
                 updateUserInteractions(nftAddress, tokenId, userAddress, {
                     userRating: currentInteractions.userRating
                 });
             }
-            // TODO: Revert stats changes
         } finally {
             setLoading(nftAddress, tokenId, false);
         }
@@ -584,6 +525,8 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
 
             if (result.success && result.data) {
                 const apiStats: NFTStats = {
+                    contractAddress: result.data.contractAddress || nftAddress,
+                    tokenId: result.data.tokenId || tokenId,
                     viewCount: result.data.viewCount || 0,
                     favoriteCount: result.data.favoriteCount || 0,
                     watchlistCount: result.data.watchlistCount || 0,
@@ -600,6 +543,8 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                 const currentStats = getStats(nftAddress, tokenId);
                 if (!currentStats) {
                     const defaultStats: NFTStats = {
+                        contractAddress: nftAddress,
+                        tokenId: tokenId,
                         viewCount: 0,
                         favoriteCount: 0,
                         watchlistCount: 0,
@@ -612,7 +557,7 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
             }
 
         } catch (error) {
-            console.error('Error loading stats from API:', error);
+            devLog.error('Error loading stats from API:', error);
             // No fallback data - stats will remain null
         } finally {
             setLoading(nftAddress, tokenId, false);
@@ -643,7 +588,7 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
             }
 
         } catch (error) {
-            console.error('Error loading user interactions from API:', error);
+            devLog.error('Error loading user interactions from API:', error);
             // No fallback data - interactions will remain null
         } finally {
             setLoading(nftAddress, tokenId, false);
@@ -734,9 +679,53 @@ export function useNFTStats(nftAddress: string, tokenId: string) {
 export function useNFTUserStats(nftAddress: string, tokenId: string, userAddress?: string) {
     const context = useNFTStatsContext();
 
-    const stats = context.getStats(nftAddress, tokenId);
-    const userInteractions = context.getUserInteractions(nftAddress, tokenId, userAddress);
+    // Use state to make stats and userInteractions reactive
+    const [stats, setStats] = useState(() => context.getStats(nftAddress, tokenId));
+    const [userInteractions, setUserInteractions] = useState(() =>
+        context.getUserInteractions(nftAddress, tokenId, userAddress)
+    );
     const loading = context.isLoading(nftAddress, tokenId);
+
+    // Use refs to avoid recreating event handler on every render
+    const contextRef = useRef(context);
+    const userAddressRef = useRef(userAddress);
+
+    useEffect(() => {
+        contextRef.current = context;
+        userAddressRef.current = userAddress;
+    });
+
+    // Listen for stats updates via custom event
+    useEffect(() => {
+        const handleStatsUpdate = (event: WindowEventMap['nft-stats-updated']) => {
+            const detail = event.detail;
+
+            if (detail.nftAddress === nftAddress && detail.tokenId === tokenId) {
+                // Use stats from event detail (guaranteed to be latest)
+                // OR fall back to fetching from context if not provided
+                const latestStats = detail.stats || contextRef.current.getStats(nftAddress, tokenId);
+                const latestInteractions = contextRef.current.getUserInteractions(nftAddress, tokenId, userAddressRef.current);
+
+                devLog.info('Stats updated for', `${nftAddress}/${tokenId}:`, {
+                    favoriteCount: latestStats?.favoriteCount,
+                    watchlistCount: latestStats?.watchlistCount,
+                    isFavorited: latestInteractions?.isFavorited,
+                    isWatchlisted: latestInteractions?.isWatchlisted,
+                    source: detail.source
+                });
+
+                setStats(latestStats);
+                setUserInteractions(latestInteractions);
+            }
+        };
+
+        window.addEventListener('nft-stats-updated', handleStatsUpdate);
+
+        return () => {
+            window.removeEventListener('nft-stats-updated', handleStatsUpdate);
+        };
+        // Only re-run when NFT identity changes
+    }, [nftAddress, tokenId]);
 
     // Auto-load stats if not present - aber nur beim ersten Mount
     const [statsLoadInitiated, setStatsLoadInitiated] = useState(false);
