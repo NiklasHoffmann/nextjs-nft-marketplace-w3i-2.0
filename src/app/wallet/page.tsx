@@ -9,7 +9,8 @@ import { useETHPrice } from '@/contexts/CurrencyContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useMarketplaceUser } from '@/hooks';
 import { getMarketplaceAddress } from '@/utils';
-import { WalletNFTsList } from '@/components';
+import { WalletNFTsList, NFTFilterSidebar } from '@/components';
+import type { NFTFilters, NFTSortOptions } from '@/components/03-marketplace/05-filters-NFTFilterBar';
 
 // Force dynamic rendering for this page to prevent SSG issues
 export const dynamic = 'force-dynamic';
@@ -43,11 +44,22 @@ function WalletDashboardContent() {
     const router = useRouter();
     const { address, isConnected, chainId } = useAccount();
 
+    // Filter and Sort State
+    const [filters, setFilters] = useState<NFTFilters>({
+        categories: [],
+        rarities: [],
+        searchTerm: '',
+    });
+    const [sort, setSort] = useState<NFTSortOptions>({
+        field: 'price',
+        direction: 'desc'
+    });
+
     const { data: balance, isLoading: balanceLoading, error: balanceError, refetch: refetchBalance } = useBalance({
         address: address,
         query: {
             enabled: !!address && !!isConnected,
-            refetchInterval: 30000, // Refetch every 30 seconds
+            refetchInterval: false, // DISABLED: Auto-refresh verursacht 429 Errors
         }
     });
 
@@ -119,16 +131,17 @@ function WalletDashboardContent() {
         }
     };
 
-    // Auto-refresh balance every 30 seconds
-    useEffect(() => {
-        if (!isConnected) return;
+    const handleWithdrawProceeds = async () => {
+        try {
+            await withdrawProceeds();
+            await refetchProceeds();
+        } catch (error) {
+            console.error('Withdraw proceeds error:', error);
+        }
+    };
 
-        const interval = setInterval(() => {
-            refetchBalance();
-        }, 30000);
-
-        return () => clearInterval(interval);
-    }, [isConnected, refetchBalance]);
+    // REMOVED: Duplicate auto-refresh interval (already handled by useBalance refetchInterval)
+    // This was causing 429 errors by making redundant requests
 
     if (!isConnected || !address) {
         return (
@@ -148,284 +161,200 @@ function WalletDashboardContent() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 pt-32">
-            <div className="max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">Wallet Dashboard</h1>
-                    <p className="text-gray-600">Manage your balance and view your NFT collection</p>
+        <div className="min-h-screen bg-gray-50">
+            {/* NFTFilterSidebar - Left Sidebar */}
+            <NFTFilterSidebar
+                onFiltersChange={setFilters}
+                onSortChange={setSort}
+                currentSort={sort}
+                totalItems={0}
+                filteredCount={0}
+            />
+
+            <main className="flex-1 pt-[66px] md:pl-16">
+                {/* Wallet Header - Simplified */}
+                <div className="border-b border-gray-200 bg-white pr-80">
+                    <div className="px-8 py-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h1 className="text-3xl font-bold text-gray-900">My Wallet</h1>
+                                <div className="flex items-center gap-2 mt-2">
+                                    <p className="font-mono text-sm text-gray-500">{address}</p>
+                                    <button
+                                        onClick={() => navigator.clipboard.writeText(address || '')}
+                                        className="text-blue-600 hover:text-blue-700 transition-colors"
+                                        title="Copy Address"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Balance Overview */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                {/* NFT Lists Area */}
+                <div className="pr-80 pl-8 pt-8">
+                    <WalletNFTsList
+                        walletAddress={address}
+                        title="Your NFT Collection"
+                        includeContext={true}
+                        autoFetch={true}
+                        separateSections={true}
+                        filters={filters}
+                        sort={sort}
+                    />
+                </div>
+            </main>
+
+            {/* Right Sidebar - Wallet Info (Fixed) */}
+            <aside className="fixed right-0 top-[66px] bottom-0 w-80 bg-white border-l border-gray-200 overflow-y-auto z-50 shadow-xl">
+                <div className="p-6 space-y-4">
                     {/* Wallet Balance Card */}
-                    <div className="bg-white rounded-2xl shadow-lg p-6">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-semibold text-gray-900">Wallet Balance</h2>
-                            <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 bg-green-500 rounded-full" />
-                                <span className="text-sm text-green-600 font-medium">Live</span>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            {/* ETH Balance */}
-                            <div className="flex items-baseline gap-3">
-                                <span className="text-3xl font-bold text-gray-900">
-                                    {balanceLoading ? (
-                                        <span className="animate-pulse">Loading...</span>
-                                    ) : balanceError ? (
-                                        <span className="text-red-500 text-sm">Error loading balance</span>
-                                    ) : (
-                                        `${formatBalance(balance, 6)} ETH`
-                                    )}
-                                </span>
-                                <button
-                                    onClick={() => refetchBalance()}
-                                    className="text-blue-600 hover:text-blue-700 transition-colors"
-                                    title="Refresh Balance"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                </button>
-                            </div>
-
-                            {/* Converted Price */}
-                            {!balancePriceLoading && !balanceError && balance && parseFloat(formatEtherViem(balance.value)) > 0 && (
-                                <p className="text-xl text-gray-600">
-                                    ≈ {balancePrice}
-                                </p>
-                            )}
-
-                            {/* Withdraw Button */}
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                Wallet Balance
+                            </h2>
                             <button
-                                onClick={handleWithdraw}
-                                disabled={isWithdrawing || !balance || parseFloat(formatEtherViem(balance.value)) === 0}
-                                className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 mt-4"
+                                onClick={() => refetchBalance()}
+                                className="text-blue-600 hover:text-blue-700 transition-colors"
+                                title="Refresh"
                             >
-                                {isWithdrawing ? (
-                                    <>
-                                        <svg className="animate-spin w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                        </svg>
-                                        Processing...
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                                        </svg>
-                                        Withdraw Balance
-                                    </>
-                                )}
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
                             </button>
                         </div>
+
+                        {balanceLoading ? (
+                            <div className="text-center py-4">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                            </div>
+                        ) : balanceError ? (
+                            <p className="text-red-600 text-sm">Error loading balance</p>
+                        ) : (
+                            <div className="space-y-3">
+                                <div className="text-center py-2 bg-white rounded-lg">
+                                    <p className="text-3xl font-bold text-blue-600">
+                                        {formatBalance(balance, 6)} ETH
+                                    </p>
+                                    {!balancePriceLoading && balancePrice && (
+                                        <p className="text-sm text-gray-600 mt-1">
+                                            ≈ {balancePrice}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Marketplace Proceeds Card */}
-                    <div className="bg-white rounded-2xl shadow-lg p-6">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-semibold text-gray-900">Marketplace Proceeds</h2>
-                            <div className="flex items-center gap-2">
-                                <div className={`w-3 h-3 rounded-full ${proceedsLoading ? 'bg-yellow-500' : 'bg-green-500'}`} />
-                                <span className={`text-sm font-medium ${proceedsLoading ? 'text-yellow-600' : 'text-green-600'}`}>
-                                    {proceedsLoading ? 'Loading' : 'Live'}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            {/* Proceeds Balance */}
-                            <div className="flex items-baseline gap-3">
-                                <span className="text-3xl font-bold text-gray-900">
-                                    {proceedsLoading ? (
-                                        <span className="animate-pulse">Loading...</span>
-                                    ) : proceedsError ? (
-                                        <span className="text-red-500 text-sm">Error loading proceeds</span>
-                                    ) : !marketplaceAddress ? (
-                                        <span className="text-gray-500 text-sm">Network not supported</span>
-                                    ) : (
-                                        `${proceeds} ETH`
-                                    )}
-                                </span>
-                                <button
-                                    onClick={() => refetchProceeds()}
-                                    disabled={proceedsLoading || !marketplaceAddress}
-                                    className="text-blue-600 hover:text-blue-700 disabled:text-gray-400 transition-colors"
-                                    title="Refresh Proceeds"
-                                >
-                                    <svg className={`w-5 h-5 ${proceedsLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                </button>
-                            </div>
-
-                            {/* Converted Price */}
-                            {!proceedsPriceLoading && proceedsAmount > 0 && (
-                                <p className="text-xl text-gray-600">
-                                    ≈ {proceedsPrice}
-                                </p>
-                            )}
-
-                            {/* Error Display */}
-                            {proceedsError && (
-                                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                                    <p className="text-sm text-red-600">{proceedsError}</p>
-                                </div>
-                            )}
-
-                            {/* Withdraw Proceeds Button */}
+                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border border-green-200 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Sales Proceeds
+                            </h2>
                             <button
-                                onClick={withdrawProceeds}
-                                disabled={isWithdrawingProceeds || proceedsLoading || proceedsAmount === 0 || !!proceedsError}
-                                className="w-full bg-green-600 text-white py-3 rounded-xl font-semibold hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 mt-4"
+                                onClick={() => refetchProceeds()}
+                                className="text-green-600 hover:text-green-700 transition-colors"
+                                title="Refresh"
                             >
-                                {isWithdrawingProceeds ? (
-                                    <>
-                                        <svg className="animate-spin w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                        </svg>
-                                        Withdrawing...
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                                        </svg>
-                                        Withdraw Proceeds
-                                    </>
-                                )}
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
                             </button>
-
-                            {proceedsAmount === 0 && !proceedsLoading && !proceedsError && (
-                                <p className="text-sm text-gray-500 text-center mt-2">
-                                    No proceeds available
-                                </p>
-                            )}
                         </div>
+
+                        {proceedsLoading ? (
+                            <div className="text-center py-4">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+                            </div>
+                        ) : proceedsError ? (
+                            <p className="text-red-600 text-sm">{proceedsError}</p>
+                        ) : (
+                            <div className="space-y-3">
+                                <div className="text-center py-2 bg-white rounded-lg">
+                                    <p className="text-3xl font-bold text-green-600">
+                                        {proceeds} ETH
+                                    </p>
+                                    {!proceedsPriceLoading && proceedsPrice && parseFloat(proceeds) > 0 && (
+                                        <p className="text-sm text-gray-600 mt-1">
+                                            ≈ {proceedsPrice}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {parseFloat(proceeds) > 0 && (
+                                    <button
+                                        onClick={handleWithdrawProceeds}
+                                        disabled={isWithdrawingProceeds}
+                                        className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-medium"
+                                    >
+                                        {isWithdrawingProceeds ? (
+                                            <>
+                                                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                Withdrawing...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                </svg>
+                                                Withdraw Proceeds
+                                            </>
+                                        )}
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
-                </div>
 
-                {/* Summary Card */}
-                <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-2xl shadow-lg p-6 mb-8">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-semibold text-gray-900">Total Portfolio Value</h2>
-                        <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-blue-500 rounded-full" />
-                            <span className="text-sm text-blue-600 font-medium">Combined</span>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="text-center">
-                            <p className="text-sm text-gray-600 mb-1">Wallet Balance</p>
-                            <p className="text-2xl font-bold text-gray-900">{formatBalance(balance, 4)} ETH</p>
-                        </div>
-                        <div className="text-center">
-                            <p className="text-sm text-gray-600 mb-1">Marketplace Proceeds</p>
-                            <p className="text-2xl font-bold text-gray-900">{proceedsLoading ? '...' : proceeds} ETH</p>
-                        </div>
-                        <div className="text-center">
-                            <p className="text-sm text-gray-600 mb-1">Total Value</p>
-                            <p className="text-3xl font-bold text-blue-600">
-                                {proceedsLoading ? '...' : (ethAmount + proceedsAmount).toFixed(4)} ETH
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Wallet Address */}
-                    <div className="pt-4 mt-4 border-t border-gray-200">
-                        <p className="text-sm text-gray-500 mb-1">Wallet Address</p>
-                        <div className="flex items-center gap-2">
-                            <p className="font-mono text-sm text-gray-900">{address}</p>
+                    {/* Quick Actions Card */}
+                    <div className="bg-gray-50 rounded-lg border border-gray-200 p-6">
+                        <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Quick Actions
+                        </h2>
+                        <div className="space-y-2">
+                            <button
+                                onClick={() => {
+                                    refetchBalance();
+                                    refetchProceeds();
+                                }}
+                                className="w-full px-4 py-2 bg-white hover:bg-gray-100 text-gray-700 rounded-lg transition-colors flex items-center justify-center gap-2 border border-gray-200"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Refresh All
+                            </button>
                             <button
                                 onClick={() => navigator.clipboard.writeText(address || '')}
-                                className="text-blue-600 hover:text-blue-700 transition-colors"
-                                title="Copy Address"
+                                className="w-full px-4 py-2 bg-white hover:bg-gray-100 text-gray-700 rounded-lg transition-colors flex items-center justify-center gap-2 border border-gray-200"
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                 </svg>
+                                Copy Address
                             </button>
                         </div>
                     </div>
                 </div>
-
-                {/* Enhanced Wallet NFTs Display */}
-                <WalletNFTsList
-                    walletAddress={address}
-                    title="Your NFT Collection"
-                    includeContext={true}
-                    autoFetch={true}
-                    gridClassName="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-7 gap-6"
-                />
-
-                {/* Debug Information - Remove in production */}
-                {DEBUG_MODE && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 mt-8">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-semibold text-yellow-800">🐛 Debug Information</h2>
-                            <button
-                                onClick={refreshExchangeRates}
-                                className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded-md text-sm hover:bg-yellow-300 transition-colors"
-                            >
-                                🔄 Refresh Rates
-                            </button>
-                        </div>
-
-                        {/* Connection and Network Status */}
-                        <div className="mb-4 p-3 bg-yellow-100 rounded-lg">
-                            <h3 className="font-semibold text-yellow-700 mb-2">Connection & Network Status</h3>
-                            <div className="text-sm space-y-1">
-                                <p>Connected: {isConnected ? 'Yes' : 'No'}</p>
-                                <p>Address: {address || 'Not connected'}</p>
-                                <p>Chain ID: {chainId || 'Unknown'}</p>
-                                <p>Marketplace Address: {marketplaceAddress || 'Not available'}</p>
-                                <p>Balance Loading: {balanceLoading ? 'Yes' : 'No'}</p>
-                                <p>Balance Error: {balanceError?.message || 'None'}</p>
-                                <p>Proceeds Loading: {proceedsLoading ? 'Yes' : 'No'}</p>
-                                <p>Proceeds Error: {proceedsError || 'None'}</p>
-                            </div>
-                        </div>
-
-                        {/* API Status */}
-                        <div className="mb-4 p-3 bg-yellow-100 rounded-lg">
-                            <h3 className="font-semibold text-yellow-700 mb-2">Exchange Rate APIs</h3>
-                            <div className="text-sm space-y-1">
-                                <p>Selected Currency: {selectedCurrency.name} ({selectedCurrency.code})</p>
-                                <p>Cache Status: {cacheInfo.status}</p>
-                                <p>Last Update: {cacheInfo.lastUpdate || 'Never'}</p>
-                                <p>API Priority: Coinbase → CryptoCompare → Cached Fallback</p>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div className="space-y-2">
-                                <h3 className="font-semibold text-yellow-700">Wallet Balance:</h3>
-                                <p>Raw Wei: {balance?.value?.toString() || 'N/A'}</p>
-                                <p>Formatted ETH: {balance ? formatEtherViem(balance.value) : 'N/A'}</p>
-                                <p>Parsed ETH: {ethAmount}</p>
-                                <p>Converted Price: {balancePrice}</p>
-                                <p>Loading: {balancePriceLoading ? 'Yes' : 'No'}</p>
-                            </div>
-                            <div className="space-y-2">
-                                <h3 className="font-semibold text-yellow-700">Marketplace Proceeds:</h3>
-                                <p>Raw Wei: {proceedsWei?.toString() || 'N/A'}</p>
-                                <p>Formatted ETH: {proceeds}</p>
-                                <p>Parsed ETH: {proceedsAmount}</p>
-                                <p>Converted Price: {proceedsPrice}</p>
-                                <p>Loading: {proceedsPriceLoading ? 'Yes' : 'No'}</p>
-                            </div>
-                        </div>
-                        <div className="mt-4 text-xs text-yellow-600">
-                            <p>📊 Open browser console for detailed API logs</p>
-                            <p>⚙️ Set DEBUG_MODE = false to hide this section</p>
-                            <p>🔄 Rates auto-update every 6 hours or use refresh button</p>
-                        </div>
-                    </div>
-                )}
-            </div>
+            </aside>
         </div>
     );
 }
