@@ -29,3 +29,6 @@ export * from './05-features';
 
 // === MARKETPLACE TYPES ===
 export * from './06-marketplace';
+
+// === EVENT TYPES ===
+export * from './events';
