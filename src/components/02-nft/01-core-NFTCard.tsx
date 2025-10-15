@@ -3,10 +3,14 @@
 
 import React, { useMemo, memo, useCallback, useRef, useState, useEffect } from 'react';
 import { useRouter } from "next/navigation";
-import { useModernNFTContext } from '@/contexts/NFTContext';
+import { useModernNFTContext, useModernNFT } from '@/contexts/NFTContext';
+import { useNFTStatsContext } from '@/contexts/NFTStatsContext';
 import { useETHPrice } from "@/contexts/CurrencyContext";
 import { formatEther } from "@/utils";
+import { devLog } from '@/utils/devLog';
+import type { NFTStatsUpdateEvent } from '@/types/events';
 import OptimizedNFTImage from './02-utils-OptimizedNFTImage';
+import NFTCardSkeleton from '@/components/05-ui/03-loading-NFTCardSkeleton';
 import type { AggregatedNFT } from '@/types/01-core/01-core-nft-modern';
 
 // ===== INTERFACES =====
@@ -182,86 +186,180 @@ export function NFTCard(props: NFTCardAllProps) {
     };
   }
 
-  // Direct context access - simpler and more efficient
-  const nftContext = useModernNFTContext();
-  const contextData = nftContext.getNFT(contractAddress, tokenId);
+  // REACTIVE Context Access - automatically re-renders when NFT data changes!
+  // This uses useSyncExternalStore internally for selective re-renders
+  const { nft: contextNFT, isLoading: contextLoading, refresh } = useModernNFT(contractAddress, tokenId, true);
+  const contextData = contextNFT;
+  const nftContext = useModernNFTContext(); // Keep for refresh() call
+
+  // Get stats context for real-time stats access
+  const statsContext = useNFTStatsContext();
 
   // Track if we ever had data to prevent skeleton flickering on refresh
   const hadDataRef = useRef(false);
-  const isLoadingRef = useRef(false);
-  const loadAttemptedRef = useRef(false);
+  const isLoadingRef = useRef(contextLoading);
+  const loadAttemptedRef = useRef(!!contextData);
+  
+  // Use ref to keep statsContext stable in event handler
+  const statsContextRef = useRef(statsContext);
+
+  useEffect(() => {
+    statsContextRef.current = statsContext;
+  });
+
+  // Store live stats in state for reactivity
+  const [liveStats, setLiveStats] = useState(() => statsContext.getStats(contractAddress, tokenId));
+
+  // Track if we already synced stats on this mount to prevent duplicate syncs
+  const hasInitialSyncRef = useRef(false);
 
   useEffect(() => {
     if (contextData) {
       hadDataRef.current = true;
       isLoadingRef.current = false;
-      loadAttemptedRef.current = false;
+      loadAttemptedRef.current = true;
+    } else {
+      isLoadingRef.current = contextLoading;
     }
-  }, [contextData]);
+  }, [contextData, contextLoading]);
 
-  // Load data if not available
+  // Sync stats from context ONCE on mount (e.g., when returning from detail page)
+  // This ensures we show the latest stats if they were updated while component was unmounted
   useEffect(() => {
-    if (!contextData && !nftContext.isDataFresh(contractAddress, tokenId)) {
-      isLoadingRef.current = true;
-      loadAttemptedRef.current = true;
-      nftContext.loadNFT(contractAddress, tokenId);
-    }
-  }, [contractAddress, tokenId, contextData]); // Removed nftContext from dependencies
+    if (!hasInitialSyncRef.current) {
+      const latestStats = statsContext.getStats(contractAddress, tokenId);
+      if (latestStats) {
+        const currentStats = liveStats;
+        const hasChanged = !currentStats || 
+          currentStats.favoriteCount !== latestStats.favoriteCount ||
+          currentStats.watchlistCount !== latestStats.watchlistCount ||
+          currentStats.viewCount !== latestStats.viewCount ||
+          currentStats.averageRating !== latestStats.averageRating ||
+          currentStats.ratingCount !== latestStats.ratingCount;
 
-  // Simple hover preloading
-  const handleHover = useCallback(() => {
-    if (!contextData) {
-      isLoadingRef.current = true;
-      loadAttemptedRef.current = true;
-      nftContext.loadNFT(contractAddress, tokenId);
+        if (hasChanged) {
+          devLog.cache('NFTCard syncing stats from context on mount:', { 
+            contractAddress, 
+            tokenId, 
+            old: currentStats,
+            new: latestStats 
+          });
+          setLiveStats(latestStats);
+        }
+      }
+      hasInitialSyncRef.current = true;
     }
-  }, [contractAddress, tokenId, contextData]); // Removed nftContext from dependencies
+  }, []); // Only run once on mount
+  
+  // Reset sync flag when component unmounts
+  useEffect(() => {
+    return () => {
+      hasInitialSyncRef.current = false;
+    };
+  }, []);
+
+  // Update live stats when component mounts or when stats change
+  useEffect(() => {
+    // Listen for stats updates from detail page or other components
+    const handleStatsUpdate = (event: WindowEventMap['nft-stats-updated']) => {
+      const { nftAddress: updatedAddress, tokenId: updatedTokenId, stats, source } = event.detail;
+
+      // Only update if this is the NFT that was updated
+      if (updatedAddress.toLowerCase() === contractAddress.toLowerCase() &&
+        updatedTokenId === tokenId) {
+        // Use stats from event detail (guaranteed to be latest)
+        // OR fall back to fetching from context if not provided
+        const currentStats = stats || statsContextRef.current.getStats(contractAddress, tokenId);
+        devLog.info('NFTCard stats updated from event:', { 
+          contractAddress, 
+          tokenId, 
+          stats: currentStats,
+          source
+        });
+        setLiveStats(currentStats);
+      }
+    };
+
+    window.addEventListener('nft-stats-updated', handleStatsUpdate);
+    return () => window.removeEventListener('nft-stats-updated', handleStatsUpdate);
+  }, [contractAddress, tokenId]);
+
+  // useModernNFT already handles loading automatically with autoLoad=true
+  // No need for manual load useEffect anymore!
+
+  // Silent background refresh on hover - only if data is very stale (>60min)
+  // This prevents visible reloading but keeps data fresh over time
+  const handleHover = useCallback(() => {
+    // Only refresh if:
+    // 1. No data at all, OR
+    // 2. Data is VERY stale (>60 min old) - not just "not fresh"
+    const shouldRefresh = !contextData || (() => {
+      const nftKey = `${contractAddress.toLowerCase()}-${tokenId}`;
+      const entry = nftContext.getNFT(contractAddress, tokenId);
+      if (!entry) return true;
+
+      // Check if data is VERY stale (>60 minutes)
+      const age = Date.now() - entry.lastUpdated;
+      const VERY_STALE_MS = 60 * 60 * 1000; // 60 minutes
+      return age > VERY_STALE_MS;
+    })();
+
+    if (shouldRefresh) {
+      // Silent refresh in background - don't show loading state
+      refresh();
+    }
+  }, [contractAddress, tokenId, contextData, refresh, nftContext]);
 
   // Hybrid data approach: props override context data
-  const displayData = useMemo(() => ({
-    // Core identification
-    contractAddress,
-    tokenId,
+  const displayData = useMemo(() => {
+    return {
+      // Core identification
+      contractAddress,
+      tokenId,
 
-    // Marketplace data (props have priority)
-    listingId: listingId || contextData?.listing?.listingId || null,
-    price: price || contextData?.listing?.price || null,
-    seller: seller || contextData?.listing?.seller || null,
-    buyer: buyer || contextData?.listing?.buyer || null,
-    isListed: isListed ?? contextData?.listed ?? false,
-    desiredNftAddress: desiredNftAddress || contextData?.listing?.desiredNftAddress || null,
-    desiredTokenId: desiredTokenId || contextData?.listing?.desiredTokenId || null,
+      // Marketplace data (props have priority)
+      listingId: listingId || contextData?.listing?.listingId || null,
+      price: price || contextData?.listing?.price || null,
+      seller: seller || contextData?.listing?.seller || null,
+      buyer: buyer || contextData?.listing?.buyer || null,
+      isListed: isListed ?? contextData?.listed ?? false,
+      desiredNftAddress: desiredNftAddress || contextData?.listing?.desiredNftAddress || null,
+      desiredTokenId: desiredTokenId || contextData?.listing?.desiredTokenId || null,
 
-    // Metadata (from context - AggregatedNFT structure)
-    name: contextData?.meta?.name || contextData?.core?.name || `NFT #${tokenId}`,
-    imageUrl: contextData?.meta?.image || null,
+      // Metadata (from context - AggregatedNFT structure)
+      name: contextData?.meta?.name || contextData?.core?.name || `NFT #${tokenId}`,
+      imageUrl: contextData?.meta?.image || null,
 
-    // Contract info (from context - core structure)
-    contractInfo: contextData?.core ? {
-      name: contextData.core.contractName || null,
-      symbol: contextData.core.contractSymbol || null,
-      totalSupply: contextData.core.totalSupply || null,
-      owner: contextData.core.owner || null
-    } : null,
+      // Contract info (from context - core structure)
+      contractInfo: contextData?.core ? {
+        name: contextData.core.contractName || null,
+        symbol: contextData.core.contractSymbol || null,
+        totalSupply: contextData.core.totalSupply || null,
+        owner: contextData.core.owner || null
+      } : null,
 
-    // Insights data (from context - insight structure)
-    customTitle: contextData?.insight?.customTitle || null,
-    category: contextData?.insight?.category || null,
-    cardDescriptions: contextData?.insight?.cardDescription || null,
-    rarity: contextData?.insight?.rarity || null,
+      // Insights data (from context - insight structure)
+      customTitle: contextData?.insight?.customTitle || null,
+      category: contextData?.insight?.category || null,
+      cardDescriptions: contextData?.insight?.cardDescription || null,
+      rarity: contextData?.insight?.rarity || null,
 
-    // Stats (from context - social structure)
-    likeCount: contextData?.social?.likeCount || null,
-    watchlistCount: contextData?.social?.watchlistCount || null,
-    averageRating: contextData?.social?.averageRating || null,
+      // Stats - use live stats from state (updated via event listener)
+      // Fallback to contextData.social only if liveStats is not available
+      likeCount: liveStats?.favoriteCount ?? contextData?.social?.likeCount ?? null,
+      watchlistCount: liveStats?.watchlistCount ?? contextData?.social?.watchlistCount ?? null,
+      averageRating: liveStats?.averageRating ?? contextData?.social?.averageRating ?? null,
 
-    // Loading state - show skeleton when actively loading OR when we attempted to load but don't have data yet
-    // Don't show error immediately if we're still trying to load
-    isLoading: !contextData && (isLoadingRef.current || !loadAttemptedRef.current),
-  }), [
+      // Loading state - ONLY show skeleton when:
+      // 1. We have NO data at all AND we're loading
+      // 2. We never loaded before (first load)
+      // Don't show skeleton during background refresh (when hadDataRef.current is true)
+      isLoading: !contextData && (isLoadingRef.current || !loadAttemptedRef.current) && !hadDataRef.current,
+    };
+  }, [
     contractAddress, tokenId, listingId, price, seller,
     buyer, isListed, desiredNftAddress, desiredTokenId,
-    contextData
+    contextData, liveStats // liveStats is in state, triggers re-render when updated
   ]);
 
   // 3D Tilt Effect State and Logic
@@ -478,58 +576,9 @@ export function NFTCard(props: NFTCardAllProps) {
     }
   }, [enableInsights, displayData?.rarity]);
 
-  // Loading state
+  // Loading state - show clean skeleton instead of bg-primary flashing
   if (displayData.isLoading) {
-    return (
-      <div className={`group cursor-pointer transform-gpu ${className}`}>
-        <div className="hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] transition-all duration-300 ease-out rounded-lg shadow-xl flex flex-col gap-2 w-full h-72 relative overflow-hidden border border-black bg-gray-100 animate-pulse">
-          {/* Content container matching real card */}
-          <div className="absolute inset-2 shadow-lg bg-gray-200 rounded-md overflow-hidden flex flex-col h-[calc(100%-16px)]">
-            <div className="relative z-10 flex flex-col h-full p-2 min-h-0">
-              {/* Header skeleton */}
-              <div className="flex-shrink-0 mb-2">
-                <div className="bg-white/95 p-2 rounded-md shadow-xl border border-gray-200/60">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0 space-y-2">
-                      {/* Symbol skeleton */}
-                      <div className="h-3.5 bg-gray-300 rounded w-20 animate-pulse"></div>
-                      {/* Name skeleton */}
-                      <div className="h-3 bg-gray-300 rounded w-32 animate-pulse"></div>
-                    </div>
-                    {/* Rating skeleton */}
-                    <div className="bg-white/95 px-2 py-1 rounded-md h-6 flex items-center gap-1 ml-2">
-                      <div className="flex items-center gap-0.5">
-                        {Array.from({ length: 5 }, (_, i) => (
-                          <div key={i} className="w-2.5 h-2.5 bg-gray-300 rounded-full"></div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Image skeleton */}
-              <div className="flex-1 flex justify-center items-center px-2 mt-2 mb-2 min-h-0">
-                <div className="rounded-xl shadow-2xl border-2 border-white/50 overflow-hidden w-full h-full bg-gray-300 animate-pulse"></div>
-              </div>
-
-              {/* Price skeleton at bottom */}
-              <div className="flex-shrink-0 mt-auto">
-                <div className="bg-white/95 p-2 rounded-md shadow-xl border border-gray-200/60">
-                  <div className="flex justify-between items-center">
-                    <div className="space-y-1 flex-1">
-                      <div className="h-4 bg-gray-300 rounded w-24 animate-pulse"></div>
-                      <div className="h-3 bg-gray-300 rounded w-16 animate-pulse"></div>
-                    </div>
-                    <div className="bg-gray-300 px-3 py-1 rounded-full h-6 w-12 animate-pulse"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <NFTCardSkeleton className={className} />;
   }
 
   // Error state - simplified since context handles errors internally
@@ -565,11 +614,11 @@ export function NFTCard(props: NFTCardAllProps) {
       style={tiltStyle}
     >
       <div className={`hover:shadow-[0_15px_30px_-8px_rgba(0,0,0,0.4)] hover:scale-[1.02] transition-all duration-300 ease-out rounded-lg shadow-xl flex flex-col flex-end gap-2 w-full h-72 relative will-change-transform origin-center border border-black ${getRarityBackground}`}>
-        {/* Content container with bg-secondary and rounded corners */}
-        <div className="absolute inset-2 shadow-lg bg-secondary rounded-md overflow-hidden flex flex-col h-[calc(100%-16px)]">
+        {/* Content container - neutral background when no image, bg-secondary when image loaded */}
+        <div className={`absolute inset-2 shadow-lg rounded-md overflow-hidden flex flex-col h-[calc(100%-16px)] ${displayData.imageUrl ? 'bg-secondary' : 'bg-gray-100'}`}>
           {/* Blurred Background Image */}
           {displayData.imageUrl && (
-            <div className="absolute inset-0 overflow-hidden rounded-md bg-secondary">
+            <div className="absolute inset-0 overflow-hidden rounded-md">
               <OptimizedNFTImage
                 imageUrl={displayData.imageUrl}
                 tokenId={`${tokenId}-bg`}
@@ -648,7 +697,6 @@ export function NFTCard(props: NFTCardAllProps) {
                       width={240}
                       height={240}
                       priority={priority}
-                      tiltRotation={currentRotation}
                     />
                     {/* Subtle inner glow */}
                     <div className="absolute inset-0 rounded-md ring-1 ring-white/20 pointer-events-none"></div>
@@ -660,7 +708,7 @@ export function NFTCard(props: NFTCardAllProps) {
               {descriptions.length > 0 && (
                 <div className="w-1/2">
                   <div
-                    className="bg-white/95 backdrop-blur-sm p-1 rounded-md shadow-md border border-gray-200/60 ring-1 ring-gray-300/20 text-xs text-gray-600 h-full overflow-hidden text-right break-words hyphens-auto"
+                    className="bg-white/95 backdrop-blur-sm pr-1 pt-1 rounded-md shadow-lg text-xs h-full overflow-hidden text-right break-words hyphens-auto"
                     lang="de"
                   >
                     {descriptions[0]}
@@ -726,8 +774,7 @@ export function NFTCard(props: NFTCardAllProps) {
                   {/* Watchlist Count - enhanced styling */}
                   <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-md border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center gap-1">
                     <svg className="w-3 h-3 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                     </svg>
                     <span className="text-xs font-medium text-gray-700">
                       {contextData?.social?.watchlistCount || 0}
@@ -739,11 +786,18 @@ export function NFTCard(props: NFTCardAllProps) {
 
             {/* Price Display - always at bottom */}
             <div className="flex-shrink-0">
-              {displayData.isListed && displayData.price && (
+              {displayData.isListed && displayData.price ? (
                 <PriceDisplay
                   price={displayData.price}
                   desiredNftAddress={displayData.desiredNftAddress}
                 />
+              ) : (
+                /* Not Listed Placeholder - 62px height, centered vertically and horizontally */
+                <div className="bg-gray-100/95 backdrop-blur-sm p-2 rounded-md shadow-2xl border border-gray-300/60 ring-1 ring-gray-400/20 h-[62px]">
+                  <div className="flex justify-center items-center h-full">
+                    <div className="text-gray-500 font-medium text-lg leading-tight">Not Listed</div>
+                  </div>
+                </div>
               )}
             </div>
           </div>

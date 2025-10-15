@@ -137,44 +137,45 @@ const OptimizedNFTImage = memo(({
     const [glitterOpacity, setGlitterOpacity] = useState(0);
     const fadeOutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Check if image might be cached from previous view - RESTORED ORIGINAL LOGIC
+    // Combined cache check and preload logic - OPTIMIZED
     useEffect(() => {
-        if (typeof window !== 'undefined' && imageUrls.length > 0) {
-            const cacheKey = imageUrls[0];
-            const cachedResult = imageLoadCache.get(cacheKey);
+        if (typeof window === 'undefined' || imageUrls.length === 0) return;
 
-            if (cachedResult) {
-                setHasBeenVisible(true);
-                setIsIntersecting(true);
-                setIsLoading(false);
-                return;
-            }
+        const cacheKey = imageUrls[0];
+        const cachedResult = imageLoadCache.get(cacheKey);
 
-            // Test image loading with timeout - RESTORED
-            const testImg = new window.Image();
-            const timeout = setTimeout(() => {
-                testImg.onload = null;
-                testImg.onerror = null;
-            }, 2000); // Increased timeout for better loading
-
-            testImg.onload = () => {
-                clearTimeout(timeout);
-                imageLoadCache.set(cacheKey, true);
-                setHasBeenVisible(true);
-                setIsIntersecting(true);
-                setIsLoading(false);
-            };
-
-            testImg.onerror = () => {
-                clearTimeout(timeout);
-                imageLoadCache.set(cacheKey, false);
-            };
-
-            testImg.src = cacheKey;
+        // If cached, set states immediately
+        if (cachedResult) {
+            setHasBeenVisible(true);
+            setIsIntersecting(true);
+            setIsLoading(false);
+            return;
         }
+
+        // Not cached - test image loading
+        const testImg = new window.Image();
+        const timeout = setTimeout(() => {
+            testImg.onload = null;
+            testImg.onerror = null;
+        }, 2000);
+
+        testImg.onload = () => {
+            clearTimeout(timeout);
+            imageLoadCache.set(cacheKey, true);
+            setHasBeenVisible(true);
+            setIsIntersecting(true);
+            setIsLoading(false);
+        };
+
+        testImg.onerror = () => {
+            clearTimeout(timeout);
+            imageLoadCache.set(cacheKey, false);
+        };
+
+        testImg.src = cacheKey;
     }, [imageUrls]);
 
-    // Intersection Observer for lazy loading - RESTORED
+    // Intersection Observer for lazy loading
     useEffect(() => {
         if (priority || hasBeenVisible || !imgRef.current) return;
 
@@ -186,37 +187,28 @@ const OptimizedNFTImage = memo(({
                     observer.disconnect();
                 }
             },
-            { rootMargin: '200px' } // Restored original value
+            { rootMargin: '200px' }
         );
 
         observer.observe(imgRef.current);
         return () => observer.disconnect();
     }, [priority, hasBeenVisible]);
 
-    // Preload image when in viewport range with BROWSER-LEVEL PRELOADING ⚡
+    // Browser-level preload when in viewport
     useEffect(() => {
-        if ((isIntersecting || priority) && imageUrls.length > 0 && typeof window !== 'undefined') {
-            const imageUrl = imageUrls[0];
+        if (!(isIntersecting || priority) || imageUrls.length === 0 || typeof window === 'undefined') return;
 
-            // Browser-level preload via <link rel="preload"> for instant cache hit
-            const existingPreload = document.querySelector(`link[href="${imageUrl}"]`);
-            if (!existingPreload) {
-                const link = document.createElement('link');
-                link.rel = 'preload';
-                link.as = 'image';
-                link.href = imageUrl;
-                document.head.appendChild(link);
+        const imageUrl = imageUrls[0];
+        const existingPreload = document.querySelector(`link[href="${imageUrl}"]`);
 
-                // Removed: console.log - too much spam in production
-            }
-
-            // Also preload via Image() for cache warming
-            const img = new window.Image();
-            img.src = imageUrl;
+        if (!existingPreload) {
+            const link = document.createElement('link');
+            link.rel = 'preload';
+            link.as = 'image';
+            link.href = imageUrl;
+            document.head.appendChild(link);
         }
     }, [isIntersecting, imageUrls, priority]);
-
-    // Removed redundant preload effect - already handled in caching effect above
 
     // Update current image URL when imageUrl prop changes - OPTIMIZED FOR CACHE
     useEffect(() => {
@@ -395,70 +387,31 @@ const OptimizedNFTImage = memo(({
         >
             <Image {...imageProps} />
 
-            {/* Glitter effect overlay for sharp images - ultra smooth fade-out */}
+            {/* Optimized single-layer glitter effect for sharp images */}
             {isSharpImage && displayGlitter && (
-                <>
-                    {/* Main glitter layer with full coverage */}
-                    <div
-                        className="absolute inset-0 pointer-events-none transition-all duration-300 ease-in-out"
-                        style={{
-                            backgroundImage: glitterStyle.backgroundImage,
-                            opacity: glitterStyle.opacity,
-                            transform: glitterStyle.transform,
-                            mixBlendMode: glitterStyle.mixBlendMode,
-                            // Ensure full coverage by expanding beyond bounds
-                            inset: '-5%',
-                            borderRadius: 'inherit',
-                            // Ultra smooth fade-out
-                            transitionDuration: '1200ms',
-                        }}
-                    />
-                    {/* Subtle sparkle particles with wider distribution */}
-                    <div
-                        className="absolute pointer-events-none transition-opacity duration-500 ease-in-out"
-                        style={{
-                            inset: '-10%', // Expand even further for sparkles
-                            backgroundImage: `
-                                radial-gradient(circle at ${15 + tiltRotation.rotateY * 0.8}% ${25 + tiltRotation.rotateX * 0.8}%, 
-                                    rgba(255, 255, 255, ${0.25 * glitterOpacity}) 0%, 
-                                    transparent 3px),
-                                radial-gradient(circle at ${85 - tiltRotation.rotateY * 0.8}% ${75 - tiltRotation.rotateX * 0.8}%, 
-                                    rgba(255, 255, 255, ${0.18 * glitterOpacity}) 0%, 
-                                    transparent 2px),
-                                radial-gradient(circle at ${65 + tiltRotation.rotateY * 0.3}% ${15 + tiltRotation.rotateX * 0.3}%, 
-                                    rgba(255, 255, 255, ${0.22 * glitterOpacity}) 0%, 
-                                    transparent 2.5px),
-                                radial-gradient(circle at ${35 - tiltRotation.rotateY * 0.5}% ${85 - tiltRotation.rotateX * 0.5}%, 
-                                    rgba(255, 255, 255, ${0.15 * glitterOpacity}) 0%, 
-                                    transparent 1.8px),
-                                radial-gradient(circle at ${50 + tiltRotation.rotateY * 0.2}% ${50 + tiltRotation.rotateX * 0.2}%, 
-                                    rgba(255, 255, 255, ${0.12 * glitterOpacity}) 0%, 
-                                    transparent 1.5px)
-                            `,
-                            opacity: Math.pow(glitterOpacity, 0.9) * 0.7, // Balanced sparkles
-                            mixBlendMode: 'screen',
-                            backgroundSize: '120px 120px, 80px 80px, 100px 100px, 60px 60px, 90px 90px',
-                            transform: `rotate(${tiltRotation.rotateY * 0.2}deg) scale(1.05)`,
-                            // Extended fade-out for sparkles
-                            transitionDuration: '1500ms',
-                        }}
-                    />
-                    {/* Soft edge glow to hide any sharp cutoffs */}
-                    <div
-                        className="absolute inset-0 pointer-events-none transition-opacity duration-400 ease-in-out"
-                        style={{
-                            backgroundImage: `radial-gradient(ellipse 120% 120% at center, 
-                                transparent 70%, 
-                                rgba(255, 255, 255, ${0.06 * glitterOpacity}) 85%, 
-                                rgba(255, 255, 255, ${0.03 * glitterOpacity}) 95%, 
-                                transparent 100%)`,
-                            opacity: glitterOpacity * 0.6,
-                            mixBlendMode: 'screen',
-                            // Longest fade-out for soft glow
-                            transitionDuration: '1800ms',
-                        }}
-                    />
-                </>
+                <div
+                    className="absolute pointer-events-none transition-all ease-in-out"
+                    style={{
+                        inset: '-5%',
+                        borderRadius: 'inherit',
+                        backgroundImage: `
+                            ${glitterStyle.backgroundImage},
+                            radial-gradient(circle at ${15 + tiltRotation.rotateY * 0.8}% ${25 + tiltRotation.rotateX * 0.8}%, 
+                                rgba(255, 255, 255, ${0.25 * glitterOpacity}) 0%, transparent 3px),
+                            radial-gradient(circle at ${85 - tiltRotation.rotateY * 0.8}% ${75 - tiltRotation.rotateX * 0.8}%, 
+                                rgba(255, 255, 255, ${0.18 * glitterOpacity}) 0%, transparent 2px),
+                            radial-gradient(circle at ${65 + tiltRotation.rotateY * 0.3}% ${15 + tiltRotation.rotateX * 0.3}%, 
+                                rgba(255, 255, 255, ${0.22 * glitterOpacity}) 0%, transparent 2.5px),
+                            radial-gradient(ellipse 120% 120% at center, 
+                                transparent 70%, rgba(255, 255, 255, ${0.06 * glitterOpacity}) 85%, transparent 100%)
+                        `,
+                        backgroundSize: 'auto, 120px 120px, 80px 80px, 100px 100px, auto',
+                        opacity: glitterStyle.opacity,
+                        transform: glitterStyle.transform,
+                        mixBlendMode: 'soft-light',
+                        transitionDuration: '1200ms',
+                    }}
+                />
             )}
 
             {/* Loading skeleton */}
