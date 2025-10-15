@@ -5,6 +5,25 @@ import { useAccount } from 'wagmi'
 import HighscoreDialog from './HighscoreDialog'
 import HighscoreTable from './HighscoreTable'
 import type { ScoreSubmitResponse } from '@/types/game'
+import {
+    CANVAS_WIDTH,
+    CANVAS_HEIGHT,
+    GRAVITY,
+    JUMP_VELOCITY,
+    MOVE_SPEED_BASE,
+    MAX_FALL_SPEED,
+    AVAILABLE_CHARACTERS,
+    BRICK_WIDTH,
+    BRICK_HEIGHT,
+    BACKGROUND_SCROLL_SPEED,
+    WINDOW_WIDTH,
+    WINDOW_HEIGHT,
+    WINDOW_ARCH_HEIGHT,
+    WINDOW_SPACING,
+    CHARACTER_SIZE_IN_WINDOW,
+    COLORS,
+    PLATFORMS_PER_LEVEL,
+} from '../config/gameConstants'
 
 export default function HistoryJumper() {
     const { address } = useAccount()
@@ -22,52 +41,46 @@ export default function HistoryJumper() {
 
     function drawTowerWindows(ctx: CanvasRenderingContext2D, s: typeof stateRef.current) {
         // Zeichne backsteinige Wand über den gesamten Hintergrund (scrollen nach unten)
-        const brickWidth = 40
-        const brickHeight = 20
-        const scrollOffset = s.backgroundScroll * 0.3
+        const scrollOffset = s.backgroundScroll * BACKGROUND_SCROLL_SPEED
 
         // Zeichne Backsteine über gesamte Breite
-        for (let y = -brickHeight; y < HEIGHT + brickHeight; y += brickHeight) {
-            const rowOffset = Math.floor((y + scrollOffset) / brickHeight) % 2 === 0 ? 0 : brickWidth / 2
-            const brickY = y + (scrollOffset % brickHeight) // Plus für nach unten scrollen
+        for (let y = -BRICK_HEIGHT; y < HEIGHT + BRICK_HEIGHT; y += BRICK_HEIGHT) {
+            const rowOffset = Math.floor((y + scrollOffset) / BRICK_HEIGHT) % 2 === 0 ? 0 : BRICK_WIDTH / 2
+            const brickY = y + (scrollOffset % BRICK_HEIGHT) // Plus für nach unten scrollen
 
-            for (let x = -brickWidth; x < WIDTH + brickWidth; x += brickWidth) {
+            for (let x = -BRICK_WIDTH; x < WIDTH + BRICK_WIDTH; x += BRICK_WIDTH) {
                 const brickX = x + rowOffset
 
                 // Backstein
-                ctx.fillStyle = 'rgba(139, 90, 43, 0.25)'
-                ctx.fillRect(brickX, brickY, brickWidth - 2, brickHeight - 2)
+                ctx.fillStyle = COLORS.brick
+                ctx.fillRect(brickX, brickY, BRICK_WIDTH - 2, BRICK_HEIGHT - 2)
 
                 // Fugen (dunkler)
-                ctx.strokeStyle = 'rgba(80, 50, 25, 0.3)'
+                ctx.strokeStyle = COLORS.brickBorder
                 ctx.lineWidth = 2
-                ctx.strokeRect(brickX, brickY, brickWidth - 2, brickHeight - 2)
+                ctx.strokeRect(brickX, brickY, BRICK_WIDTH - 2, BRICK_HEIGHT - 2)
             }
         }
 
         // Zeichne spitzbogiges Burgfenster (größer)
-        const windowWidth = 70
-        const windowHeight = 100
-        const archHeight = 35 // Höhe des spitzen Bogens oben
-        const totalWindowHeight = windowHeight + archHeight
-        const windowSpacing = 800 // Größerer Abstand für vollständiges Durchscrollen
+        const totalWindowHeight = WINDOW_HEIGHT + WINDOW_ARCH_HEIGHT
 
         // Berechne Position basierend auf backgroundScroll (synchron mit Backsteinwand)
-        const scrollPosition = s.backgroundScroll * 0.3 // Gleiche Geschwindigkeit wie Backsteine
-        const cyclePosition = scrollPosition % windowSpacing
-        const currentWindowIndex = Math.floor(scrollPosition / windowSpacing)
+        const scrollPosition = s.backgroundScroll * BACKGROUND_SCROLL_SPEED // Gleiche Geschwindigkeit wie Backsteine
+        const cyclePosition = scrollPosition % WINDOW_SPACING
+        const currentWindowIndex = Math.floor(scrollPosition / WINDOW_SPACING)
 
         // Zufällige X-Position für jedes Fenster (aber konsistent für denselben Index)
         // Verwende currentWindowIndex als Seed für pseudo-zufällige Position
         const randomSeed = (currentWindowIndex * 12345) % 100
         const minX = 80
-        const maxX = WIDTH - windowWidth - 80
+        const maxX = WIDTH - WINDOW_WIDTH - 80
         const windowX = minX + ((randomSeed / 100) * (maxX - minX))
 
         // Berechne Y-Position - das Fenster scrollt von oben (-totalWindowHeight) bis komplett unten raus (HEIGHT)
         // Der komplette Scroll-Bereich ist totalWindowHeight + HEIGHT
         const scrollRange = totalWindowHeight + HEIGHT + 50 // Extra Puffer
-        const windowY = (cyclePosition / windowSpacing) * scrollRange - totalWindowHeight
+        const windowY = (cyclePosition / WINDOW_SPACING) * scrollRange - totalWindowHeight
 
         // Zeichne nur wenn das Fenster sichtbar ist
         if (windowY + totalWindowHeight > 0 && windowY < HEIGHT) {
@@ -77,23 +90,23 @@ export default function HistoryJumper() {
             // Erstelle Fensterform (Rechteck + spitzer Bogen oben)
             ctx.beginPath()
             // Unten links
-            ctx.moveTo(windowX, windowY + archHeight + windowHeight)
+            ctx.moveTo(windowX, windowY + WINDOW_ARCH_HEIGHT + WINDOW_HEIGHT)
             // Links hoch
-            ctx.lineTo(windowX, windowY + archHeight)
+            ctx.lineTo(windowX, windowY + WINDOW_ARCH_HEIGHT)
             // Linker Bogen zum Spitz
-            ctx.quadraticCurveTo(windowX, windowY, windowX + windowWidth / 2, windowY)
+            ctx.quadraticCurveTo(windowX, windowY, windowX + WINDOW_WIDTH / 2, windowY)
             // Rechter Bogen vom Spitz
-            ctx.quadraticCurveTo(windowX + windowWidth, windowY, windowX + windowWidth, windowY + archHeight)
+            ctx.quadraticCurveTo(windowX + WINDOW_WIDTH, windowY, windowX + WINDOW_WIDTH, windowY + WINDOW_ARCH_HEIGHT)
             // Rechts runter
-            ctx.lineTo(windowX + windowWidth, windowY + archHeight + windowHeight)
+            ctx.lineTo(windowX + WINDOW_WIDTH, windowY + WINDOW_ARCH_HEIGHT + WINDOW_HEIGHT)
             ctx.closePath()
 
             // Fenster-Hintergrund mit bg-primary (#FFF9E2)
-            ctx.fillStyle = '#FFF9E2'
+            ctx.fillStyle = COLORS.window.inner
             ctx.fill()
 
             // Steinrahmen um Fenster
-            ctx.strokeStyle = 'rgba(139, 90, 43, 0.8)'
+            ctx.strokeStyle = COLORS.window.border
             ctx.lineWidth = 5
             ctx.stroke()
 
@@ -105,11 +118,11 @@ export default function HistoryJumper() {
                 const character = windowCharactersRef.current[characterIndex]
 
                 if (character && character.complete) {
-                    const charSize = 85 // Noch größer: von 70 auf 85
+                    const charSize = CHARACTER_SIZE_IN_WINDOW
                     ctx.drawImage(
                         character,
-                        windowX + (windowWidth - charSize) / 2,
-                        windowY + archHeight + (windowHeight - charSize) / 2 + 10,
+                        windowX + (WINDOW_WIDTH - charSize) / 2,
+                        windowY + WINDOW_ARCH_HEIGHT + (WINDOW_HEIGHT - charSize) / 2 + 10,
                         charSize,
                         charSize
                     )
@@ -135,23 +148,12 @@ export default function HistoryJumper() {
     const [motionEnabled, setMotionEnabled] = useState(false)
     const [motionPermission, setMotionPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt')
 
-    const WIDTH = 360
-    const HEIGHT = 640
+    // Canvas & Game Constants (imported from gameConstants.ts)
+    const WIDTH = CANVAS_WIDTH
+    const HEIGHT = CANVAS_HEIGHT
 
-    const GRAVITY = 2400
-    const JUMP_V = -880
-    const MOVE_SPEED_BASE = 260
-    const MAX_FALL = 1200
-
-    // Verfügbare Figuren
-    const CHARACTERS = [
-        '/media/game/Figur2.svg',
-        '/media/game/Figur3.svg',
-        '/media/game/Figur4.svg',
-        '/media/game/Figur5.svg',
-        '/media/game/Figur6.svg',
-        '/media/game/Figur7.svg',
-    ]
+    // Physics Constants (imported from gameConstants.ts)
+    // GRAVITY, JUMP_VELOCITY, MOVE_SPEED_BASE, MAX_FALL_SPEED
 
     type Platform = {
         x: number
@@ -451,10 +453,10 @@ export default function HistoryJumper() {
         if (s.vx < -maxVx) s.vx = -maxVx
 
         s.vy += GRAVITY * dt
-        if (s.vy > MAX_FALL) s.vy = MAX_FALL
+        if (s.vy > MAX_FALL_SPEED) s.vy = MAX_FALL_SPEED
 
         if (s.jumpPressed && s.grounded) {
-            s.vy = JUMP_V
+            s.vy = JUMP_VELOCITY
             s.grounded = false
         }
 
@@ -611,8 +613,8 @@ export default function HistoryJumper() {
     }, [address, leaderboardRefresh]) // Aktualisiere wenn Wallet sich ändert oder neuer Score submitted
 
     useEffect(() => {
-        // Load random player image
-        const randomCharacter = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)]
+        // Load random player image from AVAILABLE_CHARACTERS
+        const randomCharacter = AVAILABLE_CHARACTERS[Math.floor(Math.random() * AVAILABLE_CHARACTERS.length)]
         playerCharacterPath.current = randomCharacter  // Speichere den Pfad
 
         const img = new Image()
@@ -623,10 +625,10 @@ export default function HistoryJumper() {
 
         // Load window characters (andere Figuren für Fenster - OHNE die Spielfigur)
         const loadWindowCharacters = () => {
-            const otherCharacters = CHARACTERS.filter(c => c !== randomCharacter)
+            const otherCharacters = AVAILABLE_CHARACTERS.filter((c: string) => c !== randomCharacter)
             windowCharactersRef.current = []
 
-            otherCharacters.forEach(src => {
+            otherCharacters.forEach((src: string) => {
                 const charImg = new Image()
                 charImg.src = src
                 charImg.onload = () => {
@@ -964,8 +966,8 @@ export default function HistoryJumper() {
                             <button
                                 onClick={toggleMotionControl}
                                 className={`w-full px-4 py-2 rounded-lg font-medium transition flex items-center justify-center gap-2 ${motionEnabled
-                                        ? 'bg-green-500 text-white'
-                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                    ? 'bg-green-500 text-white'
+                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                     }`}
                             >
                                 <span className="text-xl">{motionEnabled ? '📱' : '🎮'}</span>

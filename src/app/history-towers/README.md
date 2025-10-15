@@ -7,17 +7,32 @@ Ein Canvas-basiertes Jump & Run Spiel mit progressiver Schwierigkeit und Highsco
 ```
 history-towers/
 ├── components/
-│   ├── HistoryJumper.tsx       # Hauptspiel-Komponente
+│   ├── HistoryJumper.tsx       # Hauptspiel-Komponente (1071 Zeilen - Monolithisch)
+│   ├── 01-HistoryJumper.tsx    # ⚠️ Legacy - zu entfernen?
+│   ├── 01-IcyTowers.tsx        # ⚠️ Legacy - zu entfernen?
 │   ├── HighscoreDialog.tsx     # Score-Eingabe Dialog
 │   ├── HighscoreTable.tsx      # Leaderboard Anzeige
 │   └── index.ts                # Exports
 ├── config/
-│   └── gameConfig.ts           # Spiel-Konstanten & Types
+│   ├── gameConstants.ts        # ✅ NEW - Zentrale Konstanten
+│   └── gameConfig.ts           # Spiel-Konstanten & Types (alt?)
 ├── utils/
 │   └── gameUtils.ts            # Hilfsfunktionen
 ├── page.tsx                    # Route Page
 └── README.md                   # Diese Datei
 ```
+
+## ⚠️ Code-Zustand & Refactoring-Status
+
+### Aktuelle Architektur
+- **HistoryJumper.tsx**: 1071 Zeilen monolithischer Code
+  - ✅ Funktioniert einwandfrei
+  - ❌ Schwer wartbar (alle Logic in einer Datei)
+  - ❌ Rendering & Game Logic vermischt
+  - ❌ Schwierig zu testen
+
+### Refactoring-Empfehlungen (Optional)
+**Nur bei Bedarf durchführen - siehe "Refactoring Plan" unten**
 
 ## 🎯 Features
 
@@ -138,6 +153,74 @@ http://localhost:3000/history-towers
 - [ ] Highscore-Dialog erscheint bei Game Over
 - [ ] Leaderboard lädt und zeigt Scores
 - [ ] Mobile Touch-Controls funktionieren
+```
+
+## 🔧 Refactoring Plan (Bei Bedarf)
+
+### Warum NICHT sofort refactoren?
+- ✅ Code funktioniert einwandfrei
+- ❌ 1071 Zeilen in einer Datei = hohes Risiko
+- ❌ Keine automated tests = schwierig sicher zu refactoren
+- ❌ Viel Aufwand für wenig funktionalen Gewinn
+
+### Empfohlene Struktur (Zukünftig)
+
+```
+history-towers/
+├── components/
+│   ├── HistoryJumper.tsx          # Simplified container (150 Zeilen)
+│   ├── GameCanvas.tsx             # Canvas rendering component
+│   ├── GameOverlay.tsx            # HUD/UI overlay
+│   ├── GameControls.tsx           # Input controls UI
+│   └── PauseMenu.tsx              # Pause menu
+├── hooks/
+│   ├── useHistoryTowersGame.ts    # Main game logic (400 Zeilen)
+│   ├── useGamePhysics.ts          # Physics calculations
+│   └── useMotionControls.ts       # Device orientation
+├── utils/
+│   ├── gameRenderer.ts            # Canvas rendering (300 Zeilen)
+│   ├── difficultyCalculator.ts    # Level & difficulty
+│   ├── platformSpawner.ts         # Platform generation
+│   └── collisionDetection.ts      # Collision helpers
+├── config/
+│   └── gameConstants.ts           # ✅ CREATED - All constants
+└── types/
+    └── game.ts                     # TypeScript interfaces
+```
+
+### Refactoring-Schritte (Inkrementell)
+
+**Phase 1: Vorbereitung** ✅ COMPLETED
+1. ✅ Erstelle `config/gameConstants.ts`
+2. ✅ Dokumentiere Architektur (dieses Dokument)
+
+**Phase 2: Bei neuem Feature oder Bug**
+3. Extrahiere betroffenen Code in separates Modul
+4. Schreibe Unit Tests für neues Modul
+5. Integriere zurück in HistoryJumper.tsx
+
+**Phase 3: Bei Zeit & Bedarf**
+6. Extrahiere Rendering → `utils/gameRenderer.ts`
+7. Extrahiere Game Logic → `hooks/useHistoryTowersGame.ts`
+8. Split UI → Separate Components
+
+### Verwendung von gameConstants.ts
+
+```typescript
+// OLD (direkt in Component):
+const WIDTH = 360;
+const HEIGHT = 640;
+const GRAVITY = 2400;
+
+// NEW (aus Constants):
+import {
+  CANVAS_WIDTH,
+  CANVAS_HEIGHT,
+  GRAVITY,
+  JUMP_VELOCITY,
+  PLAYER_WIDTH,
+  COLORS
+} from '../config/gameConstants';
 ```
 
 ## 📝 Code-Qualität
