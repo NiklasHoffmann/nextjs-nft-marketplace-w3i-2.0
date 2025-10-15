@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
+import {
+  getCachedStats,
+  setCachedStats,
+  invalidateStatsCache
+} from '@/lib/cache';
 
 interface NFTStats {
   contractAddress: string;
@@ -26,49 +31,115 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get view count from views collection
-    const viewsCollection = await getCollection('nft_views');
-    const viewCount = await viewsCollection.countDocuments({
-      contractAddress: contractAddress.toLowerCase(),
+    const lowerContractAddress = contractAddress.toLowerCase();
+
+    // Check cache first
+    const cachedStats = getCachedStats(lowerContractAddress, tokenId);
+    if (cachedStats) {
+      return NextResponse.json({
+        success: true,
+        data: cachedStats,
+        cached: true
+      });
+    }
+
+    // Get stats from denormalized nft_stats collection (FAST!)
+    const statsCollection = await getCollection('nft_stats');
+    const statsDoc = await statsCollection.findOne({
+      contractAddress: lowerContractAddress,
       tokenId: tokenId
     });
 
-    // Get favorite count from favorites
-    const favoritesCollection = await getCollection('user_favorites');
-    const favoriteCount = await favoritesCollection.countDocuments({
-      contractAddress: contractAddress.toLowerCase(),
-      tokenId: tokenId
-    });
+    // If no stats doc exists, create one by counting (migration path)
+    if (!statsDoc) {
+      // Count from user collections (only on first access)
+      const [favoritesCollection, watchlistCollection, ratingsCollection, viewsCollection] = await Promise.all([
+        getCollection('user_favorites'),
+        getCollection('user_watchlist'),
+        getCollection('user_ratings'),
+        getCollection('nft_views')
+      ]);
 
-    // Get rating statistics (ONLY public ratings for community averages)
-    const ratingsCollection = await getCollection('user_ratings');
-    const ratings = await ratingsCollection.find({
-      contractAddress: contractAddress.toLowerCase(),
-      tokenId: tokenId,
-      isPublic: true // Only include public ratings in community averages
-    }).toArray();
+      const [favoriteCount, watchlistCount, ratings, viewCount] = await Promise.all([
+        favoritesCollection.countDocuments({
+          contractAddress: lowerContractAddress,
+          tokenId: tokenId
+        }),
+        watchlistCollection.countDocuments({
+          contractAddress: lowerContractAddress,
+          tokenId: tokenId
+        }),
+        ratingsCollection.find({
+          contractAddress: lowerContractAddress,
+          tokenId: tokenId,
+          isPublic: true
+        }).toArray(),
+        viewsCollection.countDocuments({
+          contractAddress: lowerContractAddress,
+          tokenId: tokenId
+        })
+      ]);
 
-    const ratingCount = ratings.length;
-    const averageRating = ratingCount > 0
-      ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratingCount
-      : 0;
+      const ratingCount = ratings.length;
+      const averageRating = ratingCount > 0
+        ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratingCount
+        : 0;
 
-    // Get watchlist count
-    const watchlistCollection = await getCollection('user_watchlist');
-    const watchlistCount = await watchlistCollection.countDocuments({
-      contractAddress: contractAddress.toLowerCase(),
-      tokenId: tokenId
-    });
+      // Create initial stats document
+      const initialStats = {
+        contractAddress: lowerContractAddress,
+        tokenId: tokenId,
+        viewCount,
+        favoriteCount,
+        watchlistCount,
+        averageRating: Math.round(averageRating * 10) / 10,
+        ratingCount,
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString()
+      };
 
+      await statsCollection.insertOne(initialStats);
+
+      const stats: NFTStats = {
+        contractAddress: lowerContractAddress,
+        tokenId: tokenId,
+        viewCount,
+        favoriteCount,
+        averageRating: Math.round(averageRating * 10) / 10,
+        ratingCount,
+        watchlistCount
+      };
+
+      // Cache the newly created stats
+      setCachedStats(lowerContractAddress, tokenId, stats);
+
+      return NextResponse.json({
+        success: true,
+        data: stats
+      });
+    }
+
+    // Return existing stats from denormalized collection
+    // Ensure no negative values (safety guard against data corruption)
     const stats: NFTStats = {
-      contractAddress: contractAddress.toLowerCase(),
+      contractAddress: lowerContractAddress,
       tokenId: tokenId,
-      viewCount,
-      favoriteCount,
-      averageRating: Math.round(averageRating * 10) / 10, // Round to 1 decimal
-      ratingCount,
-      watchlistCount
+      viewCount: Math.max(0, statsDoc.viewCount || 0),
+      favoriteCount: Math.max(0, statsDoc.favoriteCount || 0),
+      averageRating: Math.max(0, statsDoc.averageRating || 0),
+      ratingCount: Math.max(0, statsDoc.ratingCount || 0),
+      watchlistCount: Math.max(0, statsDoc.watchlistCount || 0)
     };
+
+    // Cache the stats for future requests
+    setCachedStats(lowerContractAddress, tokenId, stats);
+
+    // Log warning if we found negative values (indicates data corruption)
+    if (statsDoc.viewCount < 0 || statsDoc.favoriteCount < 0 ||
+      statsDoc.watchlistCount < 0 || statsDoc.ratingCount < 0) {
+      console.warn('⚠️ Found negative stat values for', lowerContractAddress, tokenId,
+        'Stats:', statsDoc);
+    }
 
     return NextResponse.json({
       success: true,
@@ -96,16 +167,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const lowerContractAddress = contractAddress.toLowerCase();
+    const timestamp = new Date().toISOString();
+
+    // Invalidate cache when recording a view
+    invalidateStatsCache(lowerContractAddress, tokenId);
+
     const collection = await getCollection('nft_views');
 
     const viewRecord = {
-      contractAddress: contractAddress.toLowerCase(),
+      contractAddress: lowerContractAddress,
       tokenId: tokenId,
       userId: userId?.toLowerCase(), // Optional - can track anonymous views
-      viewedAt: new Date().toISOString()
+      viewedAt: timestamp
     };
 
-    await collection.insertOne(viewRecord);
+    // Insert view record and update stats atomically
+    await Promise.all([
+      collection.insertOne(viewRecord),
+      // Update viewCount in stats collection
+      (async () => {
+        const statsCollection = await getCollection('nft_stats');
+        await statsCollection.updateOne(
+          { contractAddress: lowerContractAddress, tokenId },
+          {
+            $inc: { viewCount: 1 },
+            $set: { lastUpdated: timestamp },
+            $setOnInsert: {
+              contractAddress: lowerContractAddress,
+              tokenId,
+              favoriteCount: 0,
+              watchlistCount: 0,
+              averageRating: 0,
+              ratingCount: 0,
+              createdAt: timestamp
+            }
+          },
+          { upsert: true }
+        );
+      })()
+    ]);
 
     return NextResponse.json({
       success: true,
