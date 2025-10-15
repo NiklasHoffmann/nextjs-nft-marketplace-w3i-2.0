@@ -199,7 +199,7 @@ export function NFTCard(props: NFTCardAllProps) {
   const hadDataRef = useRef(false);
   const isLoadingRef = useRef(contextLoading);
   const loadAttemptedRef = useRef(!!contextData);
-  
+
   // Use ref to keep statsContext stable in event handler
   const statsContextRef = useRef(statsContext);
 
@@ -230,7 +230,7 @@ export function NFTCard(props: NFTCardAllProps) {
       const latestStats = statsContext.getStats(contractAddress, tokenId);
       if (latestStats) {
         const currentStats = liveStats;
-        const hasChanged = !currentStats || 
+        const hasChanged = !currentStats ||
           currentStats.favoriteCount !== latestStats.favoriteCount ||
           currentStats.watchlistCount !== latestStats.watchlistCount ||
           currentStats.viewCount !== latestStats.viewCount ||
@@ -238,11 +238,11 @@ export function NFTCard(props: NFTCardAllProps) {
           currentStats.ratingCount !== latestStats.ratingCount;
 
         if (hasChanged) {
-          devLog.cache('NFTCard syncing stats from context on mount:', { 
-            contractAddress, 
-            tokenId, 
+          devLog.cache('NFTCard syncing stats from context on mount:', {
+            contractAddress,
+            tokenId,
             old: currentStats,
-            new: latestStats 
+            new: latestStats
           });
           setLiveStats(latestStats);
         }
@@ -250,7 +250,7 @@ export function NFTCard(props: NFTCardAllProps) {
       hasInitialSyncRef.current = true;
     }
   }, []); // Only run once on mount
-  
+
   // Reset sync flag when component unmounts
   useEffect(() => {
     return () => {
@@ -270,9 +270,9 @@ export function NFTCard(props: NFTCardAllProps) {
         // Use stats from event detail (guaranteed to be latest)
         // OR fall back to fetching from context if not provided
         const currentStats = stats || statsContextRef.current.getStats(contractAddress, tokenId);
-        devLog.info('NFTCard stats updated from event:', { 
-          contractAddress, 
-          tokenId, 
+        devLog.info('NFTCard stats updated from event:', {
+          contractAddress,
+          tokenId,
           stats: currentStats,
           source
         });
