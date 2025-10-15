@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { NFTDetailHeaderProps } from '@/types';
@@ -60,7 +60,8 @@ export default function NFTDetailHeader({
                 clearTimeout(timeoutId);
             }
         };
-    }, [nftAddress, tokenId]); // Only depend on NFT identity, not incrementViews function
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Empty deps - only run once on mount!
 
     const handleBack = () => {
         router.back();
@@ -83,20 +84,21 @@ export default function NFTDetailHeader({
         action();
     };
 
-    // Use context data with fallbacks to legacy props - instant updates
-    const displayStats = {
+    // Use useMemo to ensure displayStats updates when stats change
+    const displayStats = useMemo(() => ({
         viewCount: stats?.viewCount ?? 0,
         favoriteCount: stats?.favoriteCount ?? 0,
         watchlistCount: stats?.watchlistCount ?? 0,
         averageRating: stats?.averageRating ?? 0,
         ratingCount: stats?.ratingCount ?? 0
-    };
+    }), [stats]);
 
-    const displayUserInteractions = {
+    // Use useMemo to ensure displayUserInteractions updates when userInteractions change
+    const displayUserInteractions = useMemo(() => ({
         isFavorited: userInteractions?.isFavorited ?? legacyIsFavorited ?? false,
         isWatchlisted: userInteractions?.isWatchlisted ?? false,
         userRating: userInteractions?.userRating ?? 0,
-    };
+    }), [userInteractions, legacyIsFavorited]);
 
     return (
         <div className="bg-white shadow-sm border-b fixed top-16 left-0 right-0 z-40">
