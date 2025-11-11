@@ -104,35 +104,42 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                         watchlistCount: 0,
                         averageRating: 0,
                         ratingCount: 0,
-                        lastUpdated: Date.now()
+                        lastUpdated: Date.now(),
+                        contractAddress: nftAddress,
+                        tokenId: tokenId
                     }),
                     ...updates,
+                    contractAddress: nftAddress,
+                    tokenId: tokenId,
                     lastUpdated: Date.now()
                 }
             };
 
             const newStats = updated[nftKey];
 
-            devLog.cache('Stats cache updated:', {
-                nftKey,
-                favoriteCount: newStats.favoriteCount,
-                watchlistCount: newStats.watchlistCount,
-                viewCount: newStats.viewCount
-            });
+            if (newStats) {
+                devLog.cache('Stats cache updated:', {
+                    nftKey,
+                    favoriteCount: newStats.favoriteCount,
+                    watchlistCount: newStats.watchlistCount,
+                    viewCount: newStats.viewCount
+                });
 
-            // Trigger event AFTER state update with the actual new stats
-            // This ensures components receive the correct updated values
-            if (typeof window !== 'undefined') {
-                setTimeout(() => {
-                    emitStatsUpdate({
-                        nftAddress,
-                        tokenId,
-                        stats: newStats,
-                        timestamp: Date.now(),
-                        source: 'api' // Can be customized by caller
-                    });
-                    devLog.event('Event dispatched for', `${nftAddress}/${tokenId}`, 'with stats:', newStats);
-                }, 0);
+                // Trigger event AFTER state update with the actual new stats
+                // This ensures components receive the correct updated values
+                if (typeof window !== 'undefined') {
+                    setTimeout(() => {
+                        const detail: import('@/types/events').NFTStatsUpdateDetail = {
+                            nftAddress,
+                            tokenId,
+                            stats: newStats,
+                            timestamp: Date.now(),
+                            source: 'api'
+                        };
+                        emitStatsUpdate(detail);
+                        devLog.event('Event dispatched for', `${nftAddress}/${tokenId}`, 'with stats:', newStats);
+                    }, 0);
+                }
             }
 
             return updated;
@@ -191,6 +198,36 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
         const nftKey = createNFTKey(nftAddress, tokenId);
         return loadingStates[nftKey] || false;
     }, [loadingStates]);
+
+    // Helper to dispatch event with both stats and userInteractions
+    const dispatchStatsUpdateEvent = useCallback((
+        nftAddress: string,
+        tokenId: string,
+        userAddress?: string,
+        source?: 'toggleFavorite' | 'toggleWatchlist' | 'setUserRating' | 'incrementViewCount' | 'api',
+        providedUserInteractions?: UserInteractionState | null
+    ) => {
+        if (typeof window === 'undefined') return;
+
+        const stats = getStats(nftAddress, tokenId);
+        // Use provided userInteractions if available, otherwise get from cache
+        const userInteractions = providedUserInteractions !== undefined
+            ? providedUserInteractions
+            : (userAddress ? getUserInteractions(nftAddress, tokenId, userAddress) : null);
+
+        if (stats) {
+            const detail: import('@/types/events').NFTStatsUpdateDetail = {
+                nftAddress,
+                tokenId,
+                stats,
+                userInteractions: userInteractions || undefined,
+                timestamp: Date.now(),
+                source
+            };
+            emitStatsUpdate(detail);
+            devLog.event('Event dispatched for', `${nftAddress}/${tokenId}`, 'with stats:', stats, 'and userInteractions:', userInteractions);
+        }
+    }, [getStats, getUserInteractions]);
 
     // ===== STATS OPERATIONS =====
 
@@ -283,8 +320,8 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                 new: newState
             });
 
-            // Optimistic update ONLY for user interaction (not for counts!)
-            // This gives instant visual feedback for the icon
+            // Optimistic update ONLY for user interaction icon (not for counts!)
+            // This gives instant visual feedback for the heart/bookmark icon
             updateUserInteractions(nftAddress, tokenId, userAddress, {
                 [stateField]: newState
             } as Partial<UserInteractionState>);
@@ -313,41 +350,93 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                 throw new Error(result.error || `Failed to update ${actionName}`);
             }
 
-            // Update user interactions with actual API response data
-            if (result.data) {
+            // CRITICAL FIX: API now returns updated stats directly in response!
+            // This eliminates race condition between DB write and stats read
+            const apiData = result.data?.data || result.data;
+            const apiStats = result.stats || result.data?.stats;
+
+            if (apiData) {
                 const apiInteractions: UserInteractionState = {
-                    isFavorited: result.data.isFavorite || false,
-                    isWatchlisted: result.data.isWatchlisted || false,
-                    userRating: result.data.rating || 0,
+                    isFavorited: apiData.isFavorite ?? false,
+                    isWatchlisted: apiData.isWatchlisted ?? false,
+                    userRating: apiData.rating ?? 0,
                     hasViewed: true
                 };
                 updateUserInteractions(nftAddress, tokenId, userAddress, apiInteractions);
-            }
 
-            // Load real stats from server immediately after successful update
-            try {
-                const statsResponse = await fetch(`/api/nft/stats?contractAddress=${nftAddress}&tokenId=${tokenId}`);
-                const statsResult = await statsResponse.json();
-                if (statsResult.success && statsResult.data) {
-                    devLog.success(`${isFavorite ? 'Favorite' : 'Watchlist'} toggle complete:`, {
+                // Use stats from API response if available (prevents race condition!)
+                if (apiStats) {
+                    const realStats: NFTStats = {
+                        favoriteCount: apiStats.favoriteCount || 0,
+                        watchlistCount: apiStats.watchlistCount || 0,
+                        averageRating: apiStats.averageRating || 0,
+                        ratingCount: apiStats.ratingCount || 0,
+                        viewCount: apiStats.viewCount || 0,
+                        lastUpdated: Date.now(),
+                        contractAddress: nftAddress,
+                        tokenId: tokenId
+                    };
+                    
+                    devLog.success(`${actionName} complete with stats from API:`, {
                         nft: `${nftAddress}/${tokenId}`,
-                        favoriteCount: statsResult.data.favoriteCount,
-                        watchlistCount: statsResult.data.watchlistCount,
+                        favoriteCount: realStats.favoriteCount,
+                        watchlistCount: realStats.watchlistCount,
                         newState
                     });
-                    // Don't touch viewCount to avoid race conditions
-                    updateStats(nftAddress, tokenId, {
-                        favoriteCount: statsResult.data.favoriteCount || 0,
-                        watchlistCount: statsResult.data.watchlistCount || 0,
-                        averageRating: statsResult.data.averageRating || 0,
-                        ratingCount: statsResult.data.ratingCount || 0,
-                    });
+
+                    // Update cache with stats from API
+                    updateStats(nftAddress, tokenId, realStats);
+
+                    // Fire event with stats from API
+                    if (typeof window !== 'undefined') {
+                        const detail: import('@/types/events').NFTStatsUpdateDetail = {
+                            nftAddress,
+                            tokenId,
+                            stats: realStats,
+                            userInteractions: apiInteractions,
+                            timestamp: Date.now(),
+                            source: interactionType === 'favorite' ? 'toggleFavorite' : 'toggleWatchlist'
+                        };
+                        emitStatsUpdate(detail);
+                    }
                 } else {
-                    devLog.fail('Failed to load stats:', statsResult);
+                    // Fallback: Load stats from separate API if not in response (legacy support)
+                    devLog.warn(`${actionName} API didn't return stats, loading separately...`);
+                    
+                    try {
+                        const statsResponse = await fetch(`/api/nft/stats?contractAddress=${nftAddress}&tokenId=${tokenId}`);
+                        const statsResult = await statsResponse.json();
+                        
+                        if (statsResult.success && statsResult.data) {
+                            const realStats: NFTStats = {
+                                favoriteCount: statsResult.data.favoriteCount || 0,
+                                watchlistCount: statsResult.data.watchlistCount || 0,
+                                averageRating: statsResult.data.averageRating || 0,
+                                ratingCount: statsResult.data.ratingCount || 0,
+                                viewCount: statsResult.data.viewCount || 0,
+                                lastUpdated: Date.now(),
+                                contractAddress: nftAddress,
+                                tokenId: tokenId
+                            };
+                            
+                            updateStats(nftAddress, tokenId, realStats);
+
+                            if (typeof window !== 'undefined') {
+                                const detail: import('@/types/events').NFTStatsUpdateDetail = {
+                                    nftAddress,
+                                    tokenId,
+                                    stats: realStats,
+                                    userInteractions: apiInteractions,
+                                    timestamp: Date.now(),
+                                    source: interactionType === 'favorite' ? 'toggleFavorite' : 'toggleWatchlist'
+                                };
+                                emitStatsUpdate(detail);
+                            }
+                        }
+                    } catch (error) {
+                        devLog.error('Error loading stats after toggle:', error);
+                    }
                 }
-            } catch (error) {
-                devLog.error('Error loading stats after toggle:', error);
-                // Keep optimistic update if stats load fails
             }
 
         } catch (error) {
@@ -362,7 +451,7 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
         } finally {
             setLoading(nftAddress, tokenId, false);
         }
-    }, [getUserInteractions, getStats, updateUserInteractions, updateStats, setLoading]);
+    }, [getUserInteractions, getStats, updateUserInteractions, updateStats, setLoading, dispatchStatsUpdateEvent]);
 
     const toggleFavorite = useCallback(async (
         nftAddress: string,
@@ -386,6 +475,8 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
         userAddress: string,
         rating: number
     ) => {
+        devLog.info('setUserRating called:', { nftAddress, tokenId, userAddress, rating });
+
         try {
             setLoading(nftAddress, tokenId, true);
 
@@ -395,54 +486,11 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                 userRating: 0,
                 hasViewed: false
             };
-            const currentStats = getStats(nftAddress, tokenId) || {
-                viewCount: 0,
-                favoriteCount: 0,
-                watchlistCount: 0,
-                averageRating: 0,
-                ratingCount: 0,
-                lastUpdated: Date.now()
-            };
 
-            const oldRating = currentInteractions.userRating;
-            const wasRated = oldRating > 0;
-            const isNewRating = rating > 0;
-
-            // Calculate new average rating
-            let newRatingCount = currentStats.ratingCount;
-            let newAverageRating = currentStats.averageRating;
-
-            if (wasRated && isNewRating) {
-                // Update existing rating
-                const totalRating = currentStats.averageRating * currentStats.ratingCount;
-                const newTotalRating = totalRating - oldRating + rating;
-                newAverageRating = newTotalRating / currentStats.ratingCount;
-            } else if (!wasRated && isNewRating) {
-                // Add new rating
-                const totalRating = currentStats.averageRating * currentStats.ratingCount;
-                const newTotalRating = totalRating + rating;
-                newRatingCount = currentStats.ratingCount + 1;
-                newAverageRating = newTotalRating / newRatingCount;
-            } else if (wasRated && !isNewRating) {
-                // Remove rating
-                if (currentStats.ratingCount > 1) {
-                    const totalRating = currentStats.averageRating * currentStats.ratingCount;
-                    const newTotalRating = totalRating - oldRating;
-                    newRatingCount = currentStats.ratingCount - 1;
-                    newAverageRating = newTotalRating / newRatingCount;
-                } else {
-                    newRatingCount = 0;
-                    newAverageRating = 0;
-                }
-            }
-
-            // Optimistic update ONLY for user's rating (not for aggregate stats!)
+            // Optimistic update ONLY for user's rating icon/display (not for aggregate stats!)
             updateUserInteractions(nftAddress, tokenId, userAddress, {
                 userRating: rating
             });
-
-            // DON'T do optimistic update for averageRating/ratingCount
-            // These are calculated server-side from all user ratings
 
             // Call API to persist rating
             const response = await fetch('/api/user/interactions', {
@@ -463,37 +511,98 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                 devLog.error('Failed to set rating:', result.error);
                 // Revert optimistic user rating update on API failure
                 updateUserInteractions(nftAddress, tokenId, userAddress, {
-                    userRating: oldRating
+                    userRating: currentInteractions.userRating // Revert to original rating
                 });
                 throw new Error(result.error || 'Failed to update rating');
             }
 
             // Update user interactions with actual API response data
-            if (result.data) {
+            // CRITICAL FIX: API now returns stats directly in response!
+            const apiData = result.data?.data || result.data;
+            const apiStats = result.stats || result.data?.stats;
+
+            if (apiData) {
                 const apiInteractions: UserInteractionState = {
-                    isFavorited: result.data.isFavorite || false,
-                    isWatchlisted: result.data.isWatchlisted || false,
-                    userRating: result.data.rating || 0,
+                    isFavorited: apiData.isFavorite ?? false,
+                    isWatchlisted: apiData.isWatchlisted ?? false,
+                    userRating: apiData.rating ?? 0,
                     hasViewed: true
                 };
                 updateUserInteractions(nftAddress, tokenId, userAddress, apiInteractions);
-            }
 
-            // Load real stats from server to get updated averageRating and ratingCount
-            try {
-                const statsResponse = await fetch(`/api/nft/stats?contractAddress=${nftAddress}&tokenId=${tokenId}`);
-                const statsResult = await statsResponse.json();
-                if (statsResult.success && statsResult.data) {
-                    // Only update rating-related stats - don't touch viewCount
-                    updateStats(nftAddress, tokenId, {
-                        favoriteCount: statsResult.data.favoriteCount || 0,
-                        watchlistCount: statsResult.data.watchlistCount || 0,
-                        averageRating: statsResult.data.averageRating || 0,
-                        ratingCount: statsResult.data.ratingCount || 0,
+                // Use stats from API response if available (prevents race condition!)
+                if (apiStats) {
+                    const realStats: NFTStats = {
+                        favoriteCount: apiStats.favoriteCount || 0,
+                        watchlistCount: apiStats.watchlistCount || 0,
+                        averageRating: apiStats.averageRating || 0,
+                        ratingCount: apiStats.ratingCount || 0,
+                        viewCount: apiStats.viewCount || 0,
+                        lastUpdated: Date.now(),
+                        contractAddress: nftAddress,
+                        tokenId: tokenId
+                    };
+                    
+                    devLog.success('Rating complete with stats from API:', {
+                        nft: `${nftAddress}/${tokenId}`,
+                        averageRating: realStats.averageRating,
+                        ratingCount: realStats.ratingCount,
+                        userRating: rating
                     });
+
+                    // Update cache with stats from API
+                    updateStats(nftAddress, tokenId, realStats);
+
+                    // Fire event with stats from API
+                    if (typeof window !== 'undefined') {
+                        const detail: import('@/types/events').NFTStatsUpdateDetail = {
+                            nftAddress,
+                            tokenId,
+                            stats: realStats,
+                            userInteractions: apiInteractions,
+                            timestamp: Date.now(),
+                            source: 'setUserRating'
+                        };
+                        emitStatsUpdate(detail);
+                    }
+                } else {
+                    // Fallback: Load stats from separate API if not in response (legacy support)
+                    devLog.warn('Rating API didn\'t return stats, loading separately...');
+                    
+                    try {
+                        const statsResponse = await fetch(`/api/nft/stats?contractAddress=${nftAddress}&tokenId=${tokenId}`);
+                        const statsResult = await statsResponse.json();
+                        
+                        if (statsResult.success && statsResult.data) {
+                            const realStats: NFTStats = {
+                                favoriteCount: statsResult.data.favoriteCount || 0,
+                                watchlistCount: statsResult.data.watchlistCount || 0,
+                                averageRating: statsResult.data.averageRating || 0,
+                                ratingCount: statsResult.data.ratingCount || 0,
+                                viewCount: statsResult.data.viewCount || 0,
+                                lastUpdated: Date.now(),
+                                contractAddress: nftAddress,
+                                tokenId: tokenId
+                            };
+                            
+                            updateStats(nftAddress, tokenId, realStats);
+
+                            if (typeof window !== 'undefined') {
+                                const detail: import('@/types/events').NFTStatsUpdateDetail = {
+                                    nftAddress,
+                                    tokenId,
+                                    stats: realStats,
+                                    userInteractions: apiInteractions,
+                                    timestamp: Date.now(),
+                                    source: 'setUserRating'
+                                };
+                                emitStatsUpdate(detail);
+                            }
+                        }
+                    } catch (error) {
+                        devLog.error('Error loading stats after rating:', error);
+                    }
                 }
-            } catch (error) {
-                devLog.error('Error loading stats after rating:', error);
             }
 
         } catch (error) {
@@ -508,7 +617,7 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
         } finally {
             setLoading(nftAddress, tokenId, false);
         }
-    }, [getUserInteractions, getStats, updateUserInteractions, updateStats, setLoading]);
+    }, [getUserInteractions, getStats, updateUserInteractions, updateStats, setLoading, dispatchStatsUpdateEvent]);
 
     // ===== BULK OPERATIONS =====
 
@@ -566,17 +675,19 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
 
     const loadUserInteractions = useCallback(async (nftAddress: string, tokenId: string, userAddress: string) => {
         try {
-            setLoading(nftAddress, tokenId, true);
+            // DON'T set loading - user interactions are independent and should load in parallel
+            // setLoading(nftAddress, tokenId, true);
 
             // Load real user interactions from API
             const response = await fetch(`/api/user/interactions?userId=${userAddress}&contractAddress=${nftAddress}&tokenId=${tokenId}`);
             const result = await response.json();
 
             if (result.success && result.data) {
+                // CRITICAL FIX: GET request returns data directly (not nested)
                 const apiInteractions: UserInteractionState = {
-                    isFavorited: result.data.isFavorite || false,
-                    isWatchlisted: result.data.isWatchlisted || false,
-                    userRating: result.data.rating || 0,
+                    isFavorited: result.data.isFavorite ?? false,
+                    isWatchlisted: result.data.isWatchlisted ?? false,
+                    userRating: result.data.rating ?? 0,
                     hasViewed: true // Assume user has viewed if they have interactions
                 };
 
@@ -590,10 +701,9 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
         } catch (error) {
             devLog.error('Error loading user interactions from API:', error);
             // No fallback data - interactions will remain null
-        } finally {
-            setLoading(nftAddress, tokenId, false);
         }
-    }, [updateUserInteractions, setLoading]);
+        // NOTE: No loading state for user interactions - they load independently in parallel
+    }, [updateUserInteractions]);
 
     const refreshStats = useCallback(async (nftAddress: string, tokenId: string) => {
         await loadStats(nftAddress, tokenId);
@@ -686,6 +796,9 @@ export function useNFTUserStats(nftAddress: string, tokenId: string, userAddress
     );
     const loading = context.isLoading(nftAddress, tokenId);
 
+    // Force update counter for Edge browser compatibility
+    const [, forceUpdate] = useState(0);
+
     // Use refs to avoid recreating event handler on every render
     const contextRef = useRef(context);
     const userAddressRef = useRef(userAddress);
@@ -701,21 +814,24 @@ export function useNFTUserStats(nftAddress: string, tokenId: string, userAddress
             const detail = event.detail;
 
             if (detail.nftAddress === nftAddress && detail.tokenId === tokenId) {
-                // Use stats from event detail (guaranteed to be latest)
-                // OR fall back to fetching from context if not provided
-                const latestStats = detail.stats || contextRef.current.getStats(nftAddress, tokenId);
-                const latestInteractions = contextRef.current.getUserInteractions(nftAddress, tokenId, userAddressRef.current);
-
                 devLog.info('Stats updated for', `${nftAddress}/${tokenId}:`, {
-                    favoriteCount: latestStats?.favoriteCount,
-                    watchlistCount: latestStats?.watchlistCount,
-                    isFavorited: latestInteractions?.isFavorited,
-                    isWatchlisted: latestInteractions?.isWatchlisted,
+                    favoriteCount: detail.stats?.favoriteCount,
+                    watchlistCount: detail.stats?.watchlistCount,
                     source: detail.source
                 });
 
-                setStats(latestStats);
-                setUserInteractions(latestInteractions);
+                // SIMPLE AND DIRECT: Just update state with what we got from the event
+                // The event already contains fresh data from the cache after it was updated
+                if (detail.stats) {
+                    setStats(detail.stats);
+                }
+                
+                if (detail.userInteractions) {
+                    setUserInteractions(detail.userInteractions);
+                }
+                
+                // Force re-render to ensure UI updates in all browsers
+                forceUpdate(prev => prev + 1);
             }
         };
 
@@ -729,24 +845,46 @@ export function useNFTUserStats(nftAddress: string, tokenId: string, userAddress
 
     // Auto-load stats if not present - aber nur beim ersten Mount
     const [statsLoadInitiated, setStatsLoadInitiated] = useState(false);
+    const [interactionsLoadInitiated, setInteractionsLoadInitiated] = useState(false);
+
+    // Reset load flags when NFT or user changes
     useEffect(() => {
-        if (!stats && !loading && !statsLoadInitiated) {
-            setStatsLoadInitiated(true);
-            context.loadStats(nftAddress, tokenId);
-        }
-    }, [context, nftAddress, tokenId, stats, loading, statsLoadInitiated]);
+        setStatsLoadInitiated(false);
+        setInteractionsLoadInitiated(false);
+    }, [nftAddress, tokenId, userAddress]);
 
-    // Auto-load user interactions if user is connected
+    // OPTIMIZED: Load stats and user interactions in parallel for faster initial load
     useEffect(() => {
+        const shouldLoadStats = !stats && !loading && !statsLoadInitiated;
+        const shouldLoadInteractions = userAddress && !userInteractions && !loading && !interactionsLoadInitiated;
 
-        if (userAddress && !userInteractions && !loading) {
+        if (shouldLoadStats || shouldLoadInteractions) {
+            // Mark as initiated immediately to prevent double-loading
+            if (shouldLoadStats) setStatsLoadInitiated(true);
+            if (shouldLoadInteractions) setInteractionsLoadInitiated(true);
 
-            // Only load if we don't have user interactions yet
-            context.loadUserInteractions?.(nftAddress, tokenId, userAddress);
-        } else {
+            // Load both in parallel for faster UX
+            const promises: Promise<void>[] = [];
 
+            if (shouldLoadStats) {
+                promises.push(context.loadStats(nftAddress, tokenId));
+            }
+
+            if (shouldLoadInteractions) {
+                promises.push(
+                    context.loadUserInteractions?.(nftAddress, tokenId, userAddress) || Promise.resolve()
+                );
+            }
+
+            // Execute in parallel - no need to wait
+            Promise.all(promises).catch(err => {
+                devLog.error('Error during parallel stats/interactions load:', err);
+            });
         }
-    }, [context, nftAddress, tokenId, userAddress, userInteractions, loading]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [nftAddress, tokenId, userAddress, statsLoadInitiated, interactionsLoadInitiated]);
+    // NOTE: Intentionally excluding stats, userInteractions, loading from deps to prevent infinite loops
+    // They are checked in the condition but don't trigger re-runs
 
     const toggleFavorite = useCallback(async () => {
         if (!userAddress) return;

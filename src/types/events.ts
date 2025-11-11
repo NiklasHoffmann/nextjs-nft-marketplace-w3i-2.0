@@ -8,7 +8,7 @@
  * @date 2025-10-15
  */
 
-import type { NFTStats } from './03-api/01-api-responses';
+import type { NFTStats } from '@/types/api/api-responses';
 
 // ===== NFT STATS UPDATE EVENT =====
 
@@ -22,6 +22,16 @@ export interface NFTStatsWithMeta extends NFTStats {
 }
 
 /**
+ * User interaction state for NFT (personal data)
+ */
+export interface UserInteractionState {
+    isFavorited: boolean;
+    isWatchlisted: boolean;
+    userRating: number;
+    hasViewed: boolean;
+}
+
+/**
  * Detail payload for nft-stats-updated event
  * Dispatched when NFT stats change (likes, watchlist, views, ratings)
  */
@@ -32,6 +42,8 @@ export interface NFTStatsUpdateDetail {
     tokenId: string;
     /** Updated stats object */
     stats: NFTStatsWithMeta;
+    /** Updated user interactions (optional - only if relevant to this update) */
+    userInteractions?: UserInteractionState;
     /** Timestamp when the update occurred */
     timestamp: number;
     /** Optional: Source of the update (for debugging) */
