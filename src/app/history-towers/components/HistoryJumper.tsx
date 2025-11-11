@@ -990,7 +990,7 @@ export default function HistoryJumper({ onGameStateChange, onLeaderboardRefresh 
                                     onTouchEnd={() => handleTouchButton('left', false)}
                                     className="flex-1 h-16 select-none rounded-xl bg-secondary hover:bg-secondary/90 text-3xl font-bold text-primary shadow-md active:scale-95 transition-transform"
                                 >
-                                    ?
+                                    ←
                                 </button>
                                 <button
                                     onMouseDown={() => handleTouchButton('right', true)}
@@ -1000,7 +1000,7 @@ export default function HistoryJumper({ onGameStateChange, onLeaderboardRefresh 
                                     onTouchEnd={() => handleTouchButton('right', false)}
                                     className="flex-1 h-16 select-none rounded-xl bg-secondary hover:bg-secondary/90 text-3xl font-bold text-primary shadow-md active:scale-95 transition-transform"
                                 >
-                                    ?
+                                    →
                                 </button>
                             </div>
 
