@@ -1,28 +1,58 @@
 ﻿'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useAccount } from 'wagmi'
 import HighscoreDialog from './HighscoreDialog'
-import type { ScoreSubmitResponse } from '@/types/game'
 import {
-    CANVAS_WIDTH,
-    CANVAS_HEIGHT,
-    GRAVITY,
-    JUMP_VELOCITY,
-    MOVE_SPEED_BASE,
-    MAX_FALL_SPEED,
-    AVAILABLE_CHARACTERS,
-    BRICK_WIDTH,
-    BRICK_HEIGHT,
-    BACKGROUND_SCROLL_SPEED,
-    WINDOW_WIDTH,
-    WINDOW_HEIGHT,
-    WINDOW_ARCH_HEIGHT,
-    WINDOW_SPACING,
-    CHARACTER_SIZE_IN_WINDOW,
-    COLORS,
-    PLATFORMS_PER_LEVEL,
-} from '../config/gameConstants'
+    useGameState,
+    useGameInput,
+    useGamePhysics,
+    useGameRenderer,
+    useScoreManager,
+} from '../hooks'
+import { GAME_CONFIG, COLORS } from '../constants'
+import type { Platform as PlatformType } from '../types'
+
+// Tower-specific constants (keep for now)
+const CANVAS_WIDTH = GAME_CONFIG.canvasWidth
+const CANVAS_HEIGHT = GAME_CONFIG.canvasHeight
+const GRAVITY = GAME_CONFIG.gravity
+const JUMP_VELOCITY = GAME_CONFIG.jumpPower
+const MOVE_SPEED_BASE = GAME_CONFIG.moveSpeed
+const MAX_FALL_SPEED = 20 // Tower-specific max fall speed
+
+// Tower design constants (unique to this component)
+const BRICK_WIDTH = 40
+const BRICK_HEIGHT = 20
+const BACKGROUND_SCROLL_SPEED = 0.5
+const WINDOW_WIDTH = 60
+const WINDOW_HEIGHT = 80
+const WINDOW_ARCH_HEIGHT = 20
+const WINDOW_SPACING = 100
+const CHARACTER_SIZE_IN_WINDOW = 50
+const PLATFORMS_PER_LEVEL = 50
+
+// Tower-specific colors
+const TOWER_COLORS = {
+    brick: '#8B4513',
+    brickBorder: '#654321',
+    window: {
+        inner: '#87CEEB',
+        border: '#DAA520',
+    },
+}
+
+// Available character images for tower windows
+const AVAILABLE_CHARACTERS = [
+    '/media/game/character1.png',
+    '/media/game/character2.png',
+    '/media/game/character3.png',
+    '/media/game/character4.png',
+    '/media/game/character5.png',
+    '/media/game/character6.png',
+    '/media/game/character7.png',
+    '/media/game/character8.png',
+]
 
 interface HistoryJumperProps {
     onGameStateChange?: (isActive: boolean) => void;
@@ -56,11 +86,11 @@ export default function HistoryJumper({ onGameStateChange, onLeaderboardRefresh 
                 const brickX = x + rowOffset
 
                 // Backstein
-                ctx.fillStyle = COLORS.brick
+                ctx.fillStyle = TOWER_COLORS.brick
                 ctx.fillRect(brickX, brickY, BRICK_WIDTH - 2, BRICK_HEIGHT - 2)
 
                 // Fugen (dunkler)
-                ctx.strokeStyle = COLORS.brickBorder
+                ctx.strokeStyle = TOWER_COLORS.brickBorder
                 ctx.lineWidth = 2
                 ctx.strokeRect(brickX, brickY, BRICK_WIDTH - 2, BRICK_HEIGHT - 2)
             }
@@ -106,11 +136,11 @@ export default function HistoryJumper({ onGameStateChange, onLeaderboardRefresh 
             ctx.closePath()
 
             // Fenster-Hintergrund mit bg-primary (#FFF9E2)
-            ctx.fillStyle = COLORS.window.inner
+            ctx.fillStyle = TOWER_COLORS.window.inner
             ctx.fill()
 
             // Steinrahmen um Fenster
-            ctx.strokeStyle = COLORS.window.border
+            ctx.strokeStyle = TOWER_COLORS.window.border
             ctx.lineWidth = 5
             ctx.stroke()
 
@@ -141,15 +171,24 @@ export default function HistoryJumper({ onGameStateChange, onLeaderboardRefresh 
     const playerCharacterPath = useRef<string>('')  // Speichert den Pfad der Spielfigur
     const windowCharactersRef = useRef<HTMLImageElement[]>([])
 
+    // UI State (keep in component)
     const [running, setRunning] = useState(false)
     const [paused, setPaused] = useState(false)
     const [gameOver, setGameOver] = useState(false)
-    const [score, setScore] = useState(0)
-    const [best, setBest] = useState<number>(0)
     const [showHighscoreDialog, setShowHighscoreDialog] = useState(false)
-    const [leaderboardRefresh, setLeaderboardRefresh] = useState(0)
     const [motionEnabled, setMotionEnabled] = useState(false)
     const [motionPermission, setMotionPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt')
+
+    // Score State (Tower has custom score system based on distanceClimbed)
+    const [score, setScore] = useState(0)
+
+    // Custom Hooks - Game State Management
+    const gameState = useGameState()
+    const input = useGameInput()
+    const scoreManager = useScoreManager({ walletAddress: address })
+
+    // Tower-specific state (keep for now - contains backgroundScroll, etc.)
+    const [leaderboardRefresh, setLeaderboardRefresh] = useState(0)
 
     // Notify parent component about game state changes
     useEffect(() => {
@@ -570,42 +609,9 @@ export default function HistoryJumper({ onGameStateChange, onLeaderboardRefresh 
         setShowHighscoreDialog(true)
     }
 
-    // Load personal best from database
+    // Load personal best from database (now handled by useScoreManager hook)
     useEffect(() => {
-        const fetchPersonalBest = async () => {
-            try {
-                let url = '/api/game/scores?type=top&limit=1'
-
-                // Wenn Wallet verbunden ist, hole den persönlichen Highscore
-                if (address) {
-                    url = `/api/game/scores?type=user&address=${address}&limit=1`
-                }
-
-                // Verhindere Browser-Caching
-                const response = await fetch(url, {
-                    cache: 'no-store',
-                    headers: {
-                        'Cache-Control': 'no-cache, no-store, must-revalidate',
-                        'Pragma': 'no-cache',
-                        'Expires': '0'
-                    }
-                })
-                const data = await response.json()
-
-                if (data.success && data.scores && data.scores.length > 0) {
-                    setBest(data.scores[0].score)
-                } else {
-                    // Keine Scores gefunden - setze auf 0
-                    setBest(0)
-                }
-            } catch (error) {
-                console.error('Error fetching personal best:', error)
-                // Bei Fehler auf 0 setzen
-                setBest(0)
-            }
-        }
-
-        fetchPersonalBest()
+        scoreManager.fetchPersonalBest()
     }, [address, leaderboardRefresh]) // Aktualisiere wenn Wallet sich ändert oder neuer Score submitted
 
     useEffect(() => {
@@ -882,10 +888,10 @@ export default function HistoryJumper({ onGameStateChange, onLeaderboardRefresh 
                                             <p className="text-sm text-white/80 mb-1">Dein Score</p>
                                             <p className="text-4xl font-bold text-yellow-400">{Math.floor(score)}</p>
                                         </div>
-                                        {best > 0 && (
+                                        {scoreManager.bestScore > 0 && (
                                             <div className="bg-white/20 rounded-xl p-4">
                                                 <p className="text-sm text-white/80 mb-1">Highscore</p>
-                                                <p className="text-2xl font-bold text-emerald-400">{best}</p>
+                                                <p className="text-2xl font-bold text-emerald-400">{scoreManager.bestScore}</p>
                                             </div>
                                         )}
                                         <button
@@ -905,14 +911,14 @@ export default function HistoryJumper({ onGameStateChange, onLeaderboardRefresh 
                                 <div className="text-center p-8 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 max-w-sm mx-4">
                                     <h2 className="text-4xl font-bold text-white mb-6">History Jumper</h2>
                                     <div className="space-y-4 text-white/90 text-sm mb-8">
-                                        <p className="hidden md:block">? ? bewegen • ? springen</p>
+                                        <p className="hidden md:block">← → bewegen • ↑ springen</p>
                                         <p className="md:hidden">Nutze die Buttons zum Spielen</p>
                                         <p className="text-white/70">Springe auf die Plattformen und klettere so hoch wie möglich!</p>
                                     </div>
-                                    {best > 0 && (
+                                    {scoreManager.bestScore > 0 && (
                                         <div className="bg-white/20 rounded-xl p-4 mb-6">
                                             <p className="text-sm text-white/80 mb-1">Highscore</p>
-                                            <p className="text-3xl font-bold text-yellow-400">{best}</p>
+                                            <p className="text-3xl font-bold text-yellow-400">{scoreManager.bestScore}</p>
                                         </div>
                                     )}
                                     <button
@@ -1023,9 +1029,9 @@ export default function HistoryJumper({ onGameStateChange, onLeaderboardRefresh 
                     <div className="bg-primary px-6 py-3 text-center" key={`footer-${address || 'no-wallet'}`}>
                         <p className="text-xs text-gray-600 font-medium">
                             <span className="hidden sm:inline">Tastatur: ← → bewegen, ↑ springen • </span>
-                            {best > 0 ? (
-                                <span className="text-emerald-600 font-bold" key={`highscore-${address || 'global'}-${best}`}>
-                                    {address ? 'Dein Highscore' : 'Globaler Highscore'}: {best.toLocaleString()}
+                            {scoreManager.bestScore > 0 ? (
+                                <span className="text-emerald-600 font-bold" key={`highscore-${address || 'global'}-${scoreManager.bestScore}`}>
+                                    {address ? 'Dein Highscore' : 'Globaler Highscore'}: {scoreManager.bestScore.toLocaleString()}
                                 </span>
                             ) : (
                                 <span className="text-gray-500 italic">
@@ -1044,7 +1050,7 @@ export default function HistoryJumper({ onGameStateChange, onLeaderboardRefresh 
                         platformsClimbed={stateRef.current.platformsClimbed}
                         walletAddress={address}
                         onClose={() => setShowHighscoreDialog(false)}
-                        onSubmitSuccess={(response: ScoreSubmitResponse) => {
+                        onSubmitSuccess={(response: { isTopScore?: boolean }) => {
                             if (response.isTopScore) {
                                 // Aktualisiere Leaderboard
                                 setLeaderboardRefresh(prev => prev + 1)

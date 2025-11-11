@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import HistoryJumper from './HistoryJumper';
+import SimplifiedGame from './SimplifiedGame';
 import MarketplaceInfo from './MarketplaceInfo';
 import LeaderboardSidebar from './LeaderboardSidebar';
 
@@ -23,7 +24,7 @@ export default function GamePageLayout() {
 
                     {/* Center: Game */}
                     <div className="h-full min-h-0 flex items-center justify-center">
-                        <HistoryJumper
+                        <SimplifiedGame
                             onGameStateChange={setIsGameActive}
                             onLeaderboardRefresh={setLeaderboardRefresh}
                         />
