@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Force NFT Reload</title>
+</head>
+
+<body>
+    <h1>Force NFT Data Reload</h1>
+    <p>This will clear NFT cache and force a fresh load.</p>
+
+    <input type="text" id="nftAddress" placeholder="NFT Address" value="0xfdbc878ad5560de5f205a0c428d983d992c7406a"
+        style="width: 400px">
+    <br><br>
+    <input type="text" id="tokenId" placeholder="Token ID" value="862" style="width: 100px">
+    <br><br>
+    <button onclick="clearAndReload()">Clear Cache & Open NFT Page</button>
+
+    <div id="output" style="margin-top: 20px; padding: 10px; background: #f0f0f0;"></div>
+
+    <script>
+        function clearAndReload() {
+            const nftAddress = document.getElementById('nftAddress').value;
+            const tokenId = document.getElementById('tokenId').value;
+            const output = document.getElementById('output');
+
+            // Clear all NFT-related caches
+            const stores = ['nft-context-cache', 'nft-metadata-cache', 'nft-cache'];
+
+            stores.forEach(storeName => {
+                localStorage.removeItem(storeName);
+                sessionStorage.removeItem(storeName);
+            });
+
+            // Clear IndexedDB if it exists
+            if (window.indexedDB) {
+                stores.forEach(dbName => {
+                    indexedDB.deleteDatabase(dbName);
+                });
+            }
+
+            output.innerHTML = `
+                <p style="color: green;">✅ Cache cleared!</p>
+                <p>NFT Key: ${nftAddress}-${tokenId}</p>
+                <p>Redirecting in 2 seconds...</p>
+            `;
+
+            setTimeout(() => {
+                window.location.href = `/nft/${nftAddress}/${tokenId}`;
+            }, 2000);
+        }
+    </script>
+</body>
+
+</html>
