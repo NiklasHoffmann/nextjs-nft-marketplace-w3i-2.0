@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 /**
  * POST /api/auth/logout
- * Löscht die Admin-Session
+ * LÃ¶scht die Admin-Session
  */
 export async function POST(request: NextRequest) {
     try {

@@ -1,8 +1,8 @@
-// app/page.tsx
+﻿// app/page.tsx
 'use client'
 import React, { useState } from "react";
 import { ActiveItemsList, CollectionsTable, NFTFilterSidebar } from "@/components";
-import type { NFTFilters, NFTSortOptions } from "@/components/03-marketplace/05-filters-NFTFilterBar";
+import type { NFTFilters, NFTSortOptions } from "@/components/marketplace/NFTFilterBar";
 
 export default function Home() {
   const [filters, setFilters] = useState<NFTFilters>({

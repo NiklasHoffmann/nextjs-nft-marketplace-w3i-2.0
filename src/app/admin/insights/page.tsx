@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { AdminNFTInsightsManager } from "@/components/06-admin";
+import { AdminNFTInsightsManager } from "@/components/admin";
 
 function AdminContent() {
     return (

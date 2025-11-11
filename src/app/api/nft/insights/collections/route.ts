@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
+import { apiSuccess, apiError, apiInternalError } from '@/lib/api/responses';
 
 // GET /api/insights/collection - Read-only access to Collection insights
 // For admin CUD operations, use /api/nft/admin/insights/collections
@@ -72,9 +73,6 @@ export async function GET(request: NextRequest) {
 
     } catch (error) {
         console.error('GET /api/insights/collection error:', error);
-        return NextResponse.json(
-            { success: false, error: 'Failed to fetch collection insights' },
-            { status: 500 }
-      );
+        return apiInternalError('Failed to fetch collection insights');
     }
 }

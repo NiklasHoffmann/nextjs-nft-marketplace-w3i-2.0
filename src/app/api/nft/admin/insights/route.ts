@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
-import type { NFTProjectDescriptions, NFTFunctionalitiesDescriptions } from '@/types/05-features/03-nft-insights';
+import type { NFTProjectDescriptions, NFTFunctionalitiesDescriptions } from '@/types/features/nft-insights';
+import { apiBadRequest, apiSuccess, apiError, apiInternalError } from '@/lib/api/responses';
 
 interface AdminNFTInsight {
   _id?: ObjectId;
@@ -42,18 +43,12 @@ export async function POST(request: NextRequest) {
 
     // Validation - only contractAddress is required
     if (!data.contractAddress) {
-      return NextResponse.json(
-        { success: false, error: 'contractAddress is required' },
-        { status: 400 }
-      );
+      return apiBadRequest('contractAddress is required');
     }
 
     // Token ID validation - only validate format if provided
     if (data.tokenId && !/^\d+$/.test(data.tokenId.toString())) {
-      return NextResponse.json(
-        { success: false, error: 'tokenId must be a valid number if provided' },
-        { status: 400 }
-      );
+      return apiBadRequest('tokenId must be a valid number if provided');
     }
 
     const collection = await getCollection('admin_nft_insights');
@@ -86,17 +81,11 @@ export async function POST(request: NextRequest) {
 
     const result = await collection.insertOne(insight);
     const created = await collection.findOne({ _id: result.insertedId });
-    return NextResponse.json({
-      success: true,
-      data: created
-    });
+    return apiSuccess(created);
 
   } catch (error) {
     console.error('Error creating admin NFT insight:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to create insight' },
-      { status: 500 }
-    );
+    return apiInternalError('Failed to create insight');
   }
 }
 
@@ -108,18 +97,12 @@ export async function PUT(request: NextRequest) {
 
     // Validation - only contractAddress is required for updates
     if (!data.contractAddress) {
-      return NextResponse.json(
-        { success: false, error: 'contractAddress is required' },
-        { status: 400 }
-      );
+      return apiBadRequest('contractAddress is required');
     }
 
     // Token ID validation - only validate format if provided
     if (data.tokenId && !/^\d+$/.test(data.tokenId.toString())) {
-      return NextResponse.json(
-        { success: false, error: 'tokenId must be a valid number if provided' },
-        { status: 400 }
-      );
+      return apiBadRequest('tokenId must be a valid number if provided');
     }
 
     const collection = await getCollection('admin_nft_insights');
@@ -169,17 +152,11 @@ export async function PUT(request: NextRequest) {
       tokenId: data.tokenId
     });
 
-    return NextResponse.json({
-      success: true,
-      data: updated
-    });
+    return apiSuccess(updated);
 
   } catch (error) {
     console.error('Error updating admin NFT insight:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to update insight' },
-      { status: 500 }
-    );
+    return apiInternalError('Failed to update insight');
   }
 }
 
@@ -194,10 +171,7 @@ export async function DELETE(request: NextRequest) {
 
     // Validation - only contractAddress is required for deletion
     if (!contractAddress) {
-      return NextResponse.json(
-        { success: false, error: 'contractAddress is required' },
-        { status: 400 }
-      );
+      return apiBadRequest('contractAddress is required');
     }
 
     const collection = await getCollection('admin_nft_insights');
@@ -230,9 +204,6 @@ export async function DELETE(request: NextRequest) {
 
   } catch (error) {
     console.error('Error deleting admin NFT insight:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete insight' },
-      { status: 500 }
-    );
+    return apiInternalError('Failed to delete insight');
   }
 }

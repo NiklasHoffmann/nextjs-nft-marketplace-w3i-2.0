@@ -1,13 +1,13 @@
-// app/api/nft-metadata/route.ts - Optimized Version
+﻿// app/api/nft-metadata/route.ts - Optimized Version
 import { NextRequest, NextResponse } from 'next/server';
 import { LRUCache } from 'lru-cache';
-import { fetchComprehensiveNFTDataNew } from '@/utils/04-blockchain/04-blockchain-nft-fetcher';
-import { createRobustPublicClient, getTimeoutConfig } from '@/utils/04-blockchain/05-blockchain-rpc-config';
+import { fetchComprehensiveNFTDataNew } from '@/utils/blockchain/nft-fetcher';
+import { createRobustPublicClient, getTimeoutConfig } from '@/utils/blockchain/rpc-config';
 
-// Enhanced server-side cache für NFT Metadaten mit größerem TTL und besserer Performance
+// Enhanced server-side cache fÃ¼r NFT Metadaten mit grÃ¶ÃŸerem TTL und besserer Performance
 const metadataCache = new LRUCache<string, any>({
     max: 2000, // Increased cache size
-    ttl: 1000 * 60 * 60 * 2, // 2 Stunden TTL für bessere Performance
+    ttl: 1000 * 60 * 60 * 2, // 2 Stunden TTL fÃ¼r bessere Performance
     maxSize: 50 * 1024 * 1024, // 50MB max memory
     sizeCalculation: (value) => JSON.stringify(value).length,
 });
@@ -15,7 +15,7 @@ const metadataCache = new LRUCache<string, any>({
 // Enhanced image URL cache
 const imageCache = new LRUCache<string, string>({
     max: 1000,
-    ttl: 1000 * 60 * 60 * 6, // 6 Stunden TTL für Images
+    ttl: 1000 * 60 * 60 * 6, // 6 Stunden TTL fÃ¼r Images
 });
 
 export async function GET(request: NextRequest) {

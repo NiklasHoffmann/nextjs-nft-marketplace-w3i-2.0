@@ -23,7 +23,17 @@ const eslintConfig = [
     rules: {
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'react-hooks/exhaustive-deps': 'warn',
-      '@next/next/no-img-element': 'off'
+      '@next/next/no-img-element': 'off',
+
+      // Enforce absolute imports - keine relativen Imports erlauben
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: ['../*', '../../*', '../../../*'],
+            message: 'Verwende absolute Imports mit @/ anstelle von relativen Imports (../).'
+          }
+        ]
+      }]
     }
   },
 ];

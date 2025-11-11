@@ -1,10 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
 import {
     getCachedInteractions,
     setCachedInteractions,
     invalidateAllCachesForNFT
 } from '@/lib/cache';
+import {
+    apiSuccess,
+    apiBadRequest,
+    apiInternalError,
+    rateLimit,
+    RATE_LIMIT_CONFIG,
+    getQueryParam,
+    parseJsonBody,
+    isValidAddress,
+    isValidTokenId,
+    BadRequestError
+} from '@/lib/api';
 
 interface UserInteractionData {
     // Favorites
@@ -41,16 +53,19 @@ interface CombinedUserInteractionsResponse {
 // GET /api/user/interactions - Get all user interactions for an NFT
 export async function GET(request: NextRequest) {
     try {
-        const { searchParams } = new URL(request.url);
-        const userId = searchParams.get('userId');
-        const contractAddress = searchParams.get('contractAddress');
-        const tokenId = searchParams.get('tokenId');
+        // Apply rate limiting (lenient for read operations)
+        await rateLimit(request, RATE_LIMIT_CONFIG.LENIENT);
 
-        if (!userId || !contractAddress || !tokenId) {
-            return NextResponse.json(
-                { success: false, error: 'userId, contractAddress, and tokenId are required' },
-                { status: 400 }
-            );
+        // Extract and validate parameters
+        const userId = getQueryParam(request, 'userId', true);
+        const contractAddress = getQueryParam(request, 'contractAddress', true);
+        const tokenId = getQueryParam(request, 'tokenId', true);
+
+        if (!isValidAddress(contractAddress)) {
+            throw new BadRequestError('Invalid contract address format');
+        }
+        if (!isValidTokenId(tokenId)) {
+            throw new BadRequestError('Invalid token ID format');
         }
 
         // Fetch from all user collections
@@ -61,17 +76,17 @@ export async function GET(request: NextRequest) {
             getCollection('user_personal_notes'),
         ]);
 
+        if (!userId) {
+            throw new BadRequestError('User ID is required');
+        }
+
         const lowerUserId = userId.toLowerCase();
         const lowerContractAddress = contractAddress.toLowerCase();
 
         // Check cache first
         const cachedData = getCachedInteractions(lowerUserId, lowerContractAddress, tokenId);
         if (cachedData) {
-            return NextResponse.json({
-                success: true,
-                data: cachedData,
-                cached: true
-            });
+            return apiSuccess({ ...cachedData, cached: true });
         }
 
         // Query all collections in parallel
@@ -128,19 +143,16 @@ export async function GET(request: NextRequest) {
         // Cache the combined data
         setCachedInteractions(lowerUserId, lowerContractAddress, tokenId, combinedData);
 
-        const response: CombinedUserInteractionsResponse = {
-            success: true,
-            data: combinedData
-        };
-
-        return NextResponse.json(response);
+        return apiSuccess(combinedData);
 
     } catch (error) {
         console.error('Error fetching user interactions:', error);
-        return NextResponse.json(
-            { success: false, error: 'Failed to fetch user interactions' },
-            { status: 500 }
-        );
+
+        if (error instanceof BadRequestError) {
+            return apiBadRequest(error.message);
+        }
+
+        return apiInternalError('Failed to fetch user interactions');
     }
 }
 
@@ -151,10 +163,7 @@ export async function POST(request: NextRequest) {
         const { userId, contractAddress, tokenId, ...updates } = body;
 
         if (!userId || !contractAddress || !tokenId) {
-            return NextResponse.json(
-                { success: false, error: 'userId, contractAddress, and tokenId are required' },
-                { status: 400 }
-            );
+            return apiBadRequest('userId, contractAddress, and tokenId are required');
         }
 
         const lowerUserId = userId.toLowerCase();
@@ -510,19 +519,36 @@ export async function POST(request: NextRequest) {
         // weren't refreshing until cache TTL expired
         invalidateAllCachesForNFT(lowerContractAddress, tokenId, lowerUserId);
 
-        return NextResponse.json({
-            success: true,
-            data: combinedData,
+        // CRITICAL FIX: Fetch and return the updated stats IMMEDIATELY after atomic DB updates
+        // This prevents race conditions where the client fetches stats before DB write is committed
+        const statsCollection = await getCollection('nft_stats');
+        const updatedStats = await statsCollection.findOne({
+            contractAddress: lowerContractAddress,
+            tokenId: tokenId
+        });
+
+        return apiSuccess({
             message: 'User interactions updated successfully',
+            data: combinedData,
+            stats: updatedStats ? {
+                favoriteCount: updatedStats.favoriteCount || 0,
+                watchlistCount: updatedStats.watchlistCount || 0,
+                averageRating: updatedStats.averageRating || 0,
+                ratingCount: updatedStats.ratingCount || 0,
+                viewCount: updatedStats.viewCount || 0,
+                lastUpdated: updatedStats.lastUpdated
+            } : null,
             results
         });
 
     } catch (error) {
         console.error('Error updating user interactions:', error);
-        return NextResponse.json(
-            { success: false, error: 'Failed to update user interactions' },
-            { status: 500 }
-        );
+
+        if (error instanceof BadRequestError) {
+            return apiBadRequest(error.message);
+        }
+
+        return apiInternalError('Failed to update user interactions');
     }
 }
 

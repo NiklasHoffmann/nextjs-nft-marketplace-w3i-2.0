@@ -1,5 +1,5 @@
-import marketplaceAbi from "./marketplace.abi.json"
-import networkMapping from "./network.mapping.json"
+﻿import marketplaceAbi from ./marketplace.abi.json
+import networkMapping from ./network.mapping.json
 
 export { marketplaceAbi, networkMapping }
 

@@ -1,6 +1,6 @@
-'use client';
+﻿'use client';
 
-import { useActiveItems } from '@/hooks/nfts/01-core-nft-hooks';
+import { useActiveItems } from '@/hooks/nfts/nft-hooks';
 
 export default function StatsDebugPage() {
     const { items, loading, error } = useActiveItems();

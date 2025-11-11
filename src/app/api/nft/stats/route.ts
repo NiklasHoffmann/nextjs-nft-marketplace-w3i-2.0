@@ -1,10 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
 import {
   getCachedStats,
   setCachedStats,
   invalidateStatsCache
 } from '@/lib/cache';
+import {
+  apiSuccess,
+  apiBadRequest,
+  apiInternalError,
+  rateLimit,
+  RATE_LIMIT_CONFIG,
+  getQueryParam,
+  parseJsonBody,
+  isValidAddress,
+  isValidTokenId,
+  BadRequestError,
+  InternalError
+} from '@/lib/api';
 
 interface NFTStats {
   contractAddress: string;
@@ -20,15 +33,18 @@ interface NFTStats {
 // GET /api/nft/stats - Get NFT statistics
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const contractAddress = searchParams.get('contractAddress');
-    const tokenId = searchParams.get('tokenId');
+    // Apply rate limiting (lenient for read-only operations)
+    await rateLimit(request, RATE_LIMIT_CONFIG.LENIENT);
 
-    if (!contractAddress || !tokenId) {
-      return NextResponse.json(
-        { success: false, error: 'contractAddress and tokenId are required' },
-        { status: 400 }
-      );
+    // Validate and extract parameters
+    const contractAddress = getQueryParam(request, 'contractAddress', true);
+    const tokenId = getQueryParam(request, 'tokenId', true);
+
+    if (!isValidAddress(contractAddress)) {
+      throw new BadRequestError('Invalid contract address format');
+    }
+    if (!isValidTokenId(tokenId)) {
+      throw new BadRequestError('Invalid token ID format');
     }
 
     const lowerContractAddress = contractAddress.toLowerCase();
@@ -36,11 +52,7 @@ export async function GET(request: NextRequest) {
     // Check cache first
     const cachedStats = getCachedStats(lowerContractAddress, tokenId);
     if (cachedStats) {
-      return NextResponse.json({
-        success: true,
-        data: cachedStats,
-        cached: true
-      });
+      return apiSuccess({ ...cachedStats, cached: true });
     }
 
     // Get stats from denormalized nft_stats collection (FAST!)
@@ -113,10 +125,7 @@ export async function GET(request: NextRequest) {
       // Cache the newly created stats
       setCachedStats(lowerContractAddress, tokenId, stats);
 
-      return NextResponse.json({
-        success: true,
-        data: stats
-      });
+      return apiSuccess(stats);
     }
 
     // Return existing stats from denormalized collection
@@ -137,34 +146,47 @@ export async function GET(request: NextRequest) {
     // Log warning if we found negative values (indicates data corruption)
     if (statsDoc.viewCount < 0 || statsDoc.favoriteCount < 0 ||
       statsDoc.watchlistCount < 0 || statsDoc.ratingCount < 0) {
-      console.warn('⚠️ Found negative stat values for', lowerContractAddress, tokenId,
+      console.warn('âš ï¸ Found negative stat values for', lowerContractAddress, tokenId,
         'Stats:', statsDoc);
     }
 
-    return NextResponse.json({
-      success: true,
-      data: stats
-    });
+    return apiSuccess(stats);
 
   } catch (error) {
     console.error('Error fetching NFT stats:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch NFT stats' },
-      { status: 500 }
-    );
+
+    // Use typed error responses
+    if (error instanceof BadRequestError) {
+      return apiBadRequest(error.message);
+    }
+
+    if (error instanceof InternalError) {
+      return apiInternalError(error.message);
+    }
+
+    return apiInternalError('Failed to fetch NFT stats');
   }
 }
 
 // POST /api/nft/stats - Record NFT view
 export async function POST(request: NextRequest) {
   try {
-    const { contractAddress, tokenId, userId } = await request.json();
+    // Apply rate limiting (standard for write operations)
+    await rateLimit(request, RATE_LIMIT_CONFIG.STANDARD);
+
+    // Parse and validate request body
+    const body = await parseJsonBody<{ contractAddress: string; tokenId: string; userId?: string }>(request);
+    const { contractAddress, tokenId, userId } = body;
 
     if (!contractAddress || !tokenId) {
-      return NextResponse.json(
-        { success: false, error: 'contractAddress and tokenId are required' },
-        { status: 400 }
-      );
+      throw new BadRequestError('contractAddress and tokenId are required');
+    }
+
+    if (!isValidAddress(contractAddress)) {
+      throw new BadRequestError('Invalid contract address format');
+    }
+    if (!isValidTokenId(tokenId)) {
+      throw new BadRequestError('Invalid token ID format');
     }
 
     const lowerContractAddress = contractAddress.toLowerCase();
@@ -208,16 +230,16 @@ export async function POST(request: NextRequest) {
       })()
     ]);
 
-    return NextResponse.json({
-      success: true,
-      data: { message: 'View recorded' }
-    });
+    return apiSuccess({ message: 'View recorded' });
 
   } catch (error) {
     console.error('Error recording NFT view:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to record view' },
-      { status: 500 }
-    );
+
+    // Use typed error responses
+    if (error instanceof BadRequestError) {
+      return apiBadRequest(error.message);
+    }
+
+    return apiInternalError('Failed to record view');
   }
 }

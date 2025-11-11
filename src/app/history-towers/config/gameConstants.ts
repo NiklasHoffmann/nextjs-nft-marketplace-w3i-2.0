@@ -1,7 +1,7 @@
-/**
+﻿/**
  * History Towers Game Constants
  * 
- * Zentrale Konfiguration für alle Spiel-Parameter
+ * Zentrale Konfiguration fÃ¼r alle Spiel-Parameter
  */
 
 // ===== CANVAS DIMENSIONS =====
@@ -68,7 +68,7 @@ export const SCORE_MULTIPLIER_LEVEL_2 = 1.5;   // 1.5x multiplier for Level 2
 export const SCORE_MULTIPLIER_LEVEL_3 = 2;     // 2x multiplier for Level 3+
 
 // ===== TOWER WINDOW & BACKGROUND =====
-export const CHARACTER_SIZE_IN_WINDOW = 85; // Größe der Figur im Fenster
+export const CHARACTER_SIZE_IN_WINDOW = 85; // GrÃ¶ÃŸe der Figur im Fenster
 
 // ===== COLORS =====
 export const COLORS = {
@@ -82,7 +82,7 @@ export const COLORS = {
     },
     platform: {
         normal: '#3b82f6',
-        safe: '#eab308', // Goldene Farbe für Level-Plattformen
+        safe: '#eab308', // Goldene Farbe fÃ¼r Level-Plattformen
         shadow: 'rgba(0,0,0,0.15)'
     },
     player: {
@@ -118,6 +118,6 @@ export const SHADOW_OFFSET_X = 0;
 export const SHADOW_OFFSET_Y = 4;
 export const SHADOW_BLUR = 8;
 
-export const SPACING_VARIANCE = 0.2; // ±20% variance for platform spacing
+export const SPACING_VARIANCE = 0.2; // Â±20% variance for platform spacing
 export const SAFE_PLATFORM_SPACING_VARIANCE = 0.05; // Smaller variance for safe platforms
 export const TRANSITION_PLATFORMS = 4; // Number of platforms using old spacing after level change

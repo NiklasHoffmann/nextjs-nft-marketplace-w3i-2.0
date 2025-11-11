@@ -25,7 +25,7 @@ import React, {
     useSyncExternalStore
 } from 'react';
 
-import type { AggregatedNFT } from '@/types/01-core/01-core-nft-modern';
+import type { AggregatedNFT } from '@/types/core/core-nft-modern';
 
 import {
     createNFTKey,

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect } from 'react';
 import { useAccount, useBalance } from 'wagmi';
@@ -10,7 +10,7 @@ import { useCurrency } from '@/contexts/CurrencyContext';
 import { useMarketplaceUser } from '@/hooks';
 import { getMarketplaceAddress } from '@/utils';
 import { WalletNFTsList, NFTFilterSidebar } from '@/components';
-import type { NFTFilters, NFTSortOptions } from '@/components/03-marketplace/05-filters-NFTFilterBar';
+import type { NFTFilters, NFTSortOptions } from '@/components/marketplace/NFTFilterBar';
 
 // Force dynamic rendering for this page to prevent SSG issues
 export const dynamic = 'force-dynamic';
@@ -246,7 +246,7 @@ function WalletDashboardContent() {
                                     </p>
                                     {!balancePriceLoading && balancePrice && (
                                         <p className="text-sm text-gray-600 mt-1">
-                                            ≈ {balancePrice}
+                                            ˜ {balancePrice}
                                         </p>
                                     )}
                                 </div>
@@ -288,7 +288,7 @@ function WalletDashboardContent() {
                                     </p>
                                     {!proceedsPriceLoading && proceedsPrice && parseFloat(proceeds) > 0 && (
                                         <p className="text-sm text-gray-600 mt-1">
-                                            ≈ {proceedsPrice}
+                                            ˜ {proceedsPrice}
                                         </p>
                                     )}
                                 </div>

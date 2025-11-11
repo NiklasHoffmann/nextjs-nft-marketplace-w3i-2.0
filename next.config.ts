@@ -1,62 +1,84 @@
 /** @type {import('next').NextConfig} */
+
+// Bundle analyzer for production build analysis
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+});
+
 const nextConfig: import('next').NextConfig = {
   reactStrictMode: true,
   typedRoutes: true,
+
   // Performance optimizations
   poweredByHeader: false,
   compress: true,
+
   experimental: {
     optimizePackageImports: [
       '@apollo/client',
       '@rainbow-me/rainbowkit',
       'wagmi',
-      'viem'
+      'viem',
+      '@tanstack/react-query'
     ],
   },
-  webpack: (config, { isServer }) => {
+
+  webpack: (config, { isServer, dev }) => {
     // Optimize for production
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
+        net: false,
+        tls: false,
       };
     }
 
-    // Bundle analyzer optimization
-    // config.optimization = {
-    //   ...config.optimization,
-    //   splitChunks: {
-    //     chunks: 'all',
-    //     cacheGroups: {
-    //       default: {
-    //         minChunks: 2,
-    //         priority: -20,
-    //         reuseExistingChunk: true,
-    //       },
-    //       vendor: {
-    //         test: /[\\/]node_modules[\\/]/,
-    //         name: 'vendors',
-    //         priority: -10,
-    //         reuseExistingChunk: true,
-    //       },
-    //       web3: {
-    //         test: /[\\/]node_modules[\\/](wagmi|viem|@rainbow-me|@walletconnect)/,
-    //         name: 'web3',
-    //         priority: 10,
-    //         reuseExistingChunk: true,
-    //       },
-    //       apollo: {
-    //         test: /[\\/]node_modules[\\/]@apollo/,
-    //         name: 'apollo',
-    //         priority: 5,
-    //         reuseExistingChunk: true,
-    //       }
-    //     }
-    //   }
-    // };
+    // Production optimizations
+    if (!dev) {
+      config.optimization = {
+        ...config.optimization,
+        moduleIds: 'deterministic',
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            default: {
+              minChunks: 2,
+              priority: -20,
+              reuseExistingChunk: true,
+            },
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendors',
+              priority: -10,
+              reuseExistingChunk: true,
+            },
+            web3: {
+              test: /[\\/]node_modules[\\/](wagmi|viem|@rainbow-me|@walletconnect)/,
+              name: 'web3',
+              priority: 10,
+              reuseExistingChunk: true,
+            },
+            apollo: {
+              test: /[\\/]node_modules[\\/](@apollo|graphql)/,
+              name: 'apollo',
+              priority: 5,
+              reuseExistingChunk: true,
+            },
+            react: {
+              test: /[\\/]node_modules[\\/](react|react-dom|scheduler)/,
+              name: 'react',
+              priority: 15,
+              reuseExistingChunk: true,
+            },
+          }
+        }
+      };
+    }
 
     return config;
   },
+
   images: {
     remotePatterns: [
       {
@@ -79,25 +101,7 @@ const nextConfig: import('next').NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'images.unsplash.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'res.cloudinary.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
         hostname: 'dweb.link',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'picsum.photos',
         port: '',
         pathname: '/**',
       },
@@ -105,17 +109,11 @@ const nextConfig: import('next').NextConfig = {
     deviceSizes: [640, 768, 1024, 1280, 1600],
     imageSizes: [128, 256, 384, 512],
     formats: ['image/webp', 'image/avif'],
-    qualities: [40, 50, 75, 85, 90, 95], // Add quality 90 for components that use it
-    minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days for better caching
+    minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
     dangerouslyAllowSVG: false,
     contentDispositionType: 'attachment',
-    // CSP only for SVG images (if dangerouslyAllowSVG is enabled)
-    // This is NOT a global CSP - use headers() function for that
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
-    loader: 'default',
-    loaderFile: '',
-    domains: [], // Deprecated but kept for compatibility
-    unoptimized: false, // Ensure images are optimized
+    unoptimized: false,
   },
   // Headers for better caching
   async headers() {
@@ -172,4 +170,4 @@ const nextConfig: import('next').NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withBundleAnalyzer(nextConfig);

@@ -170,7 +170,9 @@ class ExchangeRateCache {
 }
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
-    const [selectedCurrency, setSelectedCurrency] = useState<Currency>(currencies[0]);
+    const [selectedCurrency, setSelectedCurrency] = useState<Currency>(
+        currencies[0] || { code: 'USD', symbol: '$', name: 'US Dollar', flag: '🇺🇸' }
+    );
     const [isClient, setIsClient] = useState(false);
     const cacheRef = useRef<ExchangeRateCache>(new ExchangeRateCache());
 

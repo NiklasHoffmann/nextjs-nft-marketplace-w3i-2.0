@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 // NFT Collection Page Client Component
 // Zeigt alle NFTs einer spezifischen Collection an
@@ -7,11 +7,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { useActiveItems } from '@/hooks'
-import { useNFTFilters } from '@/hooks/nfts/08-utils-useNFTFilters'
+import { useNFTFilters } from '@/hooks/nfts/useNFTFilters'
 import { NFTFilterSidebar, NFTScrollList } from '@/components'
-import type { NFTScrollItem } from '@/components/03-marketplace/08-ui-NFTScrollList'
-import type { NFTFilters, NFTSortOptions } from '@/components/03-marketplace/05-filters-NFTFilterBar'
-import type { FilterableNFTItem } from '@/hooks/nfts/08-utils-useNFTFilters'
+import type { NFTScrollItem } from '@/components/marketplace/NFTScrollList'
+import type { NFTFilters, NFTSortOptions } from '@/components/marketplace/NFTFilterBar'
+import type { FilterableNFTItem } from '@/hooks/nfts/useNFTFilters'
 
 interface CollectionPageClientProps {
     contractAddress: string
@@ -186,7 +186,7 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
                         />
                     ) : (
                         <div className="flex flex-col items-center justify-center py-16 px-8">
-                            <div className="text-6xl mb-4">🖼️</div>
+                            <div className="text-6xl mb-4">???</div>
                             <h3 className="text-xl font-bold mb-2 text-gray-900">No NFTs Found</h3>
                             <p className="text-gray-600 mb-4 text-center">
                                 {filters.searchTerm || filters.categories.length > 0 || filters.rarities.length > 0

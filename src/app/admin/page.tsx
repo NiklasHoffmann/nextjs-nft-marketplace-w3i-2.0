@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react';
+﻿import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { hasAdminAccess } from '@/utils';
 
@@ -37,9 +37,9 @@ function AdminContent() {
                                 Insights verwalten
                             </Link>
                             <div className="text-xs text-gray-500">
-                                • NFT-spezifische Insights erstellen<br />
-                                • Projekt-Informationen verwalten<br />
-                                • Tags und Kategorien bearbeiten
+                                â€¢ NFT-spezifische Insights erstellen<br />
+                                â€¢ Projekt-Informationen verwalten<br />
+                                â€¢ Tags und Kategorien bearbeiten
                             </div>
                         </div>
                     </div>
@@ -55,19 +55,19 @@ function AdminContent() {
                             <h3 className="text-lg font-semibold text-gray-900 ml-3">Dashboard</h3>
                         </div>
                         <p className="text-gray-600 text-sm mb-4">
-                            Übersicht über Admin-Aktivitäten, Statistiken und System-Status.
+                            Ãœbersicht Ã¼ber Admin-AktivitÃ¤ten, Statistiken und System-Status.
                         </p>
                         <div className="space-y-2">
                             <Link
                                 href="/admin/dashboard"
                                 className="block w-full px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors text-center"
                             >
-                                Dashboard öffnen
+                                Dashboard Ã¶ffnen
                             </Link>
                             <div className="text-xs text-gray-500">
-                                • System-Übersicht<br />
-                                • Aktivitäts-Logs<br />
-                                • Performance-Metriken
+                                â€¢ System-Ãœbersicht<br />
+                                â€¢ AktivitÃ¤ts-Logs<br />
+                                â€¢ Performance-Metriken
                             </div>
                         </div>
                     </div>
@@ -91,12 +91,12 @@ function AdminContent() {
                                 disabled
                                 className="block w-full px-4 py-2 bg-gray-300 text-gray-500 text-sm rounded-lg cursor-not-allowed text-center"
                             >
-                                Bald verfügbar
+                                Bald verfÃ¼gbar
                             </button>
                             <div className="text-xs text-gray-500">
-                                • System-Konfiguration<br />
-                                • Benutzer-Verwaltung<br />
-                                • Sicherheits-Einstellungen
+                                â€¢ System-Konfiguration<br />
+                                â€¢ Benutzer-Verwaltung<br />
+                                â€¢ Sicherheits-Einstellungen
                             </div>
                         </div>
                     </div>

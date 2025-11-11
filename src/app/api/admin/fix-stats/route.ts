@@ -1,5 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
+import {
+    apiSuccess,
+    apiUnauthorized,
+    apiInternalError,
+    requireAdmin,
+    rateLimit,
+    RATE_LIMIT_CONFIG
+} from '@/lib/api';
 
 /**
  * Admin API: Fix Negative Stats
@@ -11,18 +19,11 @@ import { getCollection } from '@/lib/mongodb';
  */
 export async function GET(request: NextRequest) {
     try {
-        // Simple auth check (you might want to add proper admin auth)
-        const { searchParams } = new URL(request.url);
-        const authKey = searchParams.get('key');
+        // Require admin authentication
+        await requireAdmin(request);
 
-        // TODO: Replace with proper admin authentication
-        // Temporarily disabled for development
-        if (process.env.NODE_ENV === 'production' && authKey !== process.env.ADMIN_SECRET_KEY) {
-            return NextResponse.json(
-                { success: false, error: 'Unauthorized' },
-                { status: 401 }
-            );
-        }
+        // Apply strict rate limiting for admin operations
+        await rateLimit(request, RATE_LIMIT_CONFIG.STRICT);
 
         // Get collections
         const statsCollection = await getCollection('nft_stats');
@@ -41,11 +42,10 @@ export async function GET(request: NextRequest) {
             ]
         }).toArray();
 
-        console.log(`🔍 Found ${negativeStats.length} stats documents with negative values`);
+        console.log(`ðŸ” Found ${negativeStats.length} stats documents with negative values`);
 
         if (negativeStats.length === 0) {
-            return NextResponse.json({
-                success: true,
+            return apiSuccess({
                 message: 'No negative stats found! Database is clean.',
                 fixed: 0
             });
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
         for (const statDoc of negativeStats) {
             const { contractAddress, tokenId } = statDoc;
 
-            console.log(`📊 Fixing stats for ${contractAddress}/${tokenId}`);
+            console.log(`ðŸ“Š Fixing stats for ${contractAddress}/${tokenId}`);
 
             // Recount from source collections
             const [favoriteCount, watchlistCount, ratings, viewCount] = await Promise.all([
@@ -118,8 +118,7 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        return NextResponse.json({
-            success: true,
+        return apiSuccess({
             message: `Fixed ${results.length} stats documents`,
             fixed: results.length,
             results
@@ -127,9 +126,6 @@ export async function GET(request: NextRequest) {
 
     } catch (error) {
         console.error('Error fixing negative stats:', error);
-        return NextResponse.json(
-            { success: false, error: 'Failed to fix negative stats' },
-            { status: 500 }
-        );
+        return apiInternalError('Failed to fix negative stats');
     }
 }

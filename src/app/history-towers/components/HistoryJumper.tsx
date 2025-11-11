@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
 import { useAccount } from 'wagmi'
@@ -615,6 +615,12 @@ export default function HistoryJumper() {
     useEffect(() => {
         // Load random player image from AVAILABLE_CHARACTERS
         const randomCharacter = AVAILABLE_CHARACTERS[Math.floor(Math.random() * AVAILABLE_CHARACTERS.length)]
+
+        if (!randomCharacter) {
+            console.error('No random character found');
+            return;
+        }
+
         playerCharacterPath.current = randomCharacter  // Speichere den Pfad
 
         const img = new Image()
@@ -903,7 +909,7 @@ export default function HistoryJumper() {
                                 <div className="text-center p-8 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 max-w-sm mx-4">
                                     <h2 className="text-4xl font-bold text-white mb-6">History Jumper</h2>
                                     <div className="space-y-4 text-white/90 text-sm mb-8">
-                                        <p className="hidden md:block">← → bewegen • ␣ springen</p>
+                                        <p className="hidden md:block">? ? bewegen • ? springen</p>
                                         <p className="md:hidden">Nutze die Buttons zum Spielen</p>
                                         <p className="text-white/70">Springe auf die Plattformen und klettere so hoch wie möglich!</p>
                                     </div>
@@ -945,14 +951,14 @@ export default function HistoryJumper() {
                                         className="bg-white/90 backdrop-blur-sm hover:bg-white text-gray-900 font-semibold px-4 rounded-xl shadow-lg transition-all flex items-center justify-center text-2xl h-[56px] w-[56px]"
                                         title="Pause"
                                     >
-                                        ⏸
+                                        ?
                                     </button>
                                     <button
                                         onClick={handleStart}
                                         className="bg-white/90 backdrop-blur-sm hover:bg-white text-gray-900 font-semibold px-4 rounded-xl shadow-lg transition-all flex items-center justify-center text-2xl h-[56px] w-[56px]"
                                         title="Neustart"
                                     >
-                                        ↻
+                                        ?
                                     </button>
                                 </div>
                             </div>
@@ -970,7 +976,7 @@ export default function HistoryJumper() {
                                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                     }`}
                             >
-                                <span className="text-xl">{motionEnabled ? '📱' : '🎮'}</span>
+                                <span className="text-xl">{motionEnabled ? '??' : '??'}</span>
                                 <span className="text-sm">
                                     {motionEnabled ? 'Bewegungssteuerung AN' : 'Bewegungssteuerung (kippen)'}
                                 </span>
@@ -988,7 +994,7 @@ export default function HistoryJumper() {
                                     onTouchEnd={() => handleTouchButton('left', false)}
                                     className="flex-1 h-16 select-none rounded-xl bg-secondary hover:bg-secondary/90 text-3xl font-bold text-primary shadow-md active:scale-95 transition-transform"
                                 >
-                                    ←
+                                    ?
                                 </button>
                                 <button
                                     onMouseDown={() => handleTouchButton('right', true)}
@@ -998,7 +1004,7 @@ export default function HistoryJumper() {
                                     onTouchEnd={() => handleTouchButton('right', false)}
                                     className="flex-1 h-16 select-none rounded-xl bg-secondary hover:bg-secondary/90 text-3xl font-bold text-primary shadow-md active:scale-95 transition-transform"
                                 >
-                                    →
+                                    ?
                                 </button>
                             </div>
 
@@ -1019,7 +1025,7 @@ export default function HistoryJumper() {
                     {/* Footer Info */}
                     <div className="bg-primary px-6 py-3 text-center">
                         <p className="text-xs text-gray-600 font-medium">
-                            <span className="hidden sm:inline">Tastatur: ← → bewegen, ␣ springen • </span>
+                            <span className="hidden sm:inline">Tastatur: ? ? bewegen, ? springen • </span>
                             {best > 0 && (
                                 <span className="text-emerald-600 font-bold">
                                     {address ? 'Dein Highscore' : 'Globaler Highscore'}: {best.toLocaleString()}
@@ -1034,7 +1040,7 @@ export default function HistoryJumper() {
                             onClick={() => setShowLeaderboard(!showLeaderboard)}
                             className="w-full px-4 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg hover:from-yellow-600 hover:to-orange-600 transition font-bold shadow-lg flex items-center justify-center gap-2"
                         >
-                            <span>🏆</span>
+                            <span>??</span>
                             <span>{showLeaderboard ? 'Leaderboard verstecken' : 'Leaderboard anzeigen'}</span>
                         </button>
                     </div>

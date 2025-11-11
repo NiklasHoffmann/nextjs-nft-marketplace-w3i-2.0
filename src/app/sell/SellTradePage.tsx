@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useAccount, useWalletClient } from 'wagmi';
@@ -6,7 +6,7 @@ import { NFTUserSelector } from './components/NFTUserSelector';
 import { SellForm } from './components/SellForm';
 import { TradeForm } from './components/TradeForm';
 import { TransactionPreview } from './components/TransactionPreview';
-import { NFTDetails } from '@/types/01-core/01-core-nft';
+import { NFTDetails } from '@/types/core/core-nft';
 
 type Tab = 'sell' | 'trade';
 

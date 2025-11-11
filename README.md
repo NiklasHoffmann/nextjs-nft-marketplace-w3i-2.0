@@ -142,72 +142,69 @@ A modern, full-stack NFT marketplace built with Next.js 15, TypeScript, and Web3
    
    Navigate to [http://localhost:3000](http://localhost:3000) to see the application.
 
-## 📁 Project Structure (Updated)
+## 📁 Project Structure
 
 ```
-src/
-├── app/                    # Next.js App Router
-│   ├── api/               # API routes
-│   │   ├── nft-metadata/  # NFT metadata endpoints
-│   │   ├── test/          # Health check
-│   │   └── web3/          # Web3 interaction endpoints
-│   ├── nft/               # NFT detail pages
-│   │   └── [nftAddress]/[tokenId]/  # Refactored dynamic routes
-│   ├── globals.css        # Global styles
-│   ├── layout.tsx         # Root layout
-│   └── page.tsx           # Home page
-├── components/            # React components
-│   ├── nft-detail/       # 🆕 Refactored NFT detail components
-│   │   ├── tabs/         # Tab components
-│   │   │   ├── ProjectTab.tsx
-│   │   │   ├── FunctionalitiesTab.tsx
-│   │   │   └── TokenomicsTab.tsx
-│   │   ├── NFTDetailHeader.tsx
-│   │   ├── CategoryPills.tsx
-│   │   ├── NFTMediaSection.tsx
-│   │   ├── NFTPriceCard.tsx
-│   │   ├── NFTInfoTabs.tsx
-│   │   ├── PropertiesDisplay.tsx
-│   │   ├── SwapTargetInfo.tsx
-│   │   ├── CollectionItemsList.tsx
-│   │   ├── LoadingSpinner.tsx
-│   │   ├── ErrorDisplay.tsx
-│   │   └── index.ts      # Clean exports
-│   ├── features/         # Feature-specific components
-│   │   ├── ActiveItemsList.tsx
-│   │   ├── NFTCard.tsx
-│   │   └── OptimizedNFTImage.tsx
-│   ├── ui/               # Reusable UI components
-│   ├── CurrencySelector.tsx
-│   ├── Navbar.tsx
-│   └── Web3Provider.tsx
-├── contexts/             # React contexts
-│   └── CurrencyContext.tsx
-├── hooks/                # Custom React hooks
-│   ├── useImageCache.tsx
-│   ├── useNFTMetadata.ts
-│   └── useNFTMetadataOptimized.ts
-├── lib/                  # Library configurations
-│   ├── config.ts         # App configuration
-│   └── utils.ts          # Utility functions
-├── types/                # 🆕 Centralized TypeScript types
-│   ├── nft.ts           # Core NFT types
-│   ├── nft-detail.ts    # 🆕 NFT detail page types
-│   ├── currency.ts      # Currency types
-│   ├── ui.ts           # UI component types
-│   └── index.ts        # Type exports
-├── utils/                # 🆕 Enhanced utility functions
-│   ├── nft-helpers.ts   # 🆕 NFT-specific utilities
-│   ├── bigint.ts        # BigInt utilities
-│   ├── contracts.ts     # Smart contract utilities
-│   ├── formatters.ts    # Data formatting
-│   ├── media.ts         # Media handling
-│   ├── validation.ts    # Input validation
-│   └── index.ts         # Clean exports
-├── constants/           # Application constants
-├── config/              # Configuration files
-└── ui/                  # UI layout components
+nextjs-nft-marketplace-w3i-2.0/
+├── docs/                       # 📚 Comprehensive documentation
+│   ├── README.md              # Docs navigation
+│   ├── ARCHITECTURE.md        # System architecture
+│   ├── API.md                 # API routes reference
+│   ├── FEATURES.md            # Feature documentation
+│   ├── CHANGELOG.md           # Version history & fixes
+│   └── DEVELOPMENT.md         # Development guide
+├── src/
+│   ├── app/                   # Next.js App Router
+│   │   ├── api/              # API routes
+│   │   │   ├── nft/stats/   # NFT statistics
+│   │   │   ├── user/interactions/  # User actions
+│   │   │   └── admin/       # Admin endpoints
+│   │   ├── nft/[nftAddress]/[tokenId]/  # NFT detail pages
+│   │   ├── wallet/           # Wallet dashboard
+│   │   ├── admin/            # Admin panel
+│   │   ├── layout.tsx        # Root layout
+│   │   └── page.tsx          # Home page
+│   ├── components/            # React components
+│   │   ├── 01-layout/        # Layout components
+│   │   ├── 02-nft/           # NFT components
+│   │   ├── 03-marketplace/   # Marketplace features
+│   │   ├── 05-ui/            # Reusable UI
+│   │   └── 06-admin/         # Admin components
+│   ├── contexts/              # React contexts
+│   │   ├── NFTContext.tsx    # NFT data management
+│   │   ├── NFTStatsContext.tsx  # Stats & interactions
+│   │   └── CurrencyContext.tsx  # Multi-currency
+│   ├── hooks/                 # Custom React hooks
+│   │   └── nfts/             # NFT-related hooks
+│   ├── lib/                   # Library configurations
+│   │   ├── cache.ts          # Shared cache module
+│   │   ├── mongodb.ts        # Database connection
+│   │   └── utils.ts          # Utilities
+│   ├── types/                 # TypeScript types
+│   │   ├── nft.ts            # NFT types
+│   │   ├── events.ts         # Custom events
+│   │   └── index.ts          # Type exports
+│   ├── utils/                 # Utility functions
+│   │   ├── nft-helpers.ts    # NFT utilities
+│   │   ├── formatters.ts     # Data formatting
+│   │   └── devLog.ts         # Dev logging
+│   ├── config/                # App configuration
+│   ├── constants/             # Constants
+│   └── schemas/               # Data schemas
+├── public/                    # Static assets
+├── scripts/                   # Utility scripts
+│   ├── dev/                  # Development helpers
+│   └── maintenance/          # DB maintenance
+├── .env.local                 # Environment variables
+├── next.config.ts             # Next.js config
+├── tailwind.config.js         # Tailwind config
+├── tsconfig.json              # TypeScript config
+├── package.json               # Dependencies
+└── README.md                  # This file
 ```
+
+For detailed documentation, see the `/docs` folder.
+
 
 ## 🎨 Key Features Deep Dive
 

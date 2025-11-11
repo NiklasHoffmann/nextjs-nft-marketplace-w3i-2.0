@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Game Configuration Constants for History Towers
  */
 

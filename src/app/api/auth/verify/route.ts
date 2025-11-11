@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { verifyMessage } from 'viem';
 import { isAdminAddress } from '@/config/admin';
 import { cookies } from 'next/headers';
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Prüfe ob Timestamp nicht zu alt ist (max 5 Minuten)
+        // PrÃ¼fe ob Timestamp nicht zu alt ist (max 5 Minuten)
         const now = Date.now();
         const age = now - timestamp;
         if (age > 5 * 60 * 1000) {
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Prüfe ob Admin-Adresse
+        // PrÃ¼fe ob Admin-Adresse
         const isAdmin = isAdminAddress(address);
 
         if (!isAdmin) {

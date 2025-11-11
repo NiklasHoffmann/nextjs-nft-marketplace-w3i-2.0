@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
+import { apiSuccess, apiError, apiInternalError } from '@/lib/api/responses';
 
 // GET /api/test/check-stats - Check what stats exist in database
 export async function GET(request: NextRequest) {
@@ -32,16 +33,10 @@ export async function GET(request: NextRequest) {
             watchlist: { count: watchlistCount, sample: sampleWatchlist }
         };
 
-        return NextResponse.json({
-            success: true,
-            data: report
-        });
+        return apiSuccess(report);
 
     } catch (error) {
-        console.error('❌ Error checking stats:', error);
-        return NextResponse.json(
-            { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-            { status: 500 }
-        );
+        console.error('âŒ Error checking stats:', error);
+        return apiInternalError(error instanceof Error ? error.message : 'Unknown error');
     }
 }

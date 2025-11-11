@@ -1,7 +1,7 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
-import { NFTDetails } from '@/types/01-core/01-core-nft';
+import { NFTDetails } from '@/types/core/core-nft';
 
 interface TransactionData {
     type: 'sell' | 'trade';

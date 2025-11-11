@@ -3,7 +3,12 @@
 // NFT Collection Übersichtsseite - zeigt alle NFTs einer Collection
 
 import React from "react";
-import CollectionPageClient from "../components/CollectionPageClient";
+import { gql } from '@apollo/client';
+import { Metadata } from 'next';
+import apolloClient from "@/config/apolloClient";
+import { isValidAddress } from "@/utils/validation";
+
+import CollectionPageClient from "@/app/nft/components/CollectionPageClient";
 
 interface CollectionPageProps {
     params: Promise<{

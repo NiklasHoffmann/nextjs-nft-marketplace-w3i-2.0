@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
 /**
  * GET /api/auth/challenge
- * Generiert eine zufällige Challenge-Nachricht für Wallet-Signatur
+ * Generiert eine zufÃ¤llige Challenge-Nachricht fÃ¼r Wallet-Signatur
  */
 export async function GET(request: NextRequest) {
     try {

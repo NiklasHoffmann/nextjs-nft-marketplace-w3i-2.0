@@ -1,4 +1,4 @@
-/**
+﻿/**
  * History Towers - Main Game Page
  * 
  * Jump & Run Spiel mit progressiver Schwierigkeit
@@ -7,7 +7,7 @@
  */
 
 import { Metadata } from "next";
-import { HistoryJumper } from "./components";
+import { HistoryJumper } from './components';
 
 export const metadata: Metadata = {
     title: "History Towers - Jump & Run Game",

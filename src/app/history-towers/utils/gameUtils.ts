@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Utility functions for History Towers game
  */
 

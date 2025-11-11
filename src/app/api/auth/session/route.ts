@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
 
@@ -12,12 +12,16 @@ function verifyToken(token: string): any | null {
         const parts = token.split('.');
         if (parts.length !== 3) return null;
 
-        const [header, body, signature] = parts;
+        const [header, payload, signature] = parts;
+
+        if (!payload) {
+            return null;
+        }
 
         // Verifiziere Signatur
         const expectedSignature = crypto
             .createHmac('sha256', JWT_SECRET)
-            .update(`${header}.${body}`)
+            .update(`${header}.${payload}`)
             .digest('base64url');
 
         if (signature !== expectedSignature) {
@@ -25,14 +29,14 @@ function verifyToken(token: string): any | null {
         }
 
         // Dekodiere Payload
-        const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
+        const decodedPayload = JSON.parse(Buffer.from(payload, 'base64url').toString());
 
-        // Prüfe Ablaufdatum
-        if (payload.exp && payload.exp < Date.now()) {
+        // PrÃ¼fe Ablaufdatum
+        if (decodedPayload.exp && decodedPayload.exp < Date.now()) {
             return null;
         }
 
-        return payload;
+        return decodedPayload;
     } catch (error) {
         return null;
     }
@@ -40,7 +44,7 @@ function verifyToken(token: string): any | null {
 
 /**
  * GET /api/auth/session
- * Prüft ob eine gültige Admin-Session existiert
+ * PrÃ¼ft ob eine gÃ¼ltige Admin-Session existiert
  */
 export async function GET(request: NextRequest) {
     try {

@@ -9,4 +9,4 @@
 ## Verwendung
 
 Diese Components werden nur von den NFT Collection Seiten (`app/nft/[nftAddress]/`) verwendet.
-Für wiederverwendbare NFT Components siehe `src/components/02-nft/`.
+Für wiederverwendbare NFT Components siehe `src/components/nft/`.

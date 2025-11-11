@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
+import { apiSuccess, apiError, apiInternalError, apiBadRequest } from '@/lib/api/responses';
 
 /**
  * NFT Cache API - Layer 2 (Server-Side Cache)
@@ -84,8 +85,7 @@ export async function GET(request: NextRequest) {
             if (cached) {
                 const age = now - (cached as any).cachedAt;
                 const isFresh = age < CACHE_TTL;
-                return NextResponse.json({
-                    success: true,
+                return apiSuccess({
                     data: (cached as any).data,
                     isFresh,
                     isStale: !isFresh,
@@ -100,17 +100,13 @@ export async function GET(request: NextRequest) {
             }, { status: 404 });
         }
 
-        return NextResponse.json({
-            success: false,
-            error: 'Missing contractAddress/tokenId or multiple parameter'
-        }, { status: 400 });
+        return apiBadRequest('Missing contractAddress/tokenId or multiple parameter'
+        );
 
     } catch (error) {
-        console.error('❌ Cache fetch error:', error);
-        return NextResponse.json({
-            success: false,
-            error: error instanceof Error ? error.message : 'Failed to fetch cache'
-        }, { status: 500 });
+        console.error('âŒ Cache fetch error:', error);
+        return apiInternalError(error instanceof Error ? error.message : 'Failed to fetch cache'
+        );
     }
 }
 
@@ -158,10 +154,8 @@ export async function POST(request: NextRequest) {
         const { contractAddress, tokenId, data } = body;
 
         if (!contractAddress || !tokenId || !data) {
-            return NextResponse.json({
-                success: false,
-                error: 'Missing contractAddress, tokenId, or data'
-            }, { status: 400 });
+            return apiBadRequest('Missing contractAddress, tokenId, or data'
+            );
         }
 
         const nftKey = `${contractAddress.toLowerCase()}-${tokenId}`;
@@ -188,11 +182,9 @@ export async function POST(request: NextRequest) {
         });
 
     } catch (error) {
-        console.error('❌ Cache store error:', error);
-        return NextResponse.json({
-            success: false,
-            error: error instanceof Error ? error.message : 'Failed to store cache'
-        }, { status: 500 });
+        console.error('âŒ Cache store error:', error);
+        return apiInternalError(error instanceof Error ? error.message : 'Failed to store cache'
+        );
     }
 }
 
@@ -250,16 +242,12 @@ export async function DELETE(request: NextRequest) {
             });
         }
 
-        return NextResponse.json({
-            success: false,
-            error: 'Specify contractAddress+tokenId, expired=true, or all=true'
-        }, { status: 400 });
+        return apiBadRequest('Specify contractAddress+tokenId, expired=true, or all=true'
+        );
 
     } catch (error) {
-        console.error('❌ Cache clear error:', error);
-        return NextResponse.json({
-            success: false,
-            error: error instanceof Error ? error.message : 'Failed to clear cache'
-        }, { status: 500 });
+        console.error('âŒ Cache clear error:', error);
+        return apiInternalError(error instanceof Error ? error.message : 'Failed to clear cache'
+        );
     }
 }

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
+import { apiBadRequest, apiSuccess, apiError, apiInternalError } from '@/lib/api/responses';
 
 // Interface for NFT response from external APIs
 interface ExternalNFT {
@@ -51,7 +52,7 @@ async function fetchFromAlchemy(walletAddress: string): Promise<ExternalNFT[]> {
 
     if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Alchemy API error:', response.status, errorText);
+        console.error('âŒ Alchemy API error:', response.status, errorText);
         throw new Error(`Alchemy API error: ${response.status} - ${errorText}`);
     }
 
@@ -96,7 +97,7 @@ async function fetchFromMoralis(walletAddress: string): Promise<ExternalNFT[]> {
 
     if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Moralis API error:', response.status, errorText);
+        console.error('âŒ Moralis API error:', response.status, errorText);
         throw new Error(`Moralis API error: ${response.status} - ${errorText}`);
     }
 
@@ -126,17 +127,11 @@ export async function GET(request: NextRequest) {
 
         // Validation
         if (!walletAddress) {
-            return NextResponse.json(
-                { success: false, error: 'Wallet address is required' },
-                { status: 400 }
-            );
+            return apiBadRequest('Wallet address is required');
         }
 
         if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
-            return NextResponse.json(
-                { success: false, error: 'Invalid wallet address format' },
-                { status: 400 }
-            );
+            return apiBadRequest('Invalid wallet address format');
         }
 
         let nfts: ExternalNFT[] = [];
@@ -173,7 +168,7 @@ export async function GET(request: NextRequest) {
             }
 
         } catch (apiError) {
-            console.error('❌ API request failed:', apiError);
+            console.error('âŒ API request failed:', apiError);
             throw apiError;
         }
 
@@ -187,13 +182,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(response);
 
     } catch (error) {
-        console.error('❌ Error fetching wallet NFTs:', error);
-        return NextResponse.json(
-            {
-                success: false,
-                error: error instanceof Error ? error.message : 'Failed to fetch wallet NFTs'
-            },
-            { status: 500 }
+        console.error('âŒ Error fetching wallet NFTs:', error);
+        return apiInternalError(error instanceof Error ? error.message : 'Failed to fetch wallet NFTs'
         );
     }
 }

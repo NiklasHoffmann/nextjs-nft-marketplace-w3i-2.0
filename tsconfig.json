@@ -4,15 +4,42 @@
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
+    
+    // ===== STRICT MODE =====
     "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    
+    // ===== ADDITIONAL CHECKS =====
+    // Disabled for now to focus on critical type errors
+    // "noUnusedLocals": true,
+    // "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+    
+    // ===== MODULE RESOLUTION =====
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    
+    // ===== JSX =====
     "jsx": "preserve",
+    
+    // ===== PERFORMANCE =====
     "incremental": true,
+    
+    // ===== NEXT.JS =====
     "plugins": [
       {
         "name": "next"

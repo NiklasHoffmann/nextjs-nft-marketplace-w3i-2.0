@@ -1,7 +1,7 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
-import { NFTDetails } from '@/types/01-core/01-core-nft';
+import { NFTDetails } from '@/types/core/core-nft';
 
 interface TradeFormProps {
     selectedNFT: NFTDetails | null;
@@ -82,7 +82,7 @@ export function TradeForm({ selectedNFT, onSubmit }: TradeFormProps) {
 
         setIsSearching(true);
         try {
-            // Mock search - in real app würde hier eine API-Anfrage stattfinden
+            // Mock search - in real app wÃ¼rde hier eine API-Anfrage stattfinden
             const mockResult: NFTDetails = {
                 nftAddress: formData.targetNFTAddress,
                 tokenId: formData.targetTokenId,
