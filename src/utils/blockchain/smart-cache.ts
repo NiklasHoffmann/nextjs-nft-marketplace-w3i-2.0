@@ -1,32 +1,32 @@
-// utils/04-blockchain/06-blockchain-smart-cache.ts
+﻿// utils/04-blockchain/06-blockchain-smart-cache.ts
 import { LRUCache } from 'lru-cache';
 
-// Multi-Layer Caching für verschiedene Daten-Typen mit unterschiedlichen TTLs
+// Multi-Layer Caching fÃ¼r verschiedene Daten-Typen mit unterschiedlichen TTLs
 
 /**
- * Contract-Eigenschaften die sich praktisch nie ändern
- * TTL: 24 Stunden (sehr konservativ, könnte sogar länger sein)
+ * Contract-Eigenschaften die sich praktisch nie Ã¤ndern
+ * TTL: 24 Stunden (sehr konservativ, kÃ¶nnte sogar lÃ¤nger sein)
  */
 export const contractPropertiesCache = new LRUCache<string, ContractProperties>({
-    max: 500, // Weniger Contracts, aber länger gecacht
+    max: 500, // Weniger Contracts, aber lÃ¤nger gecacht
     ttl: 1000 * 60 * 60 * 24, // 24 Stunden
     maxSize: 5 * 1024 * 1024, // 5MB
     sizeCalculation: (value) => JSON.stringify(value).length,
 });
 
 /**
- * Owner-bezogene Eigenschaften die sich bei Trades ändern
+ * Owner-bezogene Eigenschaften die sich bei Trades Ã¤ndern
  * TTL: 5 Minuten (Balance-Updates bei Trades)
  */
 export const ownershipCache = new LRUCache<string, OwnershipData>({
-    max: 2000, // Mehr Entries für aktive NFTs
+    max: 2000, // Mehr Entries fÃ¼r aktive NFTs
     ttl: 1000 * 60 * 5, // 5 Minuten
     maxSize: 10 * 1024 * 1024, // 10MB
     sizeCalculation: (value) => JSON.stringify(value).length,
 });
 
 /**
- * TokenURI und Metadaten - ändern sich praktisch nie
+ * TokenURI und Metadaten - Ã¤ndern sich praktisch nie
  * TTL: 12 Stunden (sehr konservativ)
  */
 export const tokenMetadataCache = new LRUCache<string, TokenMetadata>({
@@ -37,8 +37,8 @@ export const tokenMetadataCache = new LRUCache<string, TokenMetadata>({
 });
 
 /**
- * Approval-Status - ändert sich bei Approvals
- * TTL: 2 Minuten (schnelle Updates nötig)
+ * Approval-Status - Ã¤ndert sich bei Approvals
+ * TTL: 2 Minuten (schnelle Updates nÃ¶tig)
  */
 export const approvalCache = new LRUCache<string, string>({
     max: 1000,
@@ -84,7 +84,7 @@ export const getCacheKeys = {
     approval: (contractAddress: string, tokenId: string) => `approve:${contractAddress}:${tokenId}`,
 };
 
-// Smart Cache Invalidation für Development
+// Smart Cache Invalidation fÃ¼r Development
 export function invalidateAllCaches() {
     if (process.env.NODE_ENV === 'development') {
         contractPropertiesCache.clear();

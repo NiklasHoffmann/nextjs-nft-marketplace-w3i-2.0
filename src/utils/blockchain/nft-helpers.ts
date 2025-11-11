@@ -1,9 +1,9 @@
-/**
+﻿/**
  * NFT-specific utility functions
  */
 
-import { RoyaltyInfo } from '@/types/05-features/01-nft-detail';
-import { NFTAttribute } from '@/types/01-core/01-core-nft';
+import { RoyaltyInfo } from '@/types/features/nft-detail';
+import { NFTAttribute } from '@/types/core/core-nft';
 
 /**
  * Truncates an address for display
@@ -98,7 +98,8 @@ export const groupAttributesByType = (attributes?: NFTAttribute[] | null): Recor
     return attributes.reduce((groups, attr) => {
         const type = attr.trait_type || 'Other';
         if (!groups[type]) groups[type] = [];
-        groups[type].push(attr);
+        const group = groups[type];
+        if (group) group.push(attr);
         return groups;
     }, {} as Record<string, NFTAttribute[]>);
 };

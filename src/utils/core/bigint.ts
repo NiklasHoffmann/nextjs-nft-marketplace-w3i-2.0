@@ -1,4 +1,4 @@
-// utils/01-core/01-core-bigint.ts
+﻿// utils/01-core/01-core-bigint.ts
 // Add BigInt serialization support for JSON.stringify
 
 // Extend BigInt prototype to add toJSON method

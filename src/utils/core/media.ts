@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Utility functions for handling images and media
  */
 

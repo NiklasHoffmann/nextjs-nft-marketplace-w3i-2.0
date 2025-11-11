@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Development-only logging utility
  * Logs are only shown in development mode
  */
@@ -25,22 +25,22 @@ export const devLog = {
 
     // Emojis for better visual scanning
     success: (...args: any[]) => {
-        if (isDev) console.log('✅', ...args);
+        if (isDev) console.log('âœ…', ...args);
     },
 
     fail: (...args: any[]) => {
-        if (isDev) console.log('❌', ...args);
+        if (isDev) console.log('âŒ', ...args);
     },
 
     event: (...args: any[]) => {
-        if (isDev) console.log('📢', ...args);
+        if (isDev) console.log('ðŸ“¢', ...args);
     },
 
     cache: (...args: any[]) => {
-        if (isDev) console.log('💾', ...args);
+        if (isDev) console.log('ðŸ’¾', ...args);
     },
 
     api: (...args: any[]) => {
-        if (isDev) console.log('🌐', ...args);
+        if (isDev) console.log('ðŸŒ', ...args);
     }
 };

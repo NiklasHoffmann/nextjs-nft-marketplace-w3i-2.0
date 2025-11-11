@@ -1,11 +1,11 @@
-/**
+﻿/**
  * API UTILITIES - Daten-Fetching & Service Integration
  * 
- * API-Layer Utilities für:
- * • NFT Metadata: Fetch von Token-Metadata, Collection-Daten
- * • Data Aggregation: Zusammenführung verschiedener Datenquellen
- * • External Services: API-Integration mit externen Anbietern
- * • Response Handling: Error-Management & Datenvalidierung
+ * API-Layer Utilities fÃ¼r:
+ * â€¢ NFT Metadata: Fetch von Token-Metadata, Collection-Daten
+ * â€¢ Data Aggregation: ZusammenfÃ¼hrung verschiedener Datenquellen
+ * â€¢ External Services: API-Integration mit externen Anbietern
+ * â€¢ Response Handling: Error-Management & Datenvalidierung
  */
 
 export {
@@ -16,7 +16,7 @@ export {
     fetchMarketplaceListing,
     fetchMultipleNFTs,
     checkAPIHealth
-} from './01-api-nft';
+} from './nft';
 
 export {
     createNFTKey,
@@ -31,4 +31,4 @@ export {
     filterBySeller,
     filterListed,
     sortNFTs
-} from './02-api-nft-aggregation';
+} from './nft-aggregation';

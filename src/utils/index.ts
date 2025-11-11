@@ -1,29 +1,29 @@
-/**
+﻿/**
  * UTILS - Zentrale Utility-Funktionen Export
  * 
  * Organisierte Utility-Kategorien:
- * • 01-core: Grundlegende Datenverarbeitung (BigInt, Media)
- * • 02-formatters: Display-Formatierung (Currency, Dates, Text)
- * • 03-validation: Input-Validierung & Sanitization
- * • 04-blockchain: Smart Contract & NFT Interaktion
- * • 05-performance: Monitoring & Cache-Management
- * • 06-features: Feature-Logic & Access Control
- * • 07-api: Data-Fetching & Service Integration
+ * â€¢ core: Grundlegende Datenverarbeitung (BigInt, Media)
+ * â€¢ formatters: Display-Formatierung (Currency, Dates, Text)
+ * â€¢ validation: Input-Validierung & Sanitization
+ * â€¢ blockchain: Smart Contract & NFT Interaktion
+ * â€¢ performance: Monitoring & Cache-Management
+ * â€¢ features: Feature-Logic & Access Control
+ * â€¢ api: Data-Fetching & Service Integration
  */
 
-// 01-core: Fundamental utilities for data types and media handling
-export * from './01-core';
+// Core: Fundamental utilities for data types and media handling
+export * from './core';
 
-// 02-formatters: Data formatting and display utilities
-export * from './02-formatters';
+// Formatters: Data formatting and display utilities
+export * from './formatters';
 
-// 03-validation: Input validation and sanitization
-export * from './03-validation';
+// Validation: Input validation and sanitization
+export * from './validation';
 
-// 04-blockchain: Smart contract and NFT-specific utilities
-export * from './04-blockchain';
+// Blockchain: Smart contract and NFT-specific utilities
+export * from './blockchain';
 
-// 05-performance: Performance monitoring and cache management (exclude conflicting exports)
+// Performance: Performance monitoring and cache management (exclude conflicting exports)
 export {
     calculateCacheStats,
     filterCacheByAge,
@@ -42,10 +42,10 @@ export {
     logPerformanceSummary,
     // Cache invalidation
     createCacheInvalidationManager
-} from './05-performance';
+} from './performance';
 
-// 06-features: Feature-specific utilities and access control
-export * from './06-features';
+// Features: Feature-specific utilities and access control
+export * from './features';
 
-// 07-api: API layer utilities (includes updated createNFTKey and isDataFresh)
-export * from './07-api';
+// API: API layer utilities (includes updated createNFTKey and isDataFresh)
+export * from './api';

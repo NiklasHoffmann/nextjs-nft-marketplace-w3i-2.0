@@ -1,9 +1,9 @@
-// utils/04-blockchain/04-blockchain-nft-fetcher.ts
+﻿// utils/04-blockchain/04-blockchain-nft-fetcher.ts
 import {
     executeCriticalCall,
     executeOptionalCall,
     executeBatchContractCalls
-} from './03-blockchain-contract-calls';
+} from './contract-calls';
 import {
     contractPropertiesCache,
     ownershipCache,
@@ -13,7 +13,7 @@ import {
     type ContractProperties,
     type OwnershipData,
     type TokenMetadata
-} from './06-blockchain-smart-cache';
+} from './smart-cache';
 
 // Comprehensive NFT data interface
 interface BlockchainNFTData {
@@ -26,7 +26,7 @@ interface BlockchainNFTData {
     approvedAddress?: string;
 }
 
-// Temporäre neue fetchComprehensiveNFTData Funktion mit intelligentem Caching
+// TemporÃ¤re neue fetchComprehensiveNFTData Funktion mit intelligentem Caching
 export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: string): Promise<BlockchainNFTData | undefined> {
     try {
         // Enhanced ERC721 ABI mit allen wichtigen Funktionen
@@ -99,7 +99,7 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
 
         const contractAddress = nftAddress as `0x${string}`;
 
-        // ✨ STEP 1: Check Cache für Contract Properties (Name, Symbol, Total Supply)
+        // âœ¨ STEP 1: Check Cache fÃ¼r Contract Properties (Name, Symbol, Total Supply)
         const contractCacheKey = getCacheKeys.contractProperties(nftAddress);
         let contractProperties = contractPropertiesCache.get(contractCacheKey);
 
@@ -141,7 +141,7 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
                 cachedAt: Date.now()
             };
 
-            // Cache für 24 Stunden
+            // Cache fÃ¼r 24 Stunden
             contractPropertiesCache.set(contractCacheKey, contractProperties);
 
         } else {
@@ -149,7 +149,7 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
             contractProperties.cached = true;
         }
 
-        // ✨ STEP 2: Check Cache für Token Metadata (TokenURI)
+        // âœ¨ STEP 2: Check Cache fÃ¼r Token Metadata (TokenURI)
         const tokenCacheKey = getCacheKeys.tokenMetadata(nftAddress, tokenId);
         let tokenMetadata = tokenMetadataCache.get(tokenCacheKey);
 
@@ -163,7 +163,7 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
             });
 
             if (!tokenURIResult.success) {
-                console.error('❌ Critical tokenURI call failed');
+                console.error('âŒ Critical tokenURI call failed');
                 return undefined;
             }
 
@@ -175,7 +175,7 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
                 cachedAt: Date.now()
             };
 
-            // Cache für 12 Stunden
+            // Cache fÃ¼r 12 Stunden
             tokenMetadataCache.set(tokenCacheKey, tokenMetadata);
 
         } else {
@@ -183,7 +183,7 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
             tokenMetadata.cached = true;
         }
 
-        // ✨ STEP 3: Check Cache für Ownership Data (Owner, Balance) - kürzeres Caching
+        // âœ¨ STEP 3: Check Cache fÃ¼r Ownership Data (Owner, Balance) - kÃ¼rzeres Caching
         const ownershipCacheKey = getCacheKeys.ownership(nftAddress, tokenId);
         let ownershipData = ownershipCache.get(ownershipCacheKey);
 
@@ -223,7 +223,7 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
                 cachedAt: Date.now()
             };
 
-            // Cache für 5 Minuten (Owner kann sich ändern)
+            // Cache fÃ¼r 5 Minuten (Owner kann sich Ã¤ndern)
             ownershipCache.set(ownershipCacheKey, ownershipData);
 
         } else {
@@ -231,7 +231,7 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
             ownershipData.cached = true;
         }
 
-        // ✨ STEP 4: Check Cache für Approval Status - sehr kurzes Caching
+        // âœ¨ STEP 4: Check Cache fÃ¼r Approval Status - sehr kurzes Caching
         const approvalCacheKey = getCacheKeys.approval(nftAddress, tokenId);
         let approvedAddress = approvalCache.get(approvalCacheKey);
 
@@ -246,7 +246,7 @@ export async function fetchComprehensiveNFTDataNew(nftAddress: string, tokenId: 
 
             approvedAddress = approvalResult || '';
 
-            // Cache für 2 Minuten (Approvals ändern sich häufig)
+            // Cache fÃ¼r 2 Minuten (Approvals Ã¤ndern sich hÃ¤ufig)
             approvalCache.set(approvalCacheKey, approvedAddress);
         }
 

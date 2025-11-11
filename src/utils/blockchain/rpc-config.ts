@@ -1,4 +1,4 @@
-// utils/04-blockchain/05-blockchain-rpc-config.ts
+﻿// utils/04-blockchain/05-blockchain-rpc-config.ts
 import { createPublicClient, http, type PublicClient, type Chain, type Transport } from 'viem';
 import { sepolia, mainnet } from 'viem/chains';
 
@@ -30,7 +30,7 @@ export function getRPCEndpoints(): string[] {
     ].filter(Boolean) as string[];
 
     if (endpoints.length === 0) {
-        console.warn('⚠️ No RPC endpoints configured! Using fallback.');
+        console.warn('âš ï¸ No RPC endpoints configured! Using fallback.');
         endpoints.push('https://rpc.sepolia.org');
     }
 
@@ -47,18 +47,18 @@ export function getChainConfig(): ChainRPCConfig {
         rpcUrls: endpoints,
         primaryRpcUrl: endpoints[0] || 'https://rpc.sepolia.org',
         maxRetries: 3,
-        timeoutMs: 15000 // Erhöht von 8s auf 15s
+        timeoutMs: 15000 // ErhÃ¶ht von 8s auf 15s
     };
 }
 
 /**
- * Erstellt einen robusten PublicClient mit Fallback-Unterstützung
+ * Erstellt einen robusten PublicClient mit Fallback-UnterstÃ¼tzung
  */
 export function createRobustPublicClient(config?: Partial<ChainRPCConfig>): PublicClient {
     const chainConfig = getChainConfig();
     const finalConfig = { ...chainConfig, ...config };
 
-    // Nutze Primary RPC URL für den initialen Client
+    // Nutze Primary RPC URL fÃ¼r den initialen Client
     const client = createPublicClient({
         chain: finalConfig.chain,
         transport: http(finalConfig.primaryRpcUrl, {
@@ -70,7 +70,7 @@ export function createRobustPublicClient(config?: Partial<ChainRPCConfig>): Publ
 }
 
 /**
- * Erstellt mehrere Clients für Fallback-Strategien
+ * Erstellt mehrere Clients fÃ¼r Fallback-Strategien
  */
 export function createFallbackClients(config?: Partial<ChainRPCConfig>): PublicClient[] {
     const chainConfig = getChainConfig();
@@ -87,7 +87,7 @@ export function createFallbackClients(config?: Partial<ChainRPCConfig>): PublicC
 }
 
 /**
- * Führt Contract-Calls mit automatischem Fallback durch
+ * FÃ¼hrt Contract-Calls mit automatischem Fallback durch
  */
 export async function executeWithFallback<T>(
     operation: (client: PublicClient) => Promise<T>,
@@ -98,18 +98,20 @@ export async function executeWithFallback<T>(
 
     for (let i = 0; i < Math.min(clients.length, maxRetries); i++) {
         try {
+            const client = clients[i];
+            if (!client) continue;
 
-            const result = await operation(clients[i]);
+            const result = await operation(client);
             if (i > 0) {
 
             }
             return result;
         } catch (error) {
             lastError = error as Error;
-            console.warn(`⚠️ RPC endpoint ${i + 1} failed:`, error instanceof Error ? error.message : 'Unknown error');
+            console.warn(`âš ï¸ RPC endpoint ${i + 1} failed:`, error instanceof Error ? error.message : 'Unknown error');
 
             if (i < clients.length - 1) {
-                // Kurze Pause vor dem nächsten Versuch
+                // Kurze Pause vor dem nÃ¤chsten Versuch
                 await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
             }
         }
@@ -119,16 +121,16 @@ export async function executeWithFallback<T>(
 }
 
 /**
- * Spezielle Timeout-Konfiguration für verschiedene Call-Typen
+ * Spezielle Timeout-Konfiguration fÃ¼r verschiedene Call-Typen
  */
 export function getTimeoutConfig(callType: 'critical' | 'optional' | 'batch'): number {
     switch (callType) {
         case 'critical':
-            return 20000; // 20s für kritische Calls wie tokenURI
+            return 20000; // 20s fÃ¼r kritische Calls wie tokenURI
         case 'optional':
-            return 10000; // 10s für optionale Calls wie owner/name
+            return 10000; // 10s fÃ¼r optionale Calls wie owner/name
         case 'batch':
-            return 15000; // 15s für Batch-Calls
+            return 15000; // 15s fÃ¼r Batch-Calls
         default:
             return 15000;
     }

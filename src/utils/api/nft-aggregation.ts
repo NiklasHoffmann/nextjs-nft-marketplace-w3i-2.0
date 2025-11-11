@@ -1,4 +1,4 @@
-import type {
+﻿import type {
     AggregatedNFT,
     NFTIdentifier,
     ActiveItem,
@@ -7,10 +7,10 @@ import type {
     SocialStats,
     Insight,
     DataSource
-} from '@/types/01-core/01-core-nft-modern';
+} from '@/types/core/core-nft-modern';
 
 // Legacy type imports for transition
-import type { NFTData, NFTCardData } from '@/types/01-core/01-core-nft-legacy';
+import type { NFTData, NFTCardData } from '@/types/core/core-nft-legacy';
 
 /**
  * Creates a unique key for an NFT

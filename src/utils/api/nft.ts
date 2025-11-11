@@ -1,4 +1,4 @@
-/**
+﻿/**
  * NFT Context API Layer
  * 
  * Data fetching functions for the NFT context system.
@@ -84,8 +84,8 @@ export const fetchNFTInsights = async (contractAddress: string, tokenId: string)
         const nftResult: InsightsApiResponse = await nftResponse.json();
 
         if (nftResult.success && Array.isArray(nftResult.data) && nftResult.data.length > 0) {
-
-            return nftResult.data[0];
+            const insight = nftResult.data[0];
+            return insight || null;
         }
 
         // 2. Try to fetch collection-wide insights using the separate function
@@ -137,7 +137,8 @@ export const fetchCollectionInsights = async (contractAddress: string): Promise<
 
             // Log a sample to help debug
             if (result.data.length > 0) {
-                return result.data[0];
+                const insight = result.data[0];
+                return insight || null;
             }
         }
 
@@ -201,7 +202,7 @@ export const fetchMarketplaceListing = async (contractAddress: string, tokenId: 
         return data.listing;
 
     } catch (error) {
-        console.warn(`❌ Failed to fetch marketplace listing for ${contractAddress}/${tokenId}:`, error);
+        console.warn(`âŒ Failed to fetch marketplace listing for ${contractAddress}/${tokenId}:`, error);
         return null;
     }
 };

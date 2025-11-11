@@ -1,7 +1,7 @@
-// utils/04-blockchain/03-blockchain-contract-calls.ts
+﻿// utils/04-blockchain/03-blockchain-contract-calls.ts
 import { createPublicClient, http, type PublicClient } from 'viem';
 import { sepolia } from 'viem/chains';
-import { createFallbackClients, getTimeoutConfig } from './05-blockchain-rpc-config';
+import { createFallbackClients, getTimeoutConfig } from './rpc-config';
 
 interface ContractCallOptions {
     address: `0x${string}`;
@@ -21,7 +21,7 @@ interface CallResult<T> {
 }
 
 /**
- * Führt einen einzelnen Contract Call mit Fallback-Unterstützung durch
+ * F�hrt einen einzelnen Contract Call mit Fallback-Unterst�tzung durch
  */
 export async function executeContractCallWithFallback<T>(
     options: ContractCallOptions
@@ -40,12 +40,14 @@ export async function executeContractCallWithFallback<T>(
 
     for (let i = 0; i < Math.min(clients.length, maxRetries); i++) {
         try {
+            const client = clients[i];
+            if (!client) continue;
 
             const timeoutPromise = new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error(`${functionName} timeout after ${timeout}ms`)), timeout)
             );
 
-            const callPromise = clients[i].readContract({
+            const callPromise = client.readContract({
                 address,
                 abi,
                 functionName,
@@ -67,7 +69,7 @@ export async function executeContractCallWithFallback<T>(
         } catch (error) {
             lastError = error as Error;
             const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-            console.warn(`⚠️ ${functionName}: RPC endpoint ${i + 1} failed: ${errorMsg}`);
+            console.warn(`?? ${functionName}: RPC endpoint ${i + 1} failed: ${errorMsg}`);
 
             if (i < clients.length - 1) {
                 // Progressive delay: 500ms, 1000ms, 1500ms
@@ -84,7 +86,7 @@ export async function executeContractCallWithFallback<T>(
 }
 
 /**
- * Führt mehrere Contract Calls parallel mit intelligenter Fehlerbehandlung durch
+ * F�hrt mehrere Contract Calls parallel mit intelligenter Fehlerbehandlung durch
  */
 export async function executeBatchContractCalls(
     calls: ContractCallOptions[]
@@ -103,7 +105,9 @@ export async function executeBatchContractCalls(
         if (result.status === 'fulfilled') {
             return result.value;
         } else {
-            console.error(`❌ Batch call ${index} (${calls[index].functionName}) failed:`, result.reason);
+            const call = calls[index];
+            const functionName = call?.functionName || 'unknown';
+            console.error(`? Batch call ${index} (${functionName}) failed:`, result.reason);
             return {
                 success: false,
                 error: result.reason?.message || 'Unknown batch error'
@@ -122,7 +126,7 @@ export async function executeBatchContractCalls(
 }
 
 /**
- * Spezielle Behandlung für kritische Calls (tokenURI)
+ * Spezielle Behandlung f�r kritische Calls (tokenURI)
  */
 export async function executeCriticalCall<T>(
     options: Omit<ContractCallOptions, 'callType'>
@@ -131,20 +135,20 @@ export async function executeCriticalCall<T>(
         ...options,
         callType: 'critical',
         timeout: getTimeoutConfig('critical'),
-        maxRetries: 5 // Mehr Versuche für kritische Calls
+        maxRetries: 5 // Mehr Versuche f�r kritische Calls
     };
 
     const result = await executeContractCallWithFallback<T>(criticalOptions);
 
     if (!result.success) {
-        console.error(`❌ Critical call ${options.functionName} failed after all retries`);
+        console.error(`? Critical call ${options.functionName} failed after all retries`);
     }
 
     return result;
 }
 
 /**
- * Graceful degradation für optionale Calls
+ * Graceful degradation f�r optionale Calls
  */
 export async function executeOptionalCall<T>(
     options: Omit<ContractCallOptions, 'callType'>,
@@ -154,7 +158,7 @@ export async function executeOptionalCall<T>(
         ...options,
         callType: 'optional',
         timeout: getTimeoutConfig('optional'),
-        maxRetries: 2 // Weniger Versuche für optionale Calls
+        maxRetries: 2 // Weniger Versuche f�r optionale Calls
     };
 
     const result = await executeContractCallWithFallback<T>(optionalOptions);
@@ -166,3 +170,4 @@ export async function executeOptionalCall<T>(
         return defaultValue || null;
     }
 }
+

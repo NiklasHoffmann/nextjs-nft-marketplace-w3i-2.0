@@ -1,8 +1,8 @@
-/**
+﻿/**
  * Utility functions for working with smart contracts
  */
 
-import { isValidAddress } from '../03-validation';
+import { isValidAddress } from '../validation';
 import networkMapping from '../../constants/network.mapping.json';
 
 /**
