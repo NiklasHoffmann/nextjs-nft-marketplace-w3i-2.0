@@ -31,4 +31,4 @@
 ## Verwendung
 
 Diese Components werden ausschließlich von der NFT Detail Seite (`app/nft/[nftAddress]/[tokenId]/`) verwendet.
-Für wiederverwendbare NFT Components siehe `src/components/02-nft/`.
+Für wiederverwendbare NFT Components siehe `src/components/nft/`.

@@ -1,8 +1,8 @@
-export { default as ProjektTab } from './01-ProjektTab';
-export { default as OverviewTab } from './02-OverviewTab';
-export { default as TechnicalTab } from './03-TechnicalTab';
-export { default as InvestmentTab } from './04-InvestmentTab';
-export { default as MarketInsightsTab } from './05-MarketInsightsTab';
-export { default as PersonalTab } from './06-PersonalTab';
-export { default as FunctionalitiesTab } from './07-FunctionalitiesTab';
-export { default as TokenomicsTab } from './08-TokenomicsTab';
+export { default as ProjektTab } from './ProjektTab';
+export { default as OverviewTab } from './OverviewTab';
+export { default as TechnicalTab } from './TechnicalTab';
+export { default as InvestmentTab } from './InvestmentTab';
+export { default as MarketInsightsTab } from './MarketInsightsTab';
+export { default as PersonalTab } from './PersonalTab';
+export { default as FunctionalitiesTab } from './FunctionalitiesTab';
+export { default as TokenomicsTab } from './TokenomicsTab';
