@@ -13,22 +13,22 @@
  */
 
 // === CORE TYPES ===
-export * from './01-core';
+export * from './core';
 
 // === UI TYPES ===  
-export * from './02-ui';
+export * from './ui';
 
 // === API TYPES ===
-export * from './03-api';
+export * from './api';
 
 // === INSIGHTS TYPES ===
-export * from './04-insights';
+export * from './insights';
 
 // === FEATURE TYPES ===
-export * from './05-features';
+export * from './features';
 
 // === MARKETPLACE TYPES ===
-export * from './06-marketplace';
+export * from './marketplace';
 
 // === EVENT TYPES ===
 export * from './events';

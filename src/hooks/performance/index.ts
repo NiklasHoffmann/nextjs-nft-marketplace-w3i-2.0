@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PERFORMANCE HOOKS (DEPRECATED)
  * 
  * @deprecated Legacy Performance Monitoring - nur Debug-Komponenten
@@ -8,5 +8,5 @@
  * Migration: Use React DevTools or real Performance APIs
  */
 
-export * from './01-usePerformanceMetrics';
-export * from './02-useNFTPerformance';
+export * from './usePerformanceMetrics';
+export * from './useNFTPerformance';

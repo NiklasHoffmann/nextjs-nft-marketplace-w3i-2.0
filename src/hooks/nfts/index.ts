@@ -1,12 +1,12 @@
-/**
+﻿/**
  * NFT & COLLECTION HOOKS
  * 
- * NFT-bezogene Funktionalitäten (NICHT Marketplace Contract):
- * • Core: activeItems, modernNFT, NFTContext 
- * • Admin: NFT Insights, Collection Insights (Admin Panel)
- * • UI: User Actions, Price Data, Filters
- * • Wallet: WalletNFTs, Collection Display
- * • Collections: Collection Aggregation & Display Utils
+ * NFT-bezogene FunktionalitÃ¤ten (NICHT Marketplace Contract):
+ * â€¢ Core: activeItems, modernNFT, NFTContext 
+ * â€¢ Admin: NFT Insights, Collection Insights (Admin Panel)
+ * â€¢ UI: User Actions, Price Data, Filters
+ * â€¢ Wallet: WalletNFTs, Collection Display
+ * â€¢ Collections: Collection Aggregation & Display Utils
  */
 
 // === CORE NFT HOOKS ===
@@ -14,7 +14,7 @@ export {
     useActiveItems,
     useModernNFT,
     useModernNFTContext
-} from './01-core-nft-hooks';
+} from './nft-hooks';
 
 // === ADMIN HOOKS ===
 export {
@@ -22,15 +22,15 @@ export {
     useCollectionInsights,
     useAdminNFTInsights,
     useAdminCollectionInsights
-} from './02-admin-useNFTInsights';
+} from './useNFTInsights';
 
 // === UI & USER ACTION HOOKS ===
-export { useNFTUserActions } from './03-ui-useNFTUserActions';
+export { useNFTUserActions } from './useNFTUserActions';
 
 // === UTILITY HOOKS ===
-export { useNFTPriceData } from './05-utils-useNFTPriceData';
-export { useNFTFilters } from './08-utils-useNFTFilters';
-export { useWalletNFTs } from './09-wallet-useWalletNFTs';
+export { useNFTPriceData } from './useNFTPriceData';
+export { useNFTFilters } from './useNFTFilters';
+export { useWalletNFTs } from './useWalletNFTs';
 
 // === COLLECTION HOOKS ===
 export * from './collections';

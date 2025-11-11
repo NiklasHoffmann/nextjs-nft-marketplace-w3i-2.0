@@ -1,4 +1,4 @@
-/**
+﻿/**
  * COLLECTION DISPLAY & AGGREGATION HOOKS
  * 
  * Collection-Display Logic (verschoben aus marketplace/):
@@ -8,4 +8,4 @@
  * NICHT für Marketplace Contract Funktionen!
  */
 
-export { useAllCollections } from './06-useAllCollections';
+export { useAllCollections } from './useAllCollections';

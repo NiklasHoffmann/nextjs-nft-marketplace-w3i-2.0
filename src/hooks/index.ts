@@ -1,13 +1,13 @@
-/**
+﻿/**
  * CENTRAL HOOKS EXPORT
  * 
  * Alle Hooks importieren von hier: import { ... } from '@/hooks'
  * 
  * Organisation:
- * • marketplace/ - Marketplace Smart Contract Funktionen
- * • nfts/ - NFT Display, Admin, Utilities, Collections  
- * • interactions/ - User Action Tracking
- * • performance/ - Performance Monitoring (deprecated)
+ * â€¢ marketplace/ - Marketplace Smart Contract Funktionen
+ * â€¢ nfts/ - NFT Display, Admin, Utilities, Collections  
+ * â€¢ interactions/ - User Action Tracking
+ * â€¢ performance/ - Performance Monitoring (deprecated)
  */
 
 // Re-export all NFT hooks

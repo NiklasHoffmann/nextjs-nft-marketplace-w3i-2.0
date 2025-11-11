@@ -1,6 +1,5 @@
 ﻿import { useMemo } from 'react';
 import { formatEther } from '@/utils';
-import { useState } from 'react';
 import type { NFTFilters, NFTSortOptions } from '@/components/marketplace/NFTFilterBar';
 
 export interface FilterableNFTItem {

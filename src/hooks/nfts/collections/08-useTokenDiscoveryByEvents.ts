@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @deprecated These hooks are no longer used - replaced by NFTContext.getListedNFTs()
  * 
  * LEGACY CODE - Token discovery via blockchain events and ownership checks
@@ -64,7 +64,7 @@ export function useTokenDiscoveryByEvents() {
                     }
 
                 } catch (chunkError) {
-                    console.warn(`⚠️ Error processing blocks ${fromBlock}-${toBlock}:`, chunkError);
+                    console.warn(`âš ï¸ Error processing blocks ${fromBlock}-${toBlock}:`, chunkError);
                     // Continue with next chunk
                 }
             }
@@ -75,7 +75,7 @@ export function useTokenDiscoveryByEvents() {
 
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Failed to discover token IDs';
-            console.error('❌ Token discovery error:', errorMessage);
+            console.error('âŒ Token discovery error:', errorMessage);
             setError(errorMessage);
             return [];
         } finally {
@@ -167,7 +167,7 @@ export function useTokenDiscoveryByOwnership() {
 
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Failed to discover token IDs';
-            console.error('❌ Token discovery error:', errorMessage);
+            console.error('âŒ Token discovery error:', errorMessage);
             setError(errorMessage);
             return [];
         } finally {
