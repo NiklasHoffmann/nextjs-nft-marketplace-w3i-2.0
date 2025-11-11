@@ -144,18 +144,20 @@ export default function Navbar() {
 
                 {/* Spacer for mobile to push button to the right */}
                 <div className="flex-1 md:hidden"></div>
-                {/* Center Searchbar - Desktop only */}
+
+                {/* Center Searchbar - Desktop only - TEMPORARILY DISABLED */}
                 <div className="flex-1 hidden md:flex justify-center">
-                    <div className="relative w-full max-w-md">
+                    <div className="relative w-full max-w-md opacity-50 pointer-events-none">
                         <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                         <input
                             type="text"
-                            placeholder="Suche NFTs..."
+                            placeholder="Suche NFTs... (Bald verfügbar)"
                             value={searchTerm}
                             onChange={(e) => handleSearch(e.target.value)}
-                            className="w-full px-4 pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-4 pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-not-allowed bg-gray-50"
+                            disabled
                         />
                         {searchTerm && (
                             <button
@@ -172,11 +174,25 @@ export default function Navbar() {
                 </div>
                 {/* Right Section - hidden on mobile */}
                 <div className="hidden md:flex items-center gap-4 ml-6">
-                    {/* Links */}
-                    <Link href="/sell" className="text-gray-700 hover:text-blue-600 font-medium">Sell</Link>
-                    <Link href="/sell" className="text-gray-700 hover:text-blue-600 font-medium">Trade</Link>
+                    {/* Sell Link - TEMPORARILY DISABLED */}
+                    <button
+                        disabled
+                        className="text-gray-400 font-medium cursor-not-allowed opacity-50"
+                        title="Bald verfügbar"
+                    >
+                        Sell
+                    </button>
 
-                    {/* Game Link with Figure */}
+                    {/* Trade Link - TEMPORARILY DISABLED */}
+                    <button
+                        disabled
+                        className="text-gray-400 font-medium cursor-not-allowed opacity-50"
+                        title="Bald verfügbar"
+                    >
+                        Trade
+                    </button>
+
+                    {/* Game Link with Figure - ACTIVE */}
                     <Link
                         href="/history-towers"
                         className="flex items-center gap-2 px-3 py-1 rounded-lg hover:bg-blue-50 transition-colors group"
@@ -192,8 +208,10 @@ export default function Navbar() {
                         <span className="text-gray-700 group-hover:text-blue-600 font-medium">Spiel</span>
                     </Link>
 
-                    {/* Currency Selector */}
-                    <CurrencySelector />
+                    {/* Currency Selector - TEMPORARILY DISABLED */}
+                    <div className="opacity-50 pointer-events-none">
+                        <CurrencySelector />
+                    </div>
                     {/* Wallet Section */}
                     {mounted && isConnected && address ? (
                         /* Connected: Show Wallet Dropdown with same styling as Currency Selector */
@@ -374,18 +392,19 @@ export default function Navbar() {
 
                     {/* Mobile Menu Content */}
                     <div className="flex-1 overflow-y-auto">
-                        {/* Search Bar */}
-                        <div className="p-6 border-b border-gray-200">
+                        {/* Search Bar - TEMPORARILY DISABLED */}
+                        <div className="p-6 border-b border-gray-200 opacity-50 pointer-events-none">
                             <div className="relative">
                                 <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                                 <input
                                     type="text"
-                                    placeholder="Suche NFTs..."
+                                    placeholder="Suche NFTs... (Bald verfügbar)"
                                     value={searchTerm}
                                     onChange={(e) => handleSearch(e.target.value)}
-                                    className="w-full px-4 pl-11 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-4 pl-11 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-not-allowed bg-gray-50"
+                                    disabled
                                 />
                                 {searchTerm && (
                                     <button
@@ -403,38 +422,38 @@ export default function Navbar() {
 
                         {/* Navigation Links */}
                         <div className="p-6 space-y-2">
-                            <Link
-                                href="/"
-                                onClick={() => setIsMobileMenuOpen(false)}
-                                className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors"
+                            {/* Home Link - TEMPORARILY DISABLED */}
+                            <button
+                                disabled
+                                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg opacity-50 cursor-not-allowed"
                             >
-                                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                                 </svg>
-                                <span className="text-gray-700 font-medium">Home</span>
-                            </Link>
+                                <span className="text-gray-400 font-medium">Home (Bald verfügbar)</span>
+                            </button>
 
-                            <Link
-                                href="/sell"
-                                onClick={() => setIsMobileMenuOpen(false)}
-                                className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors"
+                            {/* Sell Link - TEMPORARILY DISABLED */}
+                            <button
+                                disabled
+                                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg opacity-50 cursor-not-allowed"
                             >
-                                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                                 </svg>
-                                <span className="text-gray-700 font-medium">Sell</span>
-                            </Link>
+                                <span className="text-gray-400 font-medium">Sell (Bald verfügbar)</span>
+                            </button>
 
-                            <Link
-                                href="/sell"
-                                onClick={() => setIsMobileMenuOpen(false)}
-                                className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors"
+                            {/* Trade Link - TEMPORARILY DISABLED */}
+                            <button
+                                disabled
+                                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg opacity-50 cursor-not-allowed"
                             >
-                                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                                 </svg>
-                                <span className="text-gray-700 font-medium">Trade</span>
-                            </Link>
+                                <span className="text-gray-400 font-medium">Trade (Bald verfügbar)</span>
+                            </button>
 
                             {/* Game Link with Figure */}
                             <Link

@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { GameScoreSubmission, ScoreSubmitResponse } from '@/types/game';
 
 interface HighscoreDialogProps {
@@ -25,6 +25,11 @@ export default function HighscoreDialog({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
+
+    // Update includeWallet wenn sich walletAddress ändert
+    useEffect(() => {
+        setIncludeWallet(!!walletAddress);
+    }, [walletAddress]);
 
     const handleSubmit = async () => {
         // Validation
@@ -148,8 +153,14 @@ export default function HighscoreDialog({
                                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                             />
                             <label htmlFor="includeWallet" className="ml-2 text-sm text-gray-700">
-                                Include my wallet address ({walletAddress.slice(0, 6)}...{walletAddress.slice(-4)})
+                                Save with wallet address
                             </label>
+                        </div>
+                    )}
+
+                    {walletAddress && includeWallet && (
+                        <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-200 font-mono">
+                            ✓ Wallet: {walletAddress.slice(0, 10)}...{walletAddress.slice(-8)}
                         </div>
                     )}
 

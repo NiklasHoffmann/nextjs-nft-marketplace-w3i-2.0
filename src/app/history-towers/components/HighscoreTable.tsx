@@ -65,6 +65,14 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
         fetchScores(loading);
     }, [filter, walletAddress, refreshTrigger]);
 
+    // Wenn die Wallet-Adresse sich ändert und wir auf "My Scores" sind,
+    // automatisch zurück zu "All Time" wechseln
+    useEffect(() => {
+        if (filter === 'my-scores' && !walletAddress) {
+            setFilter('all-time');
+        }
+    }, [walletAddress]);
+
     const formatDate = (date: Date | string) => {
         const d = new Date(date);
         return d.toLocaleDateString('de-DE', {
@@ -85,7 +93,7 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
     };
 
     const isOwnScore = (score: GameScore) => {
-        return walletAddress && score.walletAddress === walletAddress;
+        return walletAddress && score.walletAddress?.toLowerCase() === walletAddress.toLowerCase();
     };
 
     if (loading) {
@@ -118,18 +126,17 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
     }
 
     return (
-        <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="w-full h-full flex flex-col">
             {/* Header with Filters */}
-            <div className="mb-6">
+            <div className="mb-4 flex-shrink-0">
                 <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-2xl font-bold text-gray-800">ðŸ† Leaderboard</h2>
                     <button
                         onClick={() => fetchScores(false)}
                         disabled={loading || isRefreshing}
                         className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition text-sm font-medium disabled:opacity-50 flex items-center gap-1"
                         title="Aktualisieren"
                     >
-                        <span className={isRefreshing ? 'animate-spin' : ''}>ðŸ”„</span>
+                        <span className={isRefreshing ? 'animate-spin' : ''}>🔄</span>
                         <span className="hidden sm:inline">Refresh</span>
                     </button>
                 </div>
@@ -168,16 +175,16 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
             </div>
 
             {/* Scores List */}
-            <div className="max-h-[600px] overflow-y-auto pr-2" style={{
+            <div className="flex-1 overflow-y-auto pr-2 min-h-0" style={{
                 scrollbarWidth: 'thin',
                 scrollbarColor: '#CBD5E1 #F1F5F9'
             }}>
                 {scores.length === 0 ? (
                     <div className="text-center py-12 text-gray-500">
                         <p className="text-lg mb-2">
-                            {filter === 'week' && 'ðŸ“… Keine Scores in den letzten 7 Tagen'}
-                            {filter === 'my-scores' && 'ðŸŽ® Du hast noch keine Scores'}
-                            {filter === 'all-time' && 'ðŸŽ® Noch keine Scores. Sei der Erste!'}
+                            {filter === 'week' && '📅 Keine Scores in den letzten 7 Tagen'}
+                            {filter === 'my-scores' && '🎮 Du hast noch keine Scores'}
+                            {filter === 'all-time' && '🎮 Noch keine Scores. Sei der Erste!'}
                         </p>
                         <p className="text-sm">
                             {filter !== 'all-time' && 'Spiele eine Runde und speichere deinen Score!'}
@@ -208,9 +215,9 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
                                         >
                                             <td className="px-4 py-4">
                                                 <div className="flex items-center">
-                                                    {index === 0 && <span className="text-2xl mr-2">ðŸ¥‡</span>}
-                                                    {index === 1 && <span className="text-2xl mr-2">ðŸ¥ˆ</span>}
-                                                    {index === 2 && <span className="text-2xl mr-2">ðŸ¥‰</span>}
+                                                    {index === 0 && <span className="text-2xl mr-2">🥇</span>}
+                                                    {index === 1 && <span className="text-2xl mr-2">🥈</span>}
+                                                    {index === 2 && <span className="text-2xl mr-2">🥉</span>}
                                                     <span className="text-lg">{index + 1}</span>
                                                 </div>
                                             </td>
@@ -251,9 +258,9 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
                                 >
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-2">
-                                            {index === 0 && <span className="text-2xl">ðŸ¥‡</span>}
-                                            {index === 1 && <span className="text-2xl">ðŸ¥ˆ</span>}
-                                            {index === 2 && <span className="text-2xl">ðŸ¥‰</span>}
+                                            {index === 0 && <span className="text-2xl">🥇</span>}
+                                            {index === 1 && <span className="text-2xl">🥈</span>}
+                                            {index === 2 && <span className="text-2xl">🥉</span>}
                                             <span className="text-lg font-bold">#{index + 1}</span>
                                         </div>
                                         {isOwnScore(score) && (

@@ -3,7 +3,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useAccount } from 'wagmi'
 import HighscoreDialog from './HighscoreDialog'
-import HighscoreTable from './HighscoreTable'
 import type { ScoreSubmitResponse } from '@/types/game'
 import {
     CANVAS_WIDTH,
@@ -25,7 +24,12 @@ import {
     PLATFORMS_PER_LEVEL,
 } from '../config/gameConstants'
 
-export default function HistoryJumper() {
+interface HistoryJumperProps {
+    onGameStateChange?: (isActive: boolean) => void;
+    onLeaderboardRefresh?: (trigger: number) => void;
+}
+
+export default function HistoryJumper({ onGameStateChange, onLeaderboardRefresh }: HistoryJumperProps = {}) {
     const { address } = useAccount()
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
     function drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r = 6) {
@@ -143,10 +147,19 @@ export default function HistoryJumper() {
     const [score, setScore] = useState(0)
     const [best, setBest] = useState<number>(0)
     const [showHighscoreDialog, setShowHighscoreDialog] = useState(false)
-    const [showLeaderboard, setShowLeaderboard] = useState(false)
     const [leaderboardRefresh, setLeaderboardRefresh] = useState(0)
     const [motionEnabled, setMotionEnabled] = useState(false)
     const [motionPermission, setMotionPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt')
+
+    // Notify parent component about game state changes
+    useEffect(() => {
+        onGameStateChange?.(running);
+    }, [running, onGameStateChange]);
+
+    // Notify parent component about leaderboard refresh
+    useEffect(() => {
+        onLeaderboardRefresh?.(leaderboardRefresh);
+    }, [leaderboardRefresh, onLeaderboardRefresh]);
 
     // Canvas & Game Constants (imported from gameConstants.ts)
     const WIDTH = CANVAS_WIDTH
@@ -581,25 +594,8 @@ export default function HistoryJumper() {
 
                 if (data.success && data.scores && data.scores.length > 0) {
                     setBest(data.scores[0].score)
-                } else if (address) {
-                    // Wenn keine Scores für diese Wallet, hole globalen Top-Score
-                    const globalResponse = await fetch('/api/game/scores?type=top&limit=1', {
-                        cache: 'no-store',
-                        headers: {
-                            'Cache-Control': 'no-cache, no-store, must-revalidate',
-                            'Pragma': 'no-cache',
-                            'Expires': '0'
-                        }
-                    })
-                    const globalData = await globalResponse.json()
-                    if (globalData.success && globalData.scores && globalData.scores.length > 0) {
-                        setBest(globalData.scores[0].score)
-                    } else {
-                        // Keine Scores in DB - setze auf 0
-                        setBest(0)
-                    }
                 } else {
-                    // Keine Scores in DB - setze auf 0
+                    // Keine Scores gefunden - setze auf 0
                     setBest(0)
                 }
             } catch (error) {
@@ -1023,37 +1019,21 @@ export default function HistoryJumper() {
                     </div>
 
                     {/* Footer Info */}
-                    <div className="bg-primary px-6 py-3 text-center">
+                    {/* Footer mit Controls & Highscore */}
+                    <div className="bg-primary px-6 py-3 text-center" key={`footer-${address || 'no-wallet'}`}>
                         <p className="text-xs text-gray-600 font-medium">
-                            <span className="hidden sm:inline">Tastatur: ? ? bewegen, ? springen • </span>
-                            {best > 0 && (
-                                <span className="text-emerald-600 font-bold">
+                            <span className="hidden sm:inline">Tastatur: ← → bewegen, ↑ springen • </span>
+                            {best > 0 ? (
+                                <span className="text-emerald-600 font-bold" key={`highscore-${address || 'global'}-${best}`}>
                                     {address ? 'Dein Highscore' : 'Globaler Highscore'}: {best.toLocaleString()}
+                                </span>
+                            ) : (
+                                <span className="text-gray-500 italic">
+                                    {address ? 'Noch kein persönlicher Score - spiele deine erste Runde!' : 'Noch keine Highscores - sei der Erste!'}
                                 </span>
                             )}
                         </p>
                     </div>
-
-                    {/* Leaderboard Toggle Button */}
-                    <div className="px-6 py-3">
-                        <button
-                            onClick={() => setShowLeaderboard(!showLeaderboard)}
-                            className="w-full px-4 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg hover:from-yellow-600 hover:to-orange-600 transition font-bold shadow-lg flex items-center justify-center gap-2"
-                        >
-                            <span>??</span>
-                            <span>{showLeaderboard ? 'Leaderboard verstecken' : 'Leaderboard anzeigen'}</span>
-                        </button>
-                    </div>
-
-                    {/* Leaderboard Section */}
-                    {showLeaderboard && (
-                        <div className="px-6 pb-6">
-                            <HighscoreTable
-                                walletAddress={address}
-                                refreshTrigger={leaderboardRefresh}
-                            />
-                        </div>
-                    )}
                 </div>
 
                 {/* Highscore Dialog */}

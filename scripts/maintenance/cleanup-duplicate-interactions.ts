@@ -93,7 +93,7 @@ async function cleanupDuplicates(
 
     const db = client.db(DATABASE_NAME);
     const collection = db.collection(collectionName);
-    
+
     let totalDeleted = 0;
 
     for (const group of duplicates) {
@@ -113,12 +113,12 @@ async function cleanupDuplicates(
 
         // Keep the first (newest), delete the rest
         const [keepDoc, ...deleteDoc] = docs;
-        
+
         if (!keepDoc) {
             console.warn(`⚠️  No documents found for group, skipping...`);
             continue;
         }
-        
+
         const idsToDelete = deleteDoc.map(d => d._id);
 
         console.log(`\n📋 Duplicate Group in ${collectionName}:`);
@@ -126,7 +126,7 @@ async function cleanupDuplicates(
         console.log(`   NFT: ${group.contractAddress}/${group.tokenId}`);
         console.log(`   Total entries: ${docs.length}`);
         console.log(`   ✅ KEEP: ${keepDoc._id} (${keepDoc.createdAt || keepDoc._id.getTimestamp()})`);
-        
+
         for (const doc of deleteDoc) {
             console.log(`   ❌ DELETE: ${doc._id} (${doc.createdAt || doc._id.getTimestamp()})`);
         }
@@ -220,7 +220,7 @@ async function main() {
     console.log('║   🧹 User Interactions Duplicate Cleanup Script           ║');
     console.log('╚════════════════════════════════════════════════════════════╝');
     console.log();
-    
+
     if (dryRun) {
         console.log('⚠️  DRY RUN MODE - No changes will be made');
         console.log('   Run with --execute flag to actually delete duplicates\n');
@@ -240,7 +240,7 @@ async function main() {
 
         for (const collectionName of collections) {
             const duplicates = await findDuplicates(collectionName, client);
-            
+
             // Track affected NFTs for stats recalculation
             for (const dup of duplicates) {
                 affectedNFTs.add(`${dup.contractAddress}::${dup.tokenId}`);
@@ -260,7 +260,7 @@ async function main() {
         console.log('╚════════════════════════════════════════════════════════════╝');
         console.log(`Total duplicates ${dryRun ? 'found' : 'removed'}: ${totalDuplicatesRemoved}`);
         console.log(`Affected NFTs: ${affectedNFTs.size}`);
-        
+
         if (dryRun) {
             console.log('\n💡 Run with --execute flag to actually delete duplicates');
         } else {

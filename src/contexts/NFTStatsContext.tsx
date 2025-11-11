@@ -376,7 +376,7 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                         contractAddress: nftAddress,
                         tokenId: tokenId
                     };
-                    
+
                     devLog.success(`${actionName} complete with stats from API:`, {
                         nft: `${nftAddress}/${tokenId}`,
                         favoriteCount: realStats.favoriteCount,
@@ -402,11 +402,11 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                 } else {
                     // Fallback: Load stats from separate API if not in response (legacy support)
                     devLog.warn(`${actionName} API didn't return stats, loading separately...`);
-                    
+
                     try {
                         const statsResponse = await fetch(`/api/nft/stats?contractAddress=${nftAddress}&tokenId=${tokenId}`);
                         const statsResult = await statsResponse.json();
-                        
+
                         if (statsResult.success && statsResult.data) {
                             const realStats: NFTStats = {
                                 favoriteCount: statsResult.data.favoriteCount || 0,
@@ -418,7 +418,7 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                                 contractAddress: nftAddress,
                                 tokenId: tokenId
                             };
-                            
+
                             updateStats(nftAddress, tokenId, realStats);
 
                             if (typeof window !== 'undefined') {
@@ -542,7 +542,7 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                         contractAddress: nftAddress,
                         tokenId: tokenId
                     };
-                    
+
                     devLog.success('Rating complete with stats from API:', {
                         nft: `${nftAddress}/${tokenId}`,
                         averageRating: realStats.averageRating,
@@ -568,11 +568,11 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                 } else {
                     // Fallback: Load stats from separate API if not in response (legacy support)
                     devLog.warn('Rating API didn\'t return stats, loading separately...');
-                    
+
                     try {
                         const statsResponse = await fetch(`/api/nft/stats?contractAddress=${nftAddress}&tokenId=${tokenId}`);
                         const statsResult = await statsResponse.json();
-                        
+
                         if (statsResult.success && statsResult.data) {
                             const realStats: NFTStats = {
                                 favoriteCount: statsResult.data.favoriteCount || 0,
@@ -584,7 +584,7 @@ export function NFTStatsProvider({ children }: NFTStatsProviderProps) {
                                 contractAddress: nftAddress,
                                 tokenId: tokenId
                             };
-                            
+
                             updateStats(nftAddress, tokenId, realStats);
 
                             if (typeof window !== 'undefined') {
@@ -825,11 +825,11 @@ export function useNFTUserStats(nftAddress: string, tokenId: string, userAddress
                 if (detail.stats) {
                     setStats(detail.stats);
                 }
-                
+
                 if (detail.userInteractions) {
                     setUserInteractions(detail.userInteractions);
                 }
-                
+
                 // Force re-render to ensure UI updates in all browsers
                 forceUpdate(prev => prev + 1);
             }
