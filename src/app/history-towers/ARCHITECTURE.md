@@ -12,6 +12,15 @@ src/app/history-towers/
 │   ├── MarketplaceInfo.tsx     # Linke Sidebar
 │   └── LeaderboardSidebar.tsx  # Rechte Sidebar
 │
+├── hooks/               # Custom React Hooks
+│   ├── useGameState.ts         # State Management Hook
+│   ├── useGameInput.ts         # Input Handling Hook
+│   ├── useGamePhysics.ts       # Physics Engine Hook
+│   ├── useGameRenderer.ts      # Canvas Rendering Hook
+│   ├── useScoreManager.ts      # Score API Hook
+│   ├── useGameLoop.ts          # Game Loop Hook
+│   └── index.ts                # Barrel Export
+│
 ├── types/               # TypeScript Type Definitions
 │   ├── game.types.ts           # Game-bezogene Interfaces
 │   └── index.ts                # Barrel Export
@@ -27,6 +36,7 @@ src/app/history-towers/
 │   ├── scoring.ts              # Score-Berechnung
 │   └── index.ts                # Barrel Export
 │
+├── ARCHITECTURE.md      # This file
 └── page.tsx             # Next.js Page Entry Point
 ```
 
@@ -79,7 +89,118 @@ checkCollision(player, platform) {
 - **Max Schwierigkeit:** 3.0x
 - **Effekte:** Kleinere Plattformen, höhere Geschwindigkeit
 
-## 🎨 UI Components
+## � Custom Hooks
+
+### useGameState
+Zentrales State Management für das gesamte Spiel.
+
+**Managed:**
+- Player (Position, Velocity, Ground State)
+- Platforms (Array, Generation, Cleanup)
+- Particles (Array, Physics, Lifecycle)
+- Score & Combo System
+- Camera Position
+- Direction Input
+
+**Key Methods:**
+- `resetGame()` - Reset zum Startzustand
+- `updatePlayer()` - Player-Updates
+- `addParticles()` - Neue Partikel hinzufügen
+- `updateScore()` - Score erhöhen
+- `updateCombo()` - Combo-Counter
+- `batchUpdate()` - Performance-optimiert
+
+### useGameInput
+Verwaltet alle Eingaben (Keyboard + Touch).
+
+**Features:**
+- Keyboard Events (Arrow Keys, WASD, Space)
+- Touch Button States
+- Unified Input API
+- Auto-cleanup bei unmount
+
+**Key Methods:**
+- `isMovingLeft()` - Links-Eingabe check
+- `isMovingRight()` - Rechts-Eingabe check
+- `isJumping()` - Sprung-Eingabe check
+- `handleTouchButton()` - Touch-Handler
+- `resetInput()` - Alle Inputs zurücksetzen
+
+### useGamePhysics
+Physics Engine mit Kollisionserkennung.
+
+**Capabilities:**
+- Gravitation & Bewegung
+- Velocity Capping
+- Friction/Air Resistance
+- AABB Collision Detection
+- Jump Mechanics
+- Camera Following
+- Out-of-Bounds Check
+
+**Key Methods:**
+- `updatePlayerPhysics()` - Gravitation & Movement
+- `handleJump()` - Sprung-Logic
+- `checkPlatformCollision()` - Kollision mit Plattformen
+- `checkOutOfBounds()` - Game Over Check
+- `updateCamera()` - Smooth Camera Follow
+- `updateAllParticles()` - Partikel-Physik
+
+### useGameRenderer
+Canvas Rendering Engine.
+
+**Renders:**
+- Background Grid
+- Platforms mit Shadows & Highlights
+- Player mit Direction Indicator
+- Particles (Landing, Combo, Jump)
+- HUD (Score, Level, Combo Bar)
+- Pause Overlay
+
+**Key Methods:**
+- `render()` - Main render function
+- `drawPlayer()` - Spieler zeichnen
+- `drawPlatforms()` - Alle Plattformen
+- `drawHUD()` - Score/Level/Combo Display
+- `drawPauseOverlay()` - Pause Screen
+
+### useScoreManager
+API Integration für Highscores.
+
+**Features:**
+- Score Submission
+- Personal Best Tracking
+- Rank Calculation
+- Error Handling
+- Loading States
+
+**Key Methods:**
+- `submitScore()` - Score an API senden
+- `fetchPersonalBest()` - Best Score laden
+- `isNewPersonalBest()` - Check ob neuer PB
+- `getRankText()` - Rank-Label (Novice → Legendary)
+- `formatScore()` - Score formatieren
+
+### useGameLoop
+Main Game Loop mit requestAnimationFrame.
+
+**Orchestrates:**
+- Input Processing
+- Physics Updates
+- Collision Detection
+- Score & Combo Logic
+- Platform Management
+- Particle Updates
+- Camera Movement
+- Game Over Detection
+
+**Features:**
+- 60 FPS Target
+- Pause Support
+- Performance Optimized
+- Cleanup on Unmount
+
+## �🎨 UI Components
 
 ### GamePageLayout
 3-Spalten Layout (Desktop only):
