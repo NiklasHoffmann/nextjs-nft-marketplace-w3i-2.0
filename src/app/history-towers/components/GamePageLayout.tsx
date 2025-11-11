@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
-import HistoryJumperV2 from './HistoryJumperV2';
+import HistoryJumper from './HistoryJumper';
 import MarketplaceInfo from './MarketplaceInfo';
 import LeaderboardSidebar from './LeaderboardSidebar';
 
@@ -23,7 +23,7 @@ export default function GamePageLayout() {
 
                     {/* Center: Game */}
                     <div className="h-full min-h-0 flex items-center justify-center">
-                        <HistoryJumperV2
+                        <HistoryJumper
                             onGameStateChange={setIsGameActive}
                             onLeaderboardRefresh={setLeaderboardRefresh}
                         />
@@ -42,7 +42,7 @@ export default function GamePageLayout() {
 
             {/* Mobile/Tablet: Game Only */}
             <div className="xl:hidden h-full">
-                <HistoryJumperV2
+                <HistoryJumper
                     onGameStateChange={setIsGameActive}
                     onLeaderboardRefresh={setLeaderboardRefresh}
                 />
