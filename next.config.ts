@@ -1,9 +1,14 @@
 /** @type {import('next').NextConfig} */
 
-// Bundle analyzer for production build analysis
-const withBundleAnalyzer = require('@next/bundle-analyzer')({
-  enabled: process.env.ANALYZE === 'true',
-});
+// Bundle analyzer for production build analysis (only in dev)
+let withBundleAnalyzer = (config: any) => config;
+try {
+  withBundleAnalyzer = require('@next/bundle-analyzer')({
+    enabled: process.env.ANALYZE === 'true',
+  });
+} catch (e) {
+  // Bundle analyzer not installed (production build)
+}
 
 const nextConfig: import('next').NextConfig = {
   reactStrictMode: true,
