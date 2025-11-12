@@ -1,251 +1,203 @@
-/**
- * useGameState Hook
+﻿/**
+ * Game State Hook
  * 
- * Verwaltet den kompletten Game State (Player, Platforms, Particles, Score, etc.)
+ * Manages UI state for the History Towers game using useReducer pattern.
+ * Separates UI state from game physics state for better organization.
+ * 
+ * Consolidates 7 former useState hooks into a single reducer with typed actions:
+ * - running, paused, gameOver (game flow states)
+ * - score, best (score tracking)
+ * - showHighscoreDialog (dialog visibility)
+ * - leaderboardRefresh (leaderboard update trigger)
+ * 
+ * @example
+ * ```typescript
+ * const { state, startGame, pauseGame, gameOver } = useGameState();
+ * 
+ * // Start game
+ * startGame(); // state.running = true, state.score = 0
+ * 
+ * // End game
+ * gameOver(1500); // state.gameOver = true, state.showHighscoreDialog = true
+ * ```
  */
 
-import { useState, useCallback, useRef } from 'react';
-import type { GameState, Platform, Particle, Player } from '../types';
-import { GAME_CONFIG, PLAYER } from '../constants';
-import { 
-    initializePlatforms, 
-    generatePlatform,
-    shouldGenerateMorePlatforms,
-    cleanupOldPlatforms 
-} from '../utils';
+import { useReducer, useCallback } from 'react'
+import type { GameUIState } from '../types/historyTower.types'
 
-/**
- * Initialer Player State
- */
-const createInitialPlayer = (): Player => ({
-    x: PLAYER.startX,
-    y: PLAYER.startY,
-    width: PLAYER.width,
-    height: PLAYER.height,
-    velocityX: 0,
-    velocityY: 0,
-    onGround: false,
-    direction: 1,
-});
+// Action Types
+type GameStateAction =
+    | { type: 'START_GAME' }
+    | { type: 'PAUSE_GAME' }
+    | { type: 'RESUME_GAME' }
+    | { type: 'GAME_OVER'; score: number }
+    | { type: 'UPDATE_SCORE'; score: number }
+    | { type: 'UPDATE_BEST'; best: number }
+    | { type: 'SHOW_HIGHSCORE_DIALOG' }
+    | { type: 'HIDE_HIGHSCORE_DIALOG' }
+    | { type: 'TRIGGER_LEADERBOARD_REFRESH' }
+    | { type: 'RESET_GAME' }
 
-/**
- * Initialer Game State
- */
-const createInitialState = (): GameState => ({
-    player: createInitialPlayer(),
-    platforms: initializePlatforms(),
-    particles: [],
+// Initial State
+const initialState: GameUIState = {
+    running: false,
+    paused: false,
+    gameOver: false,
     score: 0,
-    highestPlatformNumber: 0,
-    platformsClimbed: 0,
-    combo: 0,
-    maxCombo: 0,
-    cameraY: 0,
-    nextPlatformNumber: 16,
-    direction: {
-        left: false,
-        right: false,
-        up: false,
-    },
-});
+    best: 0,
+    showHighscoreDialog: false,
+    leaderboardRefresh: 0,
+}
 
-export function useGameState() {
-    const [gameState, setGameState] = useState<GameState>(createInitialState());
-    const stateRef = useRef<GameState>(gameState);
-    
-    // Sync state mit ref für Performance
-    stateRef.current = gameState;
+// Reducer
+function gameStateReducer(state: GameUIState, action: GameStateAction): GameUIState {
+    switch (action.type) {
+        case 'START_GAME':
+            return {
+                ...state,
+                running: true,
+                paused: false,
+                gameOver: false,
+                score: 0,
+                showHighscoreDialog: false,
+            }
 
-    /**
-     * Reset Game State
-     */
+        case 'PAUSE_GAME':
+            return {
+                ...state,
+                running: false,
+                paused: true,
+            }
+
+        case 'RESUME_GAME':
+            return {
+                ...state,
+                running: true,
+                paused: false,
+            }
+
+        case 'GAME_OVER':
+            return {
+                ...state,
+                running: false,
+                paused: false,
+                gameOver: true,
+                score: action.score,
+                showHighscoreDialog: true,
+            }
+
+        case 'UPDATE_SCORE':
+            return {
+                ...state,
+                score: action.score,
+            }
+
+        case 'UPDATE_BEST':
+            return {
+                ...state,
+                best: action.best,
+            }
+
+        case 'SHOW_HIGHSCORE_DIALOG':
+            return {
+                ...state,
+                showHighscoreDialog: true,
+            }
+
+        case 'HIDE_HIGHSCORE_DIALOG':
+            return {
+                ...state,
+                showHighscoreDialog: false,
+            }
+
+        case 'TRIGGER_LEADERBOARD_REFRESH':
+            return {
+                ...state,
+                leaderboardRefresh: state.leaderboardRefresh + 1,
+            }
+
+        case 'RESET_GAME':
+            return {
+                ...state,
+                running: false,
+                paused: false,
+                gameOver: false,
+                score: 0,
+            }
+
+        default:
+            return state
+    }
+}
+
+export interface UseGameStateReturn {
+    state: GameUIState
+    startGame: () => void
+    pauseGame: () => void
+    resumeGame: () => void
+    gameOver: (score: number) => void
+    updateScore: (score: number) => void
+    updateBest: (best: number) => void
+    showHighscoreDialog: () => void
+    hideHighscoreDialog: () => void
+    triggerLeaderboardRefresh: () => void
+    resetGame: () => void
+}
+
+export function useGameState(): UseGameStateReturn {
+    const [state, dispatch] = useReducer(gameStateReducer, initialState)
+
+    const startGame = useCallback(() => {
+        dispatch({ type: 'START_GAME' })
+    }, [])
+
+    const pauseGame = useCallback(() => {
+        dispatch({ type: 'PAUSE_GAME' })
+    }, [])
+
+    const resumeGame = useCallback(() => {
+        dispatch({ type: 'RESUME_GAME' })
+    }, [])
+
+    const gameOver = useCallback((score: number) => {
+        dispatch({ type: 'GAME_OVER', score })
+    }, [])
+
+    const updateScore = useCallback((score: number) => {
+        dispatch({ type: 'UPDATE_SCORE', score })
+    }, [])
+
+    const updateBest = useCallback((best: number) => {
+        dispatch({ type: 'UPDATE_BEST', best })
+    }, [])
+
+    const showHighscoreDialog = useCallback(() => {
+        dispatch({ type: 'SHOW_HIGHSCORE_DIALOG' })
+    }, [])
+
+    const hideHighscoreDialog = useCallback(() => {
+        dispatch({ type: 'HIDE_HIGHSCORE_DIALOG' })
+    }, [])
+
+    const triggerLeaderboardRefresh = useCallback(() => {
+        dispatch({ type: 'TRIGGER_LEADERBOARD_REFRESH' })
+    }, [])
+
     const resetGame = useCallback(() => {
-        setGameState(createInitialState());
-    }, []);
-
-    /**
-     * Update Player Position
-     */
-    const updatePlayer = useCallback((updates: Partial<Player>) => {
-        setGameState(prev => ({
-            ...prev,
-            player: { ...prev.player, ...updates },
-        }));
-    }, []);
-
-    /**
-     * Update Player Velocity
-     */
-    const updatePlayerVelocity = useCallback((vx: number, vy: number) => {
-        setGameState(prev => ({
-            ...prev,
-            player: {
-                ...prev.player,
-                velocityX: vx,
-                velocityY: vy,
-            },
-        }));
-    }, []);
-
-    /**
-     * Set Player Ground State
-     */
-    const setPlayerOnGround = useCallback((onGround: boolean) => {
-        setGameState(prev => ({
-            ...prev,
-            player: { ...prev.player, onGround },
-        }));
-    }, []);
-
-    /**
-     * Add Platforms (bei Generierung)
-     */
-    const addPlatforms = useCallback((newPlatforms: Platform[]) => {
-        setGameState(prev => ({
-            ...prev,
-            platforms: [...prev.platforms, ...newPlatforms],
-        }));
-    }, []);
-
-    /**
-     * Update Platforms (Cleanup)
-     */
-    const updatePlatforms = useCallback((cameraY: number) => {
-        setGameState(prev => {
-            const cleaned = cleanupOldPlatforms(prev.platforms, cameraY);
-            
-            // Generiere neue Plattformen wenn nötig
-            if (shouldGenerateMorePlatforms(cleaned, cameraY)) {
-                const newPlatforms: Platform[] = [];
-                for (let i = 0; i < 5; i++) {
-                    newPlatforms.push(generatePlatform(prev.nextPlatformNumber + i));
-                }
-                
-                return {
-                    ...prev,
-                    platforms: [...cleaned, ...newPlatforms],
-                    nextPlatformNumber: prev.nextPlatformNumber + 5,
-                };
-            }
-            
-            return { ...prev, platforms: cleaned };
-        });
-    }, []);
-
-    /**
-     * Add Particles
-     */
-    const addParticles = useCallback((newParticles: Particle[]) => {
-        setGameState(prev => ({
-            ...prev,
-            particles: [...prev.particles, ...newParticles],
-        }));
-    }, []);
-
-    /**
-     * Update Particles (Physics & Cleanup)
-     */
-    const updateParticles = useCallback((updatedParticles: Particle[]) => {
-        setGameState(prev => ({
-            ...prev,
-            particles: updatedParticles,
-        }));
-    }, []);
-
-    /**
-     * Update Score
-     */
-    const updateScore = useCallback((points: number) => {
-        setGameState(prev => ({
-            ...prev,
-            score: prev.score + points,
-        }));
-    }, []);
-
-    /**
-     * Update Combo
-     */
-    const updateCombo = useCallback((combo: number) => {
-        setGameState(prev => ({
-            ...prev,
-            combo,
-            maxCombo: Math.max(prev.maxCombo, combo),
-        }));
-    }, []);
-
-    /**
-     * Reset Combo
-     */
-    const resetCombo = useCallback(() => {
-        setGameState(prev => ({
-            ...prev,
-            combo: 0,
-        }));
-    }, []);
-
-    /**
-     * Update Highest Platform
-     */
-    const updateHighestPlatform = useCallback((platformNumber: number) => {
-        setGameState(prev => {
-            if (platformNumber > prev.highestPlatformNumber) {
-                return {
-                    ...prev,
-                    highestPlatformNumber: platformNumber,
-                    platformsClimbed: prev.platformsClimbed + 1,
-                };
-            }
-            return prev;
-        });
-    }, []);
-
-    /**
-     * Update Camera Y
-     */
-    const updateCameraY = useCallback((y: number) => {
-        setGameState(prev => ({
-            ...prev,
-            cameraY: y,
-        }));
-    }, []);
-
-    /**
-     * Update Direction Input
-     */
-    const updateDirection = useCallback((direction: Partial<GameState['direction']>) => {
-        setGameState(prev => ({
-            ...prev,
-            direction: { ...prev.direction, ...direction },
-        }));
-    }, []);
-
-    /**
-     * Batch Update für Performance
-     */
-    const batchUpdate = useCallback((updates: Partial<GameState>) => {
-        setGameState(prev => ({ ...prev, ...updates }));
-    }, []);
+        dispatch({ type: 'RESET_GAME' })
+    }, [])
 
     return {
-        // State
-        gameState,
-        stateRef,
-        
-        // Actions
-        resetGame,
-        updatePlayer,
-        updatePlayerVelocity,
-        setPlayerOnGround,
-        addPlatforms,
-        updatePlatforms,
-        addParticles,
-        updateParticles,
+        state,
+        startGame,
+        pauseGame,
+        resumeGame,
+        gameOver,
         updateScore,
-        updateCombo,
-        resetCombo,
-        updateHighestPlatform,
-        updateCameraY,
-        updateDirection,
-        batchUpdate,
-    };
+        updateBest,
+        showHighscoreDialog,
+        hideHighscoreDialog,
+        triggerLeaderboardRefresh,
+        resetGame,
+    }
 }

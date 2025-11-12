@@ -129,48 +129,50 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
         <div className="w-full h-full flex flex-col">
             {/* Header with Filters */}
             <div className="mb-4 flex-shrink-0">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex gap-2 flex-wrap items-center justify-between">
+                    {/* Filter Buttons */}
+                    <div className="flex gap-2 flex-wrap">
+                        <button
+                            onClick={() => setFilter('all-time')}
+                            className={`px-4 py-2 rounded-lg font-medium transition ${filter === 'all-time'
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                        >
+                            All Time
+                        </button>
+                        <button
+                            onClick={() => setFilter('week')}
+                            className={`px-4 py-2 rounded-lg font-medium transition ${filter === 'week'
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                        >
+                            Letzte 7 Tage
+                        </button>
+                        {walletAddress && (
+                            <button
+                                onClick={() => setFilter('my-scores')}
+                                className={`px-4 py-2 rounded-lg font-medium transition ${filter === 'my-scores'
+                                    ? 'bg-blue-500 text-white'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    }`}
+                            >
+                                My Scores
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Refresh Button */}
                     <button
                         onClick={() => fetchScores(false)}
                         disabled={loading || isRefreshing}
-                        className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition text-sm font-medium disabled:opacity-50 flex items-center gap-1"
+                        className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition font-medium disabled:opacity-50 flex items-center gap-2"
                         title="Aktualisieren"
                     >
                         <span className={isRefreshing ? 'animate-spin' : ''}>🔄</span>
                         <span className="hidden sm:inline">Refresh</span>
                     </button>
-                </div>
-
-                <div className="flex gap-2 flex-wrap">
-                    <button
-                        onClick={() => setFilter('all-time')}
-                        className={`px-4 py-2 rounded-lg font-medium transition ${filter === 'all-time'
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                    >
-                        All Time
-                    </button>
-                    <button
-                        onClick={() => setFilter('week')}
-                        className={`px-4 py-2 rounded-lg font-medium transition ${filter === 'week'
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                    >
-                        Letzte 7 Tage
-                    </button>
-                    {walletAddress && (
-                        <button
-                            onClick={() => setFilter('my-scores')}
-                            className={`px-4 py-2 rounded-lg font-medium transition ${filter === 'my-scores'
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
-                        >
-                            My Scores
-                        </button>
-                    )}
                 </div>
             </div>
 

@@ -2,4 +2,4 @@
  * Barrel exports for history-towers types
  */
 
-export * from './game.types';
+export * from './historyTower.types';

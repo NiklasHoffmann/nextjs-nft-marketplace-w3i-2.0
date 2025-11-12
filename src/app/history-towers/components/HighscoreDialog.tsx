@@ -92,7 +92,7 @@ export default function HighscoreDialog({
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
                 <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4 text-center">
-                    <div className="text-6xl mb-4">ðŸŽ‰</div>
+                    <div className="text-6xl mb-4">🎉</div>
                     <h2 className="text-2xl font-bold text-green-600 mb-2">Score Saved!</h2>
                     <p className="text-gray-600">Your achievement has been recorded!</p>
                 </div>
@@ -166,7 +166,7 @@ export default function HighscoreDialog({
 
                     {!walletAddress && (
                         <p className="text-sm text-gray-500 italic">
-                            ðŸ’¡ Connect your wallet to verify your scores
+                            💡 Connect your wallet to verify your scores
                         </p>
                     )}
 
