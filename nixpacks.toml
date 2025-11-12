@@ -1,11 +1,14 @@
 [variables]
 NIXPACKS_NODE_VERSION = "22"
 
+[phases.setup]
+nixPkgs = ["nodejs-22_x"]
+
+[phases.install]
+cmds = ["npm ci"]
+
 [phases.build]
-cmds = ["npm ci", "npm run build"]
+cmds = ["npm run build"]
 
-[phases.start]
+[start]
 cmd = "npm start"
-
-[providers.node]
-version = "22"
