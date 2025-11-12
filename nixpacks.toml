@@ -1,8 +1,12 @@
+[phases.setup]
+nixpkgs = []
+
 [phases.install]
 cmds = ["npm ci"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["NODE_ENV=production npm run build"]
 
 [start]
-cmd = "npm start"
+cmd = "NODE_ENV=production npm start"
+
