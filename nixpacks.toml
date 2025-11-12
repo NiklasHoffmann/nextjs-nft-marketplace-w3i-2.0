@@ -5,7 +5,7 @@ nixpkgs = []
 cmds = ["npm ci"]
 
 [phases.build]
-cmds = ["NODE_ENV=production npm run build"]
+cmds = ["NODE_OPTIONS='--max-old-space-size=4096' NODE_ENV=production npm run build"]
 
 [start]
 cmd = "NODE_ENV=production npm start"
