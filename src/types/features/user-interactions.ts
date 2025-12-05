@@ -82,13 +82,13 @@ export interface UserNFTInteractionsResponse {
 
 // Request types for creating/updating user interactions
 export interface CreateUserNFTInteractionRequest extends Omit<UserNFTInteractions, '_id' | 'createdAt' | 'updatedAt'> {
-    contractAddress: string;
-    tokenId: string;
+    // contractAddress and tokenId inherited from NFTIdentifier via UserNFTInteractions
     userId: string;
 }
 
 export interface UpdateUserNFTInteractionRequest extends Partial<Omit<UserNFTInteractions, '_id' | 'contractAddress' | 'tokenId' | 'userId' | 'createdAt'>> {
-    contractAddress: string;
+    // contractAddress and tokenId must match exactly from base type
+    contractAddress: `0x${string}`;
     tokenId: string;
     userId: string;
 }

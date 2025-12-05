@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useMemo } from 'react';
+import { devLog } from '@/utils/devLog';
 
 export interface Currency {
     code: string;
@@ -80,7 +81,7 @@ class ExchangeRateCache {
             // Use default fallback
             return this.getDefaultRate(currency);
         } catch (error) {
-            console.error(`Error fetching rate for ${currency}:`, error);
+            devLog.error('currency', `Error fetching rate for ${currency}:`, error);
             return this.getDefaultRate(currency);
         }
     }
@@ -131,7 +132,7 @@ class ExchangeRateCache {
                 this.cache = new Map(data.entries);
             }
         } catch (error) {
-            console.error('Error loading cache from localStorage:', error);
+            devLog.error('currency', 'Error loading cache from localStorage:', error);
         }
     }
 
@@ -142,7 +143,7 @@ class ExchangeRateCache {
             };
             localStorage.setItem(EXCHANGE_RATE_CACHE_KEY, JSON.stringify(data));
         } catch (error) {
-            console.error('Error saving cache to localStorage:', error);
+            devLog.error('currency', 'Error saving cache to localStorage:', error);
         }
     }
 
@@ -162,7 +163,7 @@ class ExchangeRateCache {
 
         // Pre-warm cache with all currencies
         const refreshPromises = currencies.map(currency =>
-            this.getRate(currency.code).catch(console.error)
+            this.getRate(currency.code).catch((err) => devLog.error('currency', 'Refresh error:', err))
         );
 
         await Promise.allSettled(refreshPromises);
@@ -187,7 +188,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
                 const found = currencies.find(c => c.code === parsed.code);
                 if (found) setSelectedCurrency(found);
             } catch (error) {
-                console.error('Error loading saved currency:', error);
+                devLog.error('currency', 'Error loading saved currency:', error);
             }
         }
 
@@ -206,7 +207,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
                 // Pre-warm cache for new currency
                 cacheRef.current.getRate(currency.code);
             } catch (error) {
-                console.error('Error saving currency:', error);
+                devLog.error('currency', 'Error saving currency:', error);
             }
         }
     };
@@ -241,7 +242,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
             const rate = await cacheRef.current.getRate(selectedCurrency.code);
             return ethPrice * rate;
         } catch (error) {
-            console.error('Error converting currency:', error);
+            devLog.error('currency', 'Error converting currency:', error);
             return ethPrice * 3500; // Fallback
         }
     };
@@ -315,7 +316,7 @@ export function useETHPrice(ethAmount: number) {
 
                 setConvertedPrice(formatted);
             } catch (error) {
-                console.error('Error converting price:', error);
+                devLog.error('currency', 'Error converting price:', error);
                 setConvertedPrice(`${ethAmount} ETH`);
             } finally {
                 setLoading(false);

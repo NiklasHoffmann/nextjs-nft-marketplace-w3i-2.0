@@ -4,10 +4,9 @@
  * Alle Hooks importieren von hier: import { ... } from '@/hooks'
  * 
  * Organisation:
- * â€¢ marketplace/ - Marketplace Smart Contract Funktionen
- * â€¢ nfts/ - NFT Display, Admin, Utilities, Collections  
- * â€¢ interactions/ - User Action Tracking
- * â€¢ performance/ - Performance Monitoring (deprecated)
+ * • marketplace/ - Marketplace Smart Contract Funktionen
+ * • nfts/ - NFT Display, Admin, Utilities, Collections  
+ * • interactions/ - User Action Tracking
  */
 
 // Re-export all NFT hooks
@@ -19,8 +18,11 @@ export * from './marketplace';
 // Re-export all Interaction hooks
 export * from './interactions';
 
-// Re-export all Performance hooks
-export * from './performance';
+// Performance hooks deprecated - folder kept for future real implementation
 
 // Re-export context hooks
-export { useNFTStats, useNFTUserStats } from '@/contexts/NFTStatsContext';
+export { useNFTStats, useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
+
+// Utility hooks
+export { useAdminStatus } from './useAdminStatus';
+export { useHorizontalScroll } from './useHorizontalScroll';

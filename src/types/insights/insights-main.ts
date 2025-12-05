@@ -217,7 +217,8 @@ export interface CollectionInsightsResponse {
 
 // Create/Update request interfaces
 export interface CreateNFTInsightsRequest extends Partial<Omit<NFTInsights, '_id' | 'createdAt' | 'updatedAt'>> {
-    contractAddress: string;
+    // contractAddress inherits 0x${string} type from NFTInsights
+    contractAddress: `0x${string}`;
     tokenId: string;
 }
 
@@ -226,7 +227,7 @@ export interface UpdateNFTInsightsRequest extends Partial<Omit<NFTInsights, '_id
 }
 
 export interface CreateCollectionInsightsRequest extends Partial<Omit<CollectionInsights, '_id' | 'createdAt' | 'updatedAt'>> {
-    contractAddress: string;
+    contractAddress: `0x${string}`;
 }
 
 export interface UpdateCollectionInsightsRequest extends Partial<Omit<CollectionInsights, '_id' | 'createdAt' | 'updatedAt'>> {

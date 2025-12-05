@@ -1,33 +1,6 @@
 ﻿import { useMemo } from 'react';
 import { formatEther } from '@/utils';
-import type { NFTFilters, NFTSortOptions } from '@/components/marketplace/NFTFilterBar';
-
-export interface FilterableNFTItem {
-    contractAddress: string;
-    tokenId: string;
-    price?: string | null;
-    isListed: boolean;
-    // From Context/Card Data
-    imageUrl?: string | null;
-    name?: string | null;
-    customTitle?: string | null;
-    symbol?: string | null;
-    category?: string | null;
-    cardDescriptions?: string[] | null;
-    rarity?: string | null;
-    averageRating?: number | null;
-    ratingCount?: number | null;
-    favoriteCount?: number | null; // Updated from likeCount
-    watchlistCount?: number | null;
-    viewCount?: number | null;
-    tags?: string[] | null;
-    // Marketplace specific
-    listingId?: string;
-    seller?: string;
-    buyer?: string | null;
-    desiredNftAddress?: string;
-    desiredTokenId?: string;
-}
+import type { NFTFilters, NFTSortOptions, FilterableNFTItem } from '@/types/marketplace';
 
 /**
  * Hook for filtering and sorting NFT items
@@ -146,8 +119,8 @@ export function useNFTFilters(
                     break;
 
                 case 'likes':
-                    aValue = a.favoriteCount || 0;
-                    bValue = b.favoriteCount || 0;
+                    aValue = a.likeCount || 0;
+                    bValue = b.likeCount || 0;
                     break;
 
                 case 'watchlistCount':

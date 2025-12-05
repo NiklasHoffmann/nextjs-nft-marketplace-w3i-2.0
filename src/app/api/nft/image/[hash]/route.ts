@@ -16,12 +16,16 @@ import path from 'path';
  */
 
 const CACHE_DIR = path.join(process.cwd(), 'public', 'cached-nft-images');
+// Optimierte Gateway-Reihenfolge: Schnellste zuerst
 const IPFS_GATEWAYS = [
-    'https://ipfs.io/ipfs/',
-    'https://gateway.pinata.cloud/ipfs/',
-    'https://cloudflare-ipfs.com/ipfs/',
-    'https://dweb.link/ipfs/'
+    'https://cloudflare-ipfs.com/ipfs/',  // Cloudflare CDN - fastest
+    'https://gateway.pinata.cloud/ipfs/', // Pinata - reliable
+    'https://dweb.link/ipfs/',            // Protocol Labs - good fallback
+    'https://ipfs.io/ipfs/'               // Public gateway - last resort
 ];
+
+// Gateway Performance Tracking
+const gatewayStats = new Map<string, { hits: number; fails: number; avgTime: number }>();
 
 // Ensure cache directory exists
 async function ensureCacheDir() {
@@ -34,18 +38,37 @@ async function ensureCacheDir() {
 
 /**
  * Try multiple IPFS gateways until one works
+ * Optimized with performance tracking and adaptive ordering
  */
 async function fetchFromIPFS(ipfsHash: string): Promise<Buffer | null> {
-    for (const gateway of IPFS_GATEWAYS) {
+    // Sort gateways by performance (best first)
+    const sortedGateways = [...IPFS_GATEWAYS].sort((a, b) => {
+        const statsA = gatewayStats.get(a);
+        const statsB = gatewayStats.get(b);
+        if (!statsA || !statsB) return 0;
+
+        // Sort by success rate first, then by speed
+        const successRateA = statsA.hits / (statsA.hits + statsA.fails);
+        const successRateB = statsB.hits / (statsB.hits + statsB.fails);
+
+        if (successRateA !== successRateB) {
+            return successRateB - successRateA;
+        }
+        return statsA.avgTime - statsB.avgTime;
+    });
+
+    for (const gateway of sortedGateways) {
+        const startTime = Date.now();
+
         try {
-            // Silent gateway attempts - only log errors
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+            const timeout = setTimeout(() => controller.abort(), 8000); // Reduced to 8s for faster fallback
 
             const response = await fetch(`${gateway}${ipfsHash}`, {
                 signal: controller.signal,
                 headers: {
-                    'User-Agent': 'W3I-NFT-Marketplace/1.0'
+                    'User-Agent': 'W3I-NFT-Marketplace/1.0',
+                    'Accept': 'image/webp,image/png,image/jpeg,image/*;q=0.8' // Prefer WebP
                 }
             });
 
@@ -53,20 +76,42 @@ async function fetchFromIPFS(ipfsHash: string): Promise<Buffer | null> {
 
             if (response.ok) {
                 const arrayBuffer = await response.arrayBuffer();
-                // Success! Return buffer without logging
+                const fetchTime = Date.now() - startTime;
+
+                // Update gateway stats
+                updateGatewayStats(gateway, true, fetchTime);
+
                 return Buffer.from(arrayBuffer);
             }
 
-            // Only log if all gateways fail (see below)
+            // Update stats for failed response
+            updateGatewayStats(gateway, false, Date.now() - startTime);
+
         } catch (err) {
-            // Silent retry - continue to next gateway
+            // Update stats for error
+            updateGatewayStats(gateway, false, Date.now() - startTime);
             continue;
         }
     }
 
-    // Only log when ALL gateways fail
     console.error('❌ All IPFS gateways failed for:', ipfsHash);
     return null;
+}
+
+/**
+ * Track gateway performance for adaptive ordering
+ */
+function updateGatewayStats(gateway: string, success: boolean, time: number) {
+    const stats = gatewayStats.get(gateway) || { hits: 0, fails: 0, avgTime: 0 };
+
+    if (success) {
+        stats.hits++;
+        stats.avgTime = (stats.avgTime * (stats.hits - 1) + time) / stats.hits;
+    } else {
+        stats.fails++;
+    }
+
+    gatewayStats.set(gateway, stats);
 }
 
 /**
@@ -109,8 +154,14 @@ export async function GET(
             return new NextResponse(new Uint8Array(cached), {
                 headers: {
                     'Content-Type': contentType,
-                    'Cache-Control': 'public, max-age=31536000, immutable', // 1 year
-                    'X-Cache-Status': 'HIT'
+                    'Cache-Control': 'public, max-age=31536000, immutable', // 1 year - images never change
+                    'CDN-Cache-Control': 'public, max-age=31536000', // CDN: 1 year
+                    'Vercel-CDN-Cache-Control': 'public, max-age=31536000', // Vercel Edge: 1 year
+                    'X-Cache-Status': 'HIT',
+                    'Vary': 'Accept', // Enable content negotiation
+                    'ETag': `"${ipfsHash}"`, // Use IPFS hash as ETag
+                    'Access-Control-Allow-Origin': '*', // Allow cross-origin
+                    'Cross-Origin-Resource-Policy': 'cross-origin'
                 }
             });
         } catch (err) {
@@ -151,8 +202,14 @@ export async function GET(
         return new NextResponse(new Uint8Array(imageBuffer), {
             headers: {
                 'Content-Type': contentType,
-                'Cache-Control': 'public, max-age=31536000, immutable',
-                'X-Cache-Status': 'MISS'
+                'Cache-Control': 'public, max-age=31536000, immutable', // 1 year - images never change
+                'CDN-Cache-Control': 'public, max-age=31536000', // CDN: 1 year
+                'Vercel-CDN-Cache-Control': 'public, max-age=31536000', // Vercel Edge: 1 year
+                'X-Cache-Status': 'MISS',
+                'Vary': 'Accept', // Enable content negotiation
+                'ETag': `"${ipfsHash}"`, // Use IPFS hash as ETag
+                'Access-Control-Allow-Origin': '*', // Allow cross-origin
+                'Cross-Origin-Resource-Policy': 'cross-origin'
             }
         });
 

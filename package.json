@@ -11,7 +11,16 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
-    "cleanup:duplicates": "tsx scripts/maintenance/cleanup-duplicate-interactions.ts"
+    "cleanup:duplicates": "tsx scripts/maintenance/cleanup-duplicate-interactions.ts",
+    "sync:marketplace": "node scripts/sync-marketplace-data.js",
+    "migrate:favoriteCount": "node scripts/migrate-favoriteCount-to-likeCount.js",
+    "migrate:nft-metadata": "node scripts/migrate-nft-metadata.js",
+    "migrate:restructure": "tsx src/app/api/admin/migrate/restructure-marketplace-items/route.ts",
+    "migrate:cleanup-listings": "tsx src/app/api/admin/migrate/cleanup-invalid-listings/route.ts",
+    "migrate:clean-marketplace": "curl -X POST http://localhost:3000/api/admin/migrate/clean-marketplace-items",
+    "migrate:rename-fields": "curl -X POST http://localhost:3000/api/admin/migrate/rename-to-contractAddress",
+    "migrate:rename-likes": "curl -X POST http://localhost:3000/api/admin/migrate/rename-favorites-to-likes",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\""
   },
   "dependencies": {
     "@apollo/client": "^3.14.0",
@@ -26,32 +35,27 @@
     "lru-cache": "^11.2.1",
     "mongodb": "^6.19.0",
     "next": "15.5.2",
+    "pino-pretty": "^13.1.2",
     "postcss": "^8.5.6",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-error-boundary": "^6.0.0",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^3.4.3",
-    "viem": "^2.37.4",
+    "viem": "^2.40.3",
     "wagmi": "^2.16.9"
   },
   "devDependencies": {
     "@eslint/eslintrc": "3.0.0",
     "@next/bundle-analyzer": "^15.5.5",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.0",
     "@types/node": "^20.11.30",
     "@types/react": "18.2.44",
     "@types/react-dom": "18.2.18",
-    "@vitejs/plugin-react": "^5.1.1",
-    "@vitest/ui": "^4.0.8",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
     "dotenv": "^17.2.3",
     "eslint": "8.57.0",
     "eslint-config-next": "13.2.4",
-    "jsdom": "^27.2.0",
-    "pino-pretty": "^13.1.2",
     "tsx": "^4.20.6",
-    "typescript": "5.4.5",
-    "vitest": "^4.0.8"
+    "typescript": "5.4.5"
   }
 }

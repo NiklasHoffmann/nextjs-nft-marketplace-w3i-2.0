@@ -110,9 +110,22 @@ const nextConfig: import('next').NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: '**.ipfs.w3s.link',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'nftstorage.link',
+        port: '',
+        pathname: '/**',
+      },
     ],
     deviceSizes: [640, 768, 1024, 1280, 1600],
     imageSizes: [128, 256, 384, 512],
+    qualities: [40, 75, 85, 90, 95],
     formats: ['image/webp', 'image/avif'],
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
     dangerouslyAllowSVG: false,
@@ -159,6 +172,16 @@ const nextConfig: import('next').NextConfig = {
           {
             key: 'Cache-Control',
             value: 'public, max-age=300, stale-while-revalidate=86400',
+          },
+        ],
+      },
+      {
+        // Cache Next.js optimized images for 30 days
+        source: '/_next/image(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=2592000, stale-while-revalidate=86400, immutable',
           },
         ],
       },

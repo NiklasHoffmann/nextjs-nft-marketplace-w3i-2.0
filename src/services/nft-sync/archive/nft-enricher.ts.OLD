@@ -1,0 +1,382 @@
+/**
+ * NFT Data Enricher
+ * 
+ * Fetches additional data for NFTs from various sources:
+ * - Blockchain: Contract metadata, tokenURI
+ * - IPFS: NFT metadata (name, image, attributes)
+ * - Database: Stats (views, likes, ratings)
+ * - Admin: Insights (custom descriptions, categories)
+ */
+
+import { createPublicClient, http, getContract } from 'viem';
+import { sepolia } from 'viem/chains';
+import { erc721Abi } from 'viem';
+import { getEnrichedNFTsCollection } from '@/lib/mongodb';
+
+// Initialize Viem client
+const publicClient = createPublicClient({
+    chain: sepolia,
+    transport: http(process.env.NEXT_PUBLIC_ALCHEMY_API_KEY
+        ? `https://eth-sepolia.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
+        : undefined
+    ),
+});
+
+// Marketplace contract address for validation
+const MARKETPLACE_ADDRESS = '0x6B6825FbDA1dF2C890086E6E1F31f5D573788224'.toLowerCase();
+
+/**
+ * Validate if a listing is still valid
+ * Checks: owner === seller AND approved === marketplace
+ */
+function validateListing(
+    owner: string | null,
+    seller: string | null,
+    approved: string | null
+): { isValid: boolean; reasons: string[] } {
+    const reasons: string[] = [];
+
+    if (!owner || !seller) {
+        return { isValid: true, reasons }; // Cannot validate without data
+    }
+
+    const ownerMatchesSeller = owner.toLowerCase() === seller.toLowerCase();
+    const hasMarketplaceApproval = approved?.toLowerCase() === MARKETPLACE_ADDRESS;
+
+    if (!ownerMatchesSeller) {
+        reasons.push('owner_mismatch');
+    }
+
+    if (!hasMarketplaceApproval) {
+        reasons.push('no_approval');
+    }
+
+    return {
+        isValid: reasons.length === 0,
+        reasons
+    };
+}
+
+interface EnrichmentOptions {
+    forceRefresh?: boolean;
+    skipMetadata?: boolean;
+    skipStats?: boolean;
+    skipInsights?: boolean;
+}
+
+/**
+ * Main enrichment function - fetches all additional data for an NFT
+ */
+export async function enrichNFTData(
+    contractAddress: string,
+    tokenId: string,
+    options: EnrichmentOptions = {}
+): Promise<void> {
+    console.log(`🔍 Enriching NFT: ${contractAddress}/${tokenId}`);
+
+    try {
+        const collection = await getEnrichedNFTsCollection();
+
+        // Fetch contract metadata (name, symbol, totalSupply, tokenURI, owner)
+        const contractData = await fetchContractMetadata(contractAddress, tokenId);
+
+        // Fetch NFT metadata (name, image, attributes from tokenURI)
+        let nftMetadata = null;
+        if (!options.skipMetadata) {
+            nftMetadata = await fetchNFTMetadata(contractAddress, tokenId);
+        }
+
+        // Fetch stats from database (or initialize)
+        let stats = null;
+        if (!options.skipStats) {
+            stats = await fetchOrInitializeStats(contractAddress, tokenId);
+        }
+
+        // Fetch insights from database (or initialize)
+        let insights = null;
+        if (!options.skipInsights) {
+            insights = await fetchOrInitializeInsights(contractAddress, tokenId);
+        }
+
+        // Update MongoDB with enriched data
+        const update: any = {
+            'lastSync.metadata': new Date(),
+            'metadataSource': nftMetadata ? 'blockchain' : 'none',
+        };
+
+        if (contractData) {
+            update.contractName = contractData.name;
+            update.contractSymbol = contractData.symbol;
+            update['contract.contractName'] = contractData.name;
+            update['contract.contractSymbol'] = contractData.symbol;
+            update['contract.totalSupply'] = contractData.totalSupply;
+            update['contract.tokenURI'] = contractData.tokenURI;
+            update['contract.owner'] = contractData.owner;
+            update['contract.ownerBalance'] = contractData.ownerBalance;
+            update['contract.approved'] = contractData.approved;
+        }
+
+        if (nftMetadata) {
+            update.metadata = nftMetadata;
+            update.metadataLastSync = new Date();
+        }
+
+        if (stats) {
+            update['lastSync.stats'] = new Date();
+        }
+
+        if (insights) {
+            update['lastSync.insights'] = new Date();
+        }
+
+        // Validate listing if NFT is marked as listed
+        const existingNFT = await collection.findOne({ contractAddress, tokenId });
+        if (existingNFT?.marketplace?.isListed && contractData) {
+            const validationResult = validateListing(
+                contractData.owner,
+                existingNFT.marketplace.seller,
+                contractData.approved
+            );
+
+            if (!validationResult.isValid) {
+                update['marketplace.isValid'] = false;
+                update['marketplace.invalidReasons'] = validationResult.reasons;
+                update['marketplace.invalidatedAt'] = new Date();
+                console.log(`⚠️  Invalid listing detected: ${validationResult.reasons.join(', ')}`);
+            } else {
+                update['marketplace.isValid'] = true;
+            }
+            update['lastSync.validation'] = new Date();
+        }
+
+        // Update with $set and optionally $unset for valid listings
+        const updateQuery: any = { $set: update };
+
+        if (existingNFT?.marketplace?.isValid === false &&
+            existingNFT?.marketplace?.isListed &&
+            contractData &&
+            validateListing(contractData.owner, existingNFT.marketplace.seller, contractData.approved).isValid) {
+            // Remove invalid fields when listing becomes valid again
+            updateQuery.$unset = {
+                'marketplace.invalidReasons': '',
+                'marketplace.invalidatedAt': '',
+            };
+        }
+
+        await collection.updateOne(
+            { contractAddress, tokenId },
+            updateQuery
+        );
+
+        console.log(`✅ Enriched NFT: ${contractAddress}/${tokenId}`);
+
+    } catch (error) {
+        console.error(`❌ Error enriching NFT ${contractAddress}/${tokenId}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Fetch contract-level metadata including owner and approvals
+ */
+async function fetchContractMetadata(contractAddress: string, tokenId: string) {
+    try {
+        const contract = getContract({
+            address: contractAddress as `0x${string}`,
+            abi: erc721Abi,
+            client: publicClient,
+        });
+
+        const [name, symbol, totalSupply, tokenURI, owner, approved] = await Promise.allSettled([
+            contract.read.name(),
+            contract.read.symbol(),
+            contract.read.totalSupply?.() ?? Promise.reject('totalSupply not available'),
+            contract.read.tokenURI([BigInt(tokenId)]),
+            contract.read.ownerOf([BigInt(tokenId)]),
+            contract.read.getApproved([BigInt(tokenId)]),
+        ]);
+
+        // Get owner's balance if we have the owner
+        let ownerBalance = null;
+        if (owner.status === 'fulfilled') {
+            const balanceResult = await contract.read.balanceOf([owner.value]).catch(() => null);
+            ownerBalance = balanceResult ? Number(balanceResult) : null;
+        }
+
+        return {
+            name: name.status === 'fulfilled' ? name.value : null,
+            symbol: symbol.status === 'fulfilled' ? symbol.value : null,
+            totalSupply: totalSupply.status === 'fulfilled' ? Number(totalSupply.value) : null,
+            tokenURI: tokenURI.status === 'fulfilled' ? tokenURI.value : null,
+            owner: owner.status === 'fulfilled' ? owner.value : null,
+            ownerBalance,
+            approved: approved.status === 'fulfilled' ? approved.value : null,
+        };
+    } catch (error) {
+        console.error(`Error fetching contract metadata for ${contractAddress}:`, error);
+        return null;
+    }
+}
+
+/**
+ * Fetch NFT metadata from tokenURI
+ */
+async function fetchNFTMetadata(contractAddress: string, tokenId: string) {
+    try {
+        const contract = getContract({
+            address: contractAddress as `0x${string}`,
+            abi: erc721Abi,
+            client: publicClient,
+        });
+
+        // Get tokenURI
+        const tokenURI = await contract.read.tokenURI([BigInt(tokenId)]);
+
+        if (!tokenURI) {
+            return null;
+        }
+
+        // Convert IPFS URLs to HTTP gateway
+        let metadataUrl = tokenURI;
+        if (tokenURI.startsWith('ipfs://')) {
+            metadataUrl = tokenURI.replace('ipfs://', 'https://ipfs.io/ipfs/');
+        }
+
+        // Fetch metadata JSON
+        const response = await fetch(metadataUrl, {
+            headers: { 'Accept': 'application/json' },
+            next: { revalidate: 3600 }, // Cache for 1 hour
+        });
+
+        if (!response.ok) {
+            console.warn(`Failed to fetch metadata from ${metadataUrl}: ${response.status}`);
+            return null;
+        }
+
+        const metadata = await response.json();
+
+        // Convert IPFS image URLs
+        if (metadata.image && metadata.image.startsWith('ipfs://')) {
+            metadata.image = metadata.image.replace('ipfs://', 'https://ipfs.io/ipfs/');
+        }
+
+        return {
+            name: metadata.name || `NFT #${tokenId}`,
+            description: metadata.description || null,
+            image: metadata.image || null,
+            animationUrl: metadata.animation_url || null,
+            externalUrl: metadata.external_url || null,
+            attributes: metadata.attributes || [],
+        };
+
+    } catch (error) {
+        console.error(`Error fetching NFT metadata for ${contractAddress}/${tokenId}:`, error);
+        return null;
+    }
+}
+
+/**
+ * Fetch or initialize stats from database
+ */
+async function fetchOrInitializeStats(contractAddress: string, tokenId: string) {
+    try {
+        const collection = await getEnrichedNFTsCollection();
+
+        const doc = await collection.findOne(
+            { contractAddress, tokenId },
+            { projection: { stats: 1 } }
+        );
+
+        // Return existing stats or initialize
+        return doc?.stats || {
+            viewCount: 0,
+            favoriteCount: 0,
+            watchlistCount: 0,
+            likeCount: 0,
+            shareCount: 0,
+            commentCount: 0,
+            averageRating: 0,
+            ratingCount: 0,
+        };
+
+    } catch (error) {
+        console.error(`Error fetching stats for ${contractAddress}/${tokenId}:`, error);
+        return null;
+    }
+}
+
+/**
+ * Fetch or initialize insights from database
+ */
+async function fetchOrInitializeInsights(contractAddress: string, tokenId: string) {
+    try {
+        const collection = await getEnrichedNFTsCollection();
+
+        const doc = await collection.findOne(
+            { contractAddress, tokenId },
+            { projection: { insights: 1 } }
+        );
+
+        // Return existing insights or initialize
+        return doc?.insights || {
+            customTitle: null,
+            tags: [],
+            category: null,
+            rarity: null,
+            cardDescriptions: [],
+            projectDescriptions: { titleDescriptionPairs: [] },
+            functionalitiesDescriptions: { titleDescriptionPairs: [] },
+            projectWebsite: null,
+            projectTwitter: null,
+            projectDiscord: null,
+            partnerships: [],
+        };
+
+    } catch (error) {
+        console.error(`Error fetching insights for ${contractAddress}/${tokenId}:`, error);
+        return null;
+    }
+}
+
+/**
+ * Batch enrich multiple NFTs (useful for initial sync)
+ */
+export async function batchEnrichNFTs(
+    nfts: Array<{ contractAddress: string; tokenId: string }>,
+    options: EnrichmentOptions = {}
+): Promise<{ success: number; failed: number }> {
+    console.log(`🔄 Batch enriching ${nfts.length} NFTs...`);
+
+    let success = 0;
+    let failed = 0;
+
+    // Process in batches of 5 to avoid rate limits
+    const BATCH_SIZE = 5;
+
+    for (let i = 0; i < nfts.length; i += BATCH_SIZE) {
+        const batch = nfts.slice(i, i + BATCH_SIZE);
+
+        const results = await Promise.allSettled(
+            batch.map(nft => enrichNFTData(nft.contractAddress, nft.tokenId, options))
+        );
+
+        results.forEach(result => {
+            if (result.status === 'fulfilled') {
+                success++;
+            } else {
+                failed++;
+            }
+        });
+
+        console.log(`Progress: ${i + batch.length}/${nfts.length} (${success} success, ${failed} failed)`);
+
+        // Small delay to avoid rate limits
+        if (i + BATCH_SIZE < nfts.length) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+
+    console.log(`✅ Batch enrichment complete: ${success} success, ${failed} failed`);
+
+    return { success, failed };
+}

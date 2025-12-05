@@ -2,6 +2,8 @@
  * Utility functions for Admin access control
  */
 
+import { devLog } from '@/utils/devLog';
+
 /**
  * Check if a wallet address has admin access
  * @param walletAddress - The wallet address to check
@@ -15,7 +17,7 @@ export function hasAdminAccess(walletAddress: string | undefined): boolean {
 
     if (!adminAddresses) {
         // If no admin addresses are configured, deny access
-        console.warn('NEXT_PUBLIC_ADMIN_ADDRESSES not configured - denying admin access');
+        devLog.warn('admin-access', 'NEXT_PUBLIC_ADMIN_ADDRESSES not configured - denying admin access');
         return false;
     }
 
@@ -110,7 +112,7 @@ export function logAdminAccess(
 
     // Log to console in development
     if (process.env.NODE_ENV === 'development') {
-        console.log('ðŸ” Admin Access Log:', logEntry);
+        devLog.info('admin-access', '🔐 Admin Access Log:', logEntry);
     }
 
     // In production, this could be sent to a monitoring service
@@ -142,56 +144,4 @@ export function getAdminAddressesList(): string[] {
         .split(',')
         .map(addr => addr.trim().toLowerCase()) // Make consistent with hasAdminAccess
         .filter(addr => addr.length > 0 && isValidEthereumAddress(addr));
-}
-
-// Legacy functions for backwards compatibility with insights-specific code
-// These can be removed once all code is migrated to use the generic admin functions
-
-/**
- * @deprecated Use hasAdminAccess instead
- */
-export function hasInsightsAdminAccess(walletAddress: string | undefined): boolean {
-    return hasAdminAccess(walletAddress);
-}
-
-/**
- * @deprecated Use isAdminReadOnlyMode instead
- */
-export function isInsightsReadOnlyMode(): boolean {
-    return isAdminReadOnlyMode();
-}
-
-/**
- * @deprecated Use canPerformAdminActions instead
- */
-export function canEditInsights(walletAddress: string | undefined): boolean {
-    return canPerformAdminActions(walletAddress);
-}
-
-/**
- * @deprecated Use canViewAdminFeatures instead
- */
-export function canViewInsights(walletAddress: string | undefined): boolean {
-    // For insights, everyone can view, but for admin features, only admins can view
-    // Keep the original behavior for backwards compatibility
-    return true;
-}
-
-/**
- * @deprecated Use getAdminAccessMessage instead
- */
-export function getInsightsAccessMessage(walletAddress: string | undefined): string {
-    return getAdminAccessMessage(walletAddress);
-}
-
-/**
- * @deprecated Use logAdminAccess instead
- */
-export function logInsightsAccess(
-    walletAddress: string | undefined,
-    action: 'view' | 'create' | 'edit' | 'delete',
-    resource: string,
-    granted: boolean
-): void {
-    logAdminAccess(walletAddress, action, resource, granted);
 }

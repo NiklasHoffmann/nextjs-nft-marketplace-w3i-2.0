@@ -1,6 +1,8 @@
 ﻿// utils/01-core/01-core-bigint.ts
 // Add BigInt serialization support for JSON.stringify
 
+import { devLog } from '@/utils/devLog';
+
 // Extend BigInt prototype to add toJSON method
 declare global {
     interface BigInt {
@@ -30,7 +32,7 @@ export const parseBigIntFields = (obj: any, fields: string[]): any => {
             try {
                 result[field] = result[field];
             } catch (error) {
-                console.warn(`Failed to parse BigInt for field ${field}:`, error);
+                devLog.warn('bigint', `Failed to parse BigInt for field ${field}:`, error);
             }
         }
     });

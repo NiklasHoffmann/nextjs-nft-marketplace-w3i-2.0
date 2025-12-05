@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { formatEther } from 'viem';
+import { devLog } from '@/utils/devLog';
 import marketplaceAbi from '@/constants/marketplace.abi.json';
 
 export function useMarketplaceUser(marketplaceAddress: string) {
@@ -68,7 +69,7 @@ export function useMarketplaceUser(marketplaceAddress: string) {
         functionName: 'withdrawProceeds',
       });
     } catch (err: any) {
-      console.error('Error withdrawing proceeds:', err);
+      devLog.error('marketplace-user', 'Error withdrawing proceeds:', err);
       setError('Failed to withdraw proceeds');
       setIsLoading(false);
     }

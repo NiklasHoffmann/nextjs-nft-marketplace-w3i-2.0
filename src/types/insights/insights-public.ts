@@ -87,11 +87,12 @@ export interface PublicNFTInsightsResponse {
 
 // Request types for creating/updating public insights (admin only)
 export interface CreatePublicNFTInsightsRequest extends Omit<PublicNFTInsights, '_id' | 'createdAt' | 'updatedAt'> {
-    contractAddress: string;
+    // contractAddress inherits 0x${string} type from PublicNFTInsights
+    contractAddress: `0x${string}`;
     tokenId: string;
 }
 
 export interface UpdatePublicNFTInsightsRequest extends Partial<Omit<PublicNFTInsights, '_id' | 'contractAddress' | 'tokenId' | 'createdAt'>> {
-    contractAddress: string;
+    contractAddress: `0x${string}`;
     tokenId: string;
 }

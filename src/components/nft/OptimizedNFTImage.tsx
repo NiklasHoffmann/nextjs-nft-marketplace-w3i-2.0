@@ -42,55 +42,154 @@ const IPFS_GATEWAYS = [
 // Cache for tested gateways to avoid repeated testing
 const gatewayPerformanceCache = new Map<string, number>();
 
-// Simple LRU cache for image load results
+// Cache with timestamp for expired retry logic
+interface CacheEntry {
+    success: boolean;
+    timestamp: number;
+}
+
+// Storage key for localStorage persistence
+const STORAGE_KEY = 'nft-image-cache-v1';
+
 class ImageCache {
-    private cache = new Map<string, boolean>();
-    private maxSize = 100;
+    private cache = new Map<string, CacheEntry>();
+    private maxSize = 500; // Increased from 100 to 500 for better caching
+    private failureRetryTime = 5 * 60 * 1000; // 5 minutes for failed images
+    private saveDebounceTimer: NodeJS.Timeout | null = null;
+
+    constructor() {
+        // Load from localStorage on init
+        if (typeof window !== 'undefined') {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                if (stored) {
+                    const parsed = JSON.parse(stored) as [string, CacheEntry][];
+                    // Only load successful entries that are less than 24 hours old
+                    const now = Date.now();
+                    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+                    parsed.forEach(([key, entry]) => {
+                        if (entry.success && (now - entry.timestamp) < maxAge) {
+                            this.cache.set(key, entry);
+                        }
+                    });
+                }
+            } catch (e) {
+                // Ignore localStorage errors
+            }
+        }
+    }
+
+    private saveToStorage() {
+        if (typeof window === 'undefined') return;
+
+        // Debounce saves to avoid too many writes
+        if (this.saveDebounceTimer) {
+            clearTimeout(this.saveDebounceTimer);
+        }
+
+        this.saveDebounceTimer = setTimeout(() => {
+            try {
+                // Only save successful entries
+                const entries = Array.from(this.cache.entries())
+                    .filter(([_, entry]) => entry.success)
+                    .slice(-this.maxSize); // Keep latest entries
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+            } catch (e) {
+                // Ignore storage errors (quota exceeded, etc.)
+            }
+        }, 1000);
+    }
 
     set(key: string, value: boolean) {
         if (this.cache.size >= this.maxSize) {
-            const firstKey = this.cache.keys().next().value;
-            if (typeof firstKey === 'string') {
-                this.cache.delete(firstKey);
-            }
+            // Remove oldest entries
+            const entries = Array.from(this.cache.entries());
+            entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+            const toRemove = entries.slice(0, Math.floor(this.maxSize * 0.2)); // Remove 20%
+            toRemove.forEach(([k]) => this.cache.delete(k));
         }
-        this.cache.set(key, value);
+        this.cache.set(key, { success: value, timestamp: Date.now() });
+
+        // Persist successful loads
+        if (value) {
+            this.saveToStorage();
+        }
     }
 
     get(key: string): boolean | undefined {
-        return this.cache.get(key);
+        const entry = this.cache.get(key);
+        if (!entry) return undefined;
+
+        // If failed image is older than retry time, allow retry
+        if (!entry.success && (Date.now() - entry.timestamp) > this.failureRetryTime) {
+            this.cache.delete(key);
+            return undefined;
+        }
+
+        return entry.success;
+    }
+
+    // Check if we have many cached images (for preloading decision)
+    get size(): number {
+        return this.cache.size;
     }
 }
 
 const imageLoadCache = new ImageCache();
 
-// Extract IPFS hash from various URL formats
-const extractIPFSHash = (url: string): string | null => {
+// Extract IPFS hash from various URL formats (including path after hash)
+const extractIPFSInfo = (url: string): { hash: string; path: string } | null => {
     if (!url) return null;
 
     // ipfs:// protocol
     if (url.startsWith('ipfs://')) {
-        return url.replace('ipfs://', '').split('/')[0] || null;
+        const parts = url.replace('ipfs://', '').split('/');
+        const hash = parts[0];
+        const path = parts.slice(1).join('/');
+        return hash ? { hash, path } : null;
     }
 
     // HTTP IPFS gateway URLs
     if (url.includes('/ipfs/')) {
-        return url.split('/ipfs/')[1]?.split('/')[0] || null;
+        const afterIpfs = url.split('/ipfs/')[1];
+        if (!afterIpfs) return null;
+        const parts = afterIpfs.split('/');
+        const hash = parts[0];
+        const path = parts.slice(1).join('/');
+        return hash ? { hash, path } : null;
     }
 
     return null;
 };
 
-// Convert IPFS URLs to use our SERVER-SIDE IMAGE PROXY! âš¡
+// Legacy function for backward compatibility
+const extractIPFSHash = (url: string): string | null => {
+    const info = extractIPFSInfo(url);
+    return info?.hash || null;
+};
+
+// Convert IPFS URLs to use our server-side cache first, then fallback to gateways
 const optimizeImageUrl = (url: string): string[] => {
     if (!url) return [];
 
-    // Extract IPFS hash
-    const ipfsHash = extractIPFSHash(url);
+    // Extract IPFS hash and path
+    const ipfsInfo = extractIPFSInfo(url);
 
-    // If it's an IPFS URL, use our server proxy for INSTANT caching! ðŸš€
-    if (ipfsHash) {
-        return [`/api/nft/image/${ipfsHash}`];
+    // If it's an IPFS URL, use our server cache first!
+    if (ipfsInfo) {
+        const { hash, path: ipfsPath } = ipfsInfo;
+        const fullHash = ipfsPath ? `${hash}/${ipfsPath}` : hash;
+
+        // Priority order:
+        // 1. Our server-side cache (shared between all users!)
+        // 2. Cloudflare IPFS (fastest public gateway)
+        // 3. Other gateways as fallback
+        return [
+            `/api/nft/image/${encodeURIComponent(fullHash)}`, // Server cache - shared!
+            `https://cloudflare-ipfs.com/ipfs/${fullHash}`,   // Fast CDN fallback
+            `https://gateway.pinata.cloud/ipfs/${fullHash}`,  // Reliable fallback
+            `https://dweb.link/ipfs/${fullHash}`              // Last resort
+        ];
     }
 
     // If it's already a non-IPFS HTTP URL, use it directly
@@ -116,7 +215,7 @@ const OptimizedNFTImage = memo(({
     // Get all possible URLs for this image
     const imageUrls = optimizeImageUrl(imageUrl);
 
-    // Check if image is likely cached BEFORE setting initial loading state âš¡
+    // Check if image is likely cached BEFORE setting initial loading state ⚡
     const isCachedInitially = useMemo(() => {
         if (typeof window === 'undefined' || imageUrls.length === 0) return false;
         const cacheKey = imageUrls[0];
@@ -126,7 +225,7 @@ const OptimizedNFTImage = memo(({
 
     const [isLoading, setIsLoading] = useState(!isCachedInitially); // Start as loaded if cached!
     const [hasError, setHasError] = useState(false);
-    const [currentImageUrl, setCurrentImageUrl] = useState(imageUrl);
+    const [currentImageUrl, setCurrentImageUrl] = useState(() => imageUrls[0] || imageUrl);
     const [fallbackIndex, setFallbackIndex] = useState(0);
     const [aspectRatio, setAspectRatio] = useState<number | null>(null);
     const [isIntersecting, setIsIntersecting] = useState(priority || isCachedInitially);
@@ -160,7 +259,7 @@ const OptimizedNFTImage = memo(({
         const timeout = setTimeout(() => {
             testImg.onload = null;
             testImg.onerror = null;
-        }, 2000);
+        }, 5000); // Increased timeout
 
         testImg.onload = () => {
             clearTimeout(timeout);
@@ -173,12 +272,15 @@ const OptimizedNFTImage = memo(({
         testImg.onerror = () => {
             clearTimeout(timeout);
             imageLoadCache.set(cacheKey, false);
+            // Don't set hasError immediately - try fallback
+            setIsLoading(false);
         };
 
         testImg.src = cacheKey;
-    }, [imageUrls]);
+    }, [imageUrls, tokenId]);
 
     // Intersection Observer for lazy loading
+    // ⚡ OPTIMIZED: Larger rootMargin for earlier preloading
     useEffect(() => {
         if (priority || hasBeenVisible || !imgRef.current) return;
 
@@ -190,7 +292,10 @@ const OptimizedNFTImage = memo(({
                     observer.disconnect();
                 }
             },
-            { rootMargin: '200px' }
+            {
+                rootMargin: '400px', // ⚡ OPTIMIZED: Increased from 200px to 400px for earlier loading
+                threshold: 0.01      // ⚡ OPTIMIZED: Trigger as soon as 1% is visible
+            }
         );
 
         observer.observe(imgRef.current);
@@ -221,7 +326,8 @@ const OptimizedNFTImage = memo(({
         const firstUrl = newUrls[0];
         const isCached = firstUrl && imageLoadCache.get(firstUrl) === true;
 
-        setCurrentImageUrl(imageUrl);
+        // Use the optimized URL (e.g., /api/nft/image/{hash}) instead of raw IPFS URL
+        setCurrentImageUrl(firstUrl || imageUrl);
         setFallbackIndex(0);
         setHasError(false);
 
@@ -244,20 +350,24 @@ const OptimizedNFTImage = memo(({
             const nextIndex = fallbackIndex + 1;
             const nextUrl = imageUrls[nextIndex];
             if (nextUrl) {
-                setFallbackIndex(nextIndex);
-                setCurrentImageUrl(nextUrl);
-                setIsLoading(true);
+                // Small delay before retry to avoid flooding
+                setTimeout(() => {
+                    setFallbackIndex(nextIndex);
+                    setCurrentImageUrl(nextUrl);
+                    setIsLoading(true);
+                }, 100);
             } else {
                 // URL is undefined
                 setHasError(true);
                 setIsLoading(false);
             }
         } else {
-            // All fallbacks failed
+            // All fallbacks failed - cache as failed
+            imageLoadCache.set(imageUrls[0] || currentImageUrl, false);
             setHasError(true);
             setIsLoading(false);
         }
-    }, [fallbackIndex, imageUrls]);
+    }, [fallbackIndex, imageUrls, currentImageUrl]);
 
     // Determine object-fit based on aspect ratio - PRIORITIZE FULL IMAGE VISIBILITY
     const getObjectFit = () => {
@@ -383,11 +493,12 @@ const OptimizedNFTImage = memo(({
         placeholder: "blur" as const,
         blurDataURL,
         priority,
-        // Enhanced caching: use Next.js optimization for better caching
-        unoptimized: false, // Let Next.js optimize all images for better caching
-        // Responsive sizing for better caching - lower quality for background images
+        // Use Next.js image optimization for caching (30 day TTL in next.config.ts)
+        // Only use unoptimized for data: URLs or blob: URLs
+        unoptimized: currentImageUrl.startsWith('data:') || currentImageUrl.startsWith('blob:'),
+        // Optimized sizes for NFT cards - use consistent sizes for better cache hits
         sizes: fill ?
-            (tokenId.includes('-bg') ? "(max-width: 768px) 200px, 300px" : "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw") :
+            (tokenId.includes('-bg') ? "200px" : "(max-width: 640px) 160px, (max-width: 1024px) 200px, 256px") :
             `${width}px`,
         quality: tokenId.includes('-bg') ? 40 : 75, // Lower quality for background images
         ...(fill ? { fill: true } : { width, height }),
@@ -398,7 +509,7 @@ const OptimizedNFTImage = memo(({
             ref={imgRef}
             className={`relative overflow-hidden ${fill ? 'w-full h-full' : ''} ${aspectRatio && Math.abs(aspectRatio - 1) < 0.1 ? 'bg-transparent' : ''} ${className}`}
         >
-            <Image {...imageProps} />
+            <Image key={currentImageUrl} {...imageProps} />
 
             {/* Optimized single-layer glitter effect for sharp images */}
             {isSharpImage && displayGlitter && (

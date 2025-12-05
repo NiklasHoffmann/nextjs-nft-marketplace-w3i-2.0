@@ -2,26 +2,55 @@
 
 // NFT Collection Page Client Component
 // Zeigt alle NFTs einer spezifischen Collection an
-// Verwendet von: app/nft/[nftAddress]/page.tsx
+// Verwendet von: app/nft/[contractAddress]/page.tsx
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { useActiveItems } from '@/hooks'
+import { useMarketplaceV2 } from '@/hooks/marketplace/useMarketplaceV2'
+import { useCollections } from '@/contexts/collections/CollectionsContext'
 import { useNFTFilters } from '@/hooks/nfts/useNFTFilters'
-import { NFTFilterSidebar, NFTScrollList } from '@/components'
-import type { NFTScrollItem } from '@/components/marketplace/NFTScrollList'
-import type { NFTFilters, NFTSortOptions } from '@/components/marketplace/NFTFilterBar'
-import type { FilterableNFTItem } from '@/hooks/nfts/useNFTFilters'
+import { NFTFilterSidebar, NFTGallery } from '@/components'
+import { convertToScrollItems, convertToFilterableItems } from '@/utils/marketplace'
+import type { NFTFilters, NFTSortOptions } from '@/types/marketplace'
 
 interface CollectionPageClientProps {
     contractAddress: string
 }
 
 export default function CollectionPageClient({ contractAddress }: CollectionPageClientProps) {
-    // Use the same data source as ActiveItemsList
-    const { items: marketplaceItems, loading: graphLoading, error: graphError } = useActiveItems()
+    // Use V2 API to fetch items for this collection
+    const {
+        items: marketplaceItems,
+        loading: itemsLoading,
+        error: itemsError
+    } = useMarketplaceV2({
+        contractAddress: contractAddress,
+        isListed: true,
+        autoFetch: true,
+        limit: 50, // Reasonable limit for collection pages
+        sortBy: 'price',
+        sortOrder: 'asc'
+    })
+
+    // Get collection metadata from CollectionsContext
+    const { collections, loading: collectionsLoading } = useCollections()
+    const collectionMetadata = useMemo(() =>
+        collections.find(c => c.contractAddress?.toLowerCase() === contractAddress.toLowerCase()),
+        [collections, contractAddress]
+    )
 
     const [isLoading, setIsLoading] = useState(true)
+
+    // Debug log
+    useEffect(() => {
+        if (marketplaceItems.length > 0) {
+            console.log('📦 Collection Page loaded items:', {
+                count: marketplaceItems.length,
+                sample: marketplaceItems[0],
+                contractAddress
+            })
+        }
+    }, [marketplaceItems, contractAddress])
 
     // Filter and Sort State (wie im Marketplace)
     const [filters, setFilters] = useState<NFTFilters>({
@@ -34,45 +63,58 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
         direction: 'desc'
     })
 
-    // Filter marketplace items by contract address
-    const collectionNFTs = useMemo(() => {
-        if (!marketplaceItems || !Array.isArray(marketplaceItems)) {
-            return []
-        }
+    // Items are already filtered by contract address via API
+    const collectionNFTs = marketplaceItems
 
-        const filtered = marketplaceItems.filter((item: any) =>
-            item.nftAddress?.toLowerCase() === contractAddress.toLowerCase()
-        )
-
-        return filtered
-    }, [marketplaceItems, contractAddress])
-
-    // Convert to filterable format (wie im Marketplace)
-    const filterableItems: FilterableNFTItem[] = useMemo(() => {
-        return collectionNFTs.map((item: any) => ({
-            contractAddress: item.nftAddress,
-            nftAddress: item.nftAddress,
+    // Convert EnrichedNFTDocument to flat structure for compatibility
+    const flattenedItems = useMemo(() => {
+        return collectionNFTs.map(item => ({
+            // Core identifiers
+            contractAddress: item.contractAddress,
             tokenId: item.tokenId,
-            price: item.price,
-            isListed: item.isListed,
             listingId: item.listingId,
-            seller: item.seller,
-            buyer: item.buyer,
-            desiredNftAddress: item.desiredNftAddress,
-            desiredTokenId: item.desiredTokenId,
-            name: item.name,
-            symbol: item.symbol,
-            categories: item.categories || [],
-            description: item.description,
-            image: item.image,
-            imageUrl: item.imageUrl,
-            rarity: item.rarity,
-            averageRating: item.averageRating || 0,
-            viewCount: item.viewCount || 0,
-            favoriteCount: item.favoriteCount || 0, // Correct field name for sorting
-            watchlistCount: item.watchlistCount || 0,
+
+            // Marketplace data (flattened from nested structure)
+            price: item.marketplace?.price || null,
+            isListed: item.marketplace?.isListed || false,
+            seller: item.marketplace?.seller || null,
+            buyer: item.marketplace?.buyer || null,
+            desiredContractAddress: item.marketplace?.desiredContractAddress || null,
+            desiredTokenId: item.marketplace?.desiredTokenId || null,
+
+            // Metadata (flattened)
+            name: item.metadata?.name || `NFT #${item.tokenId}`,
+            description: item.metadata?.description || null,
+            image: item.metadata?.image || null,
+            imageUrl: item.metadata?.image || null,
+            animationUrl: item.metadata?.animationUrl || null,
+            attributes: item.metadata?.attributes || [],
+
+            // Contract data (flattened)
+            contractName: item.contract?.name || null,
+            contractSymbol: item.contract?.symbol || null,
+            owner: item.contract?.owner || null,
+
+            // Insights (flattened)
+            customTitle: item.insights?.customTitle || null,
+            category: item.insights?.category || null,
+            tags: item.insights?.tags || [],
+            rarity: item.insights?.rarity || null,
+            cardDescriptions: item.insights?.cardDescriptions || null,
+
+            // Stats will be loaded separately by NFTCard components
+            viewCount: 0,
+            likeCount: 0,
+            watchlistCount: 0,
+            averageRating: 0,
+            ratingCount: 0,
         }))
     }, [collectionNFTs])
+
+    // Convert to filterable format - using central utility function
+    const filterableItems = useMemo(() => {
+        return convertToFilterableItems(flattenedItems)
+    }, [flattenedItems])
 
     // Apply filters and sorting
     const { filteredItems: filteredNFTs, totalCount, filteredCount } = useNFTFilters(
@@ -81,53 +123,34 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
         sort
     )
 
-    // Calculate collection statistics
+    // Use collection metadata from CollectionsContext (pre-calculated)
     const collectionStats = useMemo(() => {
-        if (!collectionNFTs.length) return null
-
-        const prices = collectionNFTs
-            .map((item: any) => parseFloat(item.price || '0'))
-            .filter((price: number) => price > 0)
-
-        if (prices.length === 0) return null
-
-        const totalVolume = prices.reduce((sum: number, price: number) => sum + price, 0)
-        const avgPrice = totalVolume / prices.length
-        const minPrice = Math.min(...prices)
-        const maxPrice = Math.max(...prices)
+        if (!collectionMetadata) return null
 
         return {
-            totalListings: collectionNFTs.length,
-            totalVolume: totalVolume / 1e18, // Convert from wei to ETH
-            avgPrice: avgPrice / 1e18,
-            minPrice: minPrice / 1e18,
-            maxPrice: maxPrice / 1e18
+            totalListings: collectionMetadata.itemCount,
+            totalVolume: collectionMetadata.totalValue / 1e18, // Convert from wei to ETH
+            avgPrice: collectionMetadata.averagePrice ? collectionMetadata.averagePrice / 1e18 : 0,
+            minPrice: collectionMetadata.floorPrice ? collectionMetadata.floorPrice / 1e18 : 0,
+            maxPrice: 0, // Not in aggregation yet
+            totalSupply: collectionMetadata.totalSupply || 0,
+            totalLikes: collectionMetadata.totalLikes || 0,
+            totalViews: collectionMetadata.totalViews || 0,
+            totalWatchlist: collectionMetadata.totalWatchlist || 0,
+            averageRating: collectionMetadata.averageRating || 0,
+            totalRatings: collectionMetadata.totalRatings || 0,
+            uniqueOwners: collectionMetadata.uniqueOwners || 0
         }
-    }, [collectionNFTs])
-
-    // Convert NFTs to NFTScrollItem format
-    const convertToScrollItems = useCallback((items: any[]): NFTScrollItem[] => {
-        return items.map((item: any) => ({
-            nftAddress: item.contractAddress || item.nftAddress,
-            tokenId: item.tokenId,
-            price: item.price,
-            isListed: item.isListed,
-            listingId: item.listingId,
-            seller: item.seller,
-            buyer: item.buyer,
-            desiredNftAddress: item.desiredNftAddress,
-            desiredTokenId: item.desiredTokenId
-        }));
-    }, []);
+    }, [collectionMetadata])
 
     // Update loading state when data is available
     useEffect(() => {
-        if (!graphLoading) {
+        if (!itemsLoading && !collectionsLoading) {
             setIsLoading(false)
         }
-    }, [graphLoading])
+    }, [itemsLoading, collectionsLoading])
 
-    if (isLoading || graphLoading) {
+    if (isLoading || itemsLoading || collectionsLoading) {
         return (
             <div className="min-h-screen flex flex-col bg-gray-50">
                 <div className="flex justify-center items-center min-h-[400px] pt-[66px]">
@@ -163,7 +186,9 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
                                 </svg>
                             </Link>
                             <div>
-                                <h1 className="text-3xl font-bold text-gray-900">Collection</h1>
+                                <h1 className="text-3xl font-bold text-gray-900">
+                                    {collectionMetadata?.contractName || 'Collection'}
+                                </h1>
                                 <p className="font-mono text-xs text-gray-500 mt-1 break-all max-w-xl">
                                     {contractAddress}
                                 </p>
@@ -175,7 +200,7 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
                 {/* NFT List Area */}
                 <div className="pr-80">
                     {filteredNFTs.length > 0 ? (
-                        <NFTScrollList
+                        <NFTGallery
                             items={convertToScrollItems(filteredNFTs)}
                             enableInsights={true}
                             showStats={true}
@@ -186,7 +211,7 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
                         />
                     ) : (
                         <div className="flex flex-col items-center justify-center py-16 px-8">
-                            <div className="text-6xl mb-4">???</div>
+                            <div className="text-6xl mb-4">🖼️</div>
                             <h3 className="text-xl font-bold mb-2 text-gray-900">No NFTs Found</h3>
                             <p className="text-gray-600 mb-4 text-center">
                                 {filters.searchTerm || filters.categories.length > 0 || filters.rarities.length > 0
@@ -209,10 +234,10 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
                 </div>
 
                 {/* Error Message */}
-                {graphError && (
+                {itemsError && (
                     <div className="px-8 pb-8">
                         <div className="bg-orange-100 border border-orange-300 text-orange-800 px-4 py-3 rounded-lg text-sm">
-                            Using fallback data: {graphError.message}
+                            Error loading items: {itemsError}
                         </div>
                     </div>
                 )}
@@ -236,21 +261,73 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
                                     <span className="text-sm text-gray-600">Total Items</span>
                                     <span className="text-lg font-bold text-gray-900">{collectionStats.totalListings}</span>
                                 </div>
+                                {collectionStats.totalSupply > 0 && (
+                                    <div className="flex justify-between items-center pb-3 border-b border-gray-200">
+                                        <span className="text-sm text-gray-600">Total Supply</span>
+                                        <span className="text-lg font-bold text-gray-900">{collectionStats.totalSupply.toLocaleString()}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between items-center pb-3 border-b border-gray-200">
                                     <span className="text-sm text-gray-600">Floor Price</span>
-                                    <span className="text-lg font-bold text-green-600">{collectionStats.minPrice.toFixed(4)} ETH</span>
+                                    <span className="text-lg font-bold text-green-600">
+                                        {collectionStats.minPrice > 0 ? `${collectionStats.minPrice.toFixed(4)} ETH` : 'N/A'}
+                                    </span>
                                 </div>
                                 <div className="flex justify-between items-center pb-3 border-b border-gray-200">
                                     <span className="text-sm text-gray-600">Average Price</span>
-                                    <span className="text-lg font-bold text-blue-600">{collectionStats.avgPrice.toFixed(4)} ETH</span>
+                                    <span className="text-lg font-bold text-blue-600">
+                                        {collectionStats.avgPrice > 0 ? `${collectionStats.avgPrice.toFixed(4)} ETH` : 'N/A'}
+                                    </span>
                                 </div>
                                 <div className="flex justify-between items-center pb-3 border-b border-gray-200">
-                                    <span className="text-sm text-gray-600">Highest Price</span>
-                                    <span className="text-lg font-bold text-purple-600">{collectionStats.maxPrice.toFixed(4)} ETH</span>
-                                </div>
-                                <div className="flex justify-between items-center">
                                     <span className="text-sm text-gray-600">Total Volume</span>
                                     <span className="text-lg font-bold text-indigo-600">{collectionStats.totalVolume.toFixed(3)} ETH</span>
+                                </div>
+                                {collectionStats.uniqueOwners > 0 && (
+                                    <div className="flex justify-between items-center pb-3 border-b border-gray-200">
+                                        <span className="text-sm text-gray-600">Unique Owners</span>
+                                        <span className="text-lg font-bold text-purple-600">{collectionStats.uniqueOwners}</span>
+                                    </div>
+                                )}
+
+                                {/* Social Stats */}
+                                <div className="pt-3 border-t-2 border-gray-300">
+                                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Social Stats</h3>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-red-500">❤️</span>
+                                            <div>
+                                                <div className="text-xs text-gray-500">Likes</div>
+                                                <div className="text-sm font-bold text-gray-900">{collectionStats.totalLikes}</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-blue-500">👁️</span>
+                                            <div>
+                                                <div className="text-xs text-gray-500">Views</div>
+                                                <div className="text-sm font-bold text-gray-900">{collectionStats.totalViews}</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-amber-500">🔖</span>
+                                            <div>
+                                                <div className="text-xs text-gray-500">Watchlist</div>
+                                                <div className="text-sm font-bold text-gray-900">{collectionStats.totalWatchlist}</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-yellow-500">⭐</span>
+                                            <div>
+                                                <div className="text-xs text-gray-500">Rating</div>
+                                                <div className="text-sm font-bold text-gray-900">
+                                                    {collectionStats.averageRating > 0
+                                                        ? `${collectionStats.averageRating.toFixed(1)} (${collectionStats.totalRatings})`
+                                                        : 'N/A'
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         ) : (
@@ -298,7 +375,7 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
                         <div className="text-sm space-y-2">
                             <div className="flex justify-between items-center">
                                 <span className="text-gray-600">Showing</span>
-                                <span className="font-bold text-blue-600">{filteredCount} / {collectionNFTs.length}</span>
+                                <span className="text-font-bold text-blue-600">{filteredCount} / {marketplaceItems.length}</span>
                             </div>
                             {filters.searchTerm && (
                                 <div className="mt-2 p-2 bg-white rounded border border-blue-200">

@@ -16,6 +16,10 @@ export { useMarketplaceListing } from './useMarketplaceListing';
 export { useMarketplacePurchase } from './useMarketplacePurchase';
 export { useMarketplaceUser } from './useMarketplaceUser';
 
+// === MARKETPLACE V2 HOOKS (MongoDB-backed) ===
+export { useMarketplaceV2 } from './useMarketplaceV2';
+export { useNFTDetail } from './useNFTDetail';
+
 // Helper to get marketplace address from environment
 export const getMarketplaceAddress = (): string => {
   const address = process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS;

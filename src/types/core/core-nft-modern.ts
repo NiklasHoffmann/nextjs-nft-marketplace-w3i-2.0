@@ -5,18 +5,18 @@ import type { NFTProjectDescriptions, NFTFunctionalitiesDescriptions } from '../
 // Quellen
 export type ActiveItem = {
     listingId: string
-    nftAddress: `0x${string}`
+    contractAddress: `0x${string}`
     tokenId: string
     isListed: boolean
     price: string
     seller: `0x${string}`
     buyer: `0x${string}` | null
-    desiredNftAddress: `0x${string}`
+    desiredContractAddress: `0x${string}`
     desiredTokenId: string | null
 }
 
 export type NftCore = {
-    nftAddress: `0x${string}`
+    contractAddress: `0x${string}`
     tokenId: string
     tokenURI: string | null
     name: string | null // aus Contract
@@ -37,7 +37,7 @@ export type NftMeta = {
 }
 
 export type SocialStats = {
-    nftAddress: `0x${string}`
+    contractAddress: `0x${string}`
     tokenId?: string // optional; wenn nicht vorhanden => collection-level
     likeCount?: number
     watchlistCount?: number
@@ -49,7 +49,7 @@ export type SocialStats = {
 }
 
 export type Insight = {
-    nftAddress: `0x${string}`
+    contractAddress: `0x${string}`
     tokenId?: string // wenn fehlt => CollectionInsight
     customTitle?: string
     category?: string
@@ -80,8 +80,8 @@ export type Insight = {
 
 // Normalisiertes Ergebnis je NFT (einheitlich f�r Cards/Detail/Wallet)
 export type AggregatedNFT = {
-    key: `${string}-${string}` // `${nftAddress}-${tokenId}`
-    nftAddress: `0x${string}`
+    key: `${string}-${string}` // `${contractAddress}-${tokenId}`
+    contractAddress: `0x${string}`
     tokenId: string
     listed: boolean
     listing?: ActiveItem
@@ -102,7 +102,7 @@ export type AggregatedNFT = {
 
 // Zusammenfassung je Collection (f�r Tabellen & Collection-Page)
 export type CollectionSummary = {
-    nftAddress: `0x${string}`
+    contractAddress: `0x${string}`
     name?: string | null
     symbol?: string | null
     totalSupply?: number | null
@@ -116,7 +116,7 @@ export type CollectionSummary = {
 // ===== UTILITY TYPES =====
 
 export type NFTIdentifier = {
-    nftAddress: `0x${string}`
+    contractAddress: `0x${string}`
     tokenId: string
 }
 

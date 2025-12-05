@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
+import { devLog } from '@/utils/devLog';
 import {
     AdminNFTInsight,
     AdminCollectionInsight
@@ -70,7 +71,7 @@ export function useNFTInsights(options: UseNFTInsightsOptions = {}): UseNFTInsig
             setInsights(insightsData);
 
         } catch (err) {
-            console.error('âŒ Error fetching NFT insights:', err);
+            devLog.error('nft-insights', '❌ Error fetching NFT insights:', err);
             setError(err instanceof Error ? err.message : 'An error occurred');
             setInsights(null);
         } finally {
@@ -161,7 +162,7 @@ export function useAdminNFTInsights(): UseAdminNFTInsightsReturn {
             return result.data as AdminNFTInsight;
 
         } catch (err) {
-            console.error('Error creating NFT insights:', err);
+            devLog.error('nft-insights', 'Error creating NFT insights:', err);
             throw err;
         }
     }, []);
@@ -185,7 +186,7 @@ export function useAdminNFTInsights(): UseAdminNFTInsightsReturn {
             return result.data as AdminNFTInsight;
 
         } catch (err) {
-            console.error('Error updating NFT insights:', err);
+            devLog.error('nft-insights', 'Error updating NFT insights:', err);
             throw err;
         }
     }, []);
@@ -203,7 +204,7 @@ export function useAdminNFTInsights(): UseAdminNFTInsightsReturn {
             }
 
         } catch (err) {
-            console.error('Error deleting NFT insights:', err);
+            devLog.error('nft-insights', 'Error deleting NFT insights:', err);
             throw err;
         }
     }, []);
@@ -298,7 +299,7 @@ export function useNFTInsightsList(options: UseNFTInsightsListOptions = {}): Use
             setCurrentPage(page);
 
         } catch (err) {
-            console.error('Error fetching NFT insights list:', err);
+            devLog.error('nft-insights', 'Error fetching NFT insights list:', err);
             setError(err instanceof Error ? err.message : 'An error occurred');
             if (!append) {
                 setInsights([]);
@@ -386,7 +387,7 @@ export function useCollectionInsights(options: UseCollectionInsightsOptions = {}
             setInsights(insightsData);
 
         } catch (err) {
-            console.error('âŒ useCollectionInsights: Error fetching collection insights:', err);
+            devLog.error('collection-insights', '❌ useCollectionInsights: Error fetching collection insights:', err);
             setError(err instanceof Error ? err.message : 'An error occurred');
             setInsights(null);
         } finally {
@@ -457,7 +458,7 @@ export function useAdminCollectionInsights(): UseAdminCollectionInsightsReturn {
             return result.data as AdminCollectionInsight;
 
         } catch (err) {
-            console.error('Error creating collection insights:', err);
+            devLog.error('collection-insights', 'Error creating collection insights:', err);
             throw err;
         }
     }, []);
@@ -481,7 +482,7 @@ export function useAdminCollectionInsights(): UseAdminCollectionInsightsReturn {
             return result.data as AdminCollectionInsight;
 
         } catch (err) {
-            console.error('Error updating collection insights:', err);
+            devLog.error('collection-insights', 'Error updating collection insights:', err);
             throw err;
         }
     }, []);
@@ -499,7 +500,7 @@ export function useAdminCollectionInsights(): UseAdminCollectionInsightsReturn {
             }
 
         } catch (err) {
-            console.error('Error deleting collection insights:', err);
+            devLog.error('collection-insights', 'Error deleting collection insights:', err);
             throw err;
         }
     }, []);

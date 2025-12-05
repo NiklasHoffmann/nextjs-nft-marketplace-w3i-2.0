@@ -6,7 +6,7 @@ import { formatEther } from "@/utils";
 import OptimizedNFTImage from './OptimizedNFTImage';
 
 // Separate price component for demo
-const DemoPriceDisplay = memo(({ price, desiredNftAddress }: { price: string; desiredNftAddress: string }) => {
+const DemoPriceDisplay = memo(({ price, desiredContractAddress }: { price: string; desiredContractAddress: string }) => {
     const ethPrice = useMemo(() => parseFloat(formatEther(price)), [price]);
     const { convertedPrice, loading } = useETHPrice(ethPrice);
 
@@ -22,7 +22,7 @@ const DemoPriceDisplay = memo(({ price, desiredNftAddress }: { price: string; de
                     )}
                 </div>
                 <div className="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full shadow-lg border border-white/20">
-                    {desiredNftAddress !== "0x0000000000000000000000000000000000000000" ? (
+                    {desiredContractAddress !== "0x0000000000000000000000000000000000000000" ? (
                         <div className="flex items-center gap-2">
                             <div className="w-2 h-2 bg-orange rounded-full"></div>
                             <span className="text-xs font-medium text-orange">Swap</span>
@@ -41,7 +41,7 @@ const DemoPriceDisplay = memo(({ price, desiredNftAddress }: { price: string; de
 
 DemoPriceDisplay.displayName = 'DemoPriceDisplay';
 
-// Demo NFT Card component that doesn't use NFTContext
+// Demo NFT Card component for explanation purposes
 const DemoNFTCard = memo(() => {
     const router = useRouter();
 
@@ -129,7 +129,7 @@ const DemoNFTCard = memo(() => {
                         {/* Price */}
                         <DemoPriceDisplay
                             price="1000000000000000000"
-                            desiredNftAddress="0x0000000000000000000000000000000000000000"
+                            desiredContractAddress="0x0000000000000000000000000000000000000000"
                         />
                     </div>
                 </div>

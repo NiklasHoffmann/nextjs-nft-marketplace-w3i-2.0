@@ -4,6 +4,7 @@
  */
 
 import { QueryClient } from '@tanstack/react-query';
+import { devLog } from '@/utils/devLog';
 
 export interface CacheInvalidationConfig {
     // Blockchain events that trigger invalidation
@@ -248,7 +249,10 @@ export class CacheInvalidationManager {
      * Emergency cache clear (use with caution)
      */
     emergencyCacheClear(): void {
-        console.warn('ðŸš¨ Emergency cache clear initiated');
+        // Important warning for production monitoring
+        if (typeof window !== 'undefined') {
+            devLog.warn('cache', '🚨 Emergency cache clear initiated');
+        }
         this.queryClient.clear();
         this.invalidationQueue.clear();
         if (this.batchTimeout) {

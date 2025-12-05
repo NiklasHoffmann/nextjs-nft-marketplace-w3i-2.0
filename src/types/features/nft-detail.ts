@@ -25,13 +25,13 @@ export interface RoyaltyInfo {
 
 export interface NFTDetailsPageData {
     listingId: string;
-    nftAddress: string;
+    contractAddress: string;
     tokenId: string;
     isListed: boolean;
     price: string;
     seller: string;
     buyer?: string;
-    desiredNftAddress: string;
+    desiredContractAddress: string;
     desiredTokenId: string;
     metadata?: NftMeta;
 }
@@ -73,7 +73,7 @@ export interface NFTDetailHeaderProps {
     contractName?: string | null;
     collection?: string | null;
     contractSymbol?: string | null;
-    nftAddress: string;
+    contractAddress: string;
     isFavorited: boolean;
     onToggleFavorite: () => void;
     onShare: () => void;
@@ -106,6 +106,19 @@ export interface NFTPriceCardProps {
     convertedPrice: string;
     priceLoading: boolean;
     selectedCurrencySymbol: string;
+    // For Add to Cart functionality
+    contractAddress?: string;
+    tokenId?: string;
+    seller?: string;
+    listingId?: string;
+    // For owner-only actions
+    currentOwner?: string;
+    connectedAddress?: string;
+    nftName?: string;
+    nftImage?: string;
+    // For swap/trade functionality
+    desiredContractAddress?: string;
+    desiredTokenId?: string;
 }
 
 export interface NFTTabNavigationProps {
@@ -117,7 +130,7 @@ export interface NFTTabNavigationProps {
 export interface NFTInfoTabsProps {
     activeTab: TabType;
     onTabChange: (tab: TabType) => void;
-    nftAddress: string;
+    contractAddress: string;
     tokenId: string;
     contractName?: string | null;
     collection?: string | null;
@@ -141,13 +154,13 @@ export interface PropertiesDisplayProps {
 }
 
 export interface SwapTargetInfoProps {
-    desiredNftAddress: string;
+    desiredContractAddress: string;
     desiredTokenId: string;
 }
 
 export interface CollectionItemsListProps {
     collection?: string | null;
-    nftAddress: string;
+    contractAddress: string;
     tokenId: string;
     name?: string | null;
     price: string;
@@ -160,7 +173,7 @@ export interface ErrorDisplayProps {
 
 // Tab Component Props
 export interface ProjectTabProps {
-    nftAddress: string;
+    contractAddress: string;
     tokenId: string;
     contractName?: string | null;
     collection?: string | null;

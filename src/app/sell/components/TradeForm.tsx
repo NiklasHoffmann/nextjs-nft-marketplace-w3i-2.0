@@ -1,13 +1,13 @@
 ﻿'use client';
 
 import React, { useState } from 'react';
-import { NFTDetails } from '@/types/core/core-nft';
+import { AggregatedNFT } from '@/types/core/core-nft-modern';
 
 interface TradeFormProps {
-    selectedNFT: NFTDetails | null;
+    selectedNFT: AggregatedNFT | null;
     onSubmit: (data: {
         tradeType: 'specific' | 'collection' | 'open';
-        targetNFT?: NFTDetails;
+        targetNFT?: AggregatedNFT;
         targetCollection?: string;
         additionalETH?: string;
         description: string;
@@ -18,7 +18,7 @@ interface TradeFormProps {
 export function TradeForm({ selectedNFT, onSubmit }: TradeFormProps) {
     const [formData, setFormData] = useState({
         tradeType: 'specific' as 'specific' | 'collection' | 'open',
-        targetNFTAddress: '',
+        targetContractAddress: '',
         targetTokenId: '',
         targetCollection: '',
         additionalETH: '',
@@ -27,8 +27,8 @@ export function TradeForm({ selectedNFT, onSubmit }: TradeFormProps) {
     });
 
     const [errors, setErrors] = useState<Record<string, string>>({});
-    const [searchResults, setSearchResults] = useState<NFTDetails[]>([]);
-    const [selectedTargetNFT, setSelectedTargetNFT] = useState<NFTDetails | null>(null);
+    const [searchResults, setSearchResults] = useState<AggregatedNFT[]>([]);
+    const [selectedTargetNFT, setSelectedTargetNFT] = useState<AggregatedNFT | null>(null);
     const [isSearching, setIsSearching] = useState(false);
 
     const validateForm = () => {
@@ -78,21 +78,39 @@ export function TradeForm({ selectedNFT, onSubmit }: TradeFormProps) {
     };
 
     const searchNFT = async () => {
-        if (!formData.targetNFTAddress || !formData.targetTokenId) return;
+        if (!formData.targetContractAddress || !formData.targetTokenId) return;
 
         setIsSearching(true);
         try {
-            // Mock search - in real app wÃ¼rde hier eine API-Anfrage stattfinden
-            const mockResult: NFTDetails = {
-                nftAddress: formData.targetNFTAddress,
+            // Mock search - in real app würde hier eine API-Anfrage stattfinden
+            const mockResult: AggregatedNFT = {
+                key: `${formData.targetContractAddress}-${formData.targetTokenId}`,
+                contractAddress: formData.targetContractAddress as `0x${string}`,
                 tokenId: formData.targetTokenId,
-                metadata: {
+                listed: false,
+                core: {
+                    contractAddress: formData.targetContractAddress as `0x${string}`,
+                    tokenId: formData.targetTokenId,
+                    tokenURI: null,
+                    name: `Target NFT #${formData.targetTokenId}`,
+                    owner: '0xOtherUser' as `0x${string}`,
+                    symbol: 'TEST',
+                    contractName: 'Test Collection',
+                    contractSymbol: 'TEST'
+                },
+                meta: {
                     name: `Target NFT #${formData.targetTokenId}`,
                     description: 'Target NFT for trade',
                     image: '/media/custom-nft-3.jpg'
                 },
-                imageUrl: '/media/custom-nft-3.jpg',
-                owner: '0xOtherUser...'
+                lastUpdated: Date.now(),
+                sources: {
+                    blockchain: true,
+                    metadata: true,
+                    marketplace: false,
+                    social: false,
+                    insights: false
+                }
             };
 
             setSelectedTargetNFT(mockResult);
@@ -165,8 +183,8 @@ export function TradeForm({ selectedNFT, onSubmit }: TradeFormProps) {
                                 </label>
                                 <input
                                     type="text"
-                                    value={formData.targetNFTAddress}
-                                    onChange={(e) => handleInputChange('targetNFTAddress', e.target.value)}
+                                    value={formData.targetContractAddress}
+                                    onChange={(e) => handleInputChange('targetContractAddress', e.target.value)}
                                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                                     placeholder="0x..."
                                 />
@@ -186,7 +204,7 @@ export function TradeForm({ selectedNFT, onSubmit }: TradeFormProps) {
                                     <button
                                         type="button"
                                         onClick={searchNFT}
-                                        disabled={!formData.targetNFTAddress || !formData.targetTokenId || isSearching}
+                                        disabled={!formData.targetContractAddress || !formData.targetTokenId || isSearching}
                                         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 text-sm"
                                     >
                                         {isSearching ? 'Searching...' : 'Search'}
@@ -203,19 +221,19 @@ export function TradeForm({ selectedNFT, onSubmit }: TradeFormProps) {
                                     <h4 className="text-sm font-medium text-gray-900 mb-2">Target NFT</h4>
                                     <div className="flex gap-3">
                                         <img
-                                            src={selectedTargetNFT.imageUrl || '/media/custom-nft-3.jpg'}
-                                            alt={selectedTargetNFT.metadata?.name || 'Target NFT'}
+                                            src={selectedTargetNFT.meta?.image || '/media/custom-nft-3.jpg'}
+                                            alt={selectedTargetNFT.meta?.name || 'Target NFT'}
                                             className="w-16 h-16 rounded-lg object-cover"
                                         />
                                         <div>
                                             <h5 className="font-medium text-gray-900">
-                                                {selectedTargetNFT.metadata?.name || `NFT #${selectedTargetNFT.tokenId}`}
+                                                {selectedTargetNFT.meta?.name || `NFT #${selectedTargetNFT.tokenId}`}
                                             </h5>
                                             <p className="text-sm text-gray-600">
                                                 Token ID: {selectedTargetNFT.tokenId}
                                             </p>
                                             <p className="text-xs text-gray-500">
-                                                Owner: {selectedTargetNFT.owner?.slice(0, 6)}...{selectedTargetNFT.owner?.slice(-4)}
+                                                Owner: {selectedTargetNFT.core.owner?.slice(0, 6)}...{selectedTargetNFT.core.owner?.slice(-4)}
                                             </p>
                                         </div>
                                     </div>

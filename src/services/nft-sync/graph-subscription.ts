@@ -1,0 +1,307 @@
+/**
+ * GraphQL Subscription Manager
+ * 
+ * Listens to The Graph for marketplace events and updates MongoDB in real-time.
+ * When a new listing is detected, automatically enriches it with:
+ * - Contract metadata (name, symbol, totalSupply)
+ * - NFT metadata (name, image, attributes from tokenURI)
+ * - Stats (viewCount, likes, etc.)
+ * - Insights (custom data from admin)
+ */
+
+import { ApolloClient, InMemoryCache, HttpLink, split } from '@apollo/client';
+import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
+import { getMainDefinition } from '@apollo/client/utilities';
+import { createClient } from 'graphql-ws';
+import { ITEMS_UPDATED_SUBSCRIPTION } from '@/constants/subgraph.queries';
+import { getEnrichedNFTsCollection } from '@/lib/mongodb';
+import type { EnrichedNFTDocument } from '@/types/marketplace/enriched-nft';
+
+export class GraphQLSubscriptionManager {
+    private subscription: any = null;
+    private client: ApolloClient<any> | null = null;
+    private isActive: boolean = false;
+    private itemsProcessed: number = 0;
+    private lastUpdate: Date | null = null;
+    private pollingInterval: NodeJS.Timeout | null = null;
+    private usingPolling: boolean = false;
+
+    /**
+     * Start listening to The Graph subscription
+     * Falls back to polling if WebSocket fails
+     */
+    async start() {
+        if (this.isActive) {
+            console.log('⚠️ GraphQL subscription already active');
+            return;
+        }
+
+        console.log('📡 Starting The Graph subscription...');
+
+        try {
+            await this.startWebSocketSubscription();
+        } catch (error) {
+            console.warn('⚠️ WebSocket subscription failed, falling back to polling:', error);
+            await this.startPolling();
+        }
+    }
+
+    /**
+     * Try to start WebSocket subscription
+     */
+    private async startWebSocketSubscription() {
+        // Create Apollo Client with WebSocket for subscriptions
+        const httpLink = new HttpLink({
+            uri: process.env.NEXT_PUBLIC_SUBGRAPH_URL || 'http://localhost:8000/subgraphs/name/nft-marketplace',
+        });
+
+        const wsLink = new GraphQLWsLink(
+            createClient({
+                url: process.env.NEXT_PUBLIC_SUBGRAPH_WS_URL || 'ws://localhost:8000/subgraphs/name/nft-marketplace',
+                shouldRetry: () => false, // Don't auto-retry, we'll use polling instead
+                retryAttempts: 0,
+            })
+        );
+
+        // Split link for HTTP queries and WS subscriptions
+        const splitLink = split(
+            ({ query }) => {
+                const definition = getMainDefinition(query);
+                return (
+                    definition.kind === 'OperationDefinition' &&
+                    definition.operation === 'subscription'
+                );
+            },
+            wsLink,
+            httpLink
+        );
+
+        this.client = new ApolloClient({
+            link: splitLink,
+            cache: new InMemoryCache(),
+        });
+
+        // Subscribe to items updates with timeout
+        const subscriptionPromise = new Promise((resolve, reject) => {
+            let hasConnected = false;
+
+            this.subscription = this.client!.subscribe({
+                query: ITEMS_UPDATED_SUBSCRIPTION,
+            }).subscribe({
+                next: async (result) => {
+                    if (!hasConnected) {
+                        hasConnected = true;
+                        resolve(true);
+                    }
+                    await this.handleItemsUpdate(result.data?.items || []);
+                },
+                error: (error) => {
+                    if (!hasConnected) {
+                        reject(error);
+                    } else {
+                        console.error('❌ GraphQL subscription error:', error);
+                        // Switch to polling on connection loss
+                        this.startPolling();
+                    }
+                },
+            });
+
+            // Timeout after 5 seconds if no connection
+            setTimeout(() => {
+                if (!hasConnected) {
+                    reject(new Error('WebSocket connection timeout'));
+                }
+            }, 5000);
+        });
+
+        await subscriptionPromise;
+        this.isActive = true;
+        this.usingPolling = false;
+        console.log('✅ The Graph WebSocket subscription active');
+    }
+
+    /**
+     * Fallback polling mechanism using fetch
+     */
+    private async startPolling() {
+        if (this.pollingInterval) {
+            return; // Already polling
+        }
+
+        console.log('🔄 Starting polling mode (30s interval)...');
+
+        const graphUrl = process.env.NEXT_PUBLIC_SUBGRAPH_URL || 'http://localhost:8000/subgraphs/name/nft-marketplace';
+
+        // Use inline query string (proven to work)
+        const queryString = `
+            query GetActiveItems($first: Int = 20, $skip: Int = 0) {
+                items(
+                    first: $first
+                    skip: $skip
+                    orderBy: listingId
+                    orderDirection: desc
+                    where: { isListed: true }
+                ) {
+                    listingId
+                    nftAddress
+                    tokenId
+                    isListed
+                    price
+                    seller
+                    buyer
+                    desiredNftAddress
+                    desiredTokenId
+                }
+            }
+        `;
+
+        // Poll every 30 seconds
+        const poll = async () => {
+            try {
+                const response = await fetch(graphUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        query: queryString,
+                        variables: {
+                            first: 1000,
+                            skip: 0,
+                        },
+                    }),
+                });
+
+                const result = await response.json();
+
+                if (result.data?.items) {
+                    await this.handleItemsUpdate(result.data.items);
+                } else if (result.errors) {
+                    console.error('❌ GraphQL errors:', result.errors);
+                } else {
+                    console.error('❌ Unexpected response:', result);
+                }
+            } catch (error) {
+                console.error('❌ Polling error:', error);
+            }
+        };
+
+        // Initial poll
+        await poll();
+
+        // Set interval
+        this.pollingInterval = setInterval(poll, 30000);
+
+        this.isActive = true;
+        this.usingPolling = true;
+        console.log('✅ Polling mode active (checking every 30s)');
+    }
+
+    /**
+     * Stop subscription
+     */
+    async stop() {
+        if (this.subscription) {
+            this.subscription.unsubscribe();
+            this.subscription = null;
+        }
+
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+            this.pollingInterval = null;
+        }
+
+        this.isActive = false;
+        this.usingPolling = false;
+        console.log('🛑 The Graph subscription stopped');
+    }
+
+    /**
+     * Handle items update from subscription
+     */
+    private async handleItemsUpdate(items: any[]) {
+        if (!items || items.length === 0) return;
+
+        console.log(`📦 Received ${items.length} items from The Graph`);
+
+        try {
+            const collection = await getEnrichedNFTsCollection();
+
+            for (const item of items) {
+                try {
+                    await this.updateNFTFromGraph(item, collection);
+                    this.itemsProcessed++;
+                } catch (error) {
+                    // Use nftAddress for logging since that's what TheGraph returns
+                    const addr = item.contractAddress || item.nftAddress;
+                    console.error(`❌ Error updating NFT ${addr}-${item.tokenId}:`, error);
+                }
+            }
+
+            this.lastUpdate = new Date();
+            console.log(`✅ Processed ${items.length} items. Total: ${this.itemsProcessed}`);
+        } catch (error) {
+            console.error('❌ Error in handleItemsUpdate:', error);
+        }
+    }
+
+    /**
+     * Update single NFT from The Graph event
+     */
+    private async updateNFTFromGraph(item: any, collection: any) {
+        const priceAsNumber = typeof item.price === 'string' ? parseFloat(item.price) : item.price;
+
+        // MIGRATION MAPPING: TheGraph uses nftAddress, but we use contractAddress internally
+        const contractAddress = item.contractAddress || item.nftAddress;
+        const desiredContractAddress = item.desiredContractAddress || item.desiredNftAddress;
+
+        // ✅ FLAT STRUCTURE: All fields on top level, no nested "marketplace" object
+        const update: any = {
+            contractAddress: contractAddress,
+            tokenId: item.tokenId,
+            listingId: item.listingId,
+            isListed: item.isListed,
+            price: priceAsNumber, // Store as number for proper sorting
+            seller: item.seller,
+            buyer: item.buyer,
+            desiredContractAddress: desiredContractAddress,
+            desiredTokenId: item.desiredTokenId,
+            'lastSync.marketplace': new Date(),
+        };
+
+        const result = await collection.updateOne(
+            {
+                contractAddress: contractAddress,
+                tokenId: item.tokenId,
+                listingId: item.listingId  // Include listingId in filter
+            },
+            {
+                $set: update,
+                $setOnInsert: {
+                    // ONLY TheGraph data - NO metadata/contract/insights/stats!
+                    // Those belong in separate collections (nft_metadata, admin_nft_insights, nft_stats)
+                    listedAt: new Date(),
+                    createdAt: new Date(),
+                },
+            },
+            { upsert: true }
+        );
+
+        // New items are detected but enrichment happens separately via nft_metadata collection
+        // marketplace_items now only contains TheGraph data (listing info)
+        if (result.upsertedCount > 0) {
+            const addr = item.contractAddress || item.nftAddress;
+            console.log(`🆕 New marketplace listing: ${addr}-${item.tokenId} (listingId: ${item.listingId})`);
+        }
+    }
+
+    /**
+     * Get subscription status
+     */
+    getStatus() {
+        return {
+            isActive: this.isActive,
+            mode: this.usingPolling ? 'polling' : 'websocket',
+            itemsProcessed: this.itemsProcessed,
+            lastUpdate: this.lastUpdate,
+        };
+    }
+}

@@ -5,8 +5,11 @@ import { ErrorBoundary } from "react-error-boundary";
 import { ApolloProvider } from "@apollo/client/react";
 import apolloClient from '@/config/apolloClient';
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
-import { ModernNFTProvider } from "@/contexts/NFTContext";
-import { NFTStatsProvider } from "@/contexts/NFTStatsContext";
+import { NFTStatsProvider } from "@/contexts/nft-stats/NFTStatsContext";
+import { MarketplaceItemsProvider } from "@/contexts/marketplace-items";
+import { WalletNFTsProvider } from "@/contexts/wallet-nfts";
+import { CollectionsProvider } from "@/contexts/collections";
+import { CartProvider } from "@/contexts/CartContext";
 import { AdminGuard } from "@/components/auth";
 import Navbar from './Navbar';
 import Web3Provider from './Web3Provider';
@@ -46,18 +49,24 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     >
       <Web3Provider>
         <ApolloProvider client={apolloClient}>
-          <ModernNFTProvider>
-            <NFTStatsProvider>
-              <CurrencyProvider>
-                <AdminGuard>
-                  <div className="min-h-screen flex flex-col">
-                    <Navbar />
-                    <main className="flex-1">{children}</main>
-                  </div>
-                </AdminGuard>
-              </CurrencyProvider>
-            </NFTStatsProvider>
-          </ModernNFTProvider>
+          <NFTStatsProvider>
+            <MarketplaceItemsProvider>
+              <WalletNFTsProvider>
+                <CollectionsProvider>
+                  <CurrencyProvider>
+                    <CartProvider>
+                      <AdminGuard>
+                        <div className="min-h-screen flex flex-col">
+                          <Navbar />
+                          <main className="flex-1">{children}</main>
+                        </div>
+                      </AdminGuard>
+                    </CartProvider>
+                  </CurrencyProvider>
+                </CollectionsProvider>
+              </WalletNFTsProvider>
+            </MarketplaceItemsProvider>
+          </NFTStatsProvider>
         </ApolloProvider>
       </Web3Provider>
     </ErrorBoundary>

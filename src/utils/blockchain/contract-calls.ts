@@ -1,7 +1,8 @@
 ﻿// utils/04-blockchain/03-blockchain-contract-calls.ts
 import { createPublicClient, http, type PublicClient } from 'viem';
 import { sepolia } from 'viem/chains';
-import { createFallbackClients, getTimeoutConfig } from './rpc-config';
+import { devLog } from '@/utils/devLog';
+import { createFallbackClients, getTimeoutConfig } from '@/services/blockchain/rpc-config';
 
 interface ContractCallOptions {
     address: `0x${string}`;
@@ -69,7 +70,7 @@ export async function executeContractCallWithFallback<T>(
         } catch (error) {
             lastError = error as Error;
             const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-            console.warn(`?? ${functionName}: RPC endpoint ${i + 1} failed: ${errorMsg}`);
+            devLog.warn('contract-calls', `?? ${functionName}: RPC endpoint ${i + 1} failed: ${errorMsg}`);
 
             if (i < clients.length - 1) {
                 // Progressive delay: 500ms, 1000ms, 1500ms
@@ -107,7 +108,7 @@ export async function executeBatchContractCalls(
         } else {
             const call = calls[index];
             const functionName = call?.functionName || 'unknown';
-            console.error(`? Batch call ${index} (${functionName}) failed:`, result.reason);
+            devLog.error('contract-calls', `? Batch call ${index} (${functionName}) failed:`, result.reason);
             return {
                 success: false,
                 error: result.reason?.message || 'Unknown batch error'
@@ -141,7 +142,7 @@ export async function executeCriticalCall<T>(
     const result = await executeContractCallWithFallback<T>(criticalOptions);
 
     if (!result.success) {
-        console.error(`? Critical call ${options.functionName} failed after all retries`);
+        devLog.error('contract-calls', `? Critical call ${options.functionName} failed after all retries`);
     }
 
     return result;

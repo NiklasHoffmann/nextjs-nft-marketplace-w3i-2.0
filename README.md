@@ -41,11 +41,51 @@ A modern, full-stack NFT marketplace built with Next.js 15, TypeScript, and Web3
 - ERC-721 and ERC-2981 standard support
 - Real-time blockchain data synchronization
 
-### 💾 **Data Management**
+### 💾 **Data Management - Hybrid Architecture** ⚡ **NEW**
+
+#### **V2 Architecture: Separation of Concerns**
+- **`nft_metadata` Collection:** Central source of truth for all NFT data
+  - Metadata (name, image, description, attributes)
+  - Contract info (name, symbol, totalSupply)
+  - Ownership tracking with full history
+  - Insights (category, rarity, tags)
+  - **Instant wallet loading** (~50ms vs ~5000ms)
+  
+- **`marketplace_items` Collection:** Listing-specific data only
+  - Price, seller, buyer, listing status
+  - References `nft_metadata` via $lookup
+  - Smaller, faster queries
+  
+- **`nft_stats` Collection:** User interactions
+  - Views, likes, ratings, watchlist
+  - Aggregated statistics
+
+#### **Smart Sync Strategy**
+- **Alchemy Discovery:** withMetadata=false (cheap API calls)
+- **Blockchain Metadata:** Direct from contract + IPFS (free)
+- **90%+ API Cost Reduction:** Only fetch metadata for NEW NFTs
+- **Background Verification:** Auto-sync on wallet connect (doesn't block UI)
+- **Transfer Detection:** Automatic ownership updates
+
+#### **V1 (TheGraph) - Legacy** 
 - GraphQL integration with Apollo Client
+- Real-time blockchain data via TheGraph
+- Fully decentralized data source
+- Route: `/marketplace` (legacy)
+  - Server-side filtering, sorting, pagination
+  - Enriched data with insights and stats
+  - Route: `/marketplace-v2`
+  - 📊 [Performance Comparison](docs/MARKETPLACE_COMPARISON.md)
+
+- **Hybrid NFT Fetching System** ⚡ **OPTIMIZED**
+  - Parallel blockchain + Alchemy queries (60-70% faster)
+  - Smart field-level data merge
+  - Concurrent contract processing (3 at once)
+  - Performance: 12s → 5s (58% improvement)
+  - 📊 [Optimization Details](docs/OPTIMIZATION_SUMMARY.md)
+
 - Efficient caching and state management
 - **Centralized type definitions** for better consistency
-- Real-time updates via WebSocket subscriptions
 - Error handling and retry mechanisms
 - Optimized data fetching strategies
 

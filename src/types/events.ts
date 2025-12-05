@@ -37,7 +37,7 @@ export interface UserInteractionState {
  */
 export interface NFTStatsUpdateDetail {
     /** NFT contract address */
-    nftAddress: string;
+    contractAddress: string;
     /** NFT token ID */
     tokenId: string;
     /** Updated stats object */
@@ -55,7 +55,7 @@ export interface NFTStatsUpdateDetail {
  * Usage:
  * ```typescript
  * const event = new CustomEvent<NFTStatsUpdateDetail>('nft-stats-updated', {
- *   detail: { nftAddress, tokenId, stats, timestamp }
+ *   detail: { contractAddress, tokenId, stats, timestamp }
  * });
  * window.dispatchEvent(event);
  * ```

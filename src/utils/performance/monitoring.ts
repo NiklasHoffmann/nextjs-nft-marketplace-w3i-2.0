@@ -2,6 +2,8 @@
  * Performance monitoring utilities for the NFT marketplace
  */
 
+import { devLog } from '@/utils/devLog';
+
 interface PerformanceMetric {
     name: string;
     value: number;
@@ -48,7 +50,10 @@ class PerformanceMonitor {
 
         const threshold = thresholds[metric.name as keyof typeof thresholds];
         if (threshold && metric.value > threshold) {
-            console.warn(`Performance issue detected: ${metric.name} took ${metric.value}ms (threshold: ${threshold}ms)`);
+            // Performance warnings are important even in production
+            if (typeof window !== 'undefined') {
+                devLog.warn('performance', `Performance issue detected: ${metric.name} took ${metric.value}ms (threshold: ${threshold}ms)`);
+            }
         }
     }
 

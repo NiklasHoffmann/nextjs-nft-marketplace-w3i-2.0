@@ -2,15 +2,17 @@
  * Utility functions for formatting data
  */
 
+import { devLog } from '@/utils/devLog';
 import { FormattedPrice } from '@/types';
 
 /**
  * Format Wei value to Ether with proper decimals
+ * Supports both string and bigint inputs
  */
-export const formatEther = (weiValue: string): string => {
+export const formatEther = (weiValue: string | bigint): string => {
     try {
         // Convert Wei to ETH (1 ETH = 10^18 Wei)
-        const wei = BigInt(weiValue);
+        const wei = typeof weiValue === 'bigint' ? weiValue : BigInt(weiValue);
 
         // Use higher precision calculation
         const ethValue = Number(wei) / (10 ** 18);
@@ -29,8 +31,9 @@ export const formatEther = (weiValue: string): string => {
             return ethValue.toFixed(4).replace(/\.?0+$/, '');
         }
     } catch (error) {
-        console.error('Error formatting ether:', error);
-        return weiValue; // Return original value if conversion fails
+        devLog.error('formatters', 'Error formatting ether:', error);
+        // Return original value as string if conversion fails
+        return String(weiValue);
     }
 };
 

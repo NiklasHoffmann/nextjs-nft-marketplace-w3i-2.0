@@ -6,8 +6,10 @@ import Image from "next/image";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useAccount, useBalance } from 'wagmi';
 import { Web3ConnectButton } from './Web3ConnectButton';
-import CurrencySelector from '../marketplace/CurrencySelector';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import CurrencySelector from '../ui/CurrencySelector';
 import { hasAdminAccess } from '@/utils';
+import { useCart } from '@/contexts';
 
 export default function Navbar() {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -64,6 +66,9 @@ export default function Navbar() {
 
     // Check if user has admin access
     const isAdmin = mounted ? hasAdminAccess(address) : false;
+
+    // Get cart state
+    const { itemCount } = useCart();
 
     // Format wallet address (show first 6 and last 4 characters)
     const formatAddress = (addr: string) => {
@@ -174,6 +179,22 @@ export default function Navbar() {
                 </div>
                 {/* Right Section - hidden on mobile */}
                 <div className="hidden md:flex items-center gap-4 ml-6">
+                    {/* Cart Icon with Badge */}
+                    <Link
+                        href="/cart"
+                        className="relative p-2 text-gray-700 hover:text-blue-600 transition-colors"
+                        title="Shopping Cart"
+                    >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        {itemCount > 0 && (
+                            <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full min-w-[1.25rem]">
+                                {itemCount > 99 ? '99+' : itemCount}
+                            </span>
+                        )}
+                    </Link>
+
                     {/* Sell Link */}
                     {isAdmin ? (
                         <Link

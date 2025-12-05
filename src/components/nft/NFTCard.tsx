@@ -3,8 +3,7 @@
 
 import React, { useMemo, memo, useCallback, useRef, useState, useEffect } from 'react';
 import { useRouter } from "next/navigation";
-import { useModernNFTContext, useModernNFT } from '@/contexts/NFTContext';
-import { useNFTStatsContext } from '@/contexts/NFTStatsContext';
+import { useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
 import { useETHPrice } from "@/contexts/CurrencyContext";
 import { formatEther } from "@/utils";
 import { devLog } from '@/utils/devLog';
@@ -36,8 +35,44 @@ interface LegacyNFTCardProps {
   seller?: string;
   buyer?: string | null;
   isListed?: boolean;
-  desiredNftAddress?: string;
+  desiredContractAddress?: string;
   desiredTokenId?: string;
+  // MongoDB-optimierte Daten (optional - verhindert API calls!)
+  metadata?: {
+    name?: string | null;
+    description?: string | null;
+    image?: string | null;
+    animationUrl?: string | null;
+    externalUrl?: string | null;
+    attributes?: Array<{ trait_type: string; value: string | number }>;
+  };
+  insights?: {
+    customTitle?: string | null;
+    category?: string | null;
+    tags?: string[];
+    rarity?: string | null;
+    cardDescriptions?: string[];
+    projectDescriptions?: any;
+    functionalitiesDescriptions?: any;
+    projectWebsite?: string | null;
+    projectTwitter?: string | null;
+    projectDiscord?: string | null;
+    partnerships?: string[];
+  };
+  contract?: {
+    // New field names (from nft_metadata collection)
+    name?: string | null;
+    symbol?: string | null;
+    // Legacy field names (backward compatibility)
+    contractName?: string | null;
+    contractSymbol?: string | null;
+    totalSupply?: number | bigint | null;
+    owner?: string | null;
+    tokenURI?: string | null;
+    approved?: string | null;
+    ownerBalance?: number | bigint | null;
+  };
+  // Stats werden über StatsContext geladen (nicht über Props!)
   // Display options
   showStats?: boolean;
   className?: string;
@@ -57,9 +92,9 @@ function isLegacyProps(props: NFTCardAllProps): props is LegacyNFTCardProps {
 function isNewProps(props: NFTCardAllProps): props is NFTCardProps {
   return 'nft' in props;
 }
-const PriceDisplay = memo(({ price, desiredNftAddress }: {
+const PriceDisplay = memo(({ price, desiredContractAddress }: {
   price: string | null;
-  desiredNftAddress?: string | null;
+  desiredContractAddress?: string | null;
 }) => {
   const ethPrice = useMemo(() =>
     price ? parseFloat(formatEther(price)) : 0, [price]
@@ -68,7 +103,7 @@ const PriceDisplay = memo(({ price, desiredNftAddress }: {
 
   if (!price) return null;
 
-  const isSwap = desiredNftAddress && desiredNftAddress !== "0x0000000000000000000000000000000000000000";
+  const isSwap = desiredContractAddress && desiredContractAddress !== "0x0000000000000000000000000000000000000000";
 
   return (
     <div className="bg-white/95 backdrop-blur-sm p-2 rounded-md shadow-2xl border border-gray-200/60 ring-1 ring-gray-300/20">
@@ -106,6 +141,8 @@ PriceDisplay.displayName = 'PriceDisplay';
 export function NFTCard(props: NFTCardAllProps) {
   const router = useRouter();
 
+
+
   // ===== PROPS NORMALIZATION =====
 
   // Extract common display options
@@ -118,8 +155,8 @@ export function NFTCard(props: NFTCardAllProps) {
 
   // Handle both new and legacy prop formats
   let nft: AggregatedNFT;
-  let contractAddress: string;
-  let tokenId: string;
+  let contractAddress: string | undefined;
+  let tokenId: string | undefined;
 
   // Legacy props for backward compatibility
   let listingId: string | null = null;
@@ -127,13 +164,13 @@ export function NFTCard(props: NFTCardAllProps) {
   let seller: string | null = null;
   let buyer: string | null = null;
   let isListed: boolean = false;
-  let desiredNftAddress: `0x${string}` | undefined;
+  let desiredContractAddress: `0x${string}` | undefined;
   let desiredTokenId: string | null = null;
 
   if (isNewProps(props)) {
     // New simplified interface - just use the AggregatedNFT
     nft = props.nft;
-    contractAddress = nft.core.nftAddress;
+    contractAddress = nft.core.contractAddress;
     tokenId = nft.core.tokenId;
   } else {
     // Legacy interface - extract all props and construct AggregatedNFT
@@ -144,28 +181,28 @@ export function NFTCard(props: NFTCardAllProps) {
     seller = props.seller || null;
     buyer = props.buyer || null;
     isListed = props.isListed || false;
-    desiredNftAddress = props.desiredNftAddress as `0x${string}` | undefined;
+    desiredContractAddress = props.desiredContractAddress as `0x${string}` | undefined;
     desiredTokenId = props.desiredTokenId || null;
 
     // Create minimal AggregatedNFT from legacy props
     nft = {
       key: `${contractAddress}-${tokenId}` as `${string}-${string}`,
-      nftAddress: contractAddress as `0x${string}`,
+      contractAddress: contractAddress as `0x${string}`,
       tokenId,
       listed: isListed,
       listing: isListed && listingId ? {
         listingId,
-        nftAddress: contractAddress as `0x${string}`,
+        contractAddress: contractAddress as `0x${string}`,
         tokenId,
         isListed,
         price: price || '0',
         seller: seller as `0x${string}`,
         buyer: buyer as `0x${string}` | null,
-        desiredNftAddress: desiredNftAddress || contractAddress as `0x${string}`,
+        desiredContractAddress: desiredContractAddress || contractAddress as `0x${string}`,
         desiredTokenId: desiredTokenId
       } : undefined,
       core: {
-        nftAddress: contractAddress as `0x${string}`,
+        contractAddress: contractAddress as `0x${string}`,
         tokenId,
         tokenURI: null,
         name: null,
@@ -186,32 +223,43 @@ export function NFTCard(props: NFTCardAllProps) {
     };
   }
 
-  // REACTIVE Context Access - automatically re-renders when NFT data changes!
-  // This uses useSyncExternalStore internally for selective re-renders
-  const { nft: contextNFT, isLoading: contextLoading, refresh } = useModernNFT(contractAddress, tokenId, true);
-  const contextData = contextNFT;
-  const nftContext = useModernNFTContext(); // Keep for refresh() call
+  // Early return if essential props are missing (MUST be before any hooks!)
+  if (!contractAddress || !tokenId) {
+    devLog.error('NFTCard: Missing contractAddress or tokenId', { contractAddress, tokenId, props });
+    return null;
+  }
 
-  // Get stats context for real-time stats access
-  const statsContext = useNFTStatsContext();
+  // MongoDB-optimized data from props (prevents API calls)
+  const hasMongoDBData = isLegacyProps(props) && (props.metadata || props.insights || props.contract);
+
+  // REACTIVE Context Access - automatically re-renders when NFT data changes!
+  // NFT data comes from props (MongoDB), no context needed
+  const contextData = null;
+  const contextLoading = false;
+  const contextError = null;
+
+  // Get stats using the simplified hook - automatically loads and stays reactive
+  const { stats: liveStats, loading: statsLoading } = useNFTUserStats(contractAddress, tokenId);
+
+  // Log optimization status
+  useEffect(() => {
+    if (hasMongoDBData) {
+      devLog.info('NFTCard using MongoDB-optimized data (no API calls!):', {
+        contractAddress,
+        tokenId,
+        hasMetadata: !!isLegacyProps(props) && !!props.metadata,
+        hasInsights: !!isLegacyProps(props) && !!props.insights,
+        hasContract: !!isLegacyProps(props) && !!props.contract
+      });
+    }
+  }, [hasMongoDBData, contractAddress, tokenId]);
 
   // Track if we ever had data to prevent skeleton flickering on refresh
   const hadDataRef = useRef(false);
   const isLoadingRef = useRef(contextLoading);
   const loadAttemptedRef = useRef(!!contextData);
 
-  // Use ref to keep statsContext stable in event handler
-  const statsContextRef = useRef(statsContext);
-
-  useEffect(() => {
-    statsContextRef.current = statsContext;
-  });
-
-  // Store live stats in state for reactivity
-  const [liveStats, setLiveStats] = useState(() => statsContext.getStats(contractAddress, tokenId));
-
-  // Track if we already synced stats on this mount to prevent duplicate syncs
-  const hasInitialSyncRef = useRef(false);
+  // Stats are now loaded automatically by useNFTUserStats hook
 
   useEffect(() => {
     if (contextData) {
@@ -223,150 +271,114 @@ export function NFTCard(props: NFTCardAllProps) {
     }
   }, [contextData, contextLoading]);
 
-  // Sync stats from context ONCE on mount (e.g., when returning from detail page)
-  // This ensures we show the latest stats if they were updated while component was unmounted
-  useEffect(() => {
-    const latestStats = statsContext.getStats(contractAddress, tokenId);
-    if (latestStats) {
-      const currentStats = liveStats;
-      const hasChanged = !currentStats ||
-        currentStats.favoriteCount !== latestStats.favoriteCount ||
-        currentStats.watchlistCount !== latestStats.watchlistCount ||
-        currentStats.viewCount !== latestStats.viewCount ||
-        currentStats.averageRating !== latestStats.averageRating ||
-        currentStats.ratingCount !== latestStats.ratingCount;
-
-      if (hasChanged) {
-        devLog.cache('NFTCard syncing stats from context:', {
-          contractAddress,
-          tokenId,
-          old: currentStats,
-          new: latestStats,
-          trigger: hasInitialSyncRef.current ? 'update' : 'mount'
-        });
-        setLiveStats(latestStats);
-      }
-    }
-
-    if (!hasInitialSyncRef.current) {
-      hasInitialSyncRef.current = true;
-    }
-  }, [contractAddress, tokenId, statsContext]); // Re-run when NFT changes
-
-  // Reset sync flag when NFT changes (not just on unmount)
-  useEffect(() => {
-    // Reset flag for new NFT
-    hasInitialSyncRef.current = false;
-
-    return () => {
-      // Also reset on unmount for next mount
-      hasInitialSyncRef.current = false;
-    };
-  }, [contractAddress, tokenId]);
-
-  // Update live stats when component mounts or when stats change
-  useEffect(() => {
-    // Listen for stats updates from detail page or other components
-    const handleStatsUpdate = (event: WindowEventMap['nft-stats-updated']) => {
-      const { nftAddress: updatedAddress, tokenId: updatedTokenId, stats, source } = event.detail;
-
-      // Only update if this is the NFT that was updated
-      if (updatedAddress.toLowerCase() === contractAddress.toLowerCase() &&
-        updatedTokenId === tokenId) {
-        // Use stats from event detail (guaranteed to be latest)
-        // OR fall back to fetching from context if not provided
-        const currentStats = stats || statsContextRef.current.getStats(contractAddress, tokenId);
-        devLog.info('NFTCard stats updated from event:', {
-          contractAddress,
-          tokenId,
-          stats: currentStats,
-          source
-        });
-        setLiveStats(currentStats);
-      }
-    };
-
-    window.addEventListener('nft-stats-updated', handleStatsUpdate);
-    return () => window.removeEventListener('nft-stats-updated', handleStatsUpdate);
-  }, [contractAddress, tokenId]);
-
   // useModernNFT already handles loading automatically with autoLoad=true
   // No need for manual load useEffect anymore!
-
-  // Silent background refresh on hover - only if data is very stale (>60min)
-  // This prevents visible reloading but keeps data fresh over time
+  // DEPRECATED: Silent refresh removed - all data comes from props now
   const handleHover = useCallback(() => {
-    // Only refresh if:
-    // 1. No data at all, OR
-    // 2. Data is VERY stale (>60 min old) - not just "not fresh"
-    const shouldRefresh = !contextData || (() => {
-      const nftKey = `${contractAddress.toLowerCase()}-${tokenId}`;
-      const entry = nftContext.getNFT(contractAddress, tokenId);
-      if (!entry) return true;
+    // No-op - data refresh handled by parent components
+  }, []);
 
-      // Check if data is VERY stale (>60 minutes)
-      const age = Date.now() - entry.lastUpdated;
-      const VERY_STALE_MS = 60 * 60 * 1000; // 60 minutes
-      return age > VERY_STALE_MS;
-    })();
+  // MongoDB-optimized props (legacy interface)
+  const mongoMetadata = isLegacyProps(props) ? props.metadata : undefined;
+  const mongoInsights = isLegacyProps(props) ? props.insights : undefined;
+  const mongoContract = isLegacyProps(props) ? props.contract : undefined;
 
-    if (shouldRefresh) {
-      // Silent refresh in background - don't show loading state
-      refresh();
-    }
-  }, [contractAddress, tokenId, contextData, refresh, nftContext]);
-
-  // Hybrid data approach: props override context data
+  // Hybrid data approach: MongoDB props > context data > defaults
+  // When MongoDB data available, use ONLY MongoDB (no context fallback needed!)
   const displayData = useMemo(() => {
+    // If we have MongoDB data, use it exclusively (optimization!)
+    if (hasMongoDBData) {
+      return {
+        // Core identification
+        contractAddress,
+        tokenId,
+
+        // Marketplace data (from props)
+        listingId: listingId || null,
+        price: price || null,
+        seller: seller || null,
+        buyer: buyer || null,
+        isListed: isListed ?? false,
+        desiredContractAddress: desiredContractAddress || null,
+        desiredTokenId: desiredTokenId || null,
+
+        // Metadata - ONLY MongoDB (no API calls!)
+        name: mongoMetadata?.name || `NFT #${tokenId}`,
+        imageUrl: mongoMetadata?.image || null,
+
+        // Contract info - ONLY MongoDB
+        contractInfo: mongoContract ? {
+          name: mongoContract.name || null,
+          symbol: mongoContract.symbol || null,
+          totalSupply: mongoContract.totalSupply || null,
+          owner: mongoContract.owner || null
+        } : null,
+
+        // Insights data - ONLY MongoDB
+        customTitle: mongoInsights?.customTitle || null,
+        category: mongoInsights?.category || null,
+        cardDescriptions: mongoInsights?.cardDescriptions || null,
+        rarity: mongoInsights?.rarity || null,
+
+        // Stats - ALWAYS use live stats from NFTStatsContext (real-time!)
+        likeCount: liveStats?.likeCount ?? null,
+        watchlistCount: liveStats?.watchlistCount ?? null,
+        averageRating: liveStats?.averageRating ?? null,
+
+        // No loading state - we have data!
+        isLoading: false,
+      };
+    }
+
+    // Fallback: No MongoDB data, use AggregatedNFT data (new approach)
     return {
       // Core identification
       contractAddress,
       tokenId,
 
       // Marketplace data (props have priority)
-      listingId: listingId || contextData?.listing?.listingId || null,
-      price: price || contextData?.listing?.price || null,
-      seller: seller || contextData?.listing?.seller || null,
-      buyer: buyer || contextData?.listing?.buyer || null,
-      isListed: isListed ?? contextData?.listed ?? false,
-      desiredNftAddress: desiredNftAddress || contextData?.listing?.desiredNftAddress || null,
-      desiredTokenId: desiredTokenId || contextData?.listing?.desiredTokenId || null,
+      listingId: listingId || nft.listing?.listingId || null,
+      price: price || nft.listing?.price || null,
+      seller: seller || nft.listing?.seller || null,
+      buyer: buyer || nft.listing?.buyer || null,
+      isListed: isListed ?? nft.listed ?? false,
+      desiredContractAddress: desiredContractAddress || nft.listing?.desiredContractAddress || null,
+      desiredTokenId: desiredTokenId || nft.listing?.desiredTokenId || null,
 
-      // Metadata (from context - AggregatedNFT structure)
-      name: contextData?.meta?.name || contextData?.core?.name || `NFT #${tokenId}`,
-      imageUrl: contextData?.meta?.image || null,
+      // Metadata - from nft data
+      name: nft.meta?.name || nft.core?.name || `NFT #${tokenId}`,
+      imageUrl: nft.meta?.image || null,
 
-      // Contract info (from context - core structure)
-      contractInfo: contextData?.core ? {
-        name: contextData.core.contractName || null,
-        symbol: contextData.core.contractSymbol || null,
-        totalSupply: contextData.core.totalSupply || null,
-        owner: contextData.core.owner || null
+      // Contract info - from nft.core
+      contractInfo: nft.core ? {
+        name: nft.core.name || null,
+        symbol: nft.core.symbol || null,
+        totalSupply: null, // Not available in core
+        owner: nft.core.owner || null
       } : null,
 
-      // Insights data (from context - insight structure)
-      customTitle: contextData?.insight?.customTitle || null,
-      category: contextData?.insight?.category || null,
-      cardDescriptions: contextData?.insight?.cardDescription || null,
-      rarity: contextData?.insight?.rarity || null,
+      // Insights data - from nft.insight
+      customTitle: nft.insight?.customTitle || null,
+      category: nft.insight?.category || null,
+      cardDescriptions: nft.insight?.cardDescription ? [nft.insight.cardDescription] : null,
+      rarity: nft.insight?.rarity || null,
 
-      // Stats - use live stats from state (updated via event listener)
-      // Fallback to contextData.social only if liveStats is not available
-      likeCount: liveStats?.favoriteCount ?? contextData?.social?.likeCount ?? null,
-      watchlistCount: liveStats?.watchlistCount ?? contextData?.social?.watchlistCount ?? null,
-      averageRating: liveStats?.averageRating ?? contextData?.social?.averageRating ?? null,
+      // Stats - use live stats from state
+      likeCount: liveStats?.likeCount ?? nft.social?.likeCount ?? null,
+      watchlistCount: liveStats?.watchlistCount ?? nft.social?.watchlistCount ?? null,
+      averageRating: liveStats?.averageRating ?? nft.social?.averageRating ?? null,
 
-      // Loading state - ONLY show skeleton when:
-      // 1. We have NO data at all AND we're loading
-      // 2. We never loaded before (first load)
-      // Don't show skeleton during background refresh (when hadDataRef.current is true)
-      isLoading: !contextData && (isLoadingRef.current || !loadAttemptedRef.current) && !hadDataRef.current,
+      // Loading state - no loading needed since we have nft data
+      isLoading: false,
     };
   }, [
     contractAddress, tokenId, listingId, price, seller,
-    buyer, isListed, desiredNftAddress, desiredTokenId,
-    contextData, liveStats // liveStats is in state, triggers re-render when updated
+    buyer, isListed, desiredContractAddress, desiredTokenId,
+    contextData, liveStats, hasMongoDBData,
+    mongoMetadata, mongoInsights, mongoContract
   ]);
+
+
 
   // 3D Tilt Effect State and Logic
   const cardRef = useRef<HTMLDivElement>(null);
@@ -524,10 +536,31 @@ export function NFTCard(props: NFTCardAllProps) {
     };
   }, []);
 
-  // Navigation handler
+  // Navigation handler - use direct values instead of closure
   const handleClick = useCallback(() => {
-    router.push(`/nft/${contractAddress}/${tokenId}`);
-  }, [router, contractAddress, tokenId]);
+    // Get fresh values from nft object to avoid stale closure
+    const currentContractAddress = isNewProps(props)
+      ? props.nft.core.contractAddress
+      : props.contractAddress;
+    const currentTokenId = isNewProps(props)
+      ? props.nft.core.tokenId
+      : props.tokenId;
+
+    // Prevent navigation if contractAddress is missing
+    if (!currentContractAddress || currentContractAddress === 'undefined' || !currentTokenId) {
+      console.error('NFTCard: Cannot navigate - invalid parameters', {
+        contractAddress: currentContractAddress,
+        tokenId: currentTokenId
+      });
+      return;
+    }
+
+    const targetUrl = `/nft/${currentContractAddress}/${currentTokenId}`;
+    console.log('NFTCard: Navigating to', targetUrl);
+
+    // Use window.location instead of router.push to bypass Next.js routing issues
+    window.location.href = targetUrl;
+  }, [props]);
 
   // Focus handler for accessibility
   const handleFocus = useCallback(() => {
@@ -560,7 +593,7 @@ export function NFTCard(props: NFTCardAllProps) {
     ? finalCategory.filter(cat => cat && cat.trim().length > 0) // Filter out empty/whitespace-only categories
     : [];
   const descriptions = finalDescription && Array.isArray(finalDescription)
-    ? finalDescription.filter(desc => desc && desc.trim().length > 0) // Filter out empty/whitespace-only descriptions
+    ? finalDescription.filter(desc => typeof desc === 'string' && desc.trim().length > 0) // Filter out empty/whitespace-only descriptions
     : [];
 
   // Rarity-based background colors (simplified approach)
@@ -596,9 +629,8 @@ export function NFTCard(props: NFTCardAllProps) {
         <p className="text-red-600 text-sm">Failed to load NFT</p>
         <button
           onClick={() => {
-            loadAttemptedRef.current = false;
-            isLoadingRef.current = true;
-            nftContext.refreshNFT(contractAddress, tokenId); // Force refresh
+            // Reload page to retry - data comes from parent now
+            window.location.reload();
           }}
           className="mt-2 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm transition-colors"
         >
@@ -670,13 +702,13 @@ export function NFTCard(props: NFTCardAllProps) {
                     )}
                   </div>*/}
                   {/* Average Rating Stars - enhanced styling */}
-                  {contextData?.social?.averageRating && contextData.social.averageRating > 0 && (
+                  {displayData.averageRating && displayData.averageRating > 0 && (
                     <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-md border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center gap-1 ml-2">
                       <div className="flex items-center gap-0.5">
                         {Array.from({ length: 5 }, (_, i) => (
                           <svg
                             key={i}
-                            className={`w-2.5 h-2.5 ${contextData.social?.averageRating && i < Math.round(contextData.social.averageRating) ? 'text-yellow-400' : 'text-gray-300'}`}
+                            className={`w-2.5 h-2.5 ${displayData.averageRating && i < Math.round(displayData.averageRating) ? 'text-yellow-400' : 'text-gray-300'}`}
                             fill="currentColor"
                             viewBox="0 0 24 24"
                           >
@@ -731,22 +763,22 @@ export function NFTCard(props: NFTCardAllProps) {
                 {categories.length > 0 && (
                   <div className="flex flex-wrap gap-1 min-w-0">
                     {categories.slice(0, 1).map((cat, index) => (
-                      <div key={index} className={`backdrop-blur-sm px-2 py-1 rounded-md shadow-md border h-6 flex items-center ring-1 ${enableInsights && contextData?.insight?.category ?
+                      <div key={index} className={`backdrop-blur-sm px-2 py-1 rounded-md shadow-md border h-6 flex items-center ring-1 ${enableInsights && nft?.insight?.category ?
                         'bg-purple-100/95 border-purple-200/60 ring-purple-300/20' :
                         'bg-white/95 border-gray-200/60 ring-gray-300/20'
                         }`}>
-                        <span className={`text-xs font-medium truncate ${enableInsights && contextData?.insight?.category ? 'text-purple-700' : 'text-gray-700'
+                        <span className={`text-xs font-medium truncate ${enableInsights && nft?.insight?.category ? 'text-purple-700' : 'text-gray-700'
                           }`}>
                           {cat}
                         </span>
                       </div>
                     ))}
                     {categories.length > 1 && (
-                      <div className={`backdrop-blur-sm px-2 py-1 rounded-md shadow-md border h-6 flex items-center ring-1 ${enableInsights && contextData?.insight?.category ?
+                      <div className={`backdrop-blur-sm px-2 py-1 rounded-md shadow-md border h-6 flex items-center ring-1 ${enableInsights && nft?.insight?.category ?
                         'bg-purple-100/95 border-purple-200/60 ring-purple-300/20' :
                         'bg-white/95 border-gray-200/60 ring-gray-300/20'
                         }`}>
-                        <span className={`text-xs font-medium ${enableInsights && contextData?.insight?.category ? 'text-purple-600' : 'text-gray-500'
+                        <span className={`text-xs font-medium ${enableInsights && nft?.insight?.category ? 'text-purple-600' : 'text-gray-500'
                           }`}>
                           +{categories.length - 1}
                         </span>
@@ -796,7 +828,7 @@ export function NFTCard(props: NFTCardAllProps) {
               {displayData.isListed && displayData.price ? (
                 <PriceDisplay
                   price={displayData.price}
-                  desiredNftAddress={displayData.desiredNftAddress}
+                  desiredContractAddress={displayData.desiredContractAddress}
                 />
               ) : (
                 /* Not Listed Placeholder - 62px height, centered vertically and horizontally */

@@ -1,11 +1,13 @@
 ﻿/**
  * FORMATTER UTILITIES - Datenformatierung & Display
  * 
- * Formatierungs-Utilities fÃ¼r UI-Anzeige:
- * â€¢ Currency: ETH, USD, Wei Formatierung mit Locale-Support
- * â€¢ Numbers: GroÃŸe Zahlen, Percentages, Kompakte Notation
- * â€¢ Dates: Relative Zeit, Timestamps, Human-Readable
- * â€¢ Text: Truncation, Address-KÃ¼rzung, Sanitization
+ * Formatierungs-Utilities für UI-Anzeige:
+ * • Currency: ETH, USD, Wei Formatierung mit Locale-Support
+ * • Numbers: Große Zahlen, Percentages, Kompakte Notation
+ * • Dates: Relative Zeit, Timestamps, Human-Readable
+ * • Text: Truncation, Address-Kürzung, Sanitization
+ * • NFT: Display names, media types, rarity formatting
  */
 
 export * from './general';
+export * from './nft';

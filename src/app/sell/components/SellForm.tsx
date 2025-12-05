@@ -1,10 +1,10 @@
 ﻿'use client';
 
 import React, { useState } from 'react';
-import { NFTDetails } from '@/types/core/core-nft';
+import { AggregatedNFT } from '@/types/core/core-nft-modern';
 
 interface SellFormProps {
-    selectedNFT: NFTDetails | null;
+    selectedNFT: AggregatedNFT | null;
     onSubmit: (data: {
         price: string;
         currency: 'ETH' | 'USDC';

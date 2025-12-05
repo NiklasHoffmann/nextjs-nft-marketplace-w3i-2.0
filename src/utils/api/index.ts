@@ -21,8 +21,6 @@ export {
 export {
     createNFTKey,
     createBaseAggregatedNFT,
-    convertLegacyNFTData,
-    convertLegacyCardData,
     mergeAggregatedNFT,
     isDataFresh,
     getDataFreshness,

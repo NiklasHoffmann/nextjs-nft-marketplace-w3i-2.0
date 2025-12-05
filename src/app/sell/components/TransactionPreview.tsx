@@ -1,18 +1,18 @@
 ﻿'use client';
 
 import React from 'react';
-import { NFTDetails } from '@/types/core/core-nft';
+import { AggregatedNFT } from '@/types/core/core-nft-modern';
 
 interface TransactionData {
     type: 'sell' | 'trade';
-    selectedNFT: NFTDetails | null;
+    selectedNFT: AggregatedNFT | null;
     price?: string;
     currency?: 'ETH' | 'USDC';
     description?: string;
     duration?: string;
     allowOffers?: boolean;
     tradeType?: 'specific' | 'collection' | 'open';
-    targetNFT?: NFTDetails | null;
+    targetNFT?: AggregatedNFT | null;
     targetCollection?: string;
     additionalETH?: string;
     tradeConditions?: string;
@@ -39,17 +39,17 @@ export function TransactionPreview({ data, onConfirm, onCancel, isLoading }: Tra
                 <h3 className="text-lg font-medium text-gray-900 mb-3">NFT to Sell</h3>
                 <div className="flex gap-4">
                     <img
-                        src={selectedNFT.imageUrl || selectedNFT.metadata?.image || '/media/custom-nft.jpg'}
-                        alt={selectedNFT.metadata?.name || `NFT #${selectedNFT.tokenId}`}
+                        src={selectedNFT.meta?.image || '/media/custom-nft.jpg'}
+                        alt={selectedNFT.core.name || selectedNFT.meta?.name || `NFT #${selectedNFT.tokenId}`}
                         className="w-20 h-20 rounded-lg object-cover"
                     />
                     <div>
                         <h4 className="font-medium text-gray-900">
-                            {selectedNFT.metadata?.name || `NFT #${selectedNFT.tokenId}`}
+                            {selectedNFT.core.name || selectedNFT.meta?.name || `NFT #${selectedNFT.tokenId}`}
                         </h4>
                         <p className="text-sm text-gray-600">Token ID: {selectedNFT.tokenId}</p>
                         <p className="text-xs text-gray-500">
-                            {selectedNFT.nftAddress.slice(0, 8)}...{selectedNFT.nftAddress.slice(-6)}
+                            {selectedNFT.contractAddress.slice(0, 8)}...{selectedNFT.contractAddress.slice(-6)}
                         </p>
                     </div>
                 </div>
@@ -122,17 +122,17 @@ export function TransactionPreview({ data, onConfirm, onCancel, isLoading }: Tra
                 <h3 className="text-lg font-medium text-gray-900 mb-3">Your NFT</h3>
                 <div className="flex gap-4">
                     <img
-                        src={selectedNFT.imageUrl || selectedNFT.metadata?.image || '/media/custom-nft.jpg'}
-                        alt={selectedNFT.metadata?.name || `NFT #${selectedNFT.tokenId}`}
+                        src={selectedNFT.meta?.image || '/media/custom-nft.jpg'}
+                        alt={selectedNFT.core.name || selectedNFT.meta?.name || `NFT #${selectedNFT.tokenId}`}
                         className="w-20 h-20 rounded-lg object-cover"
                     />
                     <div>
                         <h4 className="font-medium text-gray-900">
-                            {selectedNFT.metadata?.name || `NFT #${selectedNFT.tokenId}`}
+                            {selectedNFT.core.name || selectedNFT.meta?.name || `NFT #${selectedNFT.tokenId}`}
                         </h4>
                         <p className="text-sm text-gray-600">Token ID: {selectedNFT.tokenId}</p>
                         <p className="text-xs text-gray-500">
-                            {selectedNFT.nftAddress.slice(0, 8)}...{selectedNFT.nftAddress.slice(-6)}
+                            {selectedNFT.contractAddress.slice(0, 8)}...{selectedNFT.contractAddress.slice(-6)}
                         </p>
                     </div>
                 </div>
@@ -150,17 +150,17 @@ export function TransactionPreview({ data, onConfirm, onCancel, isLoading }: Tra
                 {data.tradeType === 'specific' && data.targetNFT && (
                     <div className="flex gap-4">
                         <img
-                            src={data.targetNFT.imageUrl || data.targetNFT.metadata?.image || '/media/custom-nft-3.jpg'}
-                            alt={data.targetNFT.metadata?.name || `NFT #${data.targetNFT.tokenId}`}
+                            src={data.targetNFT.meta?.image || '/media/custom-nft-3.jpg'}
+                            alt={data.targetNFT.core.name || data.targetNFT.meta?.name || `NFT #${data.targetNFT.tokenId}`}
                             className="w-20 h-20 rounded-lg object-cover"
                         />
                         <div>
                             <h4 className="font-medium text-gray-900">
-                                {data.targetNFT.metadata?.name || `NFT #${data.targetNFT.tokenId}`}
+                                {data.targetNFT.core.name || data.targetNFT.meta?.name || `NFT #${data.targetNFT.tokenId}`}
                             </h4>
                             <p className="text-sm text-gray-600">Token ID: {data.targetNFT.tokenId}</p>
                             <p className="text-xs text-gray-500">
-                                {data.targetNFT.nftAddress.slice(0, 8)}...{data.targetNFT.nftAddress.slice(-6)}
+                                {data.targetNFT.contractAddress.slice(0, 8)}...{data.targetNFT.contractAddress.slice(-6)}
                             </p>
                         </div>
                     </div>

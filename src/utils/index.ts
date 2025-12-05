@@ -2,13 +2,14 @@
  * UTILS - Zentrale Utility-Funktionen Export
  * 
  * Organisierte Utility-Kategorien:
- * â€¢ core: Grundlegende Datenverarbeitung (BigInt, Media)
- * â€¢ formatters: Display-Formatierung (Currency, Dates, Text)
- * â€¢ validation: Input-Validierung & Sanitization
- * â€¢ blockchain: Smart Contract & NFT Interaktion
- * â€¢ performance: Monitoring & Cache-Management
- * â€¢ features: Feature-Logic & Access Control
- * â€¢ api: Data-Fetching & Service Integration
+ * • core: Grundlegende Datenverarbeitung (BigInt, Media)
+ * • formatters: Display-Formatierung (Currency, Dates, Text)
+ * • validation: Input-Validierung & Sanitization
+ * • performance: Monitoring & Cache-Management
+ * • features: Feature-Logic & Access Control
+ * • api: Data-Fetching & Service Integration
+ * 
+ * NOTE: Blockchain utilities moved to @/services/blockchain
  */
 
 // Core: Fundamental utilities for data types and media handling
@@ -20,20 +21,8 @@ export * from './formatters';
 // Validation: Input validation and sanitization
 export * from './validation';
 
-// Blockchain: Smart contract and NFT-specific utilities
-export * from './blockchain';
-
-// Performance: Performance monitoring and cache management (exclude conflicting exports)
+// Performance: Performance monitoring and cache management
 export {
-    calculateCacheStats,
-    filterCacheByAge,
-    createBatches,
-    delay,
-    isValidNFTIdentifier,
-    createNFTErrorMessage,
-    createEmptyNFTData,
-    createEmptyErrorState,
-    createEmptyLoadingState,
     // Performance monitoring
     performanceMonitor,
     measureAsync,

@@ -1,8 +1,8 @@
 ﻿// app/api/nft-metadata/route.ts - Optimized Version
 import { NextRequest, NextResponse } from 'next/server';
 import { LRUCache } from 'lru-cache';
-import { fetchComprehensiveNFTDataNew } from '@/utils/blockchain/nft-fetcher';
-import { createRobustPublicClient, getTimeoutConfig } from '@/utils/blockchain/rpc-config';
+import { fetchComprehensiveNFTDataNew } from '@/services/blockchain/nft-fetcher';
+import { createRobustPublicClient, getTimeoutConfig } from '@/services/blockchain/rpc-config';
 
 // Enhanced server-side cache fÃ¼r NFT Metadaten mit grÃ¶ÃŸerem TTL und besserer Performance
 const metadataCache = new LRUCache<string, any>({
@@ -20,17 +20,17 @@ const imageCache = new LRUCache<string, string>({
 
 export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
-    const nftAddress = searchParams.get('address');
+    const contractAddress = searchParams.get('address');
     const tokenId = searchParams.get('tokenId');
 
-    if (!nftAddress || !tokenId) {
+    if (!contractAddress || !tokenId) {
         return NextResponse.json(
-            { error: 'Missing nftAddress or tokenId parameter' },
+            { error: 'Missing contractAddress or tokenId parameter' },
             { status: 400 }
         );
     }
 
-    const cacheKey = `${nftAddress}-${tokenId}`;
+    const cacheKey = `${contractAddress}-${tokenId}`;
 
     try {
         // Clear cache for custom NFTs during development
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Use the optimized blockchain data fetcher
-        const blockchainData = await fetchComprehensiveNFTDataNew(nftAddress, tokenId);
+        const blockchainData = await fetchComprehensiveNFTDataNew(contractAddress, tokenId);
 
         if (!blockchainData?.tokenURI) {
             console.warn('No tokenURI available, cannot fetch metadata');
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
 
         // Prepare comprehensive response
         const result = {
-            nftAddress,
+            contractAddress,
             tokenId,
             metadata,
             imageUrl,
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
                 totalSupply: blockchainData.totalSupply,
                 owner: blockchainData.owner,
                 ownerBalance: blockchainData.ownerBalance,
-                approvedAddress: blockchainData.approvedAddress,
+                approved: blockchainData.approvedAddress, // Map to 'approved' for consistency
             },
             cached: false
         };
@@ -154,7 +154,7 @@ async function processMetadata(tokenURI: string): Promise<{ metadata: any; image
     }
 }
 
-async function getTokenURIWithFallback(nftAddress: string, tokenId: string): Promise<string | null> {
+async function getTokenURIWithFallback(contractAddress: string, tokenId: string): Promise<string | null> {
     try {
         // Enhanced ERC721 ABI for tokenURI function
         const ERC721_ABI = [
@@ -168,7 +168,7 @@ async function getTokenURIWithFallback(nftAddress: string, tokenId: string): Pro
         ] as const;
 
         // Validate inputs
-        if (!/^0x[a-fA-F0-9]{40}$/.test(nftAddress)) {
+        if (!/^0x[a-fA-F0-9]{40}$/.test(contractAddress)) {
             console.error('Invalid NFT address format');
             return null;
         }
@@ -187,7 +187,7 @@ async function getTokenURIWithFallback(nftAddress: string, tokenId: string): Pro
         // Call tokenURI function on the contract with timeout
         const tokenURI = await Promise.race([
             publicClient.readContract({
-                address: nftAddress as `0x${string}`,
+                address: contractAddress as `0x${string}`,
                 abi: ERC721_ABI,
                 functionName: 'tokenURI',
                 args: [tokenIdBigInt],

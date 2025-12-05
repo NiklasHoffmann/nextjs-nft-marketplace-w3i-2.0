@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
+import { devLog } from '@/utils/devLog';
 import {
     CombinedUserInteractionData,
     CombinedUserInteractionsResponse
@@ -82,7 +83,7 @@ export function useUserInteractions(options: UseUserInteractionsOptions = {}): U
             }
 
         } catch (err) {
-            console.error('âŒ Error fetching user interactions:', err);
+            devLog.error('user-interactions', '❌ Error fetching user interactions:', err);
             setError(err instanceof Error ? err.message : 'An error occurred');
             setUserInteractions(null);
         } finally {
@@ -221,7 +222,7 @@ export function useUserInteractions(options: UseUserInteractionsOptions = {}): U
             });
 
         } catch (err) {
-            console.error('âŒ Error recording view:', err);
+            devLog.error('user-interactions', '❌ Error recording view:', err);
         }
     }, [contractAddress, tokenId, userWalletAddress]);
 

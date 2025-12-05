@@ -49,5 +49,14 @@ next-env.d.ts
 # runtime caches
 /public/cached-nft-images/
 
+# Logs
+*.log
+sync-service-debug.log
+
+# Temp files
+temp-*
+*.tmp
+*.temp
+
 # moved to /public/dev-tools/ and /scripts/
 # (keeping for reference, remove after cleanup verification)

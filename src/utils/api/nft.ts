@@ -5,6 +5,7 @@
  * Handles all external API calls with robust error handling and fallbacks.
  */
 
+import { devLog } from '@/utils/devLog';
 import type { NftMeta, AdminNFTInsight, NFTStats, ActiveItem } from '@/types';
 
 // ===== API RESPONSE TYPES =====
@@ -144,7 +145,7 @@ export const fetchCollectionInsights = async (contractAddress: string): Promise<
 
         return null;
     } catch (error) {
-        console.warn(`Failed to fetch collection insights for ${contractAddress}:`, error);
+        devLog.warn('nft-api', `Failed to fetch collection insights for ${contractAddress}:`, error);
         return null;
     }
 };
@@ -188,7 +189,7 @@ export const fetchMarketplaceListing = async (contractAddress: string, tokenId: 
         const response = await fetch(`/api/marketplace/listing/${contractAddress}/${tokenId}`);
 
         if (!response.ok) {
-            console.warn(`Failed to fetch marketplace listing for ${contractAddress}/${tokenId}:`, response.status);
+            devLog.warn('nft-api', `Failed to fetch marketplace listing for ${contractAddress}/${tokenId}:`, response.status);
             return null;
         }
 
@@ -202,7 +203,7 @@ export const fetchMarketplaceListing = async (contractAddress: string, tokenId: 
         return data.listing;
 
     } catch (error) {
-        console.warn(`âŒ Failed to fetch marketplace listing for ${contractAddress}/${tokenId}:`, error);
+        devLog.warn('nft-api', `❌ Failed to fetch marketplace listing for ${contractAddress}/${tokenId}:`, error);
         return null;
     }
 };

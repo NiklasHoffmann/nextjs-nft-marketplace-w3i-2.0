@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { AdminNFTInsightsManager } from "@/components/admin";
+import { AdminNFTInsightsManager } from "../components";
 
 function AdminContent() {
     return (

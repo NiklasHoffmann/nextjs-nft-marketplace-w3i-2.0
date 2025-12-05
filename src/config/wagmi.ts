@@ -2,12 +2,9 @@ import { http } from 'wagmi'
 import { mainnet, polygon, base, sepolia } from 'wagmi/chains'
 import { connectorsForWallets } from '@rainbow-me/rainbowkit'
 import {
-    metaMaskWallet,
+    injectedWallet,
     walletConnectWallet,
     coinbaseWallet,
-    rainbowWallet,
-    trustWallet,
-    ledgerWallet,
 } from '@rainbow-me/rainbowkit/wallets'
 import { createConfig } from 'wagmi'
 import { createPublicClient } from 'viem'
@@ -29,23 +26,15 @@ if (!projectId) {
     console.warn('📝 Erstelle eine Project ID auf https://cloud.walletconnect.com')
 }
 
-// Custom Connector-Konfiguration mit verbesserter Fehlerbehandlung
+// Simplified Connector-Konfiguration - Use injected wallet instead of MetaMask SDK
 const connectors = connectorsForWallets(
     [
         {
             groupName: 'Recommended',
             wallets: [
-                metaMaskWallet,
+                injectedWallet,
                 ...(projectId ? [walletConnectWallet] : []), // Nur hinzufügen wenn Project ID verfügbar
                 coinbaseWallet,
-                rainbowWallet,
-            ],
-        },
-        {
-            groupName: 'Others',
-            wallets: [
-                trustWallet,
-                ledgerWallet,
             ],
         },
     ],

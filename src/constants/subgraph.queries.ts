@@ -36,9 +36,16 @@ export const NFT_UPDATED_SUBSCRIPTION = gql`
 `
 
 // This gives all the Items which are currently listed
+// OPTIMIZED: Added pagination support with variables
 export const GET_ACTIVE_ITEMS = gql`
-    {
-        items(first: 1000, where: { isListed: true }, orderBy: listingId, orderDirection: desc) {
+    query GetActiveItems($first: Int = 20, $skip: Int = 0) {
+        items(
+            first: $first
+            skip: $skip
+            where: { isListed: true }
+            orderBy: listingId
+            orderDirection: desc
+        ) {
             listingId
             nftAddress
             tokenId

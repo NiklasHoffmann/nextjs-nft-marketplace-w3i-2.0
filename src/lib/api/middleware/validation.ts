@@ -114,11 +114,11 @@ export function getQueryParam(
 /**
  * Extrahiert und validiert NFT-Parameter (address + tokenId)
  */
-export function getNFTParams(request: NextRequest): { nftAddress: string; tokenId: string } {
-    const nftAddress = getQueryParam(request, 'nftAddress', true);
+export function getNFTParams(request: NextRequest): { contractAddress: string; tokenId: string } {
+    const contractAddress = getQueryParam(request, 'contractAddress', true);
     const tokenId = getQueryParam(request, 'tokenId', true);
 
-    if (!isValidAddress(nftAddress)) {
+    if (!isValidAddress(contractAddress)) {
         throw new BadRequestError('Invalid NFT address format');
     }
 
@@ -126,7 +126,7 @@ export function getNFTParams(request: NextRequest): { nftAddress: string; tokenI
         throw new BadRequestError('Invalid token ID format');
     }
 
-    return { nftAddress: nftAddress!, tokenId: tokenId! };
+    return { contractAddress: contractAddress!, tokenId: tokenId! };
 }
 
 /**
@@ -154,7 +154,7 @@ export function requireJsonContentType(request: NextRequest): void {
 // ===== COMMON SCHEMAS =====
 
 export const NFTIdentifierSchema: ValidationSchema = {
-    nftAddress: {
+    contractAddress: {
         validate: isValidAddress,
         message: 'Invalid NFT address format',
     },

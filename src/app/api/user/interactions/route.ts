@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
 
         // Fetch from all user collections
         const [favoritesCollection, ratingsCollection, watchlistCollection, personalNotesCollection] = await Promise.all([
-            getCollection('user_favorites'),
+            getCollection('user_likes'),
             getCollection('user_ratings'),
             getCollection('user_watchlist'),
             getCollection('user_personal_notes'),
@@ -147,12 +147,19 @@ export async function GET(request: NextRequest) {
 
     } catch (error) {
         console.error('Error fetching user interactions:', error);
+        console.error('Error details:', {
+            message: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : 'No stack trace',
+            type: error?.constructor?.name
+        });
 
         if (error instanceof BadRequestError) {
             return apiBadRequest(error.message);
         }
 
-        return apiInternalError('Failed to fetch user interactions');
+        // Return more detailed error in development
+        const errorMessage = error instanceof Error ? error.message : 'Failed to fetch user interactions';
+        return apiInternalError(errorMessage);
     }
 }
 
@@ -172,7 +179,7 @@ export async function POST(request: NextRequest) {
 
         // Get collections
         const [favoritesCollection, ratingsCollection, watchlistCollection, personalNotesCollection] = await Promise.all([
-            getCollection('user_favorites'),
+            getCollection('user_likes'),
             getCollection('user_ratings'),
             getCollection('user_watchlist'),
             getCollection('user_personal_notes'),
@@ -181,9 +188,32 @@ export async function POST(request: NextRequest) {
         const results = [];
         const statUpdates = []; // Track stat updates to execute atomically
 
-        // Update favorites if specified
-        if (typeof updates.isFavorite === 'boolean') {
-            if (updates.isFavorite) {
+        // Update favorites if specified (TOGGLE logic)
+        if (updates.isFavorite !== undefined) {
+            const existingFavorite = await favoritesCollection.findOne({
+                userId: lowerUserId,
+                contractAddress: lowerContractAddress,
+                tokenId
+            });
+
+            if (existingFavorite) {
+                // Remove favorite
+                const result = await favoritesCollection.deleteOne({
+                    userId: lowerUserId,
+                    contractAddress: lowerContractAddress,
+                    tokenId
+                });
+                results.push({ type: 'favorite', action: 'removed', result });
+
+                // Queue atomic stat update
+                statUpdates.push({
+                    contractAddress: lowerContractAddress,
+                    tokenId,
+                    field: 'likeCount',
+                    increment: false
+                });
+            } else {
+                // Add favorite
                 const result = await favoritesCollection.updateOne(
                     { userId: lowerUserId, contractAddress: lowerContractAddress, tokenId },
                     {
@@ -202,23 +232,8 @@ export async function POST(request: NextRequest) {
                 statUpdates.push({
                     contractAddress: lowerContractAddress,
                     tokenId,
-                    field: 'favoriteCount',
+                    field: 'likeCount',
                     increment: true
-                });
-            } else {
-                const result = await favoritesCollection.deleteOne({
-                    userId: lowerUserId,
-                    contractAddress: lowerContractAddress,
-                    tokenId
-                });
-                results.push({ type: 'favorite', action: 'removed', result });
-
-                // Queue atomic stat update
-                statUpdates.push({
-                    contractAddress: lowerContractAddress,
-                    tokenId,
-                    field: 'favoriteCount',
-                    increment: false
                 });
             }
         }
@@ -327,9 +342,32 @@ export async function POST(request: NextRequest) {
             results.push({ type: 'personal_notes', action: 'updated', result });
         }
 
-        // Update watchlist if specified
-        if (typeof updates.isWatchlisted === 'boolean') {
-            if (updates.isWatchlisted) {
+        // Update watchlist if specified (TOGGLE logic)
+        if (updates.isWatchlisted !== undefined) {
+            const existingWatchlist = await watchlistCollection.findOne({
+                userId: lowerUserId,
+                contractAddress: lowerContractAddress,
+                tokenId
+            });
+
+            if (existingWatchlist) {
+                // Remove from watchlist
+                const result = await watchlistCollection.deleteOne({
+                    userId: lowerUserId,
+                    contractAddress: lowerContractAddress,
+                    tokenId
+                });
+                results.push({ type: 'watchlist', action: 'removed', result });
+
+                // Queue atomic stat update
+                statUpdates.push({
+                    contractAddress: lowerContractAddress,
+                    tokenId,
+                    field: 'watchlistCount',
+                    increment: false
+                });
+            } else {
+                // Add to watchlist
                 const result = await watchlistCollection.updateOne(
                     { userId: lowerUserId, contractAddress: lowerContractAddress, tokenId },
                     {
@@ -351,21 +389,6 @@ export async function POST(request: NextRequest) {
                     field: 'watchlistCount',
                     increment: true
                 });
-            } else {
-                const result = await watchlistCollection.deleteOne({
-                    userId: lowerUserId,
-                    contractAddress: lowerContractAddress,
-                    tokenId
-                });
-                results.push({ type: 'watchlist', action: 'removed', result });
-
-                // Queue atomic stat update
-                statUpdates.push({
-                    contractAddress: lowerContractAddress,
-                    tokenId,
-                    field: 'watchlistCount',
-                    increment: false
-                });
             }
         }
 
@@ -378,7 +401,7 @@ export async function POST(request: NextRequest) {
                     // Special handling for ratings - need to recalculate average
                     const ratingsCollection = await getCollection('user_ratings');
                     const allRatings = await ratingsCollection.find({
-                        contractAddress: update.contractAddress,
+                        contractAddress: update.contractAddress,  // user_ratings uses contractAddress field
                         tokenId: update.tokenId,
                         isPublic: true
                     }).toArray();
@@ -400,7 +423,7 @@ export async function POST(request: NextRequest) {
                                 contractAddress: update.contractAddress,
                                 tokenId: update.tokenId,
                                 viewCount: 0,
-                                favoriteCount: 0,
+                                likeCount: 0,
                                 watchlistCount: 0,
                                 createdAt: timestamp
                             }
@@ -448,7 +471,7 @@ export async function POST(request: NextRequest) {
                             contractAddress: update.contractAddress,
                             tokenId: update.tokenId,
                             viewCount: 0,
-                            favoriteCount: update.field === 'favoriteCount' ? initialValue : 0,
+                            likeCount: update.field === 'likeCount' ? initialValue : 0,
                             watchlistCount: update.field === 'watchlistCount' ? initialValue : 0,
                             averageRating: 0,
                             ratingCount: 0,
@@ -523,7 +546,7 @@ export async function POST(request: NextRequest) {
         // This prevents race conditions where the client fetches stats before DB write is committed
         const statsCollection = await getCollection('nft_stats');
         const updatedStats = await statsCollection.findOne({
-            contractAddress: lowerContractAddress,
+            contractAddress: lowerContractAddress,  // nft_stats uses contractAddress field
             tokenId: tokenId
         });
 
@@ -531,7 +554,7 @@ export async function POST(request: NextRequest) {
             message: 'User interactions updated successfully',
             data: combinedData,
             stats: updatedStats ? {
-                favoriteCount: updatedStats.favoriteCount || 0,
+                likeCount: updatedStats.likeCount || 0,
                 watchlistCount: updatedStats.watchlistCount || 0,
                 averageRating: updatedStats.averageRating || 0,
                 ratingCount: updatedStats.ratingCount || 0,

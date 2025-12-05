@@ -14,6 +14,11 @@ export const isValidAddress = (address: string): boolean => {
 };
 
 /**
+ * Alias for isValidAddress - validates NFT contract addresses
+ */
+export const isValidContractAddress = isValidAddress;
+
+/**
  * Validate token ID (should be a valid number or numeric string)
  */
 export const isValidTokenId = (tokenId: string | number): boolean => {
@@ -21,6 +26,13 @@ export const isValidTokenId = (tokenId: string | number): boolean => {
 
     const numericTokenId = typeof tokenId === 'string' ? parseInt(tokenId, 10) : tokenId;
     return !isNaN(numericTokenId) && numericTokenId >= 0;
+};
+
+/**
+ * Validate NFT token ID (string version)
+ */
+export const isValidNFTTokenId = (tokenId: string): boolean => {
+    return /^\d+$/.test(tokenId) && parseInt(tokenId) >= 0;
 };
 
 /**

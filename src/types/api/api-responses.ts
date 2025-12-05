@@ -84,7 +84,7 @@ export interface NFTStats {
   contractAddress: string;
   tokenId: string;
   viewCount: number;
-  favoriteCount: number;
+  likeCount: number;
   averageRating: number;
   ratingCount: number;
   watchlistCount: number;

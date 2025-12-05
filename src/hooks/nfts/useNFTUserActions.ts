@@ -19,12 +19,12 @@ import { createShareableNFTUrl } from '@/utils';
  * - Wallet connection state
  * 
  * REMOVED REDUNDANCIES:
- * - NFT data fetching (use NFTContext directly)
+ * - NFT data fetching (handled by API/MongoDB)
  * - Parameter extraction (do in component)
  * - Validation logic (do in component) 
- * - Insights fetching (use NFTContext directly)
+ * - Insights fetching (handled by API/MongoDB)
  */
-export function useNFTUserActions(nftAddress: string, tokenId: string) {
+export function useNFTUserActions(contractAddress: string, tokenId: string) {
     const router = useRouter();
     const { address: connectedWalletAddress } = useAccount();
 
@@ -43,7 +43,7 @@ export function useNFTUserActions(nftAddress: string, tokenId: string) {
         setRating,
         recordView
     } = useUserInteractions({
-        contractAddress: nftAddress,
+        contractAddress: contractAddress,
         tokenId: tokenId,
         userWalletAddress,
         autoFetch: isWalletConnected
@@ -55,19 +55,19 @@ export function useNFTUserActions(nftAddress: string, tokenId: string) {
     }, [router]);
 
     const handleShare = useCallback(() => {
-        if (!nftAddress || !tokenId) return;
+        if (!contractAddress || !tokenId) return;
 
-        const shareUrl = createShareableNFTUrl(nftAddress, tokenId);
+        const shareUrl = createShareableNFTUrl(contractAddress, tokenId);
         if (navigator.share) {
             navigator.share({
                 title: `NFT ${tokenId}`,
-                text: `Check out this NFT on Ideationmarket from collection ${nftAddress}`,
+                text: `Check out this NFT on Ideationmarket from collection ${contractAddress}`,
                 url: shareUrl,
             });
         } else {
             navigator.clipboard.writeText(shareUrl);
         }
-    }, [nftAddress, tokenId]);
+    }, [contractAddress, tokenId]);
 
     // Wallet-gated user actions
     const toggleFavorite = useCallback(async () => {

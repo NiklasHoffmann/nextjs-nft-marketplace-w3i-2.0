@@ -1,4 +1,5 @@
-﻿import type {
+﻿import { devLog } from '@/utils/devLog';
+import type {
     AggregatedNFT,
     NFTIdentifier,
     ActiveItem,
@@ -9,19 +10,16 @@
     DataSource
 } from '@/types/core/core-nft-modern';
 
-// Legacy type imports for transition
-import type { NFTData, NFTCardData } from '@/types/core/core-nft-legacy';
-
 /**
  * Creates a unique key for an NFT
  */
-export function createNFTKey(nftAddress: string, tokenId: string): `${string}-${string}` {
+export function createNFTKey(contractAddress: string, tokenId: string): `${string}-${string}` {
     // Defensive handling - ensure both parameters are strings, but warn on empty values
-    const safeAddress = (nftAddress || '').toLowerCase();
+    const safeAddress = (contractAddress || '').toLowerCase();
     const safeTokenId = tokenId || '';
 
-    if (!nftAddress || !tokenId) {
-        console.warn('createNFTKey: Empty parameters detected', { nftAddress, tokenId });
+    if (!contractAddress || !tokenId) {
+        devLog.warn('nft-aggregation', 'createNFTKey: Empty parameters detected', { contractAddress, tokenId });
     }
 
     return `${safeAddress}-${safeTokenId}`;
@@ -31,24 +29,24 @@ export function createNFTKey(nftAddress: string, tokenId: string): `${string}-${
  * Creates a base AggregatedNFT structure
  */
 export function createBaseAggregatedNFT(
-    nftAddress: string,
+    contractAddress: string,
     tokenId: string
 ): AggregatedNFT {
     // Defensive parameter handling - DON'T default to empty string
-    if (!nftAddress || !tokenId) {
-        console.warn('createBaseAggregatedNFT: Invalid parameters', { nftAddress, tokenId });
+    if (!contractAddress || !tokenId) {
+        devLog.warn('nft-aggregation', 'createBaseAggregatedNFT: Invalid parameters', { contractAddress, tokenId });
     }
 
-    const safeAddress = nftAddress; // Keep the original value, don't default to empty
+    const safeAddress = contractAddress; // Keep the original value, don't default to empty
     const safeTokenId = tokenId || '';
 
     return {
         key: createNFTKey(safeAddress, safeTokenId),
-        nftAddress: safeAddress as `0x${string}`,
+        contractAddress: safeAddress as `0x${string}`,
         tokenId: safeTokenId,
         listed: false,
         core: {
-            nftAddress: safeAddress as `0x${string}`,
+            contractAddress: safeAddress as `0x${string}`,
             tokenId: safeTokenId,
             tokenURI: null,
             name: null,
@@ -62,151 +60,6 @@ export function createBaseAggregatedNFT(
             marketplace: false,
             social: false,
             insights: false
-        }
-    };
-}
-
-/**
- * Converts legacy NFTData to AggregatedNFT format
- */
-export function convertLegacyNFTData(data: NFTData): AggregatedNFT {
-    return {
-        key: createNFTKey(data.nftAddress, data.tokenId),
-        nftAddress: data.nftAddress as `0x${string}`,
-        tokenId: data.tokenId,
-        listed: data.isListed,
-
-        // Core blockchain data
-        core: {
-            nftAddress: data.nftAddress as `0x${string}`,
-            tokenId: data.tokenId,
-            tokenURI: data.metadata?.image || null,
-            name: data.metadata?.name || null,
-            owner: data.owner as `0x${string}` || null,
-            symbol: data.contractInfo?.symbol || null
-        },
-
-        // Metadata
-        meta: data.metadata ? {
-            name: data.metadata.name,
-            description: data.metadata.description,
-            image: data.imageUrl || undefined,
-            animationUrl: data.animationUrl || undefined,
-            externalUrl: (data.metadata as any).external_url || undefined, // Legacy APIs use snake_case
-            attributes: data.metadata.attributes || undefined
-        } : undefined,
-
-        // Marketplace data
-        listing: data.isListed && data.price && data.seller ? {
-            listingId: data.listingId || '',
-            nftAddress: data.nftAddress as `0x${string}`,
-            tokenId: data.tokenId,
-            isListed: data.isListed,
-            price: data.price,
-            seller: data.seller as `0x${string}`,
-            buyer: null,
-            desiredNftAddress: data.nftAddress as `0x${string}`,
-            desiredTokenId: null
-        } : undefined,
-
-        // Social stats
-        social: {
-            nftAddress: data.nftAddress as `0x${string}`,
-            tokenId: data.tokenId,
-            likeCount: data.stats?.favoriteCount || undefined,
-            watchlistCount: data.stats?.watchlistCount || undefined,
-            averageRating: data.stats?.averageRating || undefined,
-            ratingCount: data.stats?.ratingCount || undefined
-        },
-
-        // Insights
-        insight: data.insights ? {
-            nftAddress: data.nftAddress as `0x${string}`,
-            tokenId: data.tokenId,
-            customTitle: data.insights.customTitle || undefined,
-            category: data.insights.category || undefined,
-            cardDescription: data.insights.cardDescriptions || undefined,
-            rarity: data.insights.rarity || undefined,
-            updatedAt: new Date().toISOString()
-        } : undefined,
-
-        lastUpdated: data.lastUpdated || Date.now(),
-        sources: {
-            blockchain: !!data.contractInfo,
-            metadata: !!data.metadata,
-            marketplace: data.isListed,
-            social: !!(data.stats?.favoriteCount || data.stats?.watchlistCount),
-            insights: !!data.insights
-        }
-    };
-}
-
-/**
- * Converts legacy NFTCardData to AggregatedNFT format
- */
-export function convertLegacyCardData(data: NFTCardData): AggregatedNFT {
-    return {
-        key: createNFTKey(data.nftAddress, data.tokenId),
-        nftAddress: data.nftAddress as `0x${string}`,
-        tokenId: data.tokenId,
-        listed: data.isListed,
-
-        core: {
-            nftAddress: data.nftAddress as `0x${string}`,
-            tokenId: data.tokenId,
-            tokenURI: data.imageUrl || null,
-            name: data.name || null,
-            owner: null, // Card data doesn't include owner
-            symbol: data.contractInfo?.symbol || null
-        },
-
-        meta: data.name || data.imageUrl ? {
-            name: data.name || undefined,
-            description: undefined,
-            image: data.imageUrl || undefined,
-            animationUrl: undefined,
-            externalUrl: undefined,
-            attributes: undefined
-        } : undefined,
-
-        listing: data.isListed && data.price ? {
-            listingId: data.listingId || '',
-            nftAddress: data.nftAddress as `0x${string}`,
-            tokenId: data.tokenId,
-            isListed: data.isListed,
-            price: data.price || '0',
-            seller: '0x0' as `0x${string}`, // Card data doesn't include seller
-            buyer: null,
-            desiredNftAddress: data.nftAddress as `0x${string}`,
-            desiredTokenId: null
-        } : undefined,
-
-        social: {
-            nftAddress: data.nftAddress as `0x${string}`,
-            tokenId: data.tokenId,
-            likeCount: data.likeCount || undefined,
-            watchlistCount: data.watchlistCount || undefined,
-            averageRating: data.averageRating || undefined,
-            ratingCount: data.ratingCount || undefined
-        },
-
-        insight: {
-            nftAddress: data.nftAddress as `0x${string}`,
-            tokenId: data.tokenId,
-            customTitle: data.customTitle || undefined,
-            category: data.category || undefined,
-            cardDescription: data.cardDescriptions || undefined,
-            rarity: data.rarity || undefined,
-            updatedAt: new Date().toISOString()
-        },
-
-        lastUpdated: data.lastUpdated || Date.now(),
-        sources: {
-            blockchain: false,
-            metadata: !!data.imageUrl,
-            marketplace: !!data.isListed,
-            social: !!(data.likeCount || data.watchlistCount),
-            insights: !!(data.customTitle || data.category)
         }
     };
 }
@@ -284,7 +137,7 @@ export function getDisplayData(nft: AggregatedNFT) {
     const displayName = nft.meta?.name || nft.core.name || `#${nft.tokenId}`;
 
     return {
-        nftAddress: nft.nftAddress,
+        contractAddress: nft.contractAddress,
         tokenId: nft.tokenId,
         name: displayName || '', // Ensure never null/undefined
         image: nft.meta?.image || null,

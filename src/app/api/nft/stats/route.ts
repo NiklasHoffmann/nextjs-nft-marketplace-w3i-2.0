@@ -9,6 +9,7 @@ import {
   apiSuccess,
   apiBadRequest,
   apiInternalError,
+  apiTooManyRequests,
   rateLimit,
   RATE_LIMIT_CONFIG,
   getQueryParam,
@@ -16,14 +17,15 @@ import {
   isValidAddress,
   isValidTokenId,
   BadRequestError,
-  InternalError
+  InternalError,
+  RateLimitError
 } from '@/lib/api';
 
 interface NFTStats {
-  contractAddress: string;
+  contractAddress: string; // API response still uses contractAddress for compatibility
   tokenId: string;
   viewCount: number;
-  favoriteCount: number;
+  likeCount: number;
   averageRating: number;
   ratingCount: number;
   watchlistCount: number;
@@ -64,68 +66,86 @@ export async function GET(request: NextRequest) {
 
     // If no stats doc exists, create one by counting (migration path)
     if (!statsDoc) {
-      // Count from user collections (only on first access)
-      const [favoritesCollection, watchlistCollection, ratingsCollection, viewsCollection] = await Promise.all([
-        getCollection('user_favorites'),
-        getCollection('user_watchlist'),
-        getCollection('user_ratings'),
-        getCollection('nft_views')
-      ]);
+      console.log(`📊 No stats found for ${lowerContractAddress}/${tokenId}, creating initial stats...`);
 
-      const [favoriteCount, watchlistCount, ratings, viewCount] = await Promise.all([
-        favoritesCollection.countDocuments({
-          contractAddress: lowerContractAddress,
-          tokenId: tokenId
-        }),
-        watchlistCollection.countDocuments({
-          contractAddress: lowerContractAddress,
-          tokenId: tokenId
-        }),
-        ratingsCollection.find({
+      try {
+        // Count from user collections (only on first access)
+        const [favoritesCollection, watchlistCollection, ratingsCollection, viewsCollection] = await Promise.all([
+          getCollection('user_likes'),
+          getCollection('user_watchlist'),
+          getCollection('user_ratings'),
+          getCollection('nft_views')
+        ]);
+
+        const [likeCount, watchlistCount, ratings, viewCount] = await Promise.all([
+          favoritesCollection.countDocuments({
+            contractAddress: lowerContractAddress,
+            tokenId: tokenId
+          }),
+          watchlistCollection.countDocuments({
+            contractAddress: lowerContractAddress,
+            tokenId: tokenId
+          }),
+          ratingsCollection.find({
+            contractAddress: lowerContractAddress,
+            tokenId: tokenId,
+            isPublic: true
+          }).toArray(),
+          viewsCollection.countDocuments({
+            contractAddress: lowerContractAddress,
+            tokenId: tokenId
+          })
+        ]);
+
+        const ratingCount = ratings.length;
+        const averageRating = ratingCount > 0
+          ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratingCount
+          : 0;
+
+        // Create initial stats document
+        const initialStats = {
           contractAddress: lowerContractAddress,
           tokenId: tokenId,
-          isPublic: true
-        }).toArray(),
-        viewsCollection.countDocuments({
+          viewCount,
+          likeCount,
+          watchlistCount,
+          averageRating: Math.round(averageRating * 10) / 10,
+          ratingCount,
+          createdAt: new Date().toISOString(),
+          lastUpdated: new Date().toISOString()
+        };
+
+        await statsCollection.insertOne(initialStats);
+        console.log(`✅ Created initial stats for ${lowerContractAddress}/${tokenId}:`, initialStats);
+
+        const stats: NFTStats = {
           contractAddress: lowerContractAddress,
-          tokenId: tokenId
-        })
-      ]);
+          tokenId: tokenId,
+          viewCount,
+          likeCount,
+          averageRating: Math.round(averageRating * 10) / 10,
+          ratingCount,
+          watchlistCount
+        };
 
-      const ratingCount = ratings.length;
-      const averageRating = ratingCount > 0
-        ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratingCount
-        : 0;
+        // Cache the newly created stats
+        setCachedStats(lowerContractAddress, tokenId, stats);
 
-      // Create initial stats document
-      const initialStats = {
-        contractAddress: lowerContractAddress,
-        tokenId: tokenId,
-        viewCount,
-        favoriteCount,
-        watchlistCount,
-        averageRating: Math.round(averageRating * 10) / 10,
-        ratingCount,
-        createdAt: new Date().toISOString(),
-        lastUpdated: new Date().toISOString()
-      };
-
-      await statsCollection.insertOne(initialStats);
-
-      const stats: NFTStats = {
-        contractAddress: lowerContractAddress,
-        tokenId: tokenId,
-        viewCount,
-        favoriteCount,
-        averageRating: Math.round(averageRating * 10) / 10,
-        ratingCount,
-        watchlistCount
-      };
-
-      // Cache the newly created stats
-      setCachedStats(lowerContractAddress, tokenId, stats);
-
-      return apiSuccess(stats);
+        return apiSuccess(stats);
+      } catch (createError) {
+        console.error('❌ Error creating initial stats:', createError);
+        // Return zero stats instead of failing
+        const zeroStats: NFTStats = {
+          contractAddress: lowerContractAddress,
+          tokenId: tokenId,
+          viewCount: 0,
+          likeCount: 0,
+          averageRating: 0,
+          ratingCount: 0,
+          watchlistCount: 0
+        };
+        return apiSuccess(zeroStats);
+      }
     }
 
     // Return existing stats from denormalized collection
@@ -134,7 +154,7 @@ export async function GET(request: NextRequest) {
       contractAddress: lowerContractAddress,
       tokenId: tokenId,
       viewCount: Math.max(0, statsDoc.viewCount || 0),
-      favoriteCount: Math.max(0, statsDoc.favoriteCount || 0),
+      likeCount: Math.max(0, statsDoc.likeCount || statsDoc.favoriteCount || 0),
       averageRating: Math.max(0, statsDoc.averageRating || 0),
       ratingCount: Math.max(0, statsDoc.ratingCount || 0),
       watchlistCount: Math.max(0, statsDoc.watchlistCount || 0)
@@ -144,9 +164,9 @@ export async function GET(request: NextRequest) {
     setCachedStats(lowerContractAddress, tokenId, stats);
 
     // Log warning if we found negative values (indicates data corruption)
-    if (statsDoc.viewCount < 0 || statsDoc.favoriteCount < 0 ||
+    if (statsDoc.viewCount < 0 || statsDoc.likeCount < 0 || statsDoc.favoriteCount < 0 ||
       statsDoc.watchlistCount < 0 || statsDoc.ratingCount < 0) {
-      console.warn('âš ï¸ Found negative stat values for', lowerContractAddress, tokenId,
+      console.warn('⚠️ Found negative stat values for', lowerContractAddress, tokenId,
         'Stats:', statsDoc);
     }
 
@@ -160,6 +180,10 @@ export async function GET(request: NextRequest) {
       return apiBadRequest(error.message);
     }
 
+    if (error instanceof RateLimitError) {
+      return apiTooManyRequests(error.message, error.retryAfter);
+    }
+
     if (error instanceof InternalError) {
       return apiInternalError(error.message);
     }
@@ -171,12 +195,15 @@ export async function GET(request: NextRequest) {
 // POST /api/nft/stats - Record NFT view
 export async function POST(request: NextRequest) {
   try {
-    // Apply rate limiting (standard for write operations)
-    await rateLimit(request, RATE_LIMIT_CONFIG.STANDARD);
+    console.log('📊 POST /api/nft/stats - Recording view...');
+
+    // Apply rate limiting - LENIENT for view tracking (high frequency operation)
+    await rateLimit(request, RATE_LIMIT_CONFIG.LENIENT);
 
     // Parse and validate request body
     const body = await parseJsonBody<{ contractAddress: string; tokenId: string; userId?: string }>(request);
     const { contractAddress, tokenId, userId } = body;
+    console.log('📝 Request body:', { contractAddress, tokenId, userId });
 
     if (!contractAddress || !tokenId) {
       throw new BadRequestError('contractAddress and tokenId are required');
@@ -191,10 +218,12 @@ export async function POST(request: NextRequest) {
 
     const lowerContractAddress = contractAddress.toLowerCase();
     const timestamp = new Date().toISOString();
+    console.log('✅ Validation passed, recording view for:', lowerContractAddress, tokenId);
 
     // Invalidate cache when recording a view
     invalidateStatsCache(lowerContractAddress, tokenId);
 
+    console.log('🔌 Getting nft_views collection...');
     const collection = await getCollection('nft_views');
 
     const viewRecord = {
@@ -204,12 +233,15 @@ export async function POST(request: NextRequest) {
       viewedAt: timestamp
     };
 
+    console.log('💾 Inserting view record and updating stats...');
     // Insert view record and update stats atomically
     await Promise.all([
       collection.insertOne(viewRecord),
       // Update viewCount in stats collection
       (async () => {
+        console.log('📈 Getting nft_stats collection...');
         const statsCollection = await getCollection('nft_stats');
+        console.log('⬆️  Updating viewCount...');
         await statsCollection.updateOne(
           { contractAddress: lowerContractAddress, tokenId },
           {
@@ -218,7 +250,7 @@ export async function POST(request: NextRequest) {
             $setOnInsert: {
               contractAddress: lowerContractAddress,
               tokenId,
-              favoriteCount: 0,
+              likeCount: 0,
               watchlistCount: 0,
               averageRating: 0,
               ratingCount: 0,
@@ -227,19 +259,32 @@ export async function POST(request: NextRequest) {
           },
           { upsert: true }
         );
+        console.log('✅ Stats updated successfully');
       })()
     ]);
 
+    console.log('🎉 View recorded successfully');
     return apiSuccess({ message: 'View recorded' });
 
   } catch (error) {
-    console.error('Error recording NFT view:', error);
+    console.error('❌ Error recording NFT view:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack trace',
+      type: error?.constructor?.name
+    });
 
     // Use typed error responses
     if (error instanceof BadRequestError) {
       return apiBadRequest(error.message);
     }
 
-    return apiInternalError('Failed to record view');
+    if (error instanceof RateLimitError) {
+      return apiTooManyRequests(error.message, error.retryAfter);
+    }
+
+    // Return more detailed error in development
+    const errorMessage = error instanceof Error ? error.message : 'Failed to record view';
+    return apiInternalError(errorMessage);
   }
 }
