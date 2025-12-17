@@ -15,6 +15,7 @@ require('dotenv').config({ path: '.env.local' });
 
 const SUBGRAPH_URL = process.env.NEXT_PUBLIC_SUBGRAPH_URL;
 const SUBGRAPH_WS_URL = process.env.NEXT_PUBLIC_SUBGRAPH_WS_URL; // Optional WebSocket URL
+const SUBGRAPH_VERSION = process.env.NEXT_PUBLIC_SUBGRAPH_VERSION || 'v1';
 const MONGODB_URI = process.env.MONGODB_URI;
 const RPC_URL = process.env.ALCHEMY_URL || process.env.JSON_RPC_URL || 'https://eth-sepolia.g.alchemy.com/v2/demo';
 
@@ -23,6 +24,7 @@ const USE_SUBSCRIPTIONS = !!SUBGRAPH_WS_URL; // Enable if WS URL is provided
 const POLLING_INTERVAL = 30000; // 30 seconds fallback polling
 
 console.log('🔧 Sync Configuration:');
+console.log(`  - Subgraph Version: ${SUBGRAPH_VERSION}`);
 console.log(`  - HTTP Endpoint: ${SUBGRAPH_URL}`);
 console.log(`  - WebSocket: ${SUBGRAPH_WS_URL || 'Not configured (using polling)'}`);
 console.log(`  - Mode: ${USE_SUBSCRIPTIONS ? '🔔 Subscriptions (real-time)' : '⏱️  Polling (30s interval)'}`);
@@ -81,8 +83,8 @@ const ERC721_ABI = [
     }
 ];
 
-// GraphQL Query für alle aktiven Listings
-const ACTIVE_ITEMS_QUERY = `
+// GraphQL Queries (v1 vs v2 schema)
+const ACTIVE_ITEMS_QUERY_V1 = `
   query GetActiveItems($first: Int!, $skip: Int!) {
     items(
       first: $first
@@ -103,6 +105,35 @@ const ACTIVE_ITEMS_QUERY = `
     }
   }
 `;
+
+const ACTIVE_ITEMS_QUERY_V2 = `
+  query GetActiveListings($first: Int!, $skip: Int!) {
+    listings(
+      first: $first
+      skip: $skip
+      where: { isListed: true }
+      orderBy: listingId
+      orderDirection: desc
+    ) {
+      id
+      listingId
+      nftAddress
+      tokenId
+      isListed
+      price
+      seller
+      buyer
+      desiredNftAddress
+      desiredTokenId
+      blockNumber
+      blockTimestamp
+      transactionHash
+    }
+  }
+`;
+
+// Select query based on version
+const ACTIVE_ITEMS_QUERY = SUBGRAPH_VERSION === 'v2' ? ACTIVE_ITEMS_QUERY_V2 : ACTIVE_ITEMS_QUERY_V1;
 
 // GraphQL Query ausführen
 async function fetchGraphQL(query, variables = {}) {
@@ -423,7 +454,8 @@ async function syncMarketplaceData() {
 
         while (hasMore) {
             const data = await fetchGraphQL(ACTIVE_ITEMS_QUERY, { skip, first: batchSize });
-            const items = data.items || [];
+            // v2 returns 'listings', v1 returns 'items'
+            const items = SUBGRAPH_VERSION === 'v2' ? (data.listings || []) : (data.items || []);
 
             if (items.length === 0) {
                 hasMore = false;
