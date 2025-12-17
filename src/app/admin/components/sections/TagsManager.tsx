@@ -4,10 +4,10 @@
  * Tags Manager Component
  * 
  * Features:
- * - ðŸ·ï¸ Dynamic Tag Addition
- * - âŒ Tag Removal
- * - ðŸ“ Auto-complete Suggestions
- * - âœ… Validation & Deduplication
+ * - 🏷️ Dynamic Tag Addition
+ * - ❌ Tag Removal
+ * - 🔍 Auto-complete Suggestions
+ * - ✅ Validation & Deduplication
  */
 
 import { useState, useCallback } from "react";
@@ -113,7 +113,7 @@ export default function TagsManager({ tags, onChange }: TagsManagerProps) {
                     onKeyDown={handleKeyDown}
                     onFocus={() => setShowSuggestions(inputValue.length > 0)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Tag hinzufÃ¼gen (Enter drÃ¼cken oder aus VorschlÃ¤gen wÃ¤hlen)"
+                    placeholder="Tag hinzufügen (Enter drücken oder aus Vorschlägen wählen)"
                 />
 
                 {/* Suggestions Dropdown */}
@@ -152,7 +152,7 @@ export default function TagsManager({ tags, onChange }: TagsManagerProps) {
 
             {/* Info */}
             <div className="text-xs text-gray-500">
-                ðŸ’¡ Tags helfen beim Kategorisieren und Filtern von NFTs. Verwende relevante Begriffe, die die Eigenschaften oder den Nutzen des NFTs beschreiben.
+                💡 Tags helfen beim Kategorisieren und Filtern von NFTs. Verwende relevante Begriffe, die die Eigenschaften oder den Nutzen des NFTs beschreiben.
             </div>
         </div>
     );

@@ -6,9 +6,10 @@ import { AdminNFTInsightsManager } from "../components";
 
 function AdminContent() {
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mb-8">
-                <div className="flex items-center gap-4 mb-4">
+        <div className="container mx-auto px-4">
+            <div className="max-w-6xl mx-auto">
+                {/* Back Button */}
+                <div className="mb-6">
                     <Link
                         href="/admin"
                         className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 transition-colors"
@@ -19,11 +20,15 @@ function AdminContent() {
                         Zurück zum Admin Panel
                     </Link>
                 </div>
-                <h1 className="text-3xl font-bold text-gray-900">NFT Insights Management</h1>
-                <p className="mt-2 text-gray-600">Manage NFT insights, descriptions, and metadata</p>
-            </div>
 
-            <AdminNFTInsightsManager />
+                {/* Header */}
+                <div className="mb-8">
+                    <h1 className="text-3xl font-bold text-gray-900 mb-2">NFT Insights</h1>
+                    <p className="text-gray-600">Manage NFT insights, descriptions, and metadata</p>
+                </div>
+
+                <AdminNFTInsightsManager />
+            </div>
         </div>
     );
 }
@@ -32,19 +37,21 @@ export default function AdminPage() {
     return (
         <div className="min-h-screen bg-gray-50 py-8">
             <Suspense fallback={
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="mb-8">
-                        <h1 className="text-3xl font-bold text-gray-900">Admin Panel</h1>
-                        <p className="mt-2 text-gray-600">Loading...</p>
-                    </div>
-                    <div className="bg-white rounded-lg shadow-lg p-6">
-                        <div className="animate-pulse">
-                            <div className="h-6 bg-gray-200 rounded w-1/4 mb-4"></div>
-                            <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
-                            <div className="space-y-4">
-                                <div className="h-10 bg-gray-200 rounded"></div>
-                                <div className="h-10 bg-gray-200 rounded"></div>
-                                <div className="h-32 bg-gray-200 rounded"></div>
+                <div className="container mx-auto px-4">
+                    <div className="max-w-6xl mx-auto">
+                        <div className="mb-8">
+                            <h1 className="text-3xl font-bold text-gray-900">NFT Insights</h1>
+                            <p className="mt-2 text-gray-600">Loading...</p>
+                        </div>
+                        <div className="bg-white border border-gray-200 rounded-lg p-6">
+                            <div className="animate-pulse">
+                                <div className="h-6 bg-gray-200 rounded w-1/4 mb-4"></div>
+                                <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
+                                <div className="space-y-4">
+                                    <div className="h-10 bg-gray-200 rounded"></div>
+                                    <div className="h-10 bg-gray-200 rounded"></div>
+                                    <div className="h-32 bg-gray-200 rounded"></div>
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -4,11 +4,11 @@
  * Title Description Manager
  * 
  * Enhanced description management with title-description pairs:
- * - ðŸ·ï¸ Multiple titles with descriptions each
- * - âž• Add/Remove title-description pairs
- * - ðŸ“ Multiple descriptions per title
- * - ðŸ”§ Dynamic editing and validation
- * - ðŸ“‹ Live preview and organization
+ * - 🏷️ Multiple titles with descriptions each
+ * - ➕ Add/Remove title-description pairs
+ * - 📝 Multiple descriptions per title
+ * - 🔧 Dynamic editing and validation
+ * - 📋 Live preview and organization
  */
 
 import { useCallback } from "react";
@@ -48,7 +48,7 @@ export default function TitleDescriptionManager({
     descriptions,
     onChange,
     placeholderTitle = "z.B. 'Exklusive Features', 'Utility & Benefits', 'Roadmap Highlights'",
-    placeholderDescription = "Beschreibung fÃ¼r diesen Titel",
+    placeholderDescription = "Beschreibung für diesen Titel",
     hideTitle = false,
     maxDescriptions = 10,
     maxCharactersPerDescription = 200
@@ -261,7 +261,7 @@ export default function TitleDescriptionManager({
                                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white text-sm"
                                                 placeholder={hideTitle
                                                     ? `Beschreibung ${descIndex + 1}`
-                                                    : `${placeholderDescription} ${descIndex + 1} fÃ¼r "${pair.title || 'diesen Titel'}"`
+                                                    : `${placeholderDescription} ${descIndex + 1} für "${pair.title || 'diesen Titel'}"`
                                                 }
                                             />
                                             {description.trim().length > 0 && (
@@ -309,7 +309,7 @@ export default function TitleDescriptionManager({
                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                     </svg>
-                                    Beschreibung hinzufÃ¼gen
+                                    Beschreibung hinzufügen
                                 </button>
                             </div>
                         </div>
@@ -328,7 +328,7 @@ export default function TitleDescriptionManager({
                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
-                        {hideTitle ? 'Beschreibung hinzufÃ¼gen' : 'Neuen Titel mit Beschreibungen hinzufÃ¼gen'}
+                        {hideTitle ? 'Beschreibung hinzufügen' : 'Neuen Titel mit Beschreibungen hinzufügen'}
                     </button>
                 </div>
             )}
@@ -353,7 +353,7 @@ export default function TitleDescriptionManager({
                                             .slice(0, 2)
                                             .map((desc: string, descIndex: number) => (
                                                 <p key={descIndex} className="text-xs text-gray-600">
-                                                    â€¢ {desc.trim()}
+                                                    • {desc.trim()}
                                                 </p>
                                             ))}
                                         {(pair.descriptions || []).filter((desc: string) => desc.trim().length > 0).length > 2 && (

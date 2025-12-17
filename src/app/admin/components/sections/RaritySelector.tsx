@@ -9,20 +9,20 @@ const RARITY_OPTIONS = [
     {
         value: 'common' as const,
         label: 'Common',
-        description: 'HÃ¤ufig vorkommend',
+        description: 'Häufig vorkommend',
         color: 'bg-gray-100 text-gray-700 border-gray-300',
         selectedColor: 'bg-gray-200 border-gray-400',
         percentage: '60-80%',
-        icon: 'âšª'
+        icon: '⚪'
     },
     {
         value: 'uncommon' as const,
         label: 'Uncommon',
-        description: 'Weniger hÃ¤ufig',
+        description: 'Weniger häufig',
         color: 'bg-green-100 text-green-700 border-green-300',
         selectedColor: 'bg-green-200 border-green-400',
         percentage: '15-25%',
-        icon: 'ðŸŸ¢'
+        icon: '🟢'
     },
     {
         value: 'rare' as const,
@@ -31,7 +31,7 @@ const RARITY_OPTIONS = [
         color: 'bg-blue-100 text-blue-700 border-blue-300',
         selectedColor: 'bg-blue-200 border-blue-400',
         percentage: '5-15%',
-        icon: 'ðŸ”µ'
+        icon: '🔵'
     },
     {
         value: 'epic' as const,
@@ -40,7 +40,7 @@ const RARITY_OPTIONS = [
         color: 'bg-purple-100 text-purple-700 border-purple-300',
         selectedColor: 'bg-purple-200 border-purple-400',
         percentage: '1-5%',
-        icon: 'ðŸŸ£'
+        icon: '🟣'
     },
     {
         value: 'legendary' as const,
@@ -49,7 +49,7 @@ const RARITY_OPTIONS = [
         color: 'bg-yellow-100 text-yellow-700 border-yellow-300',
         selectedColor: 'bg-yellow-200 border-yellow-400',
         percentage: '<1%',
-        icon: 'ðŸŸ¡'
+        icon: '🟡'
     }
 ];
 
@@ -105,9 +105,9 @@ export default function RaritySelector({ rarity, onChange }: RaritySelectorProps
                         </div>
                     ) : (
                         <div className="text-center text-gray-500 py-4">
-                            <div className="text-2xl mb-2">ðŸŽ¯</div>
-                            <p className="text-sm font-medium">Rarity auswÃ¤hlen</p>
-                            <p className="text-xs opacity-75">WÃ¤hle eine Rarity-Stufe aus, um Details zu sehen</p>
+                            <div className="text-2xl mb-2">🎯</div>
+                            <p className="text-sm font-medium">Rarity auswählen</p>
+                            <p className="text-xs opacity-75">Wähle eine Rarity-Stufe aus, um Details zu sehen</p>
                         </div>
                     )}
                 </div>
@@ -115,13 +115,13 @@ export default function RaritySelector({ rarity, onChange }: RaritySelectorProps
                 {/* Rarity Info */}
                 <div className="bg-gray-50 p-3 rounded-md">
                     <div className="text-xs text-gray-600 space-y-1">
-                        <p className="font-medium">ðŸ’¡ Rarity Guidelines:</p>
+                        <p className="font-medium">💡 Rarity Guidelines:</p>
                         <ul className="space-y-1 ml-4">
-                            <li>â€¢ <strong>Common:</strong> Standard NFTs ohne besondere Eigenschaften</li>
-                            <li>â€¢ <strong>Uncommon:</strong> Einige seltene Traits oder Features</li>
-                            <li>â€¢ <strong>Rare:</strong> Mehrere seltene Eigenschaften kombiniert</li>
-                            <li>â€¢ <strong>Epic:</strong> Sehr seltene Trait-Kombinationen</li>
-                            <li>â€¢ <strong>Legendary:</strong> Einzigartige oder extrem seltene NFTs</li>
+                            <li>• <strong>Common:</strong> Standard NFTs ohne besondere Eigenschaften</li>
+                            <li>• <strong>Uncommon:</strong> Einige seltene Traits oder Features</li>
+                            <li>• <strong>Rare:</strong> Mehrere seltene Eigenschaften kombiniert</li>
+                            <li>• <strong>Epic:</strong> Sehr seltene Trait-Kombinationen</li>
+                            <li>• <strong>Legendary:</strong> Einzigartige oder extrem seltene NFTs</li>
                         </ul>
                     </div>
                 </div>

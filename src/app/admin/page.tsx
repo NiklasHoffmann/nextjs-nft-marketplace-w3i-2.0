@@ -5,8 +5,8 @@ import { hasAdminAccess } from '@/utils';
 // Separate component to handle URL parameters (requires Suspense in Next.js 15)
 function AdminContent() {
     return (
-        <div className="container mx-auto px-4 py-8">
-            <div className="max-w-4xl mx-auto">
+        <div className="container mx-auto px-4">
+            <div className="max-w-6xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Panel</h1>
@@ -37,9 +37,9 @@ function AdminContent() {
                                 Insights verwalten
                             </Link>
                             <div className="text-xs text-gray-500">
-                                â€¢ NFT-spezifische Insights erstellen<br />
-                                â€¢ Projekt-Informationen verwalten<br />
-                                â€¢ Tags und Kategorien bearbeiten
+                                • NFT-spezifische Insights erstellen<br />
+                                • Projekt-Informationen verwalten<br />
+                                • Tags und Kategorien bearbeiten
                             </div>
                         </div>
                     </div>
@@ -55,19 +55,47 @@ function AdminContent() {
                             <h3 className="text-lg font-semibold text-gray-900 ml-3">Dashboard</h3>
                         </div>
                         <p className="text-gray-600 text-sm mb-4">
-                            Ãœbersicht Ã¼ber Admin-AktivitÃ¤ten, Statistiken und System-Status.
+                            Übersicht über Admin-Aktivitäten, Statistiken und System-Status.
                         </p>
                         <div className="space-y-2">
                             <Link
                                 href="/admin/dashboard"
                                 className="block w-full px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors text-center"
                             >
-                                Dashboard Ã¶ffnen
+                                Dashboard öffnen
                             </Link>
                             <div className="text-xs text-gray-500">
-                                â€¢ System-Ãœbersicht<br />
-                                â€¢ AktivitÃ¤ts-Logs<br />
-                                â€¢ Performance-Metriken
+                                • System-Übersicht<br />
+                                • Aktivitäts-Logs<br />
+                                • Performance-Metriken
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Marketplace Admin */}
+                    <div className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
+                        <div className="flex items-center mb-4">
+                            <div className="p-2 bg-purple-100 rounded-lg">
+                                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900 ml-3">Marketplace Admin</h3>
+                        </div>
+                        <p className="text-gray-600 text-sm mb-4">
+                            Verwalte Marketplace-Gebühren, Whitelists und Listing-Maintenance.
+                        </p>
+                        <div className="space-y-2">
+                            <Link
+                                href="/admin/marketplace"
+                                className="block w-full px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors text-center"
+                            >
+                                Marketplace verwalten
+                            </Link>
+                            <div className="text-xs text-gray-500">
+                                • Innovation Fee einstellen<br />
+                                • Collection Whitelist verwalten<br />
+                                • Listings bereinigen
                             </div>
                         </div>
                     </div>
@@ -75,8 +103,8 @@ function AdminContent() {
                     {/* Settings */}
                     <div className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
                         <div className="flex items-center mb-4">
-                            <div className="p-2 bg-purple-100 rounded-lg">
-                                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="p-2 bg-gray-100 rounded-lg">
+                                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
@@ -87,16 +115,16 @@ function AdminContent() {
                             System-Konfiguration und Admin-Einstellungen verwalten.
                         </p>
                         <div className="space-y-2">
-                            <button
-                                disabled
-                                className="block w-full px-4 py-2 bg-gray-300 text-gray-500 text-sm rounded-lg cursor-not-allowed text-center"
+                            <Link
+                                href="/admin/settings"
+                                className="block w-full px-4 py-2 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors text-center"
                             >
-                                Bald verfÃ¼gbar
-                            </button>
+                                Einstellungen öffnen
+                            </Link>
                             <div className="text-xs text-gray-500">
-                                â€¢ System-Konfiguration<br />
-                                â€¢ Benutzer-Verwaltung<br />
-                                â€¢ Sicherheits-Einstellungen
+                                • System-Konfiguration<br />
+                                • Environment Variables<br />
+                                • Admin Access
                             </div>
                         </div>
                     </div>
@@ -125,21 +153,25 @@ function AdminContent() {
 
 export default function AdminPage() {
     return (
-        <Suspense fallback={
-            <div className="container mx-auto px-4 py-8">
-                <div className="animate-pulse">
-                    <div className="h-8 bg-gray-200 rounded mb-4 w-1/4"></div>
-                    <div className="space-y-4">
-                        <div className="h-24 bg-gray-200 rounded"></div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="h-32 bg-gray-200 rounded"></div>
-                            <div className="h-32 bg-gray-200 rounded"></div>
+        <div className="min-h-screen bg-gray-50 py-8">
+            <Suspense fallback={
+                <div className="container mx-auto px-4">
+                    <div className="max-w-6xl mx-auto">
+                        <div className="animate-pulse">
+                            <div className="h-8 bg-gray-200 rounded mb-4 w-1/4"></div>
+                            <div className="space-y-4">
+                                <div className="h-24 bg-gray-200 rounded"></div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="h-32 bg-gray-200 rounded"></div>
+                                    <div className="h-32 bg-gray-200 rounded"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        }>
-            <AdminContent />
-        </Suspense>
+            }>
+                <AdminContent />
+            </Suspense>
+        </div>
     );
 }

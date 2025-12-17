@@ -1,10 +1,11 @@
 ﻿"use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useAdminNFTInsights, useNFTInsightsLegacy } from "@/hooks";
 import {
     NFTSelector,
+    NFTDatabaseSelector,
     BasicInfoManager,
     TagsManager,
     RaritySelector,
@@ -85,6 +86,7 @@ const initialFormData: NFTInsightFormData = {
 
 export default function AdminNFTInsightsManager() {
     const searchParams = useSearchParams();
+    const router = useRouter();
     const [formData, setFormData] = useState<NFTInsightFormData>(initialFormData);
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState<string | null>(null);
@@ -199,7 +201,7 @@ export default function AdminNFTInsightsManager() {
             setFormData(prev => {
                 const updatedFormData = {
                     ...prev,
-                    // WICHTIG: contractAddress und tokenId NICHT Ã¼berschreiben!
+                    // WICHTIG: contractAddress und tokenId NICHT überschreiben!
                     // Diese bleiben aus dem URL-Parameter (NFT-spezifisch)
                     customTitle: insightsToUse.customTitle || insightsToUse.title || '', // Use customTitle first, fallback to title
                     title: insightsToUse.title || '', // Keep legacy support
@@ -245,7 +247,7 @@ export default function AdminNFTInsightsManager() {
 
             // Token ID validation - only validate format if provided
             if (formData.tokenId && formData.tokenId.trim() !== '' && !/^\d+$/.test(formData.tokenId.trim())) {
-                throw new Error('Token ID muss eine gÃ¼ltige Zahl sein oder leer bleiben fÃ¼r Collection-weite Insights');
+                throw new Error('Token ID muss eine gültige Zahl sein oder leer bleiben für Collection-weite Insights');
             }
 
             let requestData: any;
@@ -356,7 +358,7 @@ export default function AdminNFTInsightsManager() {
                             <div className="ml-3">
                                 <h3 className="text-sm font-medium text-purple-800">Collection-weite Insights geladen</h3>
                                 <p className="mt-1 text-sm text-purple-700">
-                                    FÃ¼r diesen NFT existieren keine spezifischen Insights. Die Felder wurden mit den collection-weiten Insights vorausgefÃ¼llt.
+                                    Für diesen NFT existieren keine spezifischen Insights. Die Felder wurden mit den collection-weiten Insights vorausgefüllt.
                                     Beim Speichern werden NFT-spezifische Insights erstellt.
                                 </p>
                             </div>
@@ -366,7 +368,23 @@ export default function AdminNFTInsightsManager() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-                {/* NFT Selection */}
+                {/* NFT Database Selection - Primary Method */}
+                <NFTDatabaseSelector
+                    contractAddress={formData.contractAddress}
+                    tokenId={formData.tokenId}
+                    onSelect={(contractAddress: string, tokenId: string) => {
+                        // Update form data
+                        updateFormData({ contractAddress, tokenId });
+
+                        // Update URL parameters to trigger insights loading
+                        const params = new URLSearchParams(searchParams.toString());
+                        params.set('contractAddress', contractAddress);
+                        params.set('tokenId', tokenId);
+                        router.push(`?${params.toString()}`);
+                    }}
+                />
+
+                {/* NFT Manual Selection - Fallback */}
                 <NFTSelector
                     contractAddress={formData.contractAddress}
                     tokenId={formData.tokenId}
