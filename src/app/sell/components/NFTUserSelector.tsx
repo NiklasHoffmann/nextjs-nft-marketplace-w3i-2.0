@@ -7,7 +7,7 @@ import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 interface NFTUserSelectorProps {
     userNFTs: AggregatedNFT[];
     selectedNFT: AggregatedNFT | null;
-    onSelect: (nft: AggregatedNFT) => void;
+    onSelect: (nft: AggregatedNFT | null) => void;
     isLoading: boolean;
 }
 
@@ -44,16 +44,19 @@ export function NFTUserSelector({ userNFTs, selectedNFT, onSelect, isLoading }: 
     }
 
     return (
-        <div className="space-y-3 max-h-96 overflow-y-auto">
-            {userNFTs.map((nft, index) => (
-                <div
-                    key={`${nft.contractAddress}-${nft.tokenId}-${index}`}
-                    onClick={() => onSelect(nft)}
-                    className={`flex gap-3 p-3 border rounded-lg cursor-pointer transition-all hover:shadow-md ${selectedNFT?.contractAddress === nft.contractAddress && selectedNFT?.tokenId === nft.tokenId
-                        ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                        : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                >
+        <div className="space-y-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 400px)', minHeight: '400px' }}>
+            {userNFTs.map((nft, index) => {
+                const isSelected = selectedNFT?.contractAddress === nft.contractAddress && selectedNFT?.tokenId === nft.tokenId;
+                
+                return (
+                    <div
+                        key={`${nft.contractAddress}-${nft.tokenId}-${index}`}
+                        onClick={() => onSelect(isSelected ? null : nft)}
+                        className={`flex gap-3 p-3 border rounded-lg cursor-pointer transition-all hover:shadow-md ${isSelected
+                            ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                            : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                    >
                     <div className="flex-shrink-0">
                         <OptimizedNFTImage
                             imageUrl={nft.meta?.image || ''}
@@ -159,7 +162,7 @@ export function NFTUserSelector({ userNFTs, selectedNFT, onSelect, isLoading }: 
                         )}
                     </div>
 
-                    {selectedNFT?.contractAddress === nft.contractAddress && selectedNFT?.tokenId === nft.tokenId && (
+                    {isSelected && (
                         <div className="flex-shrink-0 self-center">
                             <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -167,7 +170,8 @@ export function NFTUserSelector({ userNFTs, selectedNFT, onSelect, isLoading }: 
                         </div>
                     )}
                 </div>
-            ))}
+                );
+            })}
         </div>
     );
 }
