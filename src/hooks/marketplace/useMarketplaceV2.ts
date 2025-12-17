@@ -8,7 +8,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { devLog } from '@/utils/devLog';
 import { useMarketplaceItems } from '@/contexts/marketplace-items';
 import { useCollections } from '@/contexts/collections';
 import type { EnrichedNFTDocument, MarketplaceItemsResponse } from '@/types/marketplace/enriched-nft';
@@ -27,8 +26,8 @@ interface UseMarketplaceV2Options {
   maxPrice?: string;
   seller?: string;
   isListed?: boolean;
-  category?: string;
-  rarity?: string;
+  category?: string | string[];
+  rarity?: string | string[];
   tags?: string[];
   minRating?: number;
   minViews?: number;
@@ -77,7 +76,8 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
   } = options;
 
   const [items, setItems] = useState<EnrichedNFTDocument[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(autoFetch); // Start with true if autoFetch is enabled
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(initialPage);
   const [pagination, setPagination] = useState<UseMarketplaceV2Return['pagination']>(null);
@@ -88,6 +88,10 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
 
   // Prevent concurrent loadMore calls
   const loadingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Ref to store latest fetchItems function
+  const fetchItemsRef = useRef<((pageNum: number, append?: boolean) => Promise<void>) | null>(null);
 
   // Create cache key from filters
   const createFilterKey = useCallback(() => {
@@ -130,29 +134,53 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
    * Fetch items from API (with cache support)
    */
   const fetchItems = useCallback(async (pageNum: number, append: boolean = false) => {
-    if (loadingRef.current) {
-      devLog.debug('marketplace', `⏸️ Fetch already in progress, skipping duplicate call for page ${pageNum}`);
-      return;
+    // Don't block if previous request is still running - abort it instead
+    // This allows React Strict Mode double-renders to work correctly
+
+    // Abort any pending request before starting a new one (prevents race conditions)
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      loadingRef.current = false; // Reset loading ref when aborting
     }
 
+    // Create new abort controller for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     // Check cache first (only for page 1, not for pagination)
+    // IMPORTANT: Check cache BEFORE clearing items to avoid flicker
+    const filterKey = createFilterKey();
+    console.log('🔍 [useMarketplaceV2] Checking cache for key:', filterKey);
+
     if (!append && pageNum === 1) {
-      const filterKey = createFilterKey();
       const cached = cache.getCached(filterKey);
 
       if (cached) {
-        devLog.cache('marketplace', `✅ Using cached data (${cached.data.items.length} items)`);
+        console.log('✅ [useMarketplaceV2] Cache HIT - using cached data:', cached.data.items.length);
+        // Cache hit - set items immediately without clearing first
         setItems(cached.data.items);
         setPagination(cached.data.pagination);
         setAvailableFilters(cached.data.filters || null);
         setLoading(false);
+        setInitialLoading(false);
+        abortControllerRef.current = null;
         return;
       }
+      console.log('❌ [useMarketplaceV2] Cache MISS - fetching from API');
+    }
+
+    // Clear items AFTER cache check (only if cache miss and not appending)
+    // This prevents flickering when cache is available
+    if (!append) {
+      console.log('🗑️ [useMarketplaceV2] Clearing items before fetch');
+      setItems([]);
     }
 
     loadingRef.current = true;
     setLoading(true);
     setError(null);
+
+    console.log('🌐 [useMarketplaceV2] Starting API request...');
 
     try {
       // Build query string
@@ -167,8 +195,8 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
         ...(filters.maxPrice && { maxPrice: filters.maxPrice }),
         ...(filters.seller && { seller: filters.seller }),
         ...(filters.isListed !== undefined && { isListed: filters.isListed.toString() }),
-        ...(filters.category && { category: filters.category }),
-        ...(filters.rarity && { rarity: filters.rarity }),
+        ...(filters.category && { category: Array.isArray(filters.category) ? filters.category.join(',') : filters.category }),
+        ...(filters.rarity && { rarity: Array.isArray(filters.rarity) ? filters.rarity.join(',') : filters.rarity }),
         ...(filters.tags && filters.tags.length > 0 && { tags: filters.tags.join(',') }),
         ...(filters.minRating !== undefined && { minRating: filters.minRating.toString() }),
         ...(filters.minViews !== undefined && { minViews: filters.minViews.toString() }),
@@ -176,50 +204,85 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
         ...(filters.minWatchlistCount !== undefined && { minWatchlistCount: filters.minWatchlistCount.toString() }),
       });
 
-      const response = await fetch(`/api/marketplace/items?${params.toString()}`);
+      const response = await fetch(`/api/marketplace/items?${params.toString()}`, {
+        signal: abortController.signal
+      });
+
+      console.log('📡 [useMarketplaceV2] Response received:', response.status, response.ok);
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        // Try to get error details from response
+        let errorDetails = `API error: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorDetails += ` - ${errorData.error || errorData.message || 'Unknown error'}`;
+        } catch (e) {
+          // Could not parse error response
+        }
+        throw new Error(errorDetails);
       }
 
       const data: MarketplaceItemsResponse = await response.json();
+
+      console.log('📊 [useMarketplaceV2] API Response:', {
+        success: data.success,
+        itemsCount: data.data?.items?.length || 0,
+        pagination: data.data?.pagination,
+        firstItem: data.data?.items?.[0]
+      });
 
       if (!data.success) {
         throw new Error(data.error || 'Unknown error');
       }
 
-      // Debug logging removed for production
+      // Only update if this request wasn't aborted
+      if (!abortController.signal.aborted) {
+        // Update state
+        if (append) {
+          setItems(prev => {
+            // Deduplication: Filter out items that already exist (by listingId)
+            const existingIds = new Set(prev.map(item => item.listingId).filter(Boolean));
+            const newItems = data.data.items.filter(item => {
+              console.log('📦 [useMarketplaceV2] Setting items:', data.data.items.length);
+              if (!item.listingId) return true; // Keep items without listingId
+              return !existingIds.has(item.listingId); // Skip duplicates
+            });
 
-      // Update state
-      if (append) {
-        setItems(prev => {
-          // Deduplication: Filter out items that already exist (by listingId)
-          const existingIds = new Set(prev.map(item => item.listingId).filter(Boolean));
-          const newItems = data.data.items.filter(item => {
-            if (!item.listingId) return true; // Keep items without listingId
-            return !existingIds.has(item.listingId); // Skip duplicates
+            return [...prev, ...newItems];
           });
+        } else {
+          setItems(data.data.items);
 
-          return [...prev, ...newItems];
-        });
-      } else {
-        setItems(data.data.items);
-
-        // Cache the result (only for page 1)
-        if (pageNum === 1) {
-          const filterKey = createFilterKey();
-          cache.setCache(filterKey, data.data);
+          // Cache the result (only for page 1)
+          if (pageNum === 1) {
+            const filterKey = createFilterKey();
+            cache.setCache(filterKey, data.data);
+          }
         }
+
+        setPagination(data.data.pagination);
+        setAvailableFilters(data.data.filters || null);
+        setInitialLoading(false);
+      }
+    } catch (err) {
+      // Ignore abort errors (normal flow when filters change)
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('⚠️ [useMarketplaceV2] Request aborted (normal)');
+        loadingRef.current = false; // Reset loading ref on abort
+        return;
       }
 
-      setPagination(data.data.pagination);
-      setAvailableFilters(data.data.filters || null);
-    } catch (err) {
+      console.error('❌ [useMarketplaceV2] Fetch error:', err);
+
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch items';
       setError(errorMessage);
+      setInitialLoading(false);
     } finally {
       loadingRef.current = false;
       setLoading(false);
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
     }
   }, [
     limit,
@@ -241,6 +304,9 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
     cache,
     createFilterKey,
   ]);
+
+  // Store latest fetchItems in ref
+  fetchItemsRef.current = fetchItems;
 
   /**
    * Refetch current page
@@ -268,33 +334,57 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
     await fetchItems(newPage, false);
   }, [fetchItems]);
 
-  // Auto-fetch on mount or when filters change
+  // Auto-fetch when filters change
   useEffect(() => {
-    if (autoFetch) {
-      // Clear old items immediately to prevent duplicates
-      setItems([]);
-      setPage(1);
-      fetchItems(1, false);
+    if (!autoFetch) {
+      return;
     }
+
+    console.log('[useMarketplaceV2] useEffect triggered - clearing items and fetching...');
+
+    // CRITICAL: Clear items immediately when filters change to prevent showing stale data
+    // This happens BEFORE the fetchItems call to ensure instant UI update
+    setItems([]);
+    setLoading(true);
+
+    // Abort any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // Reset page when filters change
+    setPage(1);
+
+    // Call fetchItems directly (not via ref to avoid race condition)
+    console.log('[useMarketplaceV2] Calling fetchItems...');
+    fetchItems(1, false);
+
+    // NO cleanup - let requests complete even if component unmounts or re-renders
+    // This is safe because:
+    // 1. loadingRef prevents duplicate requests
+    // 2. AbortController is checked before setting state
+    // 3. React Strict Mode won't abort our initial fetch
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     autoFetch,
+    // fetchItems removed from dependencies to prevent infinite loop!
+    // Stringify complex types for stable dependencies
     filters.search,
     filters.contractAddress,
     filters.minPrice,
     filters.maxPrice,
     filters.seller,
     filters.isListed,
-    filters.category,
-    filters.rarity,
-    filters.tags?.join(','),
+    JSON.stringify(filters.category), // Handle arrays
+    JSON.stringify(filters.rarity),   // Handle arrays
+    JSON.stringify(filters.tags),     // Handle arrays
     filters.minRating,
     filters.minViews,
     filters.minLikes,
     filters.minWatchlistCount,
     filters.sortBy,
     filters.sortOrder,
-    // fetchItems intentionally omitted to prevent infinite loop
   ]);
 
   return {

@@ -6,6 +6,7 @@ import { useCollectionsV2 } from '@/hooks/marketplace/useMarketplaceV2';
 import { useAdminStatus, useHorizontalScroll } from '@/hooks';
 import { ScrollButtons, RefreshButton, AdminDebugPanel } from '@/components/ui';
 import { CollectionCard } from './CollectionCard';
+import CollectionCardSkeleton from './CollectionCard/CollectionCardSkeleton';
 import type { NFTSortOptions, NFTFilters } from '@/types/marketplace';
 
 interface CollectionsListProps {
@@ -90,7 +91,6 @@ export function CollectionsList({ currentSort, onSortChange, filters }: Collecti
     // Handle collection click
     const handleCollectionClick = useCallback((contractAddress: string) => {
         if (!contractAddress) {
-            console.error('CollectionsList: Cannot navigate - contractAddress is undefined');
             return;
         }
         router.push(`/nft/${contractAddress}`);
@@ -108,11 +108,22 @@ export function CollectionsList({ currentSort, onSortChange, filters }: Collecti
     // Loading state
     if (!isClient || (loading && collections.length === 0)) {
         return (
-            <div className="pt-8 pb-2 w-full">
-                <div className="md:pl-16 pl-10">
-                    <div className="max-w-7xl mx-auto px-12 mb-6">
-                        <h1 className="text-4xl font-bold text-gray-900">Collections</h1>
-                        <p className="text-sm text-gray-600 pl-2 mt-2">Loading collections data...</p>
+            <div className="w-full md:pl-16 pl-10">
+                <div className="px-8 mb-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-2xl font-bold text-gray-900">Collections</h2>
+                            <p className="text-sm text-gray-600 mt-1">Loading collections...</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Skeleton cards */}
+                <div className="relative overflow-visible pb-4">
+                    <div className="flex gap-6 pb-4 pt-4 pl-8 pr-6">
+                        {Array.from({ length: 4 }, (_, i) => (
+                            <CollectionCardSkeleton key={i} />
+                        ))}
                     </div>
                 </div>
             </div>
@@ -140,68 +151,50 @@ export function CollectionsList({ currentSort, onSortChange, filters }: Collecti
     }
 
     return (
-        <div className="pt-8 pb-2 w-full">
-            <div className="md:pl-16 pl-10">
-                {/* Header */}
-                <div className="max-w-7xl mx-auto px-12 mb-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-4xl font-bold text-gray-900">Collections</h1>
-                            <p className="text-sm text-gray-600 pl-2 mt-2">
-                                {filteredCollections.length} {filteredCollections.length === 1 ? 'Collection' : 'Collections'}
-                                {filters && filteredCollections.length !== collections.length && (
-                                    <span className="text-blue-600"> (von {collections.length} total)</span>
-                                )}
-                                {summary && (
-                                    <span className="ml-3 text-green-600">• Total Value: {summary.totalValue} ETH</span>
-                                )}
-                            </p>
-                        </div>
-                        <RefreshButton onClick={refetch} loading={loading} />
+        <div className="w-full md:pl-16 pl-10">
+            {/* Header */}
+            <div className="px-8 mb-6">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-900">Utility Collections</h2>
+                        <p className="text-sm text-gray-600 mt-1">
+                            Showing {filteredCollections.length} of {summary?.totalCollections || collections.length} Collections
+                        </p>
                     </div>
+                    <RefreshButton onClick={refetch} loading={loading} />
                 </div>
-
-                {/* Collections Grid with Horizontal Scroll */}
-                <div className="relative overflow-visible pb-4">
-                    <ScrollButtons
-                        canScrollLeft={canScrollLeft}
-                        canScrollRight={canScrollRight}
-                        onScrollLeft={() => scroll('left')}
-                        onScrollRight={() => scroll('right')}
-                    />
-
-                    <div
-                        ref={scrollContainerRef}
-                        className="flex gap-6 pb-4 pt-4 scrollbar-hide scroll-smooth pl-8 pr-6"
-                        style={{
-                            scrollBehavior: 'smooth',
-                            paddingBottom: '50px',
-                            overflowX: 'auto',
-                            overflowY: 'visible',
-                        }}
-                    >
-                        {filteredCollections.map((collection, index) => (
-                            <CollectionCard
-                                key={collection.contractAddress || `unknown-${index}`}
-                                collection={collection}
-                                onClick={handleCollectionClick}
-                            />
-                        ))}
-                    </div>
-                </div>
-
-                {/* Admin Debug Panel */}
-                {summary && (
-                    <div className="max-w-7xl mx-auto px-12 mt-4">
-                        <AdminDebugPanel isAdmin={isAdmin}>
-                            <p>🔍 Debug: {summary.totalCollections} collections total</p>
-                            <p>📊 Listed: {summary.totalListedNFTs} items</p>
-                            <p>💰 Total Value: {summary.totalValue} ETH</p>
-                            <p>⚡ Data Source: MongoDB /api/marketplace/collections</p>
-                        </AdminDebugPanel>
-                    </div>
-                )}
             </div>
+
+            {/* Collections Grid with Horizontal Scroll */}
+            <div className="relative overflow-visible pb-4 min-h-[400px]">
+                <ScrollButtons
+                    canScrollLeft={canScrollLeft}
+                    canScrollRight={canScrollRight}
+                    onScrollLeft={() => scroll('left')}
+                    onScrollRight={() => scroll('right')}
+                />
+
+                <div
+                    ref={scrollContainerRef}
+                    className="flex gap-6 pb-4 pt-4 scrollbar-hide scroll-smooth pl-8 pr-6 transition-all duration-300"
+                    style={{
+                        scrollBehavior: 'smooth',
+                        paddingBottom: '50px',
+                        overflowX: 'auto',
+                        overflowY: 'visible',
+                    }}
+                >
+                    {filteredCollections.map((collection, index) => (
+                        <CollectionCard
+                            key={`${collection.contractAddress}-${currentSort.field}-${currentSort.direction}`}
+                            collection={collection}
+                            onClick={handleCollectionClick}
+                        />
+                    ))}
+                </div>
+            </div>
+
+
 
             {/* CSS for scrollbar-hide */}
             <style jsx>{`

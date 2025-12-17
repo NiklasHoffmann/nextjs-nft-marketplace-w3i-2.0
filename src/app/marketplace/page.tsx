@@ -14,61 +14,71 @@
  * Database: MongoDB marketplace_items collection with real-time sync
  */
 
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { ListedNFTsList, CollectionsList } from "./components";
 import { NFTFilterSidebar } from "@/components";
 import type { NFTFilters, NFTSortOptions } from "@/types/marketplace";
 
 export default function MarketplacePage() {
+    const searchParams = useSearchParams();
+    const urlSearchTerm = searchParams?.get('search') || '';
+
     const [filters, setFilters] = useState<NFTFilters>({
         categories: [],
         rarities: [],
+        searchTerm: urlSearchTerm,
     });
     const [sort, setSort] = useState<NFTSortOptions>({
         field: 'price',
         direction: 'desc'
     });
 
+    // Sync URL search param with filters
+    useEffect(() => {
+        setFilters(prev => ({ ...prev, searchTerm: urlSearchTerm }));
+    }, [urlSearchTerm]);
+
+    // Stable callback references to prevent infinite loops
+    const handleFiltersChange = useCallback((newFilters: NFTFilters) => {
+        setFilters(newFilters);
+    }, []);
+
+    const handleSortChange = useCallback((newSort: NFTSortOptions) => {
+        setSort(newSort);
+    }, []);
+
     return (
-        <div className="min-h-screen flex flex-col bg-gray-50">
-            {/* NFTFilterSidebar - Einmalig für beide Listen */}
+        <div className="min-h-screen bg-gray-50">
+            {/* NFTFilterSidebar */}
             <NFTFilterSidebar
-                onFiltersChange={setFilters}
-                onSortChange={setSort}
+                onFiltersChange={handleFiltersChange}
+                onSortChange={handleSortChange}
                 currentSort={sort}
                 totalItems={0}
                 filteredCount={0}
             />
 
-            <main className="flex-1 flex flex-col pt-[66px] py-8">
+            <main className="pt-[66px]">
                 {/* ListedNFTsList - MongoDB-powered */}
-                <div className="w-full">
-                    <ListedNFTsList
-                        externalFilters={filters}
-                        externalSort={sort}
-                    />
-                </div>
+                <ListedNFTsList
+                    externalFilters={filters}
+                    externalSort={sort}
+                    onFiltersChange={handleFiltersChange}
+                />
 
-                {/* Trennlinie zwischen Listen */}
-                <div className="w-full">
-                    <hr className="border-t border-gray-300" />
+                {/* Divider */}
+                <div className="px-8 my-8">
+                    <hr className="border-t border-gray-200" />
                 </div>
 
                 {/* CollectionsList - MongoDB-powered */}
-                <div className="w-full pt-4">
-                    <CollectionsList
-                        currentSort={sort}
-                        onSortChange={setSort}
-                        filters={filters}
-                    />
-                </div>
+                <CollectionsList
+                    currentSort={sort}
+                    onSortChange={setSort}
+                    filters={filters}
+                />
             </main>
-
-            <footer className="w-full py-4 text-center text-gray-400 border-t mt-auto">
-                <p className="text-sm">
-                    ⚡ Powered by MongoDB • Real-time sync • 60x faster
-                </p>
-            </footer>
         </div>
     );
 }

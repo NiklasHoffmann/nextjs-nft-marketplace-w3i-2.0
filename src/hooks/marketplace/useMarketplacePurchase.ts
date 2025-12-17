@@ -55,7 +55,8 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
           BigInt("1"), // erc1155PurchaseQuantity (always 1 for ERC721)
           desiredErc1155Holder // desiredErc1155Holder (for swaps)
         ],
-        value: ethValue
+        value: ethValue,
+        gas: BigInt(400000)
       });
     } catch (err: any) {
       setError(err.message || 'Failed to purchase listing');

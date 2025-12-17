@@ -126,7 +126,12 @@ export async function GET(
                         price: '$price',
                         seller: '$seller',
                         isListed: '$isListed',
-                        listedAt: '$listedAt'
+                        listedAt: '$listedAt',
+                        desiredContractAddress: '$desiredContractAddress',
+                        desiredTokenId: '$desiredTokenId',
+                        isValid: '$isValid',
+                        invalidReasons: '$invalidReasons',
+                        invalidatedAt: '$invalidatedAt'
                     }
                 }
             },
@@ -186,6 +191,11 @@ export async function GET(
                     seller: nft.seller,
                     listingId: nft.listingId,
                     listedAt: nft.listedAt,
+                    desiredContractAddress: nft.desiredContractAddress || null,
+                    desiredTokenId: nft.desiredTokenId || null,
+                    isValid: nft.isValid ?? true,
+                    invalidReasons: nft.invalidReasons || null,
+                    invalidatedAt: nft.invalidatedAt || null,
                 },
 
                 insights: nft.insights ? {

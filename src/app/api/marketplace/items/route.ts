@@ -47,8 +47,8 @@ export async function GET(request: NextRequest) {
         const maxPrice = searchParams.get('maxPrice');
         const seller = searchParams.get('seller');
         const isListed = searchParams.get('isListed');
-        const category = searchParams.get('category');
-        const rarity = searchParams.get('rarity');
+        const category = searchParams.get('category')?.split(',').filter(Boolean);
+        const rarity = searchParams.get('rarity')?.split(',').filter(Boolean);
         const tags = searchParams.get('tags')?.split(',').filter(Boolean);
         const minRating = searchParams.get('minRating');
         const minViews = searchParams.get('minViews');
@@ -79,11 +79,8 @@ export async function GET(request: NextRequest) {
         }
         if (seller) query.seller = seller;
 
-        if (minPrice || maxPrice) {
-            query.price = {};
-            if (minPrice) query.price.$gte = minPrice;
-            if (maxPrice) query.price.$lte = maxPrice;
-        }
+        // Note: Price filters are applied later in the pipeline using $expr
+        // because price is stored as string but needs numeric comparison
 
         // Get database and collections
         const db = await getDatabase();
@@ -93,6 +90,28 @@ export async function GET(request: NextRequest) {
         // Build aggregation pipeline
         const pipeline: any[] = [
             { $match: query },
+
+            // Price filters using $expr for numeric comparison (price is stored as string)
+            ...(minPrice || maxPrice ? [{
+                $match: {
+                    $expr: {
+                        $and: [
+                            ...(minPrice ? [{
+                                $gte: [
+                                    { $toLong: { $ifNull: ['$price', '0'] } },
+                                    parseFloat(minPrice) * 1e18 // Convert ETH to Wei
+                                ]
+                            }] : []),
+                            ...(maxPrice ? [{
+                                $lte: [
+                                    { $toLong: { $ifNull: ['$price', '0'] } },
+                                    parseFloat(maxPrice) * 1e18 // Convert ETH to Wei
+                                ]
+                            }] : [])
+                        ]
+                    }
+                }
+            }] : []),
 
             // JOIN with nft_metadata collection (get NFT data)
             {
@@ -283,18 +302,18 @@ export async function GET(request: NextRequest) {
                 { 'insights.projectTwitter': searchRegex },
                 { 'insights.projectDiscord': searchRegex },
 
-                // Tags (array search)
-                { 'insights.tags': { $in: [searchRegex] } },
+                // Tags (array search - use elemMatch instead of $in with $regex)
+                { 'insights.tags': searchRegex },
 
-                // Descriptions (array search)
-                { 'insights.descriptions': { $in: [searchRegex] } },
-                { 'insights.cardDescriptions': { $in: [searchRegex] } },
+                // Descriptions (array search - use elemMatch for arrays)
+                { 'insights.descriptions': searchRegex },
+                { 'insights.cardDescriptions': searchRegex },
                 {
                     'insights.projectDescriptions.titleDescriptionPairs': {
                         $elemMatch: {
                             $or: [
                                 { title: searchRegex },
-                                { description: searchRegex }
+                                { descriptions: searchRegex }
                             ]
                         }
                     }
@@ -304,7 +323,7 @@ export async function GET(request: NextRequest) {
                         $elemMatch: {
                             $or: [
                                 { title: searchRegex },
-                                { description: searchRegex }
+                                { descriptions: searchRegex }
                             ]
                         }
                     }
@@ -314,7 +333,7 @@ export async function GET(request: NextRequest) {
                         $elemMatch: {
                             $or: [
                                 { title: searchRegex },
-                                { description: searchRegex }
+                                { descriptions: searchRegex }
                             ]
                         }
                     }
@@ -322,8 +341,8 @@ export async function GET(request: NextRequest) {
             ];
         }
 
-        if (category) metadataFilters['insights.category'] = category;
-        if (rarity) metadataFilters['insights.rarity'] = rarity;
+        if (category && category.length > 0) metadataFilters['insights.category'] = { $in: category };
+        if (rarity && rarity.length > 0) metadataFilters['insights.rarity'] = { $in: rarity };
         if (tags && tags.length > 0) metadataFilters['insights.tags'] = { $in: tags };
 
         if (Object.keys(metadataFilters).length > 0) {
@@ -332,10 +351,10 @@ export async function GET(request: NextRequest) {
 
         // Apply stats filters
         const statsFilters: any = {};
-        if (minRating) statsFilters['stats.averageRating'] = { $gte: parseFloat(minRating) };
-        if (minViews) statsFilters['stats.viewCount'] = { $gte: parseInt(minViews) };
-        if (minLikes) statsFilters['stats.likeCount'] = { $gte: parseInt(minLikes) };
-        if (minWatchlistCount) statsFilters['stats.watchlistCount'] = { $gte: parseInt(minWatchlistCount) };
+        if (minRating) statsFilters['statsData.averageRating'] = { $gte: parseFloat(minRating) };
+        if (minViews) statsFilters['statsData.viewCount'] = { $gte: parseInt(minViews) };
+        if (minLikes) statsFilters['statsData.likeCount'] = { $gte: parseInt(minLikes) };
+        if (minWatchlistCount) statsFilters['statsData.watchlistCount'] = { $gte: parseInt(minWatchlistCount) };
 
         if (Object.keys(statsFilters).length > 0) {
             pipeline.push({ $match: statsFilters });
