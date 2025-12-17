@@ -1,9 +1,21 @@
 /**
  * GET /api/marketplace/nft/[contractAddress]/[tokenId]
  * 
- * Fetches complete NFT data with new architecture:
+ * ⚠️ DEPRECATED: Use /api/nft/detail instead!
+ * 
+ * This endpoint does NOT sync blockchain state on-demand.
+ * The approved/owner data may be stale!
+ * 
+ * New endpoint: GET /api/nft/detail?contractAddress=...&tokenId=...
+ * - On-demand blockchain sync (owner + approved)
+ * - Lazy IPFS metadata loading
+ * - Always fresh data (5min cache)
+ * 
+ * @deprecated Use /api/nft/detail for fresh blockchain state
+ * 
+ * Fetches complete NFT data (OLD ARCHITECTURE):
  * - marketplace_items (listing data)
- * - $lookup nft_metadata (metadata + contract)
+ * - $lookup nft_metadata (metadata + contract) ← May be stale!
  * - $lookup admin_nft_insights (insights with collection-level fallback)
  * - Stats loaded via StatsContext (not included)
  */

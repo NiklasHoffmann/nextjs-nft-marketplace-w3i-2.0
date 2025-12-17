@@ -119,6 +119,10 @@ export interface NFTPriceCardProps {
     // For swap/trade functionality
     desiredContractAddress?: string;
     desiredTokenId?: string;
+    // v2 Marketplace fields
+    status?: 'LISTED' | 'PARTIALLY_FILLED' | 'SOLD_OUT' | 'CANCELED' | 'INVALIDATED' | null;
+    listingType?: 'PURE_ETH' | 'SWAP_AND_ETH' | 'PURE_SWAP' | null;
+    tokenStandard?: 'ERC721' | 'ERC1155' | null;
 }
 
 export interface NFTTabNavigationProps {

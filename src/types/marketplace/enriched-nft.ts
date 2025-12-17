@@ -22,18 +22,50 @@ export interface EnrichedNFTDocument {
     // Listing ID (duplicated from marketplace.listingId for easier access/indexing)
     listingId: string | null;
 
-    // ===== THE GRAPH DATA =====
+    // ===== THE GRAPH DATA (v2 Schema) =====
     marketplace: {
+        // Core Listing Data
         listingId: string | null;
         isListed: boolean;
         isValid?: boolean; // Marketplace validation status
         invalidReasons?: string[] | null; // Reasons why listing is invalid
         invalidatedAt?: Date | null; // When was it invalidated
-        price: string | null; // Wei as string
+        
+        // Pricing (v1 & v2 compatible)
+        price: string | null; // Wei as string (priceTotal or legacy price)
+        priceTotal?: string | null; // v2: Total price in Wei
+        unitPrice?: string | null; // v2: Price per unit (ERC1155 partial buys)
+        
+        // Parties
         seller: string | null;
         buyer: string | null;
-        desiredContractAddress: string | null;
+        
+        // Swap Data (v1 & v2)
+        desiredContractAddress: string | null; // v1 field name
+        desiredTokenAddress?: string | null; // v2 field name
         desiredTokenId: string | null;
+        desiredErc1155Quantity?: string | null; // v2: Amount for ERC1155 swaps
+        
+        // v2-only Fields (New Schema)
+        tokenStandard?: 'ERC721' | 'ERC1155' | null; // Token type
+        listingType?: 'PURE_ETH' | 'SWAP_AND_ETH' | 'PURE_SWAP' | null; // Listing type
+        status?: 'LISTED' | 'PARTIALLY_FILLED' | 'SOLD_OUT' | 'CANCELED' | 'INVALIDATED' | null;
+        
+        // ERC1155 Support
+        erc1155QuantityListed?: string | null; // Total quantity listed
+        remainingQuantity?: string | null; // Remaining quantity available
+        
+        // Advanced Features
+        buyerWhitelistEnabled?: boolean; // Buyer whitelist restriction
+        partialBuyEnabled?: boolean; // Partial purchases allowed (ERC1155)
+        feeRate?: string | null; // Dynamic fee rate (denominator: 100,000)
+        
+        // Chain Info
+        chainId?: number; // v2: Chain ID (e.g., 11155111 for Sepolia)
+        
+        // Timestamps
+        createdAt?: string | Date | null; // Listing creation time
+        syncedAt?: Date | null; // Last sync from subgraph
     };
 
     // ===== IPFS METADATA =====
@@ -60,6 +92,14 @@ export interface EnrichedNFTDocument {
         ownerBalance: number | null;
         approvedAddress: string | null;
         approved?: string | null; // Alias for approvedAddress (API compatibility)
+    };
+
+    // ===== BLOCKCHAIN STATE (on-demand synced) =====
+    blockchain?: {
+        owner: string | null;
+        approved: string | null;
+        isApprovedForAll: boolean;
+        lastSyncedAt: Date | null;
     };
 
     // ===== INSIGHTS =====

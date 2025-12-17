@@ -18,8 +18,8 @@
 - ❌ owner (comes from blockchain)
 - ❌ approved (comes from blockchain)
 - ❌ metadata (comes from IPFS, stored in nft_metadata)
-- ❌ insights (comes from MongoDB, stored in nft_metadata)
-- ❌ stats (separate collection)
+- ❌ insights (separate collection: admin_nft_insights)
+- ❌ stats (separate collection: nft_stats)
 
 **Actions:**
 ```typescript
@@ -113,14 +113,21 @@ if (!existing) {
 
 ### 4. Insights (Admin-Managed)
 **Source:** Admin API (`/api/admin/insights`)  
-**Target:** `nft_metadata` collection  
+**Target:** `admin_nft_insights` collection (SEPARATE!)  
 **Frequency:** ON-DEMAND (only when admin changes)  
 **Priority:** LOW
 
 **What to store:**
 - ✅ category, subcategory, rarity
 - ✅ tags[], featured, priority
-- ✅ customDescription, customImage
+- ✅ customTitle, customDescription, customImage
+- ✅ tokenId (optional: null = collection-wide, set = item-specific)
+
+**Why separate collection?**
+- ✅ Collection-wide + item-specific insights work seamlessly
+- ✅ No data duplication needed
+- ✅ Simple $lookup with fallback logic in APIs
+- ✅ Admin UI stays simple
 
 **No automatic sync needed** - only updated via admin actions.
 
@@ -182,7 +189,7 @@ await nftStats.updateOne(
 }
 ```
 
-#### `nft_metadata` - Complete NFT Data
+#### `nft_metadata` - NFT Blockchain & IPFS Data
 ```typescript
 {
     contractAddress: string,
@@ -208,21 +215,39 @@ await nftStats.updateOne(
     },
     metadataFetchedAt: Date,
     
-    // Admin insights (manual)
-    insights: {
-        category: string,
-        subcategory: string,
-        rarity: string,
-        tags: string[],
-        featured: boolean,
-        customDescription: string
-    },
-    insightsUpdatedAt: Date,
+    createdAt: Date,
+    updatedAt: Date
+}
+```
+
+#### `admin_nft_insights` - Admin-Managed Insights (SEPARATE!)
+```typescript
+{
+    contractAddress: string,
+    tokenId?: string,  // Optional: null/missing = collection-wide, set = item-specific
+    
+    // Admin insights
+    category: string,
+    subcategory: string,
+    rarity: string,
+    tags: string[],
+    featured: boolean,
+    priority: number,
+    customTitle: string,
+    customDescription: string,
+    customImage: string,
     
     createdAt: Date,
     updatedAt: Date
 }
 ```
+
+**Why separate?**
+- ✅ Collection-wide insights (contractAddress only) work seamlessly
+- ✅ Item-specific insights (contractAddress + tokenId) work in parallel
+- ✅ Simple $lookup in APIs with fallback logic
+- ✅ No data duplication needed
+- ✅ Admin UI stays simple
 
 #### `nft_stats` - User Interactions (separate for performance)
 ```typescript

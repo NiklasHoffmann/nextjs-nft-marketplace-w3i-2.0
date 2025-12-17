@@ -1,39 +1,37 @@
 /**
  * NFT Sync Service - Main Entry Point
  * 
- * Background service that keeps MongoDB in sync with:
- * - The Graph v1 (marketplace/blockchain data - legacy)
- * - The Graph v2 (Ideation Market - new schema)
- * - IPFS (NFT metadata)
- * - Stats API (social stats)
- * - Insights API (curated insights)
+ * OPTIMIZED ARCHITECTURE (per DATA_SYNC_ARCHITECTURE.md)
+ * 
+ * Background services:
+ * - The Graph v2: Polls every 30s (LISTING DATA ONLY)
+ * - Stats Sync: Aggregates stats periodically
+ * - Insights Sync: Syncs admin insights
+ * 
+ * On-demand services (NOT scheduled):
+ * - Blockchain State Sync: Called when needed (owner + approved)
+ * - IPFS Metadata Sync: Called when missing (one-time fetch)
  */
 
-import { GraphQLSubscriptionManager } from './graph-subscription';
 import { GraphQLSyncV2 } from './graph-subscription-v2';
 import { StatsSync } from './stats-sync';
 import { InsightsSync } from './insights-sync';
-import { marketplaceMetadataSync } from './metadata-sync';
+
+// ❌ DEPRECATED: graph-subscription.ts (v1 - REMOVED)
+// ❌ DEPRECATED: metadata-sync.ts (replaced by on-demand services)
 
 export class NFTSyncService {
-    private graphSubscription: GraphQLSubscriptionManager;  // v1
-    private graphSyncV2: GraphQLSyncV2 | null = null;       // v2 (optional)
+    private graphSyncV2: GraphQLSyncV2;
     private statsSync: StatsSync;
     private insightsSync: InsightsSync;
 
     private isRunning: boolean = false;
 
     constructor() {
-        this.graphSubscription = new GraphQLSubscriptionManager();
+        this.graphSyncV2 = new GraphQLSyncV2();
         this.statsSync = new StatsSync();
         this.insightsSync = new InsightsSync();
-
-        // Initialize v2 sync if enabled
-        const subgraphVersion = process.env.NEXT_PUBLIC_SUBGRAPH_VERSION || 'v1';
-        if (subgraphVersion === 'v2' || process.env.NEXT_PUBLIC_SUBGRAPH_V2_URL) {
-            this.graphSyncV2 = new GraphQLSyncV2();
-            console.log('🆕 Subgraph v2 sync initialized');
-        }
+        console.log('🆕 Subgraph v2 sync initialized (OPTIMIZED: listing data only)');
     }
 
     /**
@@ -48,26 +46,23 @@ export class NFTSyncService {
         console.log('🚀 Starting NFT Sync Service...');
 
         try {
-            // Start GraphQL subscription (real-time marketplace updates)
-            const subgraphVersion = process.env.NEXT_PUBLIC_SUBGRAPH_VERSION || 'v1';
-            
-            if (subgraphVersion === 'v2' && this.graphSyncV2) {
-                console.log('📡 Using Subgraph v2 (Ideation Market)');
-                await this.graphSyncV2.start();
-            } else if (subgraphVersion === 'v1') {
-                console.log('📡 Using Subgraph v1 (legacy)');
-                await this.graphSubscription.start();
-            }
+            // Start GraphQL v2 sync (real-time marketplace updates)
+            console.log('📡 Using Subgraph v2 (Ideation Market) - OPTIMIZED');
+            await this.graphSyncV2.start();
 
             // Start periodic sync jobs
             this.statsSync.start();
             this.insightsSync.start();
 
-            // ✅ Start marketplace metadata sync (NEW ARCHITECTURE: uses nft_metadata collection)
-            marketplaceMetadataSync.start();
+            // ❌ REMOVED: metadata-sync (replaced by on-demand services)
+            // Blockchain state and IPFS metadata are now fetched on-demand
+            // See: blockchain-state-sync.ts and ipfs-metadata-lazy-sync.ts
 
             this.isRunning = true;
-            console.log('✅ NFT Sync Service started successfully');
+            console.log('✅ NFT Sync Service started successfully (OPTIMIZED ARCHITECTURE)');
+            console.log('   ✅ Subgraph v2: Every 30s (listing data only)');
+            console.log('   ✅ Blockchain State: On-demand (when needed)');
+            console.log('   ✅ IPFS Metadata: Lazy-loaded (one-time fetch)');
         } catch (error) {
             console.error('❌ Error starting NFT Sync Service:', error);
             throw error;
@@ -87,17 +82,15 @@ export class NFTSyncService {
 
         try {
             await this.graphSubscription.stop();
-            
+
             // Stop v2 sync if running
             if (this.graphSyncV2) {
                 await this.graphSyncV2.stop();
             }
-            
+
+            this.statsSync.styncV2.stop();
             this.statsSync.stop();
             this.insightsSync.stop();
-
-            // ✅ Stop marketplace metadata sync
-            marketplaceMetadataSync.stop();
 
             this.isRunning = false;
             console.log('✅ NFT Sync Service stopped');
@@ -111,20 +104,13 @@ export class NFTSyncService {
      * Get service status
      */
     getStatus() {
-        const status: any = {
+        return {
             isRunning: this.isRunning,
-            graphSubscription: this.graphSubscription.getStatus(),
+            architecture: 'OPTIMIZED (v2 only)',
+            graphSyncV2: this.graphSyncV2.getStatus(),
             statsSync: this.statsSync.getStatus(),
-            insightsSync: this.insightsSync.getStatus(),
-            marketplaceMetadataSync: marketplaceMetadataSync.getStatus(),
+            insightsSync: this.insightsSync.getStatus()
         };
-
-        // Add v2 status if available
-        if (this.graphSyncV2) {
-            status.graphSyncV2 = this.graphSyncV2.getStatus();
-        }
-
-        return status;
     }
 }
 

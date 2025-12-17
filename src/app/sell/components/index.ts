@@ -1,5 +1,6 @@
 export { EmptyState } from './EmptyState';
 export { PageHeader } from './PageHeader';
+export { SellHeader } from './SellHeader';
 export { BatchListingInfoBanner } from './BatchListingInfoBanner';
 export { NFTSearchFilter } from './NFTSearchFilter';
 export { ErrorDisplay } from './ErrorDisplay';

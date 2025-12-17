@@ -16,6 +16,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAccount, useReadContract } from 'wagmi';
+import { useSearchParams } from 'next/navigation';
 import { useUserNFTs, useListingForm, useMarketplaceContracts, useNFTApproval } from './hooks';
 import { useNotifications } from '@/contexts/notifications';
 import { TransactionData, BatchTransactionData, ListingType } from './types';
@@ -25,6 +26,7 @@ import marketplaceAbi from '@/constants/marketplace.abi.json';
 // UI Components
 import { EmptyState } from './components/EmptyState';
 import { PageHeader } from './components/PageHeader';
+import { SellHeader } from './components/SellHeader';
 import { BatchListingInfoBanner } from './components/BatchListingInfoBanner';
 import { NFTSearchFilter } from './components/NFTSearchFilter';
 import { ErrorDisplay } from './components/ErrorDisplay';
@@ -40,6 +42,11 @@ import { ListingProgressOverlay } from './components/ListingProgressOverlay';
 export function SellPage() {
     const { isConnected } = useAccount();
     const notifications = useNotifications();
+    const searchParams = useSearchParams();
+
+    // Get NFT from URL params (if coming from detail page)
+    const urlContract = searchParams?.get('contract');
+    const urlTokenId = searchParams?.get('tokenId');
 
     // Custom hooks for state management
     const {
@@ -96,6 +103,19 @@ export function SellPage() {
     // Ref to prevent showing same error multiple times
     const lastErrorRef = useRef<string | null>(null);
 
+    // Auto-select NFT from URL parameters (when coming from detail page)
+    useEffect(() => {
+        if (urlContract && urlTokenId && allNFTs.length > 0 && !selectedNFT) {
+            const nftToSelect = allNFTs.find(
+                nft => nft.contractAddress.toLowerCase() === urlContract.toLowerCase() && 
+                       nft.tokenId === urlTokenId
+            );
+            if (nftToSelect) {
+                handleNFTSelect(nftToSelect);
+            }
+        }
+    }, [urlContract, urlTokenId, allNFTs, selectedNFT]);
+
     // Watch for successful listing confirmation
     useEffect(() => {
         if (listingSuccess && listingTxHash) {
@@ -120,7 +140,7 @@ export function SellPage() {
             setShowPreview(false);
             setShowListingProgress(false);
         }
-    }, [listingSuccess, listingTxHash, notifications.clearAll, notifications.success, resetForm]);
+    }, [listingSuccess, listingTxHash, resetForm]); // ← FIX: Removed notifications from dependencies
 
     // Watch for transaction errors (user rejection or blockchain error)
     useEffect(() => {
@@ -189,7 +209,7 @@ export function SellPage() {
             // Reset when error is cleared
             lastErrorRef.current = null;
         }
-    }, [listingError, notifications.clearAll, notifications.error]);
+    }, [listingError]); // ← FIX: Removed notifications from dependencies
 
     // Create ListingService instance with proper checkWhitelist function
     const listingService = useMemo(() => {
@@ -355,16 +375,29 @@ export function SellPage() {
         );
     }
 
+    // Calculate listed/unlisted counts
+    const listedCount = allNFTs.filter(nft => nft.listed).length;
+    const unlistedCount = allNFTs.filter(nft => !nft.listed).length;
+
     // Render main content
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 pt-32">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Header with listing type toggle */}
-                <PageHeader
-                    listingType={listingType}
-                    onListingTypeChange={setListingType}
-                    showToggle={!showPreview}
-                />
+        <div className="min-h-screen bg-gray-50">
+            {/* Sticky Header */}
+            <SellHeader 
+                listingType={listingType}
+                nftCount={allNFTs.length}
+                listedCount={listedCount}
+                unlistedCount={unlistedCount}
+            />
+
+            <main className="pt-[66px]">
+                <div className="max-w-6xl mx-auto px-8 py-8">
+                    {/* Header with listing type toggle */}
+                    <PageHeader
+                        listingType={listingType}
+                        onListingTypeChange={setListingType}
+                        showToggle={!showPreview}
+                    />
 
                 {/* Approval Dialog */}
                 {showApprovalDialog && selectedNFT && (
@@ -409,7 +442,7 @@ export function SellPage() {
                         <BatchListingInfoBanner onBatchClick={() => setListingType('batch')} />
 
                         {/* NFT Selection Panel */}
-                        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 p-6 hover:shadow-2xl transition-all duration-300">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
                             <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
                                 <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -455,7 +488,7 @@ export function SellPage() {
                         </div>
 
                         {/* Listing Form Panel */}
-                        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 p-6 hover:shadow-2xl transition-all duration-300">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
                             <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
                                 <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -471,7 +504,8 @@ export function SellPage() {
                         </div>
                     </div>
                 )}
-            </div>
+                </div>
+            </main>
 
             {/* Listing Progress Overlay */}
             {showListingProgress && transactionData.selectedNFT && (

@@ -23,6 +23,7 @@ interface ContractInfoSectionProps {
         ownerBalance: number | null;
         approved: string | null;
     };
+    isApprovedForAll?: boolean; // Operator-level approval (separate prop!)
 }
 
 function shortenAddress(address: string | null): string {
@@ -40,18 +41,28 @@ function InfoRow({ label, value, subtitle }: { label: string; value: React.React
     );
 }
 
-export function ContractInfoSection({ contract }: ContractInfoSectionProps) {
+export function ContractInfoSection({ contract, isApprovedForAll }: ContractInfoSectionProps) {
     // Get current chain ID from wagmi
     const chainId = useChainId();
-    
+
     // Get marketplace address from network.mapping.json for current chain
     const marketplaceAddress = getMarketplaceAddress(chainId);
+    console.log('🏷️ ContractInfoSection - contract:', contract);
+    console.log('🏷️ ContractInfoSection - isApprovedForAll:', isApprovedForAll);
     
-    const isApprovedForMarketplace = contract.approved && marketplaceAddress
+    // Check Token-Level Approval (getApproved)
+    const hasTokenApproval = contract.approved && marketplaceAddress
         ? contract.approved.toLowerCase() === marketplaceAddress.toLowerCase()
         : false;
+
+    // Check Operator-Level Approval (isApprovedForAll)
+    const hasOperatorApproval = isApprovedForAll === true;
+
+    // NFT is approved if EITHER token-level OR operator-level approval exists
+    const isApprovedForMarketplace = hasTokenApproval || hasOperatorApproval;
+
     const isNoApproval = contract.approved === '0x0000000000000000000000000000000000000000';
-    const hasOtherApproval = contract.approved && !isApprovedForMarketplace && !isNoApproval;
+    const hasOtherApproval = contract.approved && !hasTokenApproval && !isNoApproval;
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -95,53 +106,91 @@ export function ContractInfoSection({ contract }: ContractInfoSectionProps) {
                 />
 
                 <InfoRow
-                    label="Approved Address"
+                    label="Approval Status"
                     value={
-                        contract.approved ? (
-                            <div className="space-y-2">
+                        <div className="space-y-2">
+                            {/* Show Token-Level Approval (getApproved) */}
+                            <div>
+                                <div className="text-xs text-gray-500 mb-1">Token Approval (getApproved):</div>
                                 <div className="flex items-center gap-2">
-                                    <code className="bg-gray-100 px-2 py-1 rounded text-xs">
-                                        {contract.approved}
-                                    </code>
-                                    <button
-                                        onClick={() => navigator.clipboard.writeText(contract.approved!)}
-                                        className="text-blue-600 hover:text-blue-800 text-xs"
-                                        title="Copy address"
-                                    >
-                                        📋
-                                    </button>
+                                    {contract.approved && !isNoApproval ? (
+                                        <>
+                                            <code className="bg-gray-100 px-2 py-1 rounded text-xs">
+                                                {contract.approved}
+                                            </code>
+                                            <button
+                                                onClick={() => navigator.clipboard.writeText(contract.approved!)}
+                                                className="text-blue-600 hover:text-blue-800 text-xs"
+                                                title="Copy address"
+                                            >
+                                                📋
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <span className="text-gray-500 text-xs">None (0x000...)</span>
+                                    )}
                                 </div>
-                                {isApprovedForMarketplace && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        ✅ Approved for Marketplace
-                                    </span>
-                                )}
-                                {isNoApproval && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                        ❌ Not Approved
+                                {hasTokenApproval && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-1">
+                                        ✅ Approved for this Token
                                     </span>
                                 )}
                                 {hasOtherApproval && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 mt-1">
                                         ⚠️ Approved for Other Address
                                     </span>
                                 )}
                             </div>
-                        ) : (
-                            <div className="space-y-2">
-                                <span className="text-gray-500">None</span>
-                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                    ❌ Not Approved
-                                </span>
+
+                            {/* Show Operator-Level Approval (isApprovedForAll) */}
+                            <div>
+                                <div className="text-xs text-gray-500 mb-1">Operator Approval (isApprovedForAll):</div>
+                                <div className="flex items-center gap-2">
+                                    {hasOperatorApproval ? (
+                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            ✅ All NFTs Approved for Marketplace
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                            ❌ Not Set
+                                        </span>
+                                    )}
+                                </div>
                             </div>
-                        )
+
+                            {/* Final Status */}
+                            <div className="pt-2 border-t border-gray-200">
+                                {isApprovedForMarketplace ? (
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2 text-green-700">
+                                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                            </svg>
+                                            <span className="font-medium text-sm">Can be listed on marketplace</span>
+                                        </div>
+                                        {hasOperatorApproval && hasOtherApproval && (
+                                            <p className="text-xs text-gray-600 ml-7">
+                                                ℹ️ Token is approved via Operator Approval. Token-level approval for other marketplace is ignored.
+                                            </p>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2 text-red-700">
+                                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                        </svg>
+                                        <span className="font-medium text-sm">Approval required to list</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     }
                     subtitle={
-                        isApprovedForMarketplace
-                            ? 'NFT can be sold on this marketplace'
-                            : isNoApproval || !contract.approved
-                                ? 'NFT cannot be sold - approval required'
-                                : 'Approved for different marketplace/address'
+                        hasOperatorApproval
+                            ? '✨ All your NFTs from this collection are approved (recommended)'
+                            : hasTokenApproval
+                                ? '✨ Only this specific NFT is approved'
+                                : 'Set approval to enable trading on marketplace'
                     }
                 />
 

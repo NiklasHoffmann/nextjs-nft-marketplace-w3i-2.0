@@ -156,12 +156,17 @@ export function NFTFilterSidebar({
     }, [numericFiltersString]); // Only depend on stringified version
 
     // Update parent when filters change (debounced for search and numeric inputs)
+    // Use JSON.stringify to do deep comparison and avoid unnecessary calls
+    const filtersString = useMemo(() => JSON.stringify(filters), [filters]);
+    
     useEffect(() => {
         onFiltersChange(filters);
-    }, [filters, onFiltersChange]); // onFiltersChange must be stable (useCallback in parent)
+    }, [filtersString]); // Only trigger when filter values actually change
 
     const updateFilters = (updates: Partial<NFTFilters>) => {
-        setFilters((prev: NFTFilters) => ({ ...prev, ...updates }));
+        const newFilters = { ...filters, ...updates };
+        setFilters(newFilters);
+        onFiltersChange(newFilters);
     };
 
     const updateSort = (field: NFTSortOptions['field']) => {
@@ -181,14 +186,18 @@ export function NFTFilterSidebar({
         const newCategories = filters.categories.includes(category)
             ? filters.categories.filter((c: string) => c !== category)
             : [...filters.categories, category];
-        updateFilters({ categories: newCategories });
+        const newFilters = { ...filters, categories: newCategories };
+        setFilters(newFilters);
+        onFiltersChange(newFilters);
     };
 
     const toggleRarity = (rarity: string) => {
         const newRarities = filters.rarities.includes(rarity)
             ? filters.rarities.filter((r: string) => r !== rarity)
             : [...filters.rarities, rarity];
-        updateFilters({ rarities: newRarities });
+        const newFilters = { ...filters, rarities: newRarities };
+        setFilters(newFilters);
+        onFiltersChange(newFilters);
     };
 
     const getRarityColor = (rarity: string) => {

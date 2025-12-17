@@ -173,21 +173,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
                     ownerBalance: item.contract.ownerBalance
                 } : undefined
             } as NFTScrollItem));
-    }, [
-        items,
-        loading,
-        filters.searchTerm,
-        filters.categories.join(','),
-        filters.rarities.join(','),
-        filters.priceMin,
-        filters.priceMax,
-        filters.minRating,
-        filters.minViews,
-        filters.minLikes,
-        filters.minWatchlistCount,
-        sort.field,
-        sort.direction
-    ]);
+    }, [items]);
 
     // Preload images
     const imageUrls = useMemo(() => {

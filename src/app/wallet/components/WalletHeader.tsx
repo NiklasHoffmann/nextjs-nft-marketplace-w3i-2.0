@@ -27,11 +27,11 @@ export function WalletHeader({
 
     return (
         <div className="sticky top-[66px] z-10 bg-white border-b border-gray-200">
-            <div className="px-8 py-6">
+            <div className="px-8 py-4">
                 {/* Back Link */}
                 <Link
                     href="/marketplace"
-                    className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-4"
+                    className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-3"
                     title="Back to Marketplace"
                 >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

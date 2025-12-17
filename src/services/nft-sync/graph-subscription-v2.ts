@@ -9,6 +9,7 @@ import { ApolloClient, InMemoryCache, HttpLink } from '@apollo/client';
 import { GET_ACTIVE_LISTINGS, LISTINGS_UPDATED_SUBSCRIPTION } from '@/constants/subgraph.queries.v2';
 import { getDatabase } from '@/lib/mongodb';
 import type { ListingV2 } from '@/types/marketplace/listing-v2';
+import { blockchainStateSync } from './blockchain-state-sync';
 
 export class GraphQLSyncV2 {
     private client: ApolloClient<any> | null = null;
@@ -27,7 +28,7 @@ export class GraphQLSyncV2 {
         }
 
         const subgraphUrl = process.env.NEXT_PUBLIC_SUBGRAPH_V2_URL;
-        
+
         if (!subgraphUrl) {
             console.warn('⚠️ NEXT_PUBLIC_SUBGRAPH_V2_URL not configured, skipping v2 sync');
             return;
@@ -78,7 +79,7 @@ export class GraphQLSyncV2 {
             console.log('\n📡 [V2 Subgraph] Fetching active listings...');
             console.log('   Query: GET_ACTIVE_LISTINGS');
             console.log('   Variables: { first: 1000, skip: 0 }');
-            
+
             const result = await this.client.query({
                 query: GET_ACTIVE_LISTINGS,
                 variables: {
@@ -99,8 +100,8 @@ export class GraphQLSyncV2 {
                     console.log(`      Price: ${listing.priceTotal} wei`);
                     console.log(`      Seller: ${listing.seller}`);
                     console.log(`      Status: ${listing.active ? '✅ Active' : '❌ Inactive'}`);
-                });  
-                
+                });
+
                 await this.syncListingsToMongoDB(result.data.listings);
                 this.lastUpdate = new Date();
                 console.log(`\n✅ [V2 Subgraph] Synced ${result.data.listings.length} listings at ${this.lastUpdate.toISOString()}`);
@@ -126,34 +127,35 @@ export class GraphQLSyncV2 {
             console.log('\n💾 [V2 MongoDB] Syncing to database...');
             console.log(`   Collection: marketplace_items`);
             console.log(`   Items to sync: ${listings.length}`);
-            
+
             const db = await getDatabase();
             const collection = db.collection('marketplace_items');
 
-            // Upsert all listings with field mapping (v2 schema → v1 compatible)
-            // Note: approved/approvedAddress is synced separately by metadata-sync.ts
+            // ✅ OPTIMIZED: Only sync listing data (no metadata/approval here)
+            // Metadata is stored in nft_metadata collection (lazy-loaded)
+            // Blockchain state (owner/approval) is synced on-demand
             const bulkOps = listings.map((listing) => ({
                 updateOne: {
-                    filter: { 
+                    filter: {
                         listingId: listing.listingId,
-                        chainId: listing.chainId 
+                        chainId: listing.chainId
                     },
                     update: {
                         $set: {
-                            // V2 → V1 field mapping
+                            // V2 → V1 field mapping (LISTING DATA ONLY)
                             listingId: listing.listingId,
                             chainId: listing.chainId,
-                            contractAddress: listing.tokenAddress,       // v2: tokenAddress → v1: contractAddress
-                            nftAddress: listing.tokenAddress,            // Also keep nftAddress for compatibility
+                            contractAddress: listing.tokenAddress,
+                            nftAddress: listing.tokenAddress,
                             tokenId: listing.tokenId,
                             tokenStandard: listing.tokenStandard,
                             erc1155QuantityListed: listing.erc1155QuantityListed,
                             remainingQuantity: listing.remainingQuantity,
-                            price: listing.priceTotal || listing.unitPrice,  // v2: priceTotal → v1: price
+                            price: listing.priceTotal || listing.unitPrice,
                             priceTotal: listing.priceTotal,
                             unitPrice: listing.unitPrice,
                             seller: listing.seller,
-                            isListed: listing.active,                    // v2: active → v1: isListed
+                            isListed: listing.active,
                             active: listing.active,
                             status: listing.status,
                             listingType: listing.listingType,
@@ -164,8 +166,7 @@ export class GraphQLSyncV2 {
                             desiredTokenId: listing.desiredTokenId,
                             desiredErc1155Quantity: listing.desiredErc1155Quantity,
                             createdAt: listing.createdAt,
-                            syncedAt: new Date(),
-                            isNewListing: true  // 🔥 NEW: Mark as new for approval fetch
+                            syncedAt: new Date()
                         },
                         $setOnInsert: {
                             firstSyncedAt: new Date()
@@ -178,25 +179,30 @@ export class GraphQLSyncV2 {
             if (bulkOps.length > 0) {
                 const result = await collection.bulkWrite(bulkOps);
                 this.itemsProcessed += result.upsertedCount + result.modifiedCount;
-                
+
                 console.log(`✅ [V2 MongoDB] Database updated:`);
                 console.log(`   New listings: ${result.upsertedCount}`);
                 console.log(`   Updated listings: ${result.modifiedCount}`);
                 console.log(`   Total processed: ${this.itemsProcessed}`);
-                
-                // 🔥 NEW: For new listings, immediately fetch approval to avoid 0x000... issue
+
+                // 🔥 OPTIMIZED: Trigger blockchain state sync for NEW listings only
                 if (result.upsertedCount > 0) {
-                    console.log(`\n🔄 [V2 Approval] Fetching approval for ${result.upsertedCount} new listings...`);
-                    // Fetch only items marked as new
-                    const newListings = await collection.find({ isNewListing: true }).toArray();
-                    if (newListings.length > 0) {
-                        await this.fetchApprovalForNewListings(newListings, collection);
-                        // Clear the isNewListing flag
-                        await collection.updateMany(
-                            { isNewListing: true },
-                            { $unset: { isNewListing: '' } }
-                        );
-                    }
+                    console.log(`\n🔄 [Blockchain Sync] Triggering on-demand sync for ${result.upsertedCount} new listings...`);
+
+                    // Get newly inserted listings
+                    const newListings = listings.slice(0, result.upsertedCount);
+                    const nftsToSync = newListings.map(l => ({
+                        contractAddress: l.tokenAddress,
+                        tokenId: l.tokenId
+                    }));
+
+                    // Sync blockchain state asynchronously (don't block subgraph sync)
+                    blockchainStateSync.syncBatch(
+                        nftsToSync,
+                        process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS
+                    ).catch(error => {
+                        console.error('❌ [Blockchain Sync] Error syncing new listings:', error);
+                    });
                 }
             }
         } catch (error) {
@@ -208,104 +214,18 @@ export class GraphQLSyncV2 {
     }
 
     /**
-     * Fetch approval status for new listings immediately
-     * This prevents the 0x000... issue for newly listed NFTs
-     */
-    private async fetchApprovalForNewListings(listings: any[], collection: any) {
-        try {
-            const ERC721_ABI = [
-                {
-                    name: 'getApproved',
-                    type: 'function',
-                    stateMutability: 'view',
-                    inputs: [{ name: 'tokenId', type: 'uint256' }],
-                    outputs: [{ name: '', type: 'address' }],
-                }
-            ] as const;
-
-            const { createPublicClient, http } = await import('viem');
-            const { sepolia } = await import('viem/chains');
-
-            const client = createPublicClient({
-                chain: sepolia,
-                transport: http(process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || 'https://rpc.sepolia.org')
-            });
-
-            const db = await getDatabase();
-            const metadataCollection = db.collection('nft_metadata');
-
-            // Process in parallel (max 5 at once)
-            const BATCH_SIZE = 5;
-            for (let i = 0; i < listings.length; i += BATCH_SIZE) {
-                const batch = listings.slice(i, i + BATCH_SIZE);
-                
-                await Promise.all(batch.map(async (listing) => {
-                    try {
-                        const approvedAddress = await client.readContract({
-                            address: listing.contractAddress as `0x${string}`,
-                            abi: ERC721_ABI,
-                            functionName: 'getApproved',
-                            args: [BigInt(listing.tokenId)]
-                        });
-
-                        const now = new Date();
-
-                        // Update marketplace_items with approval
-                        await collection.updateOne(
-                            { 
-                                listingId: listing.listingId,
-                                chainId: listing.chainId 
-                            },
-                            {
-                                $set: {
-                                    approved: approvedAddress,
-                                    approvedAddress: approvedAddress,
-                                    'lastSync.approval': now
-                                }
-                            }
-                        );
-
-                        // Also update nft_metadata collection
-                        await metadataCollection.updateOne(
-                            {
-                                contractAddress: listing.contractAddress,
-                                tokenId: listing.tokenId
-                            },
-                            {
-                                $set: {
-                                    'blockchain.approved': approvedAddress,
-                                    updatedAt: now
-                                }
-                            },
-                            { upsert: true }
-                        );
-
-                        console.log(`  ✅ Approval fetched for ${listing.contractAddress}/${listing.tokenId}: ${approvedAddress}`);
-                    } catch (error) {
-                        console.error(`  ❌ Failed to fetch approval for ${listing.contractAddress}/${listing.tokenId}:`, error);
-                    }
-                }));
-            }
-
-            console.log(`✅ [V2 Approval] Completed approval fetch for new listings`);
-        } catch (error) {
-            console.error('❌ [V2 Approval] Error fetching approvals:', error);
-        }
-    }
-
-    /**
      * Stop syncing
      */
     async stop() {
         console.log('🛑 Stopping Subgraph v2 sync...');
-        
+
         if (this.pollingInterval) {
             clearInterval(this.pollingInterval);
             this.pollingInterval = null;
         }
 
         this.isActive = false;
-        
+
         console.log(`📊 v2: Total items processed: ${this.itemsProcessed}`);
     }
 

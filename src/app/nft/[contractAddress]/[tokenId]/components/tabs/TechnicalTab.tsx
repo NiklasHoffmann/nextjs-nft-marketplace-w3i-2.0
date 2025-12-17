@@ -21,6 +21,7 @@ interface TechnicalTabProps {
     // Enhanced contract fields
     ownerBalance?: number | null;
     approved?: string | null;
+    isApprovedForAll?: boolean;
     tokenURI?: string | null;
 }
 
@@ -40,6 +41,7 @@ export default function TechnicalTab({ contractAddress,
     rarityScore,
     ownerBalance,
     approved,
+    isApprovedForAll,
     tokenURI
 }: TechnicalTabProps) {
 
@@ -56,6 +58,7 @@ export default function TechnicalTab({ contractAddress,
                     ownerBalance: ownerBalance ?? null,
                     approved: approved ?? null
                 }}
+                isApprovedForAll={isApprovedForAll}
             />
 
             {/* Basic NFT Details */}

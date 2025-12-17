@@ -1,7 +1,16 @@
 /**
- * Hook for fetching single NFT detail from marketplace cache or API
- * Uses MarketplaceCacheContext to prevent unnecessary reloads
- * Also checks WalletNFTsContext for user-owned NFTs
+ * Hook for fetching single NFT detail from OPTIMIZED API
+ * 
+ * Uses /api/nft/detail which:
+ * - Fetches from nft_metadata (cached IPFS data)
+ * - On-demand blockchain sync for owner/approved (5min cache)
+ * - Lazy-loads IPFS metadata if missing
+ * - Always returns fresh blockchain state!
+ * 
+ * Fallbacks:
+ * 1. Cache (MarketplaceCacheContext)
+ * 2. Optimized API (/api/nft/detail)
+ * 3. WalletNFTsContext (for non-listed NFTs)
  */
 
 'use client';
@@ -65,12 +74,12 @@ export function useNFTDetail(options: UseNFTDetailOptions): UseNFTDetailReturn {
             return;
         }
 
-        // 2. Fetch from API (has complete contract data from nft_metadata)
+        // 2. Fetch from OPTIMIZED API (with on-demand blockchain sync)
         setLoading(true);
         setError(null);
 
         try {
-            const response = await fetch(`/api/marketplace/nft/${contractAddress}/${tokenId}`);
+            const response = await fetch(`/api/nft/detail?contractAddress=${contractAddress}&tokenId=${tokenId}`);
 
             if (!response.ok) {
                 // 404 is expected for NFTs not on marketplace - try WalletNFTs as fallback
@@ -121,6 +130,14 @@ export function useNFTDetail(options: UseNFTDetailOptions): UseNFTDetailReturn {
                                 approved: null,
                             },
 
+                            // Blockchain state (fallback - no data from wallet)
+                            blockchain: {
+                                owner: null,
+                                approved: null,
+                                isApprovedForAll: false,
+                                lastSyncedAt: null,
+                            },
+
                             // Insights from MongoDB enrichment
                             insights: {
                                 customTitle: walletNFT.insights?.customTitle || null,
@@ -165,18 +182,93 @@ export function useNFTDetail(options: UseNFTDetailOptions): UseNFTDetailReturn {
                 throw new Error(`API error: ${response.status}`);
             }
 
-            const result = await response.json();
+            const nftData = await response.json();
 
-            if (!result.success) {
-                throw new Error(result.error || 'Failed to fetch NFT');
-            }
+            // Convert /api/nft/detail response to EnrichedNFTDocument format
+            const enrichedNFT: EnrichedNFTDocument = {
+                _id: undefined,
+                contractAddress: nftData.contractAddress,
+                tokenId: nftData.tokenId,
+                listingId: nftData.marketplace?.listingId || null,
 
-            const nftData = result.data;
-            setNFT(nftData);
+                // Marketplace data
+                marketplace: nftData.marketplace || {
+                    listingId: null,
+                    isListed: false,
+                    isValid: undefined,
+                    invalidReasons: null,
+                    invalidatedAt: null,
+                    price: null,
+                    seller: null,
+                    buyer: null,
+                    desiredContractAddress: null,
+                    desiredTokenId: null,
+                },
+
+                // Metadata from nft_metadata (IPFS data)
+                metadata: nftData.metadata || {
+                    name: `NFT #${nftData.tokenId}`,
+                    description: null,
+                    image: null,
+                    animationUrl: null,
+                    externalUrl: null,
+                    attributes: [],
+                },
+
+                // Contract data (static info)
+                contract: {
+                    owner: null, // Deprecated - use blockchain.owner
+                    tokenURI: nftData.contract?.tokenURI || null,
+                    name: nftData.contract?.name || null,
+                    symbol: nftData.contract?.symbol || null,
+                    totalSupply: nftData.contract?.totalSupply || null,
+                    ownerBalance: nftData.contract?.ownerBalance || null,
+                    approvedAddress: null, // Deprecated - use blockchain.approved
+                    approved: null, // Deprecated - use blockchain.approved
+                },
+
+                // Blockchain state (on-demand synced - USE THIS!)
+                blockchain: {
+                    owner: nftData.blockchain?.owner || null,
+                    approved: nftData.blockchain?.approved || null,
+                    isApprovedForAll: nftData.blockchain?.isApprovedForAll || false,
+                    lastSyncedAt: nftData.blockchain?.lastSyncedAt ? new Date(nftData.blockchain.lastSyncedAt) : null,
+                },
+
+                // Insights from admin_nft_insights
+                insights: nftData.insights || {
+                    customTitle: null,
+                    category: null,
+                    tags: [],
+                    rarity: null,
+                    cardDescriptions: null,
+                    projectDescriptions: null,
+                    functionalitiesDescriptions: null,
+                    projectWebsite: null,
+                    projectTwitter: null,
+                    projectDiscord: null,
+                    partnerships: null,
+                },
+
+                // Data quality flags
+                dataQuality: {
+                    hasMetadata: !!(nftData.metadata?.name || nftData.metadata?.description || nftData.metadata?.image),
+                    hasInsights: !!(nftData.insights?.category || nftData.insights?.rarity),
+                    metadataSource: nftData.cached ? 'cache' : 'ipfs',
+                },
+
+                // Timestamps
+                createdAt: new Date(),
+                lastUpdated: new Date(),
+                metadataLastUpdated: new Date(),
+                insightsLastUpdated: nftData.insights ? new Date() : null,
+            };
+
+            setNFT(enrichedNFT);
 
             // Store in cache (wrap in items array to match cache format)
             cache.setCache(cacheKey, {
-                items: [nftData],
+                items: [enrichedNFT],
                 pagination: {
                     page: 1,
                     limit: 1,

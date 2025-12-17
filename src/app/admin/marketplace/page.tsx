@@ -41,7 +41,7 @@ export default function MarketplaceAdminPage() {
   } = useMarketplaceAdmin(MARKETPLACE_ADDRESS);
 
   // Form states
-  const [newFee, setNewFee] = useState('250'); // 2.5% default
+  const [newFee, setNewFee] = useState('2500'); // 2.5% default
   const [singleCollection, setSingleCollection] = useState('');
   const [batchCollections, setBatchCollections] = useState('');
   const [listingIdToClean, setListingIdToClean] = useState('');
@@ -391,26 +391,26 @@ export default function MarketplaceAdminPage() {
             <div className="mb-4">
               <p className="text-sm text-gray-600 mb-2">
                 Current Fee: <span className="font-mono font-semibold">
-                  {currentFee ? `${Number(currentFee) / 100}%` : 'Loading...'}
+                  {currentFee ? `${Number(currentFee) / 1000}%` : 'Loading...'}
                 </span>
               </p>
             </div>
             <form onSubmit={handleSetFee}>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  New Fee (in basis points)
+                  New Fee (denominator: 100,000)
                 </label>
                 <input
                   type="number"
                   value={newFee}
                   onChange={(e) => setNewFee(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="250 = 2.5%"
+                  placeholder="2500 = 2.5%"
                   min="0"
-                  max="10000"
+                  max="100000"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Current: {newFee} = {parseInt(newFee) / 100}%
+                  Current: {newFee} = {parseInt(newFee) / 1000}%
                 </p>
               </div>
               <button

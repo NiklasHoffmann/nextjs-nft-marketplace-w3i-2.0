@@ -177,14 +177,13 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                             <button
                                 type="button"
                                 onClick={() => setMode('sale')}
-                                className={`relative rounded-xl border-2 p-5 transition-all duration-300 transform hover:scale-105 ${mode === 'sale'
-                                    ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg'
-                                    : 'border-gray-200 hover:border-blue-300 bg-white hover:shadow-md'
+                                className={`relative rounded-lg border-2 p-4 transition-all ${mode === 'sale'
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-200 hover:border-blue-300 bg-white'
                                     }`}
                             >
                                 <div className="flex flex-col items-center text-center">
-                                    <div className={`rounded-full p-3 mb-3 ${mode === 'sale' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gray-100'
-                                        }`}>
+                                    <div className={`rounded-full p-2.5 mb-2 ${mode === 'sale' ? 'bg-blue-600' : 'bg-gray-100'}`}>
                                         <svg className={`w-6 h-6 ${mode === 'sale' ? 'text-white' : 'text-gray-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                                         </svg>
@@ -207,14 +206,13 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                             <button
                                 type="button"
                                 onClick={() => setMode('trade')}
-                                className={`relative rounded-xl border-2 p-5 transition-all duration-300 transform hover:scale-105 ${mode === 'trade'
-                                    ? 'border-green-500 bg-gradient-to-br from-green-50 to-green-100 shadow-lg'
-                                    : 'border-gray-200 hover:border-green-300 bg-white hover:shadow-md'
+                                className={`relative rounded-lg border-2 p-4 transition-all ${mode === 'trade'
+                                    ? 'border-green-500 bg-green-50'
+                                    : 'border-gray-200 hover:border-green-300 bg-white'
                                     }`}
                             >
                                 <div className="flex flex-col items-center text-center">
-                                    <div className={`rounded-full p-3 mb-3 ${mode === 'trade' ? 'bg-gradient-to-br from-green-500 to-green-600' : 'bg-gray-100'
-                                        }`}>
+                                    <div className={`rounded-full p-2.5 mb-2 ${mode === 'trade' ? 'bg-green-600' : 'bg-gray-100'}`}>
                                         <svg className={`w-6 h-6 ${mode === 'trade' ? 'text-white' : 'text-gray-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                                         </svg>
@@ -237,14 +235,13 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                             <button
                                 type="button"
                                 onClick={() => setMode('hybrid')}
-                                className={`relative rounded-xl border-2 p-5 transition-all duration-300 transform hover:scale-105 ${mode === 'hybrid'
-                                    ? 'border-purple-500 bg-gradient-to-br from-purple-50 to-purple-100 shadow-lg'
-                                    : 'border-gray-200 hover:border-purple-300 bg-white hover:shadow-md'
+                                className={`relative rounded-lg border-2 p-4 transition-all ${mode === 'hybrid'
+                                    ? 'border-purple-500 bg-purple-50'
+                                    : 'border-gray-200 hover:border-purple-300 bg-white'
                                     }`}
                             >
                                 <div className="flex flex-col items-center text-center">
-                                    <div className={`rounded-full p-3 mb-3 ${mode === 'hybrid' ? 'bg-gradient-to-br from-purple-500 to-purple-600' : 'bg-gray-100'
-                                        }`}>
+                                    <div className={`rounded-full p-2.5 mb-2 ${mode === 'hybrid' ? 'bg-purple-600' : 'bg-gray-100'}`}>
                                         <svg className={`w-6 h-6 ${mode === 'hybrid' ? 'text-white' : 'text-gray-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                                         </svg>
@@ -267,7 +264,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
 
                     {/* Preis-Sektion (für Verkauf und Hybrid) */}
                     {(mode === 'sale' || mode === 'hybrid') && (
-                        <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-5 shadow-md">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                             <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
@@ -278,19 +275,19 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Verkaufspreis *
                                 </label>
-                                <div className="flex">
+                                <div className="flex gap-2">
                                     <input
                                         type="number"
                                         step="0.0001"
                                         value={formData.price}
                                         onChange={(e) => handleInputChange('price', e.target.value)}
-                                        className={`flex-1 rounded-l-lg border ${errors.price ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
+                                        className={`flex-1 rounded-lg border ${errors.price ? 'border-red-300' : 'border-gray-300'} px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500`}
                                         placeholder="0.00"
                                     />
                                     <select
                                         value={formData.currency}
                                         onChange={(e) => handleInputChange('currency', e.target.value)}
-                                        className="rounded-r-lg border border-l-0 border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm"
+                                        className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     >
                                         <option value="ETH">ETH</option>
                                         <option value="USDC">USDC</option>
@@ -302,7 +299,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
 
                                 {/* Gebühren-Übersicht */}
                                 {formData.price && parseFloat(formData.price) > 0 && (
-                                    <div className="mt-3 p-3 bg-white rounded border border-blue-200 text-xs space-y-1">
+                                    <div className="mt-3 p-3 bg-white rounded-lg border border-blue-200 text-xs space-y-1">
                                         <div className="flex justify-between text-gray-600">
                                             <span>Marketplace-Gebühr ({(innovationFeePercentage * 100).toFixed(2)}%):</span>
                                             <span>{fees.marketplaceFee.toFixed(4)} {formData.currency}</span>
@@ -323,7 +320,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
 
                     {/* Tausch-Sektion (für Tausch und Hybrid) */}
                     {(mode === 'trade' || mode === 'hybrid') && (
-                        <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-xl p-5 shadow-md">
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                             <h3 className="text-sm font-semibold text-green-900 mb-3 flex items-center gap-2">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
@@ -381,7 +378,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                                             type="text"
                                             value={formData.targetContractAddress}
                                             onChange={(e) => handleInputChange('targetContractAddress', e.target.value)}
-                                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 shadow-sm"
+                                            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
                                             placeholder="0x..."
                                         />
                                     </div>
@@ -393,7 +390,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                                             type="text"
                                             value={formData.targetTokenId}
                                             onChange={(e) => handleInputChange('targetTokenId', e.target.value)}
-                                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 shadow-sm"
+                                            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
                                             placeholder="1"
                                         />
                                     </div>
@@ -401,13 +398,13 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                                         type="button"
                                         onClick={searchNFT}
                                         disabled={isSearching || !formData.targetContractAddress || !formData.targetTokenId}
-                                        className="w-full px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-300"
+                                        className="w-full px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-semibold transition-colors"
                                     >
                                         {isSearching ? 'Suche...' : 'NFT suchen'}
                                     </button>
 
                                     {selectedTargetNFT && (
-                                        <div className="mt-2 p-3 bg-white border border-green-300 rounded-xl shadow-sm">
+                                        <div className="mt-2 p-3 bg-white border border-green-200 rounded-lg">
                                             <div className="flex items-center gap-3">
                                                 <img
                                                     src={selectedTargetNFT.meta?.image || '/media/custom-nft-3.jpg'}
@@ -450,7 +447,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                                         type="text"
                                         value={formData.targetCollection}
                                         onChange={(e) => handleInputChange('targetCollection', e.target.value)}
-                                        className={`w-full rounded-lg border ${errors.targetCollection ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 shadow-sm`}
+                                        className={`w-full rounded-lg border ${errors.targetCollection ? 'border-red-300' : 'border-gray-300'} px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500`}
                                         placeholder="0x..."
                                     />
                                     {errors.targetCollection && (
@@ -470,7 +467,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                             value={formData.description}
                             onChange={(e) => handleInputChange('description', e.target.value)}
                             rows={4}
-                            className={`w-full rounded-xl border ${errors.description ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
+                            className={`w-full rounded-lg border ${errors.description ? 'border-red-300' : 'border-gray-300'} px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500`}
                             placeholder={
                                 mode === 'sale'
                                     ? 'Warum verkaufen Sie diesen NFT?'
@@ -487,11 +484,11 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                     {/* Submit Button */}
                     <button
                         type="submit"
-                        className={`w-full px-6 py-4 rounded-xl text-white font-semibold text-lg shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 ${mode === 'sale'
-                            ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
+                        className={`w-full px-6 py-3 rounded-lg text-white font-semibold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 ${mode === 'sale'
+                            ? 'bg-blue-600 hover:bg-blue-700'
                             : mode === 'trade'
-                                ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800'
-                                : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800'
+                                ? 'bg-green-600 hover:bg-green-700'
+                                : 'bg-purple-600 hover:bg-purple-700'
                             }`}
                     >
                         {!isFullyApproved && (

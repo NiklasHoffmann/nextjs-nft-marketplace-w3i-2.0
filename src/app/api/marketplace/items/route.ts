@@ -258,12 +258,45 @@ export async function GET(request: NextRequest) {
                     insights: '$insightsData',
                     // Stats are loaded via StatsContext (not from API)
 
-                    // Also keep nested marketplace object for compatibility
+                    // Nested marketplace object with ALL v2 fields
                     marketplace: {
+                        // Core Listing
                         listingId: '$listingId',
-                        price: '$price',
-                        seller: '$seller',
                         isListed: '$isListed',
+                        
+                        // Pricing (v1 & v2)
+                        price: '$price',
+                        priceTotal: '$priceTotal',
+                        unitPrice: '$unitPrice',
+                        
+                        // Parties
+                        seller: '$seller',
+                        buyer: '$buyer',
+                        
+                        // Swap Data
+                        desiredContractAddress: '$desiredContractAddress',
+                        desiredTokenAddress: '$desiredTokenAddress',
+                        desiredTokenId: '$desiredTokenId',
+                        desiredErc1155Quantity: '$desiredErc1155Quantity',
+                        
+                        // v2 Fields
+                        tokenStandard: '$tokenStandard',
+                        listingType: '$listingType',
+                        status: '$status',
+                        
+                        // ERC1155
+                        erc1155QuantityListed: '$erc1155QuantityListed',
+                        remainingQuantity: '$remainingQuantity',
+                        
+                        // Advanced
+                        buyerWhitelistEnabled: '$buyerWhitelistEnabled',
+                        partialBuyEnabled: '$partialBuyEnabled',
+                        feeRate: '$feeRate',
+                        
+                        // Chain & Timestamps
+                        chainId: '$chainId',
+                        createdAt: '$createdAt',
+                        syncedAt: '$syncedAt',
                         listedAt: '$listedAt'
                     },
 

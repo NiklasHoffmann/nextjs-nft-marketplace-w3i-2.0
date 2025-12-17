@@ -46,7 +46,7 @@ function NFTDetailPage() {
         tokenId,
         autoFetch: isValidParams
     });
-
+    console.log('NFTDetailPage:', { contractAddress, tokenId, isValidParams, nftData, dataError });
     const { address: userAddress } = useAccount();
     const router = useRouter();
 
@@ -102,14 +102,45 @@ function NFTDetailPage() {
         if (!isValidParams || !nftData) return null;
 
         return {
+            // Core
             listingId: nftData.marketplace?.listingId || `${contractAddress}-${tokenId}`,
             contractAddress,
             tokenId,
             isListed: nftData.marketplace?.isListed || false,
+            
+            // Pricing (v1 & v2)
             price: nftData.marketplace?.price || "0",
+            priceTotal: nftData.marketplace?.priceTotal,
+            unitPrice: nftData.marketplace?.unitPrice,
+            
+            // Parties
             seller: nftData.marketplace?.seller || nftData.contract?.owner || "",
-            desiredContractAddress: nftData.marketplace?.desiredContractAddress || "",
-            desiredTokenId: nftData.marketplace?.desiredTokenId ? String(nftData.marketplace.desiredTokenId) : ""
+            buyer: nftData.marketplace?.buyer ?? undefined,
+            
+            // Swap Data
+            desiredContractAddress: nftData.marketplace?.desiredContractAddress || nftData.marketplace?.desiredTokenAddress || "",
+            desiredTokenAddress: nftData.marketplace?.desiredTokenAddress,
+            desiredTokenId: nftData.marketplace?.desiredTokenId ? String(nftData.marketplace.desiredTokenId) : "",
+            desiredErc1155Quantity: nftData.marketplace?.desiredErc1155Quantity,
+            
+            // v2 Fields
+            tokenStandard: nftData.marketplace?.tokenStandard || 'ERC721',
+            listingType: nftData.marketplace?.listingType,
+            status: nftData.marketplace?.status,
+            
+            // ERC1155
+            erc1155QuantityListed: nftData.marketplace?.erc1155QuantityListed,
+            remainingQuantity: nftData.marketplace?.remainingQuantity,
+            
+            // Advanced
+            buyerWhitelistEnabled: nftData.marketplace?.buyerWhitelistEnabled,
+            partialBuyEnabled: nftData.marketplace?.partialBuyEnabled,
+            feeRate: nftData.marketplace?.feeRate,
+            
+            // Chain & Timestamps
+            chainId: nftData.marketplace?.chainId,
+            createdAt: nftData.marketplace?.createdAt,
+            syncedAt: nftData.marketplace?.syncedAt
         };
     }, [contractAddress, tokenId, isValidParams, nftData]);
 
@@ -187,15 +218,20 @@ function NFTDetailPage() {
         tokenId,
         seller: nftDetails?.seller,
         listingId: nftDetails?.listingId,
-        currentOwner: nftData?.contract?.owner || undefined,
+        currentOwner: nftData?.blockchain?.owner || nftData?.contract?.owner || undefined,
         connectedAddress: userAddress || undefined,
         nftName: finalName,
         nftImage: finalImageUrl || undefined,
         desiredContractAddress: nftDetails?.desiredContractAddress,
-        desiredTokenId: nftDetails?.desiredTokenId
+        desiredTokenId: nftDetails?.desiredTokenId,
+        // v2 fields
+        status: nftDetails?.status,
+        listingType: nftDetails?.listingType,
+        tokenStandard: nftDetails?.tokenStandard
     }), [
         nftDetails?.price, nftDetails?.isListed, nftDetails?.seller,
         nftDetails?.desiredContractAddress, nftDetails?.desiredTokenId, nftDetails?.listingId,
+        nftDetails?.status, nftDetails?.listingType, nftDetails?.tokenStandard,
         priceData.convertedPrice, priceData.priceLoading, priceData.selectedCurrencySymbol,
         contractAddress, tokenId, nftData?.contract?.owner, userAddress, finalName, finalImageUrl
     ]);
@@ -211,12 +247,12 @@ function NFTDetailPage() {
             contractName: contractInfo?.name || null,
             collection: contractInfo?.name || null,
             contractSymbol: contractInfo?.symbol || null,
-            tokenStandard: 'ERC721',
+            tokenStandard: nftDetails?.tokenStandard || 'ERC721',
             blockchain: 'Ethereum',
             totalSupply: typeof contractInfo?.totalSupply === 'bigint'
                 ? Number(contractInfo.totalSupply)
                 : contractInfo?.totalSupply ?? null,
-            currentOwner: nftData?.contract?.owner || null,
+            currentOwner: nftData?.blockchain?.owner || nftData?.contract?.owner || null,
             creator: null,
             nftDetails,
             description: metadata?.description || '',
@@ -246,7 +282,8 @@ function NFTDetailPage() {
             invalidReasons: nftData?.marketplace?.invalidReasons ?? null,
             invalidatedAt: nftData?.marketplace?.invalidatedAt ? new Date(nftData.marketplace.invalidatedAt) : null,
             ownerBalance: nftData?.contract?.ownerBalance ?? null,
-            approved: nftData?.contract?.approved || nftData?.contract?.approvedAddress || null,
+            approved: nftData?.blockchain?.approved || null,
+            isApprovedForAll: nftData?.blockchain?.isApprovedForAll ?? false,
             tokenURI: nftData?.contract?.tokenURI ?? null
         };
     }, [
@@ -274,7 +311,7 @@ function NFTDetailPage() {
         price: nftDetails?.price || "0"
     }), [contractInfo?.name, contractAddress, tokenId, finalName, nftDetails?.price]);
 
-    console.log('NFTDetailPage Render Complete:', { "approvedAddress:": nftData?.contract?.approvedAddress, "approved:": nftData?.contract?.approved });
+    console.log('NFTDetailPage Render Complete:', { "blockchain.approved:": nftData?.blockchain?.approved, "blockchain.isApprovedForAll:": nftData?.blockchain?.isApprovedForAll });
     // Early returns for loading and error states
     if (isLoading && !nftData) {
         return <LoadingSpinner />;

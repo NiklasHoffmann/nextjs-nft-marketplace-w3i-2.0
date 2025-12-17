@@ -43,6 +43,7 @@ interface NewNFTInfoTabsProps extends NFTInfoTabsProps {
     invalidatedAt?: Date | null;
     ownerBalance?: number | null;
     approved?: string | null;
+    isApprovedForAll?: boolean;
     tokenURI?: string | null;
 }
 
@@ -87,6 +88,7 @@ function NewNFTInfoTabs({
     invalidatedAt,
     ownerBalance,
     approved,
+    isApprovedForAll,
     tokenURI
 }: NewNFTInfoTabsProps) {
     const effectivePublicInsights = publicInsights || (adminInsights as any);
@@ -118,6 +120,7 @@ function NewNFTInfoTabs({
                         isValid={isValid}
                         invalidReasons={invalidReasons}
                         invalidatedAt={invalidatedAt}
+                        nftDetails={nftDetails}
                     />
                 );
             case 'technical':
@@ -139,6 +142,7 @@ function NewNFTInfoTabs({
                         rarityScore={rarityScore}
                         ownerBalance={ownerBalance}
                         approved={approved}
+                        isApprovedForAll={isApprovedForAll}
                         tokenURI={tokenURI}
                     />
                 );

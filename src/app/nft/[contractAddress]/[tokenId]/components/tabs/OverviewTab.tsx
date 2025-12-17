@@ -27,6 +27,8 @@ interface OverviewTabProps {
     isValid?: boolean;
     invalidReasons?: string[] | null;
     invalidatedAt?: Date | null;
+    // v2 marketplace details
+    nftDetails?: any;
 }
 
 export default function OverviewTab({ contractAddress,
@@ -49,7 +51,8 @@ export default function OverviewTab({ contractAddress,
     tokenStandard,
     isValid,
     invalidReasons,
-    invalidatedAt
+    invalidatedAt,
+    nftDetails
 }: OverviewTabProps) {
     // Name priority: contractName (collection) > collection > fallback
     // Note: customTitle was removed from NFTInsights schema
@@ -231,6 +234,143 @@ export default function OverviewTab({ contractAddress,
                             <span className="text-sm text-gray-500">
                                 +{attributes.length - 8} more attributes in Technical tab
                             </span>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Marketplace v2 Information */}
+            {nftDetails && isListed && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                        <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        Marketplace Details (v2)
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {/* Listing Type */}
+                        {nftDetails.listingType && (
+                            <div className="bg-white rounded-lg p-3">
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Listing Type</label>
+                                <p className="text-sm font-semibold text-gray-900 mt-1">
+                                    {nftDetails.listingType === 'PURE_ETH' && '💰 ETH Only'}
+                                    {nftDetails.listingType === 'SWAP_AND_ETH' && '🔄 Swap + ETH'}
+                                    {nftDetails.listingType === 'PURE_SWAP' && '🔁 Pure Swap'}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Status */}
+                        {nftDetails.status && (
+                            <div className="bg-white rounded-lg p-3">
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</label>
+                                <p className="text-sm font-semibold text-gray-900 mt-1">
+                                    {nftDetails.status === 'LISTED' && '✅ Listed'}
+                                    {nftDetails.status === 'PARTIALLY_FILLED' && '⏳ Partially Filled'}
+                                    {nftDetails.status === 'SOLD_OUT' && '✔️ Sold Out'}
+                                    {nftDetails.status === 'CANCELED' && '❌ Canceled'}
+                                    {nftDetails.status === 'INVALIDATED' && '⚠️ Invalidated'}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Token Standard */}
+                        <div className="bg-white rounded-lg p-3">
+                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Token Standard</label>
+                            <p className="text-sm font-semibold text-gray-900 mt-1">{nftDetails.tokenStandard || tokenStandard}</p>
+                        </div>
+
+                        {/* ERC1155 Quantity (if applicable) */}
+                        {nftDetails.tokenStandard === 'ERC1155' && nftDetails.erc1155QuantityListed && (
+                            <>
+                                <div className="bg-white rounded-lg p-3">
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Listed Quantity</label>
+                                    <p className="text-sm font-semibold text-gray-900 mt-1">{nftDetails.erc1155QuantityListed}</p>
+                                </div>
+                                {nftDetails.remainingQuantity && (
+                                    <div className="bg-white rounded-lg p-3">
+                                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Remaining</label>
+                                        <p className="text-sm font-semibold text-gray-900 mt-1">{nftDetails.remainingQuantity}</p>
+                                    </div>
+                                )}
+                                {nftDetails.unitPrice && (
+                                    <div className="bg-white rounded-lg p-3">
+                                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</label>
+                                        <p className="text-sm font-semibold text-gray-900 mt-1">
+                                            {(parseFloat(nftDetails.unitPrice) / 1e18).toFixed(4)} ETH
+                                        </p>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {/* Fee Rate */}
+                        {nftDetails.feeRate && (
+                            <div className="bg-white rounded-lg p-3">
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Marketplace Fee</label>
+                                <p className="text-sm font-semibold text-gray-900 mt-1">
+                                    {(parseFloat(nftDetails.feeRate) / 1000).toFixed(2)}%
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Buyer Whitelist */}
+                        {nftDetails.buyerWhitelistEnabled !== undefined && (
+                            <div className="bg-white rounded-lg p-3">
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Buyer Whitelist</label>
+                                <p className="text-sm font-semibold text-gray-900 mt-1">
+                                    {nftDetails.buyerWhitelistEnabled ? '🔒 Enabled' : '🔓 Disabled'}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Partial Buy (ERC1155) */}
+                        {nftDetails.partialBuyEnabled !== undefined && (
+                            <div className="bg-white rounded-lg p-3">
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Partial Buy</label>
+                                <p className="text-sm font-semibold text-gray-900 mt-1">
+                                    {nftDetails.partialBuyEnabled ? '✅ Enabled' : '❌ Disabled'}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Chain ID */}
+                        {nftDetails.chainId && (
+                            <div className="bg-white rounded-lg p-3">
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Chain ID</label>
+                                <p className="text-sm font-semibold text-gray-900 mt-1">
+                                    {nftDetails.chainId === 11155111 ? 'Sepolia' : nftDetails.chainId}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Created At */}
+                        {nftDetails.createdAt && (
+                            <div className="bg-white rounded-lg p-3">
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Listed On</label>
+                                <p className="text-sm font-semibold text-gray-900 mt-1">
+                                    {new Date(parseInt(nftDetails.createdAt) * 1000).toLocaleDateString()}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Swap Target (if applicable) */}
+                    {(nftDetails.listingType === 'SWAP_AND_ETH' || nftDetails.listingType === 'PURE_SWAP') && 
+                     (nftDetails.desiredTokenAddress || nftDetails.desiredContractAddress) && (
+                        <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                            <h4 className="text-sm font-semibold text-yellow-900 mb-2">🔄 Swap Requirements</h4>
+                            <div className="space-y-1 text-xs text-yellow-800">
+                                <p><span className="font-medium">Desired NFT:</span> {nftDetails.desiredTokenAddress || nftDetails.desiredContractAddress}</p>
+                                {nftDetails.desiredTokenId && (
+                                    <p><span className="font-medium">Token ID:</span> {nftDetails.desiredTokenId}</p>
+                                )}
+                                {nftDetails.desiredErc1155Quantity && (
+                                    <p><span className="font-medium">Quantity:</span> {nftDetails.desiredErc1155Quantity}</p>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
