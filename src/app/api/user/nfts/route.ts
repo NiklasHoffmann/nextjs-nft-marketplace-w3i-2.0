@@ -23,7 +23,7 @@ import type { EnrichedNFTMetadata } from '@/types/nft-metadata';
  * GET /api/user/nfts
  * 
  * Retrieve all NFTs owned by wallet from database (instant load)
- * Query params: walletAddress (required)
+ * Query params: walletAddress (required), plus filters (same as /api/marketplace/items)
  */
 export async function GET(request: NextRequest) {
     try {
@@ -37,17 +37,50 @@ export async function GET(request: NextRequest) {
 
         const lowerWalletAddress = walletAddress.toLowerCase();
 
+        // Parse filter parameters (same as marketplace)
+        const { searchParams } = new URL(request.url);
+        const search = searchParams.get('search');
+        const category = searchParams.get('category')?.split(',').filter(Boolean);
+        const rarity = searchParams.get('rarity')?.split(',').filter(Boolean);
+        const minPrice = searchParams.get('minPrice');
+        const maxPrice = searchParams.get('maxPrice');
+        const minRating = searchParams.get('minRating');
+        const minViews = searchParams.get('minViews');
+        const minLikes = searchParams.get('minLikes');
+        const minWatchlistCount = searchParams.get('minWatchlistCount');
+        const isListed = searchParams.get('isListed');
+
+        // Parse sorting (same as marketplace)
+        const sortBy = searchParams.get('sortBy') || 'lastVerified';
+        const sortOrder = searchParams.get('sortOrder') || 'desc';
+
         console.log(`📋 [User NFTs] Loading NFTs for wallet: ${lowerWalletAddress}`);
+        console.log(`🔍 [User NFTs] Filters:`, {
+            search, category, rarity, minPrice, maxPrice,
+            minRating, minViews, minLikes, minWatchlistCount, isListed
+        });
+        console.log(`📊 [User NFTs] Sort:`, { sortBy, sortOrder });
 
         // Query nft_metadata with enrichment
         const nftMetadataCollection = await getCollection('nft_metadata');
 
+        // Build match query for wallet + basic filters
+        const matchQuery: any = {
+            currentOwner: lowerWalletAddress
+        };
+
+        // Apply filters (same logic as marketplace)
+        if (category && category.length > 0) {
+            matchQuery['insights.category'] = { $in: category };
+        }
+        if (rarity && rarity.length > 0) {
+            matchQuery['insights.rarity'] = { $in: rarity };
+        }
+
         const pipeline = [
-            // Match NFTs owned by wallet
+            // Match NFTs owned by wallet + basic filters
             {
-                $match: {
-                    currentOwner: lowerWalletAddress
-                }
+                $match: matchQuery
             },
             // Join with marketplace_items to check listing status
             {
@@ -132,25 +165,128 @@ export async function GET(request: NextRequest) {
                     preserveNullAndEmptyArrays: true
                 }
             },
-            // Skip stats lookup - stats are handled by StatsContext for real-time updates
+            // Lookup stats from nft_stats collection
+            {
+                $lookup: {
+                    from: 'nft_stats',
+                    let: {
+                        nftAddr: { $toLower: '$contractAddress' },
+                        tokId: '$tokenId'
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: [{ $toLower: '$nftAddress' }, '$$nftAddr'] },
+                                        { $eq: ['$tokenId', '$$tokId'] }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    as: 'statsData'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$statsData',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
             // Add computed fields
             {
                 $addFields: {
                     isListed: { $gt: [{ $size: '$listings' }, 0] },
-                    insights: '$insightsData'
-                    // Stats removed - loaded via StatsContext
+                    insights: '$insightsData',
+                    stats: '$statsData'
                 }
+            },
+            // Apply filters that need computed fields
+            ...(minPrice || maxPrice || minRating || minViews || minLikes || minWatchlistCount || isListed !== null || search ? [{
+                $match: {
+                    ...(search ? {
+                        $or: [
+                            { 'metadata.name': { $regex: search, $options: 'i' } },
+                            { 'metadata.description': { $regex: search, $options: 'i' } },
+                            { contractAddress: { $regex: search, $options: 'i' } }
+                        ]
+                    } : {}),
+                    $expr: {
+                        $and: [
+                            // Price filters (from listings)
+                            ...(minPrice ? [{
+                                $gte: [
+                                    { $toDouble: { $arrayElemAt: ['$listings.price', 0] } },
+                                    parseFloat(minPrice)
+                                ]
+                            }] : []),
+                            ...(maxPrice ? [{
+                                $lte: [
+                                    { $toDouble: { $arrayElemAt: ['$listings.price', 0] } },
+                                    parseFloat(maxPrice)
+                                ]
+                            }] : []),
+                            // Stats filters - use $stats (mapped from $statsData)
+                            ...(minRating ? [{
+                                $gte: [{ $ifNull: ['$stats.averageRating', 0] }, parseFloat(minRating)]
+                            }] : []),
+                            ...(minViews ? [{
+                                $gte: [{ $ifNull: ['$stats.viewCount', 0] }, parseInt(minViews)]
+                            }] : []),
+                            ...(minLikes ? [{
+                                $gte: [{ $ifNull: ['$stats.likeCount', 0] }, parseInt(minLikes)]
+                            }] : []),
+                            ...(minWatchlistCount ? [{
+                                $gte: [{ $ifNull: ['$stats.watchlistCount', 0] }, parseInt(minWatchlistCount)]
+                            }] : []),
+                            // Listing status filter
+                            ...(isListed !== null ? [{
+                                $eq: ['$isListed', isListed === 'true']
+                            }] : [])
+                        ].filter(f => Object.keys(f).length > 0)
+                    }
+                }
+            }] : []),
+            // Apply sorting (use $stats which is mapped from $statsData)
+            {
+                $sort: (() => {
+                    const sortField: any = {};
+
+                    switch (sortBy) {
+                        case 'price':
+                            sortField['listings.0.price'] = sortOrder === 'asc' ? 1 : -1;
+                            break;
+                        case 'rating':
+                            sortField['stats.averageRating'] = sortOrder === 'asc' ? 1 : -1;
+                            break;
+                        case 'views':
+                            sortField['stats.viewCount'] = sortOrder === 'asc' ? 1 : -1;
+                            break;
+                        case 'likes':
+                            sortField['stats.likeCount'] = sortOrder === 'asc' ? 1 : -1;
+                            break;
+                        case 'watchlistCount':
+                            sortField['stats.watchlistCount'] = sortOrder === 'asc' ? 1 : -1;
+                            break;
+                        case 'name':
+                            sortField['metadata.name'] = sortOrder === 'asc' ? 1 : -1;
+                            break;
+                        case 'created':
+                            sortField.createdAt = sortOrder === 'asc' ? 1 : -1;
+                            break;
+                        default:
+                            sortField.lastVerified = -1;
+                    }
+
+                    return sortField;
+                })()
             },
             // Clean up
             {
                 $project: {
-                    insightsData: 0
-                }
-            },
-            // Sort by most recently verified
-            {
-                $sort: {
-                    lastVerified: -1
+                    insightsData: 0,
+                    statsData: 0
                 }
             }
         ];

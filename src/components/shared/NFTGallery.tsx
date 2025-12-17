@@ -177,7 +177,7 @@ export function NFTGallery({
     }
 
     return (
-        <div className={className}>
+        <div className={`${className} transition-all duration-200`}>
             {/* Title and View Toggle */}
             <div className="flex items-center justify-between mb-4">
                 {title && (
@@ -209,7 +209,7 @@ export function NFTGallery({
 
             {/* Grid View */}
             {isGridView ? (
-                <div className={`grid ${gridColumns} ${gap} ${padding}`}>
+                <div className={`grid ${gridColumns} ${gap} ${padding} min-h-[288px]`}>
                     {items.map((item) => {
                         const cardContent = (
                             <div className={`flex-shrink-0 ${cardWidth} relative`}>
@@ -275,7 +275,7 @@ export function NFTGallery({
                 </div>
             ) : (
                 /* Scroll View */
-                <div className="relative overflow-visible">
+                <div className="relative overflow-visible min-h-[288px]">
                     {/* Scroll Buttons */}
                     <ScrollButtons
                         canScrollLeft={canScrollLeft}

@@ -39,7 +39,9 @@ export async function GET(request: NextRequest) {
                     totalValue: { $sum: { $toDouble: '$price' } },
                     averagePrice: { $avg: { $toDouble: '$price' } },
                     // Collect token IDs for preview images
-                    tokenIds: { $push: '$tokenId' }
+                    tokenIds: { $push: '$tokenId' },
+                    // Count unique sellers (owners)
+                    uniqueSellers: { $addToSet: '$seller' }
                 }
             }
         ];
@@ -177,6 +179,8 @@ export async function GET(request: NextRequest) {
                 averageRating: stats.averageRating || 0,
                 // Supply info
                 totalSupply: contractInfo.totalSupply || insights?.totalSupply || null,
+                // Unique owners (sellers with listed items)
+                uniqueOwners: col.uniqueSellers?.length || 0,
                 insights: includeInsights ? insights : undefined
             };
         });

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import type { NFTFilters, NFTSortOptions } from '@/types/marketplace';
 
@@ -97,6 +97,20 @@ export function NFTFilterSidebar({
     const [filters, setFilters] = useState<NFTFilters>({
         categories: [],
         rarities: [],
+        searchTerm: '',
+    });
+
+    // Local search term for immediate UI update
+    const [localSearchTerm, setLocalSearchTerm] = useState('');
+
+    // Local numeric filters for debounced updates
+    const [localNumericFilters, setLocalNumericFilters] = useState({
+        priceMin: undefined as number | undefined,
+        priceMax: undefined as number | undefined,
+        minRating: undefined as number | undefined,
+        minViews: undefined as number | undefined,
+        minLikes: undefined as number | undefined,
+        minWatchlistCount: undefined as number | undefined,
     });
 
     const [isOpen, setIsOpen] = useState(false);
@@ -112,14 +126,39 @@ export function NFTFilterSidebar({
         rating: false,
         stats: false,
         rarity: false,
-        collections: false,
-        sort: false,
     });
 
-    // Update parent when filters change
+    // Debounce search term updates (500ms delay)
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            setFilters((prev: NFTFilters) => ({ ...prev, searchTerm: localSearchTerm }));
+        }, 500);
+
+        return () => clearTimeout(timeoutId);
+    }, [localSearchTerm]);
+
+    // Debounce numeric filter updates (500ms delay)
+    // Memoize dependencies to prevent unnecessary re-renders
+    const numericFiltersString = useMemo(
+        () => JSON.stringify(localNumericFilters),
+        [localNumericFilters]
+    );
+
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            setFilters((prev: NFTFilters) => ({
+                ...prev,
+                ...localNumericFilters
+            }));
+        }, 500);
+
+        return () => clearTimeout(timeoutId);
+    }, [numericFiltersString]); // Only depend on stringified version
+
+    // Update parent when filters change (debounced for search and numeric inputs)
     useEffect(() => {
         onFiltersChange(filters);
-    }, [filters]); // Removed onFiltersChange from dependencies to prevent infinite loop
+    }, [filters, onFiltersChange]); // onFiltersChange must be stable (useCallback in parent)
 
     const updateFilters = (updates: Partial<NFTFilters>) => {
         setFilters((prev: NFTFilters) => ({ ...prev, ...updates }));
@@ -127,13 +166,6 @@ export function NFTFilterSidebar({
 
     const updateSort = (field: NFTSortOptions['field']) => {
         const newDirection = currentSort.field === field && currentSort.direction === 'desc' ? 'asc' as const : 'desc' as const;
-
-        // Immer +180° im Uhrzeigersinn
-        setFieldRotations(prev => {
-            const currentRotation = prev[field] || 0;
-            return { ...prev, [field]: currentRotation + 180 };
-        });
-
         onSortChange({ field, direction: newDirection });
     };
 
@@ -161,12 +193,12 @@ export function NFTFilterSidebar({
 
     const getRarityColor = (rarity: string) => {
         switch (rarity) {
-            case 'legendary': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-            case 'epic': return 'bg-purple-100 text-purple-800 border-purple-300';
-            case 'rare': return 'bg-blue-100 text-blue-800 border-blue-300';
-            case 'uncommon': return 'bg-green-100 text-green-800 border-green-300';
-            case 'common': return 'bg-gray-100 text-gray-800 border-gray-300';
-            default: return 'bg-gray-100 text-gray-800 border-gray-300';
+            case 'legendary': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+            case 'epic': return 'bg-purple-50 text-purple-700 border-purple-200';
+            case 'rare': return 'bg-blue-50 text-blue-700 border-blue-200';
+            case 'uncommon': return 'bg-green-50 text-green-700 border-green-200';
+            case 'common': return 'bg-gray-50 text-gray-700 border-gray-200';
+            default: return 'bg-gray-50 text-gray-700 border-gray-200';
         }
     };
 
@@ -178,6 +210,88 @@ export function NFTFilterSidebar({
     };
 
     const activeFiltersCount = filters.categories.length + filters.rarities.length;
+
+    // Sammle alle aktiven Filter als Chips
+    const getActiveFilterChips = () => {
+        const chips: { type: string; value: string; label: string }[] = [];
+
+        // Kategorien
+        filters.categories.forEach(cat => {
+            chips.push({ type: 'category', value: cat, label: cat });
+        });
+
+        // Rarities
+        filters.rarities.forEach(rarity => {
+            chips.push({ type: 'rarity', value: rarity, label: rarity });
+        });
+
+        // Preis (nur anzeigen wenn tatsächlich Werte gesetzt)
+        const hasPrice = (filters.priceMin !== undefined && filters.priceMin > 0) ||
+            (filters.priceMax !== undefined && filters.priceMax > 0);
+        if (hasPrice) {
+            const min = filters.priceMin ?? 0;
+            const max = filters.priceMax ?? '∞';
+            chips.push({ type: 'price', value: 'price', label: `${min} - ${max} ETH` });
+        }
+
+        // Rating (nur anzeigen wenn > 0)
+        if (filters.minRating !== undefined && filters.minRating > 0) {
+            chips.push({ type: 'rating', value: 'rating', label: `≥ ${filters.minRating} ⭐` });
+        }
+
+        // Stats (nur anzeigen wenn > 0)
+        if (filters.minViews !== undefined && filters.minViews > 0) {
+            chips.push({ type: 'views', value: 'views', label: `≥ ${filters.minViews} Views` });
+        }
+        if (filters.minLikes !== undefined && filters.minLikes > 0) {
+            chips.push({ type: 'likes', value: 'likes', label: `≥ ${filters.minLikes} Likes` });
+        }
+        if (filters.minWatchlistCount !== undefined && filters.minWatchlistCount > 0) {
+            chips.push({ type: 'watchlist', value: 'watchlist', label: `≥ ${filters.minWatchlistCount} Watchlist` });
+        }
+
+        // Search
+        if (filters.searchTerm) {
+            chips.push({ type: 'search', value: 'search', label: `"${filters.searchTerm}"` });
+        }
+
+        return chips;
+    };
+
+    const removeFilterChip = (chip: { type: string; value: string }) => {
+        switch (chip.type) {
+            case 'category':
+                toggleCategory(chip.value);
+                break;
+            case 'rarity':
+                toggleRarity(chip.value);
+                break;
+            case 'price':
+                setLocalNumericFilters(prev => ({ ...prev, priceMin: undefined, priceMax: undefined }));
+                updateFilters({ priceMin: undefined, priceMax: undefined });
+                break;
+            case 'rating':
+                setLocalNumericFilters(prev => ({ ...prev, minRating: undefined }));
+                updateFilters({ minRating: undefined });
+                break;
+            case 'views':
+                setLocalNumericFilters(prev => ({ ...prev, minViews: undefined }));
+                updateFilters({ minViews: undefined });
+                break;
+            case 'likes':
+                setLocalNumericFilters(prev => ({ ...prev, minLikes: undefined }));
+                updateFilters({ minLikes: undefined });
+                break;
+            case 'watchlist':
+                setLocalNumericFilters(prev => ({ ...prev, minWatchlistCount: undefined }));
+                updateFilters({ minWatchlistCount: undefined });
+                break;
+            case 'search':
+                setLocalSearchTerm('');
+                updateFilters({ searchTerm: '' });
+                break;
+        }
+    };
 
     // Öffne Panel bei Hover über Filter Button (nur Desktop)
     const handleFilterButtonMouseEnter = () => {
@@ -265,15 +379,16 @@ export function NFTFilterSidebar({
                     >
                         {option.icon}
 
-                        {/* Pfeil dreht sich wie Uhrzeiger um das Icon - rechts rum bei asc?desc, links rum bei desc?asc */}
+                        {/* Pfeil rotiert basierend auf tatsächlicher Sort Direction */}
                         {currentSort.field === option.field && (
                             <div
                                 className="absolute top-1 left-1/2 -translate-x-1/2 transition-transform duration-500"
                                 style={{
                                     transformOrigin: 'center 20px',
-                                    transform: `translateX(-50%) rotate(${fieldRotations[option.field] || 0}deg)`
+                                    transform: `translateX(-50%) rotate(${currentSort.direction === 'desc' ? 180 : 0}deg)`
                                 }}
                             >
+                                {/* Pfeil: desc=180°=▲, asc=0°=▼ */}
                                 <div className="w-0 h-0 border-l-[7.5px] border-l-transparent border-r-[7.5px] border-r-transparent border-b-[8px] border-b-white"></div>
                             </div>
                         )}
@@ -300,86 +415,60 @@ export function NFTFilterSidebar({
                         {filteredCount} von {totalItems} NFTs
                     </p> 
                     */}
-                    {/* Fixed height container to prevent layout shifts */}
-                    <div className="h-6 flex items-center">
-                        {activeFiltersCount > 0 ? (
-                            <button
-                                onClick={clearAllFilters}
-                                className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-opacity"
-                            >
-                                Alle Filter zurücksetzen
-                            </button>
-                        ) : (
-                            <span className="text-xs text-gray-500">
-                                Keine Filter gesetzt
-                            </span>
+                    {/* Active Filter Chips */}
+                    <div className="flex flex-wrap gap-2 items-start">
+                        {getActiveFilterChips().map((chip, index) => {
+                            // Get chip-specific styling
+                            const getChipStyle = () => {
+                                if (chip.type === 'rarity') {
+                                    return getRarityColor(chip.value);
+                                }
+                                switch (chip.type) {
+                                    case 'price':
+                                        return 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100';
+                                    case 'likes':
+                                        return 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100';
+                                    case 'views':
+                                        return 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200';
+                                    case 'rating':
+                                        return 'bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100';
+                                    case 'watchlist':
+                                        return 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100';
+                                    case 'search':
+                                        return 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100';
+                                    case 'category':
+                                        return 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100';
+                                    default:
+                                        return 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100';
+                                }
+                            };
+
+                            return (
+                                <button
+                                    key={`${chip.type}-${chip.value}-${index}`}
+                                    onClick={() => removeFilterChip(chip)}
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full transition-colors group flex-shrink-0 capitalize ${getChipStyle()}`}
+                                >
+                                    <span className="max-w-[120px] truncate">{chip.label}</span>
+                                    <svg
+                                        className="w-3 h-3 group-hover:opacity-70"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            );
+                        })}
+                        {getActiveFilterChips().length === 0 && (
+                            <span className="text-xs text-gray-400 italic">Keine Filter aktiv</span>
                         )}
                     </div>
                 </div>
 
                 {/* Content */}
                 <div className="p-4 pt-8 space-y-3">
-                    {/* Search - Ganz oben, immer sichtbar, kein Collapse */}
-                    <div className="mb-4">
-                        <label className="text-sm font-semibold text-gray-900 mb-2 block">Suche</label>
-                        <div className="relative">
-                            <input
-                                type="text"
-                                placeholder="NFT Name suchen..."
-                                value={filters.searchTerm || ''}
-                                onChange={(e) => updateFilters({ searchTerm: e.target.value })}
-                                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm"
-                            />
-                            <svg
-                                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                        </div>
-                    </div>
-
-                    {/* Divider nach Search */}
-                    <div className="border-t border-gray-200"></div>
-
-                    {/* Kategorien - Standardmäßig offen */}
-                    <div className="border border-gray-200 rounded-lg overflow-hidden">
-                        <button
-                            onClick={() => toggleSection('categories')}
-                            className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
-                        >
-                            <h4 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                                Kategorien
-                            </h4>
-                            <svg
-                                className={`w-5 h-5 transition-transform ${expandedSections.categories ? 'rotate-180' : ''}`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </button>
-                        {expandedSections.categories && (
-                            <div className="p-3 space-y-2 bg-white">
-                                {AVAILABLE_CATEGORIES.map((category) => (
-                                    <button
-                                        key={category}
-                                        onClick={() => toggleCategory(category)}
-                                        className={`w-full px-4 py-2.5 rounded-lg text-left transition-all text-sm ${filters.categories.includes(category)
-                                            ? 'bg-blue-500 text-white shadow-md'
-                                            : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                                            }`}
-                                    >
-                                        <span className="font-medium">{category}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
                     {/* Preis Filter */}
                     <div className="border border-gray-200 rounded-lg overflow-hidden">
                         <button
@@ -404,8 +493,8 @@ export function NFTFilterSidebar({
                                         type="number"
                                         placeholder="0.0"
                                         step="0.01"
-                                        value={filters.priceMin || ''}
-                                        onChange={(e) => updateFilters({ priceMin: e.target.value ? parseFloat(e.target.value) : undefined })}
+                                        value={localNumericFilters.priceMin ?? ''}
+                                        onChange={(e) => setLocalNumericFilters(prev => ({ ...prev, priceMin: e.target.value ? parseFloat(e.target.value) : undefined }))}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
                                 </div>
@@ -415,8 +504,8 @@ export function NFTFilterSidebar({
                                         type="number"
                                         placeholder="100.0"
                                         step="0.01"
-                                        value={filters.priceMax || ''}
-                                        onChange={(e) => updateFilters({ priceMax: e.target.value ? parseFloat(e.target.value) : undefined })}
+                                        value={localNumericFilters.priceMax ?? ''}
+                                        onChange={(e) => setLocalNumericFilters(prev => ({ ...prev, priceMax: e.target.value ? parseFloat(e.target.value) : undefined }))}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
                                 </div>
@@ -449,8 +538,8 @@ export function NFTFilterSidebar({
                                     min="0"
                                     max="5"
                                     step="0.5"
-                                    value={filters.minRating || ''}
-                                    onChange={(e) => updateFilters({ minRating: e.target.value ? parseFloat(e.target.value) : undefined })}
+                                    value={localNumericFilters.minRating ?? ''}
+                                    onChange={(e) => setLocalNumericFilters(prev => ({ ...prev, minRating: e.target.value ? parseFloat(e.target.value) : undefined }))}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
@@ -480,8 +569,8 @@ export function NFTFilterSidebar({
                                     <input
                                         type="number"
                                         placeholder="0"
-                                        value={filters.minViews || ''}
-                                        onChange={(e) => updateFilters({ minViews: e.target.value ? parseInt(e.target.value) : undefined })}
+                                        value={localNumericFilters.minViews ?? ''}
+                                        onChange={(e) => setLocalNumericFilters(prev => ({ ...prev, minViews: e.target.value ? parseInt(e.target.value) : undefined }))}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
                                 </div>
@@ -490,8 +579,8 @@ export function NFTFilterSidebar({
                                     <input
                                         type="number"
                                         placeholder="0"
-                                        value={filters.minLikes || ''}
-                                        onChange={(e) => updateFilters({ minLikes: e.target.value ? parseInt(e.target.value) : undefined })}
+                                        value={localNumericFilters.minLikes ?? ''}
+                                        onChange={(e) => setLocalNumericFilters(prev => ({ ...prev, minLikes: e.target.value ? parseInt(e.target.value) : undefined }))}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
                                 </div>
@@ -500,8 +589,8 @@ export function NFTFilterSidebar({
                                     <input
                                         type="number"
                                         placeholder="0"
-                                        value={filters.minWatchlistCount || ''}
-                                        onChange={(e) => updateFilters({ minWatchlistCount: e.target.value ? parseInt(e.target.value) : undefined })}
+                                        value={localNumericFilters.minWatchlistCount ?? ''}
+                                        onChange={(e) => setLocalNumericFilters(prev => ({ ...prev, minWatchlistCount: e.target.value ? parseInt(e.target.value) : undefined }))}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
                                 </div>
@@ -541,217 +630,6 @@ export function NFTFilterSidebar({
                                         </button>
                                     ))}
                                 </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Collections */}
-                    <div className="border border-gray-200 rounded-lg overflow-hidden">
-                        <button
-                            onClick={() => toggleSection('collections')}
-                            className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
-                        >
-                            <h4 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                                Collections
-                            </h4>
-                            <svg
-                                className={`w-5 h-5 transition-transform ${expandedSections.collections ? 'rotate-180' : ''}`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </button>
-                        {expandedSections.collections && (
-                            <div className="p-3 space-y-2 bg-white">
-                                <p className="text-xs text-gray-500 mb-3">Collection-Sortierung</p>
-
-                                {/* Collection-spezifische Sortieroptionen */}
-                                <button
-                                    onClick={() => updateSort('price')}
-                                    className={`w-full px-4 py-2 rounded-lg text-left transition-all duration-200 flex items-center justify-between border ${currentSort.field === 'price'
-                                        ? 'bg-purple-500 text-white border-purple-600 shadow-md'
-                                        : 'bg-white/50 backdrop-blur-sm text-gray-700 border-gray-200 hover:bg-white/80 hover:border-gray-300 hover:scale-[1.02] shadow-sm'
-                                        }`}
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <svg className={`w-5 h-5 ${currentSort.field === 'price' ? 'text-white' : 'text-green-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        <span className="text-sm font-medium">Total Value</span>
-                                    </span>
-                                    {currentSort.field === 'price' && (
-                                        <span className="text-lg">
-                                            {currentSort.direction === 'desc' ? '?' : '?'}
-                                        </span>
-                                    )}
-                                </button>
-
-                                <button
-                                    onClick={() => updateSort('created')}
-                                    className={`w-full px-4 py-2 rounded-lg text-left transition-all duration-200 flex items-center justify-between border ${currentSort.field === 'created'
-                                        ? 'bg-purple-500 text-white border-purple-600 shadow-md'
-                                        : 'bg-white/50 backdrop-blur-sm text-gray-700 border-gray-200 hover:bg-white/80 hover:border-gray-300 hover:scale-[1.02] shadow-sm'
-                                        }`}
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <svg className={`w-5 h-5 ${currentSort.field === 'created' ? 'text-white' : 'text-indigo-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                                        </svg>
-                                        <span className="text-sm font-medium">Total Supply</span>
-                                    </span>
-                                    {currentSort.field === 'created' && (
-                                        <span className="text-lg">
-                                            {currentSort.direction === 'desc' ? '?' : '?'}
-                                        </span>
-                                    )}
-                                </button>
-
-                                <button
-                                    onClick={() => updateSort('rating')}
-                                    className={`w-full px-4 py-2 rounded-lg text-left transition-all duration-200 flex items-center justify-between border ${currentSort.field === 'rating'
-                                        ? 'bg-purple-500 text-white border-purple-600 shadow-md'
-                                        : 'bg-white/50 backdrop-blur-sm text-gray-700 border-gray-200 hover:bg-white/80 hover:border-gray-300 hover:scale-[1.02] shadow-sm'
-                                        }`}
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <svg className={`w-5 h-5 ${currentSort.field === 'rating' ? 'text-white' : 'text-blue-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                        </svg>
-                                        <span className="text-sm font-medium">Listed</span>
-                                    </span>
-                                    {currentSort.field === 'rating' && (
-                                        <span className="text-lg">
-                                            {currentSort.direction === 'desc' ? '?' : '?'}
-                                        </span>
-                                    )}
-                                </button>
-
-                                <button
-                                    onClick={() => updateSort('views')}
-                                    className={`w-full px-4 py-2 rounded-lg text-left transition-all duration-200 flex items-center justify-between border ${currentSort.field === 'views'
-                                        ? 'bg-purple-500 text-white border-purple-600 shadow-md'
-                                        : 'bg-white/50 backdrop-blur-sm text-gray-700 border-gray-200 hover:bg-white/80 hover:border-gray-300 hover:scale-[1.02] shadow-sm'
-                                        }`}
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <svg className={`w-5 h-5 ${currentSort.field === 'views' ? 'text-white' : 'text-orange-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                        </svg>
-                                        <span className="text-sm font-medium">Unlisted</span>
-                                    </span>
-                                    {currentSort.field === 'views' && (
-                                        <span className="text-lg">
-                                            {currentSort.direction === 'desc' ? '?' : '?'}
-                                        </span>
-                                    )}
-                                </button>
-
-                                <button
-                                    onClick={() => updateSort('name')}
-                                    className={`w-full px-4 py-2 rounded-lg text-left transition-all duration-200 flex items-center justify-between border ${currentSort.field === 'name'
-                                        ? 'bg-purple-500 text-white border-purple-600 shadow-md'
-                                        : 'bg-white/50 backdrop-blur-sm text-gray-700 border-gray-200 hover:bg-white/80 hover:border-gray-300 hover:scale-[1.02] shadow-sm'
-                                        }`}
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <svg className={`w-5 h-5 ${currentSort.field === 'name' ? 'text-white' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-                                        </svg>
-                                        <span className="text-sm font-medium">Name</span>
-                                    </span>
-                                    {currentSort.field === 'name' && (
-                                        <span className="text-lg">
-                                            {currentSort.direction === 'desc' ? '?' : '?'}
-                                        </span>
-                                    )}
-                                </button>                                {/* Divider */}
-                                <div className="border-t border-gray-200 my-3"></div>
-
-                                <p className="text-xs text-gray-500 mb-2">Collection Stats Filter</p>
-
-                                {/* Min Supply Filter */}
-                                <div>
-                                    <label className="text-xs text-gray-600 mb-1 block">Min Supply</label>
-                                    <input
-                                        type="number"
-                                        placeholder="0"
-                                        min="0"
-                                        value={filters.minSupply || ''}
-                                        onChange={(e) => updateFilters({ minSupply: e.target.value ? parseInt(e.target.value) : undefined })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
-
-                                {/* Min Listed Items Filter */}
-                                <div>
-                                    <label className="text-xs text-gray-600 mb-1 block">Min Listed Items</label>
-                                    <input
-                                        type="number"
-                                        placeholder="0"
-                                        min="0"
-                                        value={filters.minListedItems || ''}
-                                        onChange={(e) => updateFilters({ minListedItems: e.target.value ? parseInt(e.target.value) : undefined })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
-
-                                {/* Min Floor Price Filter */}
-                                <div>
-                                    <label className="text-xs text-gray-600 mb-1 block">Min Floor Price (ETH)</label>
-                                    <input
-                                        type="number"
-                                        placeholder="0.0"
-                                        step="0.01"
-                                        min="0"
-                                        value={filters.minFloorPrice || ''}
-                                        onChange={(e) => updateFilters({ minFloorPrice: e.target.value ? parseFloat(e.target.value) : undefined })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Sortierung */}
-                    <div className="border border-gray-200 rounded-lg overflow-hidden">
-                        <button
-                            onClick={() => toggleSection('sort')}
-                            className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
-                        >
-                            <h4 className="text-base font-semibold text-gray-900">Sortierung</h4>
-                            <svg
-                                className={`w-5 h-5 transition-transform ${expandedSections.sort ? 'rotate-180' : ''}`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </button>
-                        {expandedSections.sort && (
-                            <div className="p-3 space-y-2 bg-white">
-                                {SORT_OPTIONS.map((option) => (
-                                    <button
-                                        key={option.field}
-                                        onClick={() => updateSort(option.field)}
-                                        className={`w-full px-4 py-2 rounded-lg text-left transition-all flex items-center justify-between ${currentSort.field === option.field
-                                            ? 'bg-blue-500 text-white'
-                                            : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                                            }`}
-                                    >
-                                        <span className="flex items-center gap-2">
-                                            {option.icon}
-                                            <span className="text-sm">{option.label}</span>
-                                        </span>
-                                        {currentSort.field === option.field && (
-                                            <span className="text-lg">
-                                                {currentSort.direction === 'desc' ? '?' : '?'}
-                                            </span>
-                                        )}
-                                    </button>
-                                ))}
                             </div>
                         )}
                     </div>

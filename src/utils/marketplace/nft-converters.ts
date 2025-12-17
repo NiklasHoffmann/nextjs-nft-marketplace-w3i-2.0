@@ -115,7 +115,7 @@ export function convertToFilterableItems(
         desiredContractAddress: item.desiredContractAddress,
         desiredTokenId: item.desiredTokenId,
 
-        // NFT Metadata
+        // NFT Metadata (flattened for filtering)
         name: item.name,
         symbol: item.symbol,
         category: item.category,
@@ -135,6 +135,11 @@ export function convertToFilterableItems(
 
         // Display
         imageUrl: item.imageUrl,
+
+        // Preserve nested objects for NFTCard compatibility
+        metadata: item.metadata,
+        contract: item.contract,
+        insights: item.insights,
     }));
 }
 

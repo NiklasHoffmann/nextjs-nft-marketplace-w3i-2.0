@@ -16,6 +16,7 @@ export default function Navbar() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const dropdownRef = useRef<HTMLDivElement>(null);
     const mobileMenuRef = useRef<HTMLDivElement>(null);
     const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
@@ -33,29 +34,41 @@ export default function Navbar() {
     useEffect(() => {
         const search = searchParams?.get('search') || '';
         setSearchTerm(search);
+        setDebouncedSearchTerm(search);
     }, [searchParams]);
 
-    // Handle search
-    const handleSearch = (value: string) => {
-        setSearchTerm(value);
+    // Debounce search term (500ms delay)
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+        }, 500);
 
-        // Only navigate to home if not already there
-        if (pathname !== '/') {
-            router.push(`/?search=${encodeURIComponent(value)}`);
-        } else {
-            // Update URL without navigation
-            const params = new URLSearchParams(searchParams?.toString() || '');
-            if (value) {
-                params.set('search', value);
-            } else {
-                params.delete('search');
-            }
-            router.replace(`/?${params.toString()}`, { scroll: false });
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    // Apply search when debounced term changes
+    useEffect(() => {
+        // Don't navigate if debounced term matches URL (prevents loop)
+        const currentUrlSearch = searchParams?.get('search') || '';
+        if (debouncedSearchTerm === currentUrlSearch) return;
+
+        // Navigate to marketplace with search parameter
+        const params = new URLSearchParams();
+        if (debouncedSearchTerm) {
+            params.set('search', debouncedSearchTerm);
         }
-    };
+
+        if (pathname !== '/marketplace') {
+            // Navigate to marketplace with search
+            router.push(`/marketplace?${params.toString()}`);
+        } else {
+            // Update URL without navigation if already on marketplace
+            router.replace(`/marketplace?${params.toString()}`, { scroll: false });
+        }
+    }, [debouncedSearchTerm, pathname, router, searchParams]);
 
     const clearSearch = () => {
-        handleSearch('');
+        setSearchTerm('');
     };
 
     // Wallet connection state - only after mounted
@@ -150,19 +163,18 @@ export default function Navbar() {
                 {/* Spacer for mobile to push button to the right */}
                 <div className="flex-1 md:hidden"></div>
 
-                {/* Center Searchbar - Desktop only - TEMPORARILY DISABLED */}
+                {/* Center Searchbar - Desktop only */}
                 <div className="flex-1 hidden md:flex justify-center">
-                    <div className="relative w-full max-w-md opacity-50 pointer-events-none">
+                    <div className="relative w-full max-w-md">
                         <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                         <input
                             type="text"
-                            placeholder="Suche NFTs... (Bald verfügbar)"
+                            placeholder="Search NFTs..."
                             value={searchTerm}
-                            onChange={(e) => handleSearch(e.target.value)}
-                            className="w-full px-4 pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-not-allowed bg-gray-50"
-                            disabled
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full px-4 pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                         />
                         {searchTerm && (
                             <button
@@ -210,24 +222,6 @@ export default function Navbar() {
                             title="Bald verfügbar"
                         >
                             Sell
-                        </button>
-                    )}
-
-                    {/* Trade Link */}
-                    {isAdmin ? (
-                        <button
-                            onClick={() => alert('Trade-Funktion wird implementiert')}
-                            className="text-gray-700 hover:text-blue-600 font-medium transition-colors cursor-pointer"
-                        >
-                            Trade
-                        </button>
-                    ) : (
-                        <button
-                            disabled
-                            className="text-gray-400 font-medium cursor-not-allowed opacity-50"
-                            title="Bald verfügbar"
-                        >
-                            Trade
                         </button>
                     )}
 
@@ -458,7 +452,7 @@ export default function Navbar() {
                                     type="text"
                                     placeholder="Suche NFTs... (Bald verfügbar)"
                                     value={searchTerm}
-                                    onChange={(e) => handleSearch(e.target.value)}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
                                     className="w-full px-4 pl-11 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-not-allowed bg-gray-50"
                                     disabled
                                 />
@@ -510,32 +504,6 @@ export default function Navbar() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                                     </svg>
                                     <span className="text-gray-400 font-medium">Sell (Bald verfügbar)</span>
-                                </button>
-                            )}
-
-                            {/* Trade Link */}
-                            {isAdmin ? (
-                                <button
-                                    onClick={() => {
-                                        setIsMobileMenuOpen(false);
-                                        alert('Trade-Funktion wird implementiert');
-                                    }}
-                                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors border border-blue-200"
-                                >
-                                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                    </svg>
-                                    <span className="text-blue-700 font-medium">Trade</span>
-                                </button>
-                            ) : (
-                                <button
-                                    disabled
-                                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg opacity-50 cursor-not-allowed"
-                                >
-                                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                    </svg>
-                                    <span className="text-gray-400 font-medium">Trade (Bald verfügbar)</span>
                                 </button>
                             )}
 

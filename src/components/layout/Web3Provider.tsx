@@ -8,7 +8,6 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { ReactNode, useState, useEffect } from 'react'
 import { ApolloProvider } from '@apollo/client'
 import apolloClient from '@/config/apolloClient'
-import { ApolloErrorBoundary } from './ErrorBoundary'
 
 export default function Web3Provider({ children }: { children: ReactNode }) {
     const [mounted, setMounted] = useState(false)
@@ -53,16 +52,14 @@ export default function Web3Provider({ children }: { children: ReactNode }) {
         <WagmiProvider config={wagmiConfig}>
             <QueryClientProvider client={queryClient}>
                 <ApolloProvider client={apolloClient}>
-                    <ApolloErrorBoundary>
-                        <RainbowKitProvider
-                            theme={darkTheme()}
-                            modalSize="compact"
-                            showRecentTransactions={true}
-                            initialChain={wagmiConfig.chains[0]} // Setzt Sepolia als Standard
-                        >
-                            {children}
-                        </RainbowKitProvider>
-                    </ApolloErrorBoundary>
+                    <RainbowKitProvider
+                        theme={darkTheme()}
+                        modalSize="compact"
+                        showRecentTransactions={true}
+                        initialChain={wagmiConfig.chains[0]} // Setzt Sepolia als Standard
+                    >
+                        {children}
+                    </RainbowKitProvider>
                 </ApolloProvider>
                 {/* React Query Devtools only in development */}
                 {process.env.NODE_ENV !== "production" && <ReactQueryDevtools initialIsOpen={false} />}

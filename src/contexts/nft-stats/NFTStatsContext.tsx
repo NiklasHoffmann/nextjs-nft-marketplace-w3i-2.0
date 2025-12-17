@@ -1,24 +1,20 @@
 /**
- * NFTStatsContext - MINIMAL, RELIABLE Real-time NFT Statistics
+ * NFTStatsContext - EINFACHE VERSION MIT GETEILTEM CACHE
  * 
- * Uses simple useState with a Map-like structure.
- * Key insight: The context value object is stable, only the data inside changes.
+ * Problem gelöst: Mehrere Komponenten nutzen den Hook für das gleiche NFT.
+ * Wenn eine Komponente liked, müssen alle anderen davon erfahren.
+ * 
+ * Lösung: 
+ * 1. Globaler Cache für Stats (außerhalb React)
+ * 2. Einfaches Event-System: Bei Update → alle Listener benachrichtigen
+ * 3. Listener registrieren sich beim Mount, deregistrieren beim Unmount
  */
 
 'use client';
 
-import React, {
-    createContext,
-    useContext,
-    useState,
-    useCallback,
-    useEffect,
-    useRef,
-    ReactNode
-} from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 
 // ===== TYPES =====
-
 export interface NFTStats {
     viewCount: number;
     likeCount: number;
@@ -33,410 +29,435 @@ export interface UserInteractionState {
     userRating: number | null;
 }
 
-// ===== SIMPLE GLOBAL STORE =====
-// This lives outside React to avoid re-render issues
+// ===== GLOBALER CACHE (außerhalb React, aber einfach) =====
+const statsCache = new Map<string, NFTStats>();
+const interactionsCache = new Map<string, UserInteractionState>();
+const listeners = new Map<string, Set<() => void>>();
 
-interface StoreEntry {
-    stats: NFTStats | null;
-    userInteractions: Map<string, UserInteractionState>;
-    loading: boolean;
+// Cache-Timestamps: Daten sind 30 Sekunden gültig
+const statsCacheTimestamps = new Map<string, number>();
+const interactionsCacheTimestamps = new Map<string, number>();
+const CACHE_TTL = 30000; // 30 Sekunden
+
+// Request Queue für Batch Loading (verhindert Rate Limits)
+const pendingStatsRequests = new Map<string, Promise<void>>();
+const pendingInteractionsRequests = new Map<string, Promise<void>>();
+
+function isCacheValid(key: string, timestampMap: Map<string, number>): boolean {
+    const timestamp = timestampMap.get(key);
+    if (!timestamp) return false;
+    return Date.now() - timestamp < CACHE_TTL;
 }
 
-const store = new Map<string, StoreEntry>();
-const listeners = new Set<() => void>();
+function getCacheKey(contractAddress: string, tokenId: string, userAddress?: string) {
+    return userAddress
+        ? `${contractAddress.toLowerCase()}-${tokenId}-${userAddress.toLowerCase()}`
+        : `${contractAddress.toLowerCase()}-${tokenId}`;
+}
 
-function getKey(contractAddress: string, tokenId: string): string {
+function getStatsKey(contractAddress: string, tokenId: string) {
     return `${contractAddress.toLowerCase()}-${tokenId}`;
 }
 
-function getEntry(key: string): StoreEntry {
-    if (!store.has(key)) {
-        store.set(key, { stats: null, userInteractions: new Map(), loading: false });
-    }
-    return store.get(key)!;
-}
-
-function notifyListeners() {
-    listeners.forEach(listener => listener());
-}
-
-// ===== API FUNCTIONS =====
-
-async function fetchStats(contractAddress: string, tokenId: string): Promise<NFTStats | null> {
-    try {
-        const res = await fetch(`/api/nft/stats?contractAddress=${contractAddress}&tokenId=${tokenId}`);
-        if (!res.ok) {
-            return null;
-        }
-        const result = await res.json();
-        const data = result.data || result;
-        return {
-            viewCount: data.viewCount || 0,
-            likeCount: data.likeCount || 0,
-            watchlistCount: data.watchlistCount || 0,
-            ratingCount: data.ratingCount || 0,
-            averageRating: data.averageRating || 0
-        };
-    } catch (e) {
-        console.error('[NFTStatsContext] Error fetching stats:', e);
-        return null;
+function notifyListeners(key: string) {
+    const keyListeners = listeners.get(key);
+    if (keyListeners) {
+        keyListeners.forEach(listener => listener());
     }
 }
 
-async function fetchUserInteractions(contractAddress: string, tokenId: string, userAddress: string): Promise<UserInteractionState | null> {
-    try {
-        const res = await fetch(`/api/user/interactions?contractAddress=${contractAddress}&tokenId=${tokenId}&userId=${userAddress}`);
-        if (!res.ok) {
-            return null;
-        }
-        const result = await res.json();
-        const data = result.data || result;
-        return {
-            isFavorited: data.isFavorite || false,
-            isWatchlisted: data.isWatchlisted || false,
-            userRating: data.rating ?? null
-        };
-    } catch (e) {
-        console.error('[NFTStatsContext] Error fetching user interactions:', e);
-        return null;
+function subscribe(key: string, listener: () => void) {
+    if (!listeners.has(key)) {
+        listeners.set(key, new Set());
     }
+    listeners.get(key)!.add(listener);
+    return () => {
+        listeners.get(key)?.delete(listener);
+    };
 }
 
-// ===== STORE ACTIONS =====
-
-async function loadStats(contractAddress: string, tokenId: string): Promise<void> {
-    const key = getKey(contractAddress, tokenId);
-    const entry = getEntry(key);
-
-    if (entry.loading || entry.stats) {
-        return;
-    }
-
-    entry.loading = true;
-    const stats = await fetchStats(contractAddress, tokenId);
-    entry.stats = stats;
-    entry.loading = false;
-    notifyListeners();
-}
-
-async function loadUserInteractions(contractAddress: string, tokenId: string, userAddress: string): Promise<void> {
-    const key = getKey(contractAddress, tokenId);
-    const entry = getEntry(key);
-    const userKey = userAddress.toLowerCase();
-
-    if (entry.userInteractions.has(userKey)) {
-        return;
-    }
-
-    const interactions = await fetchUserInteractions(contractAddress, tokenId, userAddress);
-    if (interactions) {
-        entry.userInteractions.set(userKey, interactions);
-        notifyListeners();
-    }
-}
-
-async function toggleFavorite(contractAddress: string, tokenId: string, userAddress: string): Promise<void> {
-    const key = getKey(contractAddress, tokenId);
-    const entry = getEntry(key);
-    const userKey = userAddress.toLowerCase();
-
-    try {
-        const res = await fetch('/api/user/interactions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contractAddress,
-                tokenId,
-                userId: userAddress,
-                isFavorite: true
-            })
-        });
-
-        if (res.ok) {
-            const result = await res.json();
-            const responseData = result.data || result;
-            const data = responseData.data || responseData;
-            const stats = responseData.stats;
-
-            if (stats) {
-                entry.stats = {
-                    viewCount: stats.viewCount || 0,
-                    likeCount: stats.likeCount || 0,
-                    watchlistCount: stats.watchlistCount || 0,
-                    ratingCount: stats.ratingCount || 0,
-                    averageRating: stats.averageRating || 0
-                };
-            }
-            if (data) {
-                entry.userInteractions.set(userKey, {
-                    isFavorited: data.isFavorite || false,
-                    isWatchlisted: data.isWatchlisted || false,
-                    userRating: data.rating ?? null
-                });
-            }
-            notifyListeners();
-        }
-    } catch (e) {
-        console.error('[NFTStatsContext] toggleFavorite error:', e);
-    }
-}
-
-async function toggleWatchlist(contractAddress: string, tokenId: string, userAddress: string): Promise<void> {
-    const key = getKey(contractAddress, tokenId);
-    const entry = getEntry(key);
-    const userKey = userAddress.toLowerCase();
-
-    try {
-        const res = await fetch('/api/user/interactions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contractAddress,
-                tokenId,
-                userId: userAddress,
-                isWatchlisted: true
-            })
-        });
-
-        if (res.ok) {
-            const result = await res.json();
-            const responseData = result.data || result;
-            const data = responseData.data || responseData;
-            const stats = responseData.stats;
-
-            if (stats) {
-                entry.stats = {
-                    viewCount: stats.viewCount || 0,
-                    likeCount: stats.likeCount || 0,
-                    watchlistCount: stats.watchlistCount || 0,
-                    ratingCount: stats.ratingCount || 0,
-                    averageRating: stats.averageRating || 0
-                };
-            }
-            if (data) {
-                entry.userInteractions.set(userKey, {
-                    isFavorited: data.isFavorite || false,
-                    isWatchlisted: data.isWatchlisted || false,
-                    userRating: data.rating ?? null
-                });
-            }
-            notifyListeners();
-        }
-    } catch (e) {
-        console.error('[NFTStatsContext] toggleWatchlist error:', e);
-    }
-}
-
-async function setUserRating(contractAddress: string, tokenId: string, userAddress: string, rating: number): Promise<void> {
-    const key = getKey(contractAddress, tokenId);
-    const entry = getEntry(key);
-    const userKey = userAddress.toLowerCase();
-
-    try {
-        const res = await fetch('/api/user/interactions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contractAddress,
-                tokenId,
-                userId: userAddress,
-                rating
-            })
-        });
-
-        if (res.ok) {
-            const result = await res.json();
-            const responseData = result.data || result;
-            const data = responseData.data || responseData;
-            const stats = responseData.stats;
-
-            if (stats) {
-                entry.stats = {
-                    viewCount: stats.viewCount || 0,
-                    likeCount: stats.likeCount || 0,
-                    watchlistCount: stats.watchlistCount || 0,
-                    ratingCount: stats.ratingCount || 0,
-                    averageRating: stats.averageRating || 0
-                };
-            }
-            if (data) {
-                entry.userInteractions.set(userKey, {
-                    isFavorited: data.isFavorite || false,
-                    isWatchlisted: data.isWatchlisted || false,
-                    userRating: data.rating ?? null
-                });
-            }
-            notifyListeners();
-        }
-    } catch (e) {
-        console.error('[NFTStatsContext] setUserRating error:', e);
-    }
-}
-
-async function recordView(contractAddress: string, tokenId: string): Promise<void> {
-    const key = getKey(contractAddress, tokenId);
-    const entry = getEntry(key);
-
-    try {
-        const res = await fetch('/api/nft/stats', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contractAddress, tokenId })
-        });
-
-        if (res.ok) {
-            const data = await res.json();
-            if (data.stats) {
-                entry.stats = {
-                    viewCount: data.stats.viewCount || 0,
-                    likeCount: data.stats.likeCount || 0,
-                    watchlistCount: data.stats.watchlistCount || 0,
-                    ratingCount: data.stats.ratingCount || 0,
-                    averageRating: data.stats.averageRating || 0
-                };
-                notifyListeners();
-            }
-        }
-    } catch (e) {
-        console.error('recordView error:', e);
-    }
-}
-
-// ===== CONTEXT =====
-
-interface NFTStatsContextType {
-    version: number;
-}
-
-const NFTStatsContext = createContext<NFTStatsContextType>({ version: 0 });
+// ===== CONTEXT (nur für Provider-Check) =====
+const NFTStatsContext = createContext<boolean>(false);
 
 export function NFTStatsProvider({ children }: { children: ReactNode }) {
-    const [version, setVersion] = useState(0);
-
-    useEffect(() => {
-        const listener = () => setVersion(v => v + 1);
-        listeners.add(listener);
-        return () => { listeners.delete(listener); };
-    }, []);
-
     return (
-        <NFTStatsContext.Provider value={{ version }}>
+        <NFTStatsContext.Provider value={true}>
             {children}
         </NFTStatsContext.Provider>
     );
 }
 
-// ===== HOOKS =====
+// ===== DER EINZIGE HOOK =====
+export function useNFTStats(contractAddress: string, tokenId: string, userAddress?: string) {
+    const statsKey = getStatsKey(contractAddress, tokenId);
+    const interactionsKey = userAddress ? getCacheKey(contractAddress, tokenId, userAddress) : null;
 
-/**
- * Main hook for NFT stats - automatically reactive
- */
-export function useNFTUserStats(contractAddress: string, tokenId: string, userAddress?: string) {
-    const { version } = useContext(NFTStatsContext);
-    const loadedRef = useRef(false);
-    const userLoadedRef = useRef<string | null>(null);
+    // Trigger für Re-Renders wenn Cache sich ändert
+    const [, forceUpdate] = useState(0);
+    const [loading, setLoading] = useState(true);
 
-    const key = getKey(contractAddress, tokenId);
-    const entry = getEntry(key);
-
-    // Auto-load stats once
+    // Subscribe to cache updates
     useEffect(() => {
-        if (contractAddress && tokenId && !loadedRef.current) {
-            loadedRef.current = true;
-            loadStats(contractAddress, tokenId);
-        }
-    }, [contractAddress, tokenId]);
+        if (!contractAddress || !tokenId) return;
 
-    // Auto-load user interactions when user changes
-    useEffect(() => {
-        if (contractAddress && tokenId && userAddress && userLoadedRef.current !== userAddress) {
-            userLoadedRef.current = userAddress;
-            loadUserInteractions(contractAddress, tokenId, userAddress);
-        }
-    }, [contractAddress, tokenId, userAddress]);
+        const unsubStats = subscribe(statsKey, () => forceUpdate(v => v + 1));
+        const unsubInteractions = interactionsKey
+            ? subscribe(interactionsKey, () => forceUpdate(v => v + 1))
+            : undefined;
 
-    // Get current data (reactive via version)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _v = version; // Reference for reactivity
-
-    const stats = entry.stats;
-    const userInteractions = userAddress
-        ? entry.userInteractions.get(userAddress.toLowerCase()) ?? null
-        : null;
-    const loading = entry.loading;
-
-    // STABLE action functions - these never change reference
-    const actions = useRef({
-        toggleFavorite: async () => {
-            if (userAddress) await toggleFavorite(contractAddress, tokenId, userAddress);
-        },
-        toggleWatchlist: async () => {
-            if (userAddress) await toggleWatchlist(contractAddress, tokenId, userAddress);
-        },
-        setRating: async (rating: number) => {
-            if (userAddress) await setUserRating(contractAddress, tokenId, userAddress, rating);
-        },
-        incrementViews: async () => {
-            await recordView(contractAddress, tokenId);
-        },
-        refresh: async () => {
-            loadedRef.current = false;
-            const e = getEntry(key);
-            e.stats = null;
-            e.loading = false;
-            await loadStats(contractAddress, tokenId);
-        }
-    });
-
-    // Update refs when params change
-    useEffect(() => {
-        actions.current = {
-            toggleFavorite: async () => {
-                if (userAddress) await toggleFavorite(contractAddress, tokenId, userAddress);
-            },
-            toggleWatchlist: async () => {
-                if (userAddress) await toggleWatchlist(contractAddress, tokenId, userAddress);
-            },
-            setRating: async (rating: number) => {
-                if (userAddress) await setUserRating(contractAddress, tokenId, userAddress, rating);
-            },
-            incrementViews: async () => {
-                await recordView(contractAddress, tokenId);
-            },
-            refresh: async () => {
-                loadedRef.current = false;
-                const e = getEntry(key);
-                e.stats = null;
-                e.loading = false;
-                await loadStats(contractAddress, tokenId);
-            }
+        return () => {
+            unsubStats();
+            unsubInteractions?.();
         };
-    }, [contractAddress, tokenId, userAddress, key]);
+    }, [statsKey, interactionsKey, contractAddress, tokenId]);
+
+    // Helper: Load stats with request deduplication
+    const loadStats = useCallback(async () => {
+        // Check if request is already pending
+        if (pendingStatsRequests.has(statsKey)) {
+            await pendingStatsRequests.get(statsKey);
+            return;
+        }
+
+        const requestPromise = (async () => {
+            try {
+                const res = await fetch(`/api/nft/stats?contractAddress=${contractAddress}&tokenId=${tokenId}`);
+                if (res.ok) {
+                    const result = await res.json();
+                    const data = result.data || result;
+                    const newStats: NFTStats = {
+                        viewCount: data.viewCount || 0,
+                        likeCount: data.likeCount || 0,
+                        watchlistCount: data.watchlistCount || 0,
+                        ratingCount: data.ratingCount || 0,
+                        averageRating: data.averageRating || 0
+                    };
+                    statsCache.set(statsKey, newStats);
+                    statsCacheTimestamps.set(statsKey, Date.now());
+                    notifyListeners(statsKey);
+                } else {
+                    // Bei Error: Setze Default-Werte damit NFT trotzdem angezeigt wird
+                    console.warn(`Stats API error ${res.status} for ${contractAddress}:${tokenId}`);
+                    const defaultStats: NFTStats = {
+                        viewCount: 0,
+                        likeCount: 0,
+                        watchlistCount: 0,
+                        ratingCount: 0,
+                        averageRating: 0
+                    };
+                    statsCache.set(statsKey, defaultStats);
+                    statsCacheTimestamps.set(statsKey, Date.now());
+                    notifyListeners(statsKey);
+                }
+            } catch (e) {
+                // Bei Netzwerk-Error: Setze Default-Werte damit NFT trotzdem angezeigt wird
+                console.error('Error loading stats:', e);
+                const defaultStats: NFTStats = {
+                    viewCount: 0,
+                    likeCount: 0,
+                    watchlistCount: 0,
+                    ratingCount: 0,
+                    averageRating: 0
+                };
+                statsCache.set(statsKey, defaultStats);
+                statsCacheTimestamps.set(statsKey, Date.now());
+                notifyListeners(statsKey);
+            } finally {
+                // WICHTIG: Promise IMMER aus Queue entfernen, auch bei Error
+                pendingStatsRequests.delete(statsKey);
+            }
+        })();
+
+        pendingStatsRequests.set(statsKey, requestPromise);
+        await requestPromise;
+    }, [contractAddress, tokenId, statsKey]);
+
+    // Helper: Load interactions with request deduplication
+    const loadInteractions = useCallback(async () => {
+        if (!userAddress || !interactionsKey) return;
+
+        // Check if request is already pending
+        if (pendingInteractionsRequests.has(interactionsKey)) {
+            await pendingInteractionsRequests.get(interactionsKey);
+            return;
+        }
+
+        const requestPromise = (async () => {
+            try {
+                const res = await fetch(`/api/user/interactions?contractAddress=${contractAddress}&tokenId=${tokenId}&userId=${userAddress}`);
+                if (res.ok) {
+                    const result = await res.json();
+                    const data = result.data || result;
+                    const newInteractions: UserInteractionState = {
+                        isFavorited: data.isFavorite || false,
+                        isWatchlisted: data.isWatchlisted || false,
+                        userRating: data.rating ?? null
+                    };
+                    interactionsCache.set(interactionsKey, newInteractions);
+                    interactionsCacheTimestamps.set(interactionsKey, Date.now());
+                    notifyListeners(interactionsKey);
+                } else {
+                    // Bei Error: Setze Default-Werte
+                    console.warn(`Interactions API error ${res.status} for ${contractAddress}:${tokenId}`);
+                    const defaultInteractions: UserInteractionState = {
+                        isFavorited: false,
+                        isWatchlisted: false,
+                        userRating: null
+                    };
+                    interactionsCache.set(interactionsKey, defaultInteractions);
+                    interactionsCacheTimestamps.set(interactionsKey, Date.now());
+                    notifyListeners(interactionsKey);
+                }
+            } catch (e) {
+                // Bei Netzwerk-Error: Setze Default-Werte
+                console.error('Error loading user interactions:', e);
+                const defaultInteractions: UserInteractionState = {
+                    isFavorited: false,
+                    isWatchlisted: false,
+                    userRating: null
+                };
+                interactionsCache.set(interactionsKey, defaultInteractions);
+                interactionsCacheTimestamps.set(interactionsKey, Date.now());
+                notifyListeners(interactionsKey);
+            } finally {
+                // WICHTIG: Promise IMMER aus Queue entfernen, auch bei Error
+                pendingInteractionsRequests.delete(interactionsKey);
+            }
+        })();
+
+        pendingInteractionsRequests.set(interactionsKey, requestPromise);
+        await requestPromise;
+    }, [contractAddress, tokenId, userAddress, interactionsKey]);
+
+    // Stats laden beim Mount - mit intelligentem Cache (30s TTL)
+    useEffect(() => {
+        if (!contractAddress || !tokenId) return;
+
+        let cancelled = false;
+
+        async function loadData() {
+            setLoading(true);
+
+            // Stats laden (nur wenn Cache abgelaufen oder nicht vorhanden)
+            if (!isCacheValid(statsKey, statsCacheTimestamps)) {
+                await loadStats();
+            }
+
+            // User Interactions laden (nur wenn Cache abgelaufen oder nicht vorhanden)
+            if (userAddress && interactionsKey && !isCacheValid(interactionsKey, interactionsCacheTimestamps)) {
+                await loadInteractions();
+            }
+
+            if (!cancelled) setLoading(false);
+        }
+
+        loadData();
+
+        return () => { cancelled = true; };
+    }, [contractAddress, tokenId, userAddress, statsKey, interactionsKey, loadStats, loadInteractions]);
+
+    // ===== ACTIONS - Jede Action updated den GLOBALEN Cache =====
+
+    const updateStatsCache = useCallback((newStats: NFTStats) => {
+        console.log('[NFTStatsContext] updateStatsCache:', { statsKey, newStats });
+        statsCache.set(statsKey, newStats);
+        statsCacheTimestamps.set(statsKey, Date.now()); // Cache-Timestamp aktualisieren
+        notifyListeners(statsKey);
+    }, [statsKey]);
+
+    const updateInteractionsCache = useCallback((newInteractions: UserInteractionState) => {
+        if (interactionsKey) {
+            console.log('[NFTStatsContext] updateInteractionsCache:', { interactionsKey, newInteractions });
+            interactionsCache.set(interactionsKey, newInteractions);
+            interactionsCacheTimestamps.set(interactionsKey, Date.now()); // Cache-Timestamp aktualisieren
+            notifyListeners(interactionsKey);
+        }
+    }, [interactionsKey]);
+
+    const toggleFavorite = useCallback(async () => {
+        if (!userAddress) return;
+        console.log('[NFTStatsContext] toggleFavorite called for:', { contractAddress, tokenId, userAddress });
+
+        try {
+            const res = await fetch('/api/user/interactions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contractAddress, tokenId, userId: userAddress, isFavorite: true })
+            });
+
+            if (res.ok) {
+                const result = await res.json();
+                console.log('[NFTStatsContext] toggleFavorite API response:', result);
+
+                // Stats aktualisieren (API gibt result.data.stats zurück)
+                if (result.data?.stats) {
+                    updateStatsCache({
+                        viewCount: result.data.stats.viewCount || 0,
+                        likeCount: result.data.stats.likeCount || 0,
+                        watchlistCount: result.data.stats.watchlistCount || 0,
+                        ratingCount: result.data.stats.ratingCount || 0,
+                        averageRating: result.data.stats.averageRating || 0
+                    });
+                }
+
+                // User Interactions aktualisieren (result.data.data enthält die Interactions)
+                const interactions = result.data?.data || result.data;
+                if (interactions) {
+                    updateInteractionsCache({
+                        isFavorited: interactions.isFavorite || false,
+                        isWatchlisted: interactions.isWatchlisted || false,
+                        userRating: interactions.rating ?? null
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('toggleFavorite error:', e);
+        }
+    }, [contractAddress, tokenId, userAddress, updateStatsCache, updateInteractionsCache]);
+
+    const toggleWatchlist = useCallback(async () => {
+        if (!userAddress) return;
+
+        try {
+            const res = await fetch('/api/user/interactions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contractAddress, tokenId, userId: userAddress, isWatchlisted: true })
+            });
+
+            if (res.ok) {
+                const result = await res.json();
+
+                // Stats aktualisieren (API gibt result.data.stats zurück)
+                if (result.data?.stats) {
+                    updateStatsCache({
+                        viewCount: result.data.stats.viewCount || 0,
+                        likeCount: result.data.stats.likeCount || 0,
+                        watchlistCount: result.data.stats.watchlistCount || 0,
+                        ratingCount: result.data.stats.ratingCount || 0,
+                        averageRating: result.data.stats.averageRating || 0
+                    });
+                }
+
+                // User Interactions aktualisieren (result.data.data enthält die Interactions)
+                const interactions = result.data?.data || result.data;
+                if (interactions) {
+                    updateInteractionsCache({
+                        isFavorited: interactions.isFavorite || false,
+                        isWatchlisted: interactions.isWatchlisted || false,
+                        userRating: interactions.rating ?? null
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('toggleWatchlist error:', e);
+        }
+    }, [contractAddress, tokenId, userAddress, updateStatsCache, updateInteractionsCache]);
+
+    const setRating = useCallback(async (rating: number) => {
+        if (!userAddress) return;
+
+        try {
+            const res = await fetch('/api/user/interactions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contractAddress, tokenId, userId: userAddress, rating })
+            });
+
+            if (res.ok) {
+                const result = await res.json();
+
+                // Stats aktualisieren (API gibt result.data.stats zurück)
+                if (result.data?.stats) {
+                    updateStatsCache({
+                        viewCount: result.data.stats.viewCount || 0,
+                        likeCount: result.data.stats.likeCount || 0,
+                        watchlistCount: result.data.stats.watchlistCount || 0,
+                        ratingCount: result.data.stats.ratingCount || 0,
+                        averageRating: result.data.stats.averageRating || 0
+                    });
+                }
+
+                // User Interactions aktualisieren (result.data.data enthält die Interactions)
+                const interactions = result.data?.data || result.data;
+                if (interactions) {
+                    updateInteractionsCache({
+                        isFavorited: interactions.isFavorite || false,
+                        isWatchlisted: interactions.isWatchlisted || false,
+                        userRating: interactions.rating ?? null
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('setRating error:', e);
+        }
+    }, [contractAddress, tokenId, userAddress, updateStatsCache, updateInteractionsCache]);
+
+    const incrementViews = useCallback(async () => {
+        try {
+            const res = await fetch('/api/nft/stats', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contractAddress, tokenId })
+            });
+
+            if (res.ok) {
+                const result = await res.json();
+                if (result.data?.stats || result.stats) {
+                    const stats = result.data?.stats || result.stats;
+                    updateStatsCache({
+                        viewCount: stats.viewCount || 0,
+                        likeCount: stats.likeCount || 0,
+                        watchlistCount: stats.watchlistCount || 0,
+                        ratingCount: stats.ratingCount || 0,
+                        averageRating: stats.averageRating || 0
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('incrementViews error:', e);
+        }
+    }, [contractAddress, tokenId, updateStatsCache]);
+
+    const refresh = useCallback(async () => {
+        try {
+            const res = await fetch(`/api/nft/stats?contractAddress=${contractAddress}&tokenId=${tokenId}`);
+            if (res.ok) {
+                const result = await res.json();
+                const data = result.data || result;
+                updateStatsCache({
+                    viewCount: data.viewCount || 0,
+                    likeCount: data.likeCount || 0,
+                    watchlistCount: data.watchlistCount || 0,
+                    ratingCount: data.ratingCount || 0,
+                    averageRating: data.averageRating || 0
+                });
+            }
+        } catch (e) {
+            console.error('refresh error:', e);
+        }
+    }, [contractAddress, tokenId, updateStatsCache]);
+
+    // Lese Stats und Interactions aus dem globalen Cache
+    const stats = statsCache.get(statsKey) || null;
+    const userInteractions = interactionsKey ? interactionsCache.get(interactionsKey) || null : null;
 
     return {
         stats,
         userInteractions,
         loading,
         hasUserAddress: Boolean(userAddress),
-        toggleFavorite: actions.current.toggleFavorite,
-        toggleWatchlist: actions.current.toggleWatchlist,
-        setRating: actions.current.setRating,
-        incrementViews: actions.current.incrementViews,
-        refresh: actions.current.refresh
+        toggleFavorite,
+        toggleWatchlist,
+        setRating,
+        incrementViews,
+        refresh
     };
 }
 
-// Legacy compatibility
+// Backwards compatibility
+export { useNFTStats as useNFTUserStats };
 export function useNFTStatsContext() {
     return useContext(NFTStatsContext);
 }
-
-export function useNFTStatsVersion() {
-    return useContext(NFTStatsContext).version;
-}
-
-export function useNFTStats(contractAddress: string, tokenId: string) {
-    return useNFTUserStats(contractAddress, tokenId);
-}
-
 export default NFTStatsProvider;

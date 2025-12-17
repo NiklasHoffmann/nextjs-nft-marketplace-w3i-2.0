@@ -10,9 +10,12 @@ import { MarketplaceItemsProvider } from "@/contexts/marketplace-items";
 import { WalletNFTsProvider } from "@/contexts/wallet-nfts";
 import { CollectionsProvider } from "@/contexts/collections";
 import { CartProvider } from "@/contexts/CartContext";
+import { NotificationProvider, NotificationContainer } from "@/contexts/notifications";
 import { AdminGuard } from "@/components/auth";
 import Navbar from './Navbar';
+import AdminNavbar from './AdminNavbar';
 import Web3Provider from './Web3Provider';
+import { usePathname } from 'next/navigation';
 
 // --- Simple global fallback UI for render errors ---
 function GlobalErrorFallback({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {
@@ -36,6 +39,18 @@ function GlobalErrorFallback({ error, resetErrorBoundary }: { error: Error; rese
   );
 }
 
+function LayoutContent({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isAdminRoute = pathname?.startsWith('/admin');
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      {isAdminRoute ? <AdminNavbar /> : <Navbar />}
+      <main className="flex-1">{children}</main>
+    </div>
+  );
+}
+
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
     <ErrorBoundary
@@ -47,28 +62,28 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         // TODO: Sentry.captureException(error)
       }}
     >
-      <Web3Provider>
-        <ApolloProvider client={apolloClient}>
-          <NFTStatsProvider>
-            <MarketplaceItemsProvider>
-              <WalletNFTsProvider>
-                <CollectionsProvider>
-                  <CurrencyProvider>
-                    <CartProvider>
-                      <AdminGuard>
-                        <div className="min-h-screen flex flex-col">
-                          <Navbar />
-                          <main className="flex-1">{children}</main>
-                        </div>
-                      </AdminGuard>
-                    </CartProvider>
-                  </CurrencyProvider>
-                </CollectionsProvider>
-              </WalletNFTsProvider>
-            </MarketplaceItemsProvider>
-          </NFTStatsProvider>
-        </ApolloProvider>
-      </Web3Provider>
+      <NotificationProvider>
+        <Web3Provider>
+          <ApolloProvider client={apolloClient}>
+            <NFTStatsProvider>
+              <MarketplaceItemsProvider>
+                <WalletNFTsProvider>
+                  <CollectionsProvider>
+                    <CurrencyProvider>
+                      <CartProvider>
+                        <AdminGuard>
+                          <LayoutContent>{children}</LayoutContent>
+                          <NotificationContainer />
+                        </AdminGuard>
+                      </CartProvider>
+                    </CurrencyProvider>
+                  </CollectionsProvider>
+                </WalletNFTsProvider>
+              </MarketplaceItemsProvider>
+            </NFTStatsProvider>
+          </ApolloProvider>
+        </Web3Provider>
+      </NotificationProvider>
     </ErrorBoundary>
   );
 }

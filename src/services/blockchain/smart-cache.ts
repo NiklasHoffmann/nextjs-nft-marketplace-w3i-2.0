@@ -134,3 +134,20 @@ export function getCacheStats() {
         }
     };
 }
+
+/**
+ * Clear approval cache for a specific NFT
+ * Useful when approval status changes (e.g., after listing)
+ */
+export function clearApprovalCache(contractAddress: string, tokenId: string) {
+    const key = getCacheKeys.approval(contractAddress, tokenId);
+    approvalCache.delete(key);
+}
+
+/**
+ * Clear all approval caches
+ * Useful for complete refresh
+ */
+export function clearAllApprovalCaches() {
+    approvalCache.clear();
+}

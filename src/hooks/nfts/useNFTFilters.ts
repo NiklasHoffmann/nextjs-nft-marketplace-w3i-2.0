@@ -47,47 +47,68 @@ export function useNFTFilters(
                 }
             }
 
-            // Price filters (only for listed items)
-            if (item.isListed && item.price) {
-                const priceInEth = parseFloat(formatEther(item.price));
+            // Price filters
+            // Apply to listed items: filter by price range
+            // Apply to unlisted items: only exclude if BOTH min and max are set and we want "only listed in range"
+            if (filters.priceMin !== undefined || filters.priceMax !== undefined) {
+                if (item.isListed && item.price) {
+                    // Listed item - apply price filter
+                    const priceInEth = parseFloat(formatEther(item.price));
 
-                if (filters.priceMin && priceInEth < filters.priceMin) {
-                    return false;
-                }
+                    if (filters.priceMin !== undefined && priceInEth < filters.priceMin) {
+                        return false;
+                    }
 
-                if (filters.priceMax && priceInEth > filters.priceMax) {
-                    return false;
+                    if (filters.priceMax !== undefined && priceInEth > filters.priceMax) {
+                        return false;
+                    }
                 }
-            } else if (filters.priceMin || filters.priceMax) {
-                // If price filters are set but item has no price, exclude it
-                return false;
+                // Unlisted items pass through (no price to filter on)
             }
 
             // Rating filter
-            if (filters.minRating && (!item.averageRating || item.averageRating < filters.minRating)) {
-                return false;
-            }
-
-            // Views filter
-            if (filters.minViews && filters.minViews > 0) {
-                if (!item.viewCount || item.viewCount < filters.minViews) {
-
+            // If filter is active (> 0), only show NFTs WITH stats that meet criteria
+            if (filters.minRating !== undefined && filters.minRating > 0) {
+                // Exclude NFTs without stats data
+                if (item.averageRating === undefined || item.averageRating === null) {
+                    return false;
+                }
+                // Apply filter
+                if (item.averageRating < filters.minRating) {
                     return false;
                 }
             }
 
-            // Likes filter (updated to use favoriteCount)
-            if (filters.minLikes && filters.minLikes > 0) {
-                if (!item.favoriteCount || item.favoriteCount < filters.minLikes) {
+            // Views filter
+            if (filters.minViews !== undefined && filters.minViews > 0) {
+                if (item.viewCount === undefined || item.viewCount === null) {
+                    return false;
+                }
+                if (item.viewCount < filters.minViews) {
+                    return false;
+                }
+            }
 
+            // Likes filter
+            // If filter is active (> 0), only show NFTs WITH stats that meet criteria
+            // If filter is inactive (0 or undefined), show all NFTs
+            if (filters.minLikes !== undefined && filters.minLikes > 0) {
+                // Exclude NFTs without stats data
+                if (item.favoriteCount === undefined || item.favoriteCount === null) {
+                    return false;
+                }
+                // Apply filter
+                if (item.favoriteCount < filters.minLikes) {
                     return false;
                 }
             }
 
             // Watchlist filter
-            if (filters.minWatchlistCount && filters.minWatchlistCount > 0) {
-                if (!item.watchlistCount || item.watchlistCount < filters.minWatchlistCount) {
-
+            if (filters.minWatchlistCount !== undefined && filters.minWatchlistCount > 0) {
+                if (item.watchlistCount === undefined || item.watchlistCount === null) {
+                    return false;
+                }
+                if (item.watchlistCount < filters.minWatchlistCount) {
                     return false;
                 }
             }

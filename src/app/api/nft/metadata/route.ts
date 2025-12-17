@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const contractAddress = searchParams.get('address');
     const tokenId = searchParams.get('tokenId');
+    const forceRefreshApproval = searchParams.get('refreshApproval') === 'true'; // 🔥 NEW
 
     if (!contractAddress || !tokenId) {
         return NextResponse.json(
@@ -38,23 +39,31 @@ export async function GET(request: NextRequest) {
             metadataCache.delete(cacheKey);
         }
 
-        // Check cache first
-        const cachedMetadata = metadataCache.get(cacheKey);
-        if (cachedMetadata) {
-            // Return with optimized headers
-            const response = NextResponse.json({
-                ...cachedMetadata,
-                cached: true
-            });
+        // Check cache first (skip if forceRefreshApproval is true)
+        if (!forceRefreshApproval) {
+            const cachedMetadata = metadataCache.get(cacheKey);
+            if (cachedMetadata) {
+                // Return with optimized headers
+                const response = NextResponse.json({
+                    ...cachedMetadata,
+                    cached: true
+                });
 
-            response.headers.set('Cache-Control', 'public, max-age=3600, s-maxage=7200');
-            response.headers.set('CDN-Cache-Control', 'public, max-age=86400');
-            response.headers.set('Vary', 'Accept-Encoding');
+                response.headers.set('Cache-Control', 'public, max-age=3600, s-maxage=7200');
+                response.headers.set('CDN-Cache-Control', 'public, max-age=86400');
+                response.headers.set('Vary', 'Accept-Encoding');
 
-            return response;
+                return response;
+            }
         }
 
         // Use the optimized blockchain data fetcher
+        // 🔥 NEW: Clear approval cache if refreshApproval is requested
+        if (forceRefreshApproval) {
+            const { clearApprovalCache } = await import('@/services/blockchain/smart-cache');
+            clearApprovalCache(contractAddress, tokenId);
+        }
+
         const blockchainData = await fetchComprehensiveNFTDataNew(contractAddress, tokenId);
 
         if (!blockchainData?.tokenURI) {

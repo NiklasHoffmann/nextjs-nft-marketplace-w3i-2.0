@@ -7,6 +7,8 @@
  * Separated from context for better testability and reusability.
  */
 
+
+
 import type { NFTStats, UserInteractionState } from './NFTStatsService';
 
 export interface NFTStatsCacheState {
