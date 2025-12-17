@@ -51,8 +51,12 @@ export default function OverviewTab({ contractAddress,
     invalidReasons,
     invalidatedAt
 }: OverviewTabProps) {
-    const displayName = (insights && 'customName' in insights ? insights.customName : null) || contractName || collection || 'Unknown NFT';
-    const displayDescription = (insights && 'description' in insights ? insights.description : null) || description || 'No description available';
+    // Name priority: contractName (collection) > collection > fallback
+    // Note: customTitle was removed from NFTInsights schema
+    const displayName = contractName || collection || 'Unknown NFT';
+
+    // Description priority: metadata description > fallback
+    const displayDescription = description || 'No description available';
 
     return (
         <div className="space-y-6">

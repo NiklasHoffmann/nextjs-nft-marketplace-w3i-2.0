@@ -46,7 +46,7 @@ function NFTDetailPage() {
         tokenId,
         autoFetch: isValidParams
     });
-    console.log('NFTDetailPage Render:', { contractAddress, tokenId, isValidParams, dataLoading, dataError, nftData });
+
     const { address: userAddress } = useAccount();
     const router = useRouter();
 
@@ -119,7 +119,11 @@ function NFTDetailPage() {
     const error = dataError;
     const hasValidData = isValidParams && nftDetails;
     const finalImageUrl = imageUrl;
-    const finalName = metadata?.name || `Token #${tokenId}`;
+
+    // Use customTitle from insights if available, otherwise use metadata name or fallback
+    const finalName = useMemo(() => {
+        return publicInsights?.customTitle || metadata?.name || `Token #${tokenId}`;
+    }, [publicInsights?.customTitle, metadata?.name, tokenId]);
 
     // Record view on mount - DISABLED temporarily to fix infinite loop
     // TODO: Re-enable with proper debouncing after stats sync is fixed
@@ -297,13 +301,12 @@ function NFTDetailPage() {
                                 <MemoizedNewNFTInfoTabs {...infoTabsProps} />
                             )}
 
-                            {/* Mobile Only - Price Card & Swap Info before Collection Items */}
+                            {/* Mobile Only - Price Card & Swap Info */}
                             <div className="lg:hidden space-y-6">
                                 <MemoizedNFTPriceCard {...priceCardProps} />
                                 <MemoizedSwapTargetInfo {...swapTargetProps} />
+                                <MemoizedCollectionItemsList {...collectionItemsProps} />
                             </div>
-
-                            <MemoizedCollectionItemsList {...collectionItemsProps} />
                         </div>
 
                         {/* Right Side - Media & Price (1/3 width) - Desktop Only */}
@@ -320,6 +323,11 @@ function NFTDetailPage() {
 
                             <div className="hidden lg:block">
                                 <MemoizedSwapTargetInfo {...swapTargetProps} />
+                            </div>
+
+                            {/* Desktop Only - Collection Items */}
+                            <div className="hidden lg:block">
+                                <MemoizedCollectionItemsList {...collectionItemsProps} />
                             </div>
                         </div>
                     </div>

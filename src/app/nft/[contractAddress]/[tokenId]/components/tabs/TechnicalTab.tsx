@@ -45,7 +45,7 @@ export default function TechnicalTab({ contractAddress,
 
     return (
         <div className="space-y-6">
-            {/* Enhanced Contract Information Section */}
+            {/* Contract Information */}
             <ContractInfoSection
                 contract={{
                     contractName: contractName || 'Unknown',
@@ -58,78 +58,42 @@ export default function TechnicalTab({ contractAddress,
                 }}
             />
 
-            {/* Contract Information */}
+            {/* Basic NFT Details */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
-                    Smart Contract Details
+                    NFT Details
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                        <div>
-                            <label className="text-sm font-medium text-gray-500">Contract Address</label>
-                            <p className="text-sm font-mono text-gray-900 break-all bg-gray-50 rounded p-2 mt-1">
-                                {contractAddress}
-                            </p>
-                            <button
-                                onClick={() => navigator.clipboard.writeText(contractAddress)}
-                                className="text-xs text-blue-600 hover:text-blue-700 mt-1"
-                            >
-                                Copy Address
-                            </button>
-                        </div>
-
-                        <div>
-                            <label className="text-sm font-medium text-gray-500">Token ID</label>
-                            <p className="text-sm font-mono text-gray-900 bg-gray-50 rounded p-2 mt-1">{tokenId}</p>
-                        </div>
-
-                        <div>
-                            <label className="text-sm font-medium text-gray-500">Token Standard</label>
-                            <p className="text-sm text-gray-900 font-medium">{tokenStandard}</p>
-                        </div>
-
-                        <div>
-                            <label className="text-sm font-medium text-gray-500">Blockchain</label>
-                            <p className="text-sm text-gray-900 font-medium">{blockchain}</p>
-                        </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-500">Contract Address</label>
+                        <p className="text-sm font-mono text-gray-900 break-all bg-gray-50 rounded p-2 mt-1">
+                            {contractAddress}
+                        </p>
+                        <button
+                            onClick={() => navigator.clipboard.writeText(contractAddress)}
+                            className="text-xs text-blue-600 hover:text-blue-700 mt-1"
+                        >
+                            Copy Address
+                        </button>
                     </div>
 
-                    <div className="space-y-4">
-                        <div>
-                            <label className="text-sm font-medium text-gray-500">Collection Name</label>
-                            <p className="text-sm text-gray-900">{contractName || 'Unknown'}</p>
-                        </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-500">Token ID</label>
+                        <p className="text-sm font-mono text-gray-900 bg-gray-50 rounded p-2 mt-1">{tokenId}</p>
+                    </div>
 
-                        <div>
-                            <label className="text-sm font-medium text-gray-500">Collection Symbol</label>
-                            <p className="text-sm text-gray-900">{contractSymbol || 'N/A'}</p>
-                        </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-500">Token Standard</label>
+                        <p className="text-sm text-gray-900 font-medium">{tokenStandard}</p>
+                    </div>
 
-                        <div>
-                            <label className="text-sm font-medium text-gray-500">Total Supply</label>
-                            <p className="text-sm text-gray-900 font-medium">
-                                {totalSupply?.toLocaleString() || 'Unknown'} tokens
-                            </p>
-                        </div>
-
-                        <div>
-                            <label className="text-sm font-medium text-gray-500">Current Owner</label>
-                            <p className="text-sm font-mono text-gray-900 bg-gray-50 rounded p-2 mt-1">
-                                {currentOwner ? truncateAddress(currentOwner) : 'Loading...'}
-                            </p>
-                            {currentOwner && (
-                                <button
-                                    onClick={() => navigator.clipboard.writeText(currentOwner)}
-                                    className="text-xs text-blue-600 hover:text-blue-700 mt-1"
-                                >
-                                    Copy Address
-                                </button>
-                            )}
-                        </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-500">Blockchain</label>
+                        <p className="text-sm text-gray-900 font-medium">{blockchain}</p>
                     </div>
                 </div>
             </div>

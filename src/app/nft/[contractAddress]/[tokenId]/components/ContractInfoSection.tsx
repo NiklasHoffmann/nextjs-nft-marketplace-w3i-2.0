@@ -8,6 +8,11 @@
  * - Total supply
  */
 
+'use client';
+
+import { useChainId } from 'wagmi';
+import { getMarketplaceAddress } from '@/services/blockchain/contracts';
+
 interface ContractInfoSectionProps {
     contract: {
         contractName: string;
@@ -18,7 +23,6 @@ interface ContractInfoSectionProps {
         ownerBalance: number | null;
         approved: string | null;
     };
-    marketplaceAddress?: string;
 }
 
 function shortenAddress(address: string | null): string {
@@ -36,11 +40,16 @@ function InfoRow({ label, value, subtitle }: { label: string; value: React.React
     );
 }
 
-export function ContractInfoSection({
-    contract,
-    marketplaceAddress = '0x6B6825FbDA1dF2C890086E6E1F31f5D573788224'
-}: ContractInfoSectionProps) {
-    const isApprovedForMarketplace = contract.approved?.toLowerCase() === marketplaceAddress.toLowerCase();
+export function ContractInfoSection({ contract }: ContractInfoSectionProps) {
+    // Get current chain ID from wagmi
+    const chainId = useChainId();
+    
+    // Get marketplace address from network.mapping.json for current chain
+    const marketplaceAddress = getMarketplaceAddress(chainId);
+    
+    const isApprovedForMarketplace = contract.approved && marketplaceAddress
+        ? contract.approved.toLowerCase() === marketplaceAddress.toLowerCase()
+        : false;
     const isNoApproval = contract.approved === '0x0000000000000000000000000000000000000000';
     const hasOtherApproval = contract.approved && !isApprovedForMarketplace && !isNoApproval;
 

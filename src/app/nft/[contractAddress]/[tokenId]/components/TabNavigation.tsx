@@ -53,15 +53,6 @@ function NFTTabNavigation({ activeTab, onTabChange, isWalletConnected = false }:
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 8.943 7.134 6 12 6c4.866 0 8.268 2.943 9.542 6-1.274 3.057-4.676 6-9.542 6-4.866 0-8.268-2.943-9.542-6z" />
                     </svg>
                 )
-            },
-            {
-                key: 'tokenomics' as TabType,
-                label: 'Tokenomics',
-                icon: (
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                    </svg>
-                )
             }
         ];
 

@@ -212,6 +212,18 @@ const OptimizedNFTImage = memo(({
     priority = false,
     tiltRotation = { rotateX: 0, rotateY: 0 },
 }: OptimizedNFTImageProps) => {
+    // Early return if no valid imageUrl
+    if (!imageUrl || imageUrl.trim() === '') {
+        return (
+            <ImageSkeleton
+                className={className}
+                width={width}
+                height={height}
+                fill={fill}
+            />
+        );
+    }
+
     // Get all possible URLs for this image
     const imageUrls = optimizeImageUrl(imageUrl);
 

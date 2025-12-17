@@ -241,18 +241,7 @@ export function NFTCard(props: NFTCardAllProps) {
   // Get stats using the simplified hook - automatically loads and stays reactive
   const { stats: liveStats, loading: statsLoading } = useNFTUserStats(contractAddress, tokenId);
 
-  // Log optimization status
-  useEffect(() => {
-    if (hasMongoDBData) {
-      devLog.info('NFTCard using MongoDB-optimized data (no API calls!):', {
-        contractAddress,
-        tokenId,
-        hasMetadata: !!isLegacyProps(props) && !!props.metadata,
-        hasInsights: !!isLegacyProps(props) && !!props.insights,
-        hasContract: !!isLegacyProps(props) && !!props.contract
-      });
-    }
-  }, [hasMongoDBData, contractAddress, tokenId]);
+  // MongoDB data optimization - no API calls needed when all data is present
 
   // Track if we ever had data to prevent skeleton flickering on refresh
   const hadDataRef = useRef(false);
@@ -679,12 +668,13 @@ export function NFTCard(props: NFTCardAllProps) {
               <div className="bg-white/95 backdrop-blur-md p-2 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
-                    {/* Collection Name from contractInfo if available */}
+                    {/* Collection Symbol/Address */}
                     <h3 className="text-sm font-semibold text-gray-900 truncate">
                       {displayData.contractInfo?.symbol || `${(contractAddress || '').slice(0, 6)}...${(contractAddress || '').slice(-4)}`}
                     </h3>
+                    {/* NFT Name: customTitle > metadata name > contract name */}
                     <p className="text-xs text-gray-600 truncate">
-                      {displayData.contractInfo?.name || displayData.customTitle || displayData.name}
+                      {displayData.customTitle || displayData.name || displayData.contractInfo?.name || `#${tokenId}`}
                     </p>
                   </div>
                   {/* Contract Info and Rarity indicators 

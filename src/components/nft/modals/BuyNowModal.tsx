@@ -1,6 +1,8 @@
 'use client';
 import { memo, useState, useCallback, useMemo } from 'react';
 import { formatEther } from '@/utils';
+import { useMarketplaceFees } from '@/app/sell/hooks/useMarketplaceFees';
+import { useMarketplaceContracts } from '@/app/sell/hooks/useMarketplaceContracts';
 
 interface BuyNowModalProps {
     isOpen: boolean;
@@ -29,22 +31,31 @@ function BuyNowModal({
     const [purchaseStep, setPurchaseStep] = useState<'review' | 'processing' | 'success' | 'error'>('review');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+    // Get dynamic fees from contract
+    const { marketplaceAddress } = useMarketplaceContracts();
+    const { calculateFees, innovationFeePercentage, royaltyFeePercentage } = useMarketplaceFees({
+        marketplaceAddress,
+        contractAddress: contractAddress as `0x${string}`,
+        tokenId
+    });
+
     // Calculate fees and totals
     const calculations = useMemo(() => {
         const priceInEth = parseFloat(formatEther(price));
-        const platformFee = priceInEth * 0.025; // 2.5% platform fee
-        const creatorRoyalty = priceInEth * 0.05; // 5% creator royalty (example)
+        const fees = calculateFees(priceInEth);
         const gasFee = 0.003; // Estimated gas fee in ETH
-        const total = priceInEth + platformFee + creatorRoyalty + gasFee;
+        const total = priceInEth + fees.marketplaceFee + fees.royaltyFee + gasFee;
 
         return {
             price: priceInEth,
-            platformFee,
-            creatorRoyalty,
+            platformFee: fees.marketplaceFee,
+            creatorRoyalty: fees.royaltyFee,
             gasFee,
-            total
+            total,
+            platformFeePercentage: innovationFeePercentage,
+            royaltyFeePercentage
         };
-    }, [price]);
+    }, [price, calculateFees, innovationFeePercentage, royaltyFeePercentage]);
 
     const handlePurchase = useCallback(async () => {
         setIsPurchasing(true);
@@ -177,14 +188,14 @@ function BuyNowModal({
                                 </div>
 
                                 <div className="flex justify-between items-center">
-                                    <span className="text-gray-600 text-sm">Platform Fee (2.5%)</span>
+                                    <span className="text-gray-600 text-sm">Platform Fee ({calculations.platformFeePercentage.toFixed(2)}%)</span>
                                     <span className="text-gray-700 text-sm">
                                         {calculations.platformFee.toFixed(4)} ETH
                                     </span>
                                 </div>
 
                                 <div className="flex justify-between items-center">
-                                    <span className="text-gray-600 text-sm">Creator Royalty (5%)</span>
+                                    <span className="text-gray-600 text-sm">Creator Royalty ({calculations.royaltyFeePercentage.toFixed(2)}%)</span>
                                     <span className="text-gray-700 text-sm">
                                         {calculations.creatorRoyalty.toFixed(4)} ETH
                                     </span>

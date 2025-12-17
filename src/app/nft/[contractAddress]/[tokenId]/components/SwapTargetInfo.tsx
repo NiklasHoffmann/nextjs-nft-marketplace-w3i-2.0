@@ -1,7 +1,13 @@
 import { SwapTargetInfoProps } from '@/types';
 
 export default function SwapTargetInfo({ desiredContractAddress, desiredTokenId }: SwapTargetInfoProps) {
-    if (desiredContractAddress === "0x0000000000000000000000000000000000000000") {
+    // Don't show swap target if not set
+    if (!desiredContractAddress ||
+        !desiredTokenId ||
+        desiredContractAddress === "0x0000000000000000000000000000000000000000" ||
+        desiredContractAddress === "" ||
+        desiredTokenId === "0" ||
+        desiredTokenId === "") {
         return null;
     }
 
