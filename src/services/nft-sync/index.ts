@@ -2,19 +2,22 @@
  * NFT Sync Service - Main Entry Point
  * 
  * Background service that keeps MongoDB in sync with:
- * - The Graph (marketplace/blockchain data)
+ * - The Graph v1 (marketplace/blockchain data - legacy)
+ * - The Graph v2 (Ideation Market - new schema)
  * - IPFS (NFT metadata)
  * - Stats API (social stats)
  * - Insights API (curated insights)
  */
 
 import { GraphQLSubscriptionManager } from './graph-subscription';
+import { GraphQLSyncV2 } from './graph-subscription-v2';
 import { StatsSync } from './stats-sync';
 import { InsightsSync } from './insights-sync';
 import { marketplaceMetadataSync } from './metadata-sync';
 
 export class NFTSyncService {
-    private graphSubscription: GraphQLSubscriptionManager;
+    private graphSubscription: GraphQLSubscriptionManager;  // v1
+    private graphSyncV2: GraphQLSyncV2 | null = null;       // v2 (optional)
     private statsSync: StatsSync;
     private insightsSync: InsightsSync;
 
@@ -24,6 +27,13 @@ export class NFTSyncService {
         this.graphSubscription = new GraphQLSubscriptionManager();
         this.statsSync = new StatsSync();
         this.insightsSync = new InsightsSync();
+
+        // Initialize v2 sync if enabled
+        const subgraphVersion = process.env.NEXT_PUBLIC_SUBGRAPH_VERSION || 'v1';
+        if (subgraphVersion === 'v2' || process.env.NEXT_PUBLIC_SUBGRAPH_V2_URL) {
+            this.graphSyncV2 = new GraphQLSyncV2();
+            console.log('🆕 Subgraph v2 sync initialized');
+        }
     }
 
     /**
@@ -39,7 +49,15 @@ export class NFTSyncService {
 
         try {
             // Start GraphQL subscription (real-time marketplace updates)
-            await this.graphSubscription.start();
+            const subgraphVersion = process.env.NEXT_PUBLIC_SUBGRAPH_VERSION || 'v1';
+            
+            if (subgraphVersion === 'v2' && this.graphSyncV2) {
+                console.log('📡 Using Subgraph v2 (Ideation Market)');
+                await this.graphSyncV2.start();
+            } else if (subgraphVersion === 'v1') {
+                console.log('📡 Using Subgraph v1 (legacy)');
+                await this.graphSubscription.start();
+            }
 
             // Start periodic sync jobs
             this.statsSync.start();
@@ -69,6 +87,12 @@ export class NFTSyncService {
 
         try {
             await this.graphSubscription.stop();
+            
+            // Stop v2 sync if running
+            if (this.graphSyncV2) {
+                await this.graphSyncV2.stop();
+            }
+            
             this.statsSync.stop();
             this.insightsSync.stop();
 
@@ -87,13 +111,20 @@ export class NFTSyncService {
      * Get service status
      */
     getStatus() {
-        return {
+        const status: any = {
             isRunning: this.isRunning,
             graphSubscription: this.graphSubscription.getStatus(),
             statsSync: this.statsSync.getStatus(),
             insightsSync: this.insightsSync.getStatus(),
             marketplaceMetadataSync: marketplaceMetadataSync.getStatus(),
         };
+
+        // Add v2 status if available
+        if (this.graphSyncV2) {
+            status.graphSyncV2 = this.graphSyncV2.getStatus();
+        }
+
+        return status;
     }
 }
 

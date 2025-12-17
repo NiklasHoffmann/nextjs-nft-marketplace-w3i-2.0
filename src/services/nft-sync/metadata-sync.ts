@@ -35,8 +35,8 @@ export class MarketplaceMetadataSync {
     // Sync alle 30 Sekunden
     private readonly SYNC_INTERVAL = 30 * 1000;
 
-    // Batch-Größe: 5 NFTs gleichzeitig
-    private readonly BATCH_SIZE = 5;
+    // Batch-Größe: 20 NFTs gleichzeitig (increased for faster initial sync)
+    private readonly BATCH_SIZE = 20;
 
     // Rate Limiting: 1 Sekunde Pause zwischen Batches
     private readonly BATCH_DELAY = 1000;
@@ -92,18 +92,23 @@ export class MarketplaceMetadataSync {
         try {
             const collection = await getCollection('marketplace_items');
 
-            // Finde NFTs ohne echte Metadata (haben noch die Dummy-Daten)
+            // Finde NFTs die Metadata/Approval Sync brauchen
+            // NEW ARCHITECTURE: metadata is in nft_metadata collection, so check lastSync timestamps
             // Exclude collection-level entries (they don't have tokenId)
             const nftsNeedingMetadata = await collection
                 .find({
                     tokenId: { $ne: null }, // Must have a tokenId (exclude collection-level entries)
                     isCollectionLevel: { $ne: true }, // Explicitly exclude collection-level entries
+                    active: true, // 🔥 FIXED: Use 'active' field from V2 schema
                     $or: [
-                        { 'metadata.name': /^(Crypto Punk|Bored Ape|Cool Cat|Pudgy Penguin|Azuki|Doodle|Meebits|CloneX|Moonbird|Art Block)/ },
-                        { 'metadata.name': null },
-                        { 'metadata.image': null },
-                        { metadataLastSync: null },
-                        { metadataLastSync: { $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } } // Älter als 24h
+                        { 'lastSync.metadata': null }, // Never synced metadata
+                        { 'lastSync.metadata': { $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } }, // Metadata older than 24h
+                        { 'lastSync.approval': null }, // Never synced approval
+                        { 'lastSync.approval': { $lt: new Date(Date.now() - 5 * 60 * 1000) } }, // Approval older than 5 min
+                        // 🔥 NEW: Also refresh if approval is 0x000... (invalid)
+                        { approved: null },
+                        { approved: '0x0000000000000000000000000000000000000000' },
+                        { approved: { $exists: false } }
                     ]
                 })
                 .limit(this.BATCH_SIZE)
@@ -115,6 +120,7 @@ export class MarketplaceMetadataSync {
             }
 
             console.log(`\n🔄 Synce Metadata für ${nftsNeedingMetadata.length} NFTs...`);
+            console.log(`   📋 NFTs to sync:`, nftsNeedingMetadata.map(n => `${n.contractAddress?.slice(0,6)}.../${n.tokenId}`).join(', '));
 
             // Verarbeite in Batches
             for (let i = 0; i < nftsNeedingMetadata.length; i += this.BATCH_SIZE) {
@@ -154,9 +160,10 @@ export class MarketplaceMetadataSync {
             console.log(`  📡 Fetching metadata: ${contractAddress.slice(0, 6)}...${contractAddress.slice(-4)}:${tokenId}`);
 
             // Nutze die EXISTIERENDE funktionierende API!
+            // 🔥 NEW: Force refresh approval to get current blockchain state
             const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
             const response = await fetch(
-                `${baseUrl}/api/nft/metadata?address=${contractAddress}&tokenId=${tokenId}`,
+                `${baseUrl}/api/nft/metadata?address=${contractAddress}&tokenId=${tokenId}&refreshApproval=true`,
                 {
                     headers: {
                         'Content-Type': 'application/json',
@@ -170,6 +177,12 @@ export class MarketplaceMetadataSync {
             }
 
             const data: MetadataApiResponse = await response.json();
+            
+            console.log(`  📦 API Response for ${tokenId}:`, {
+                hasBlockchain: !!data.blockchain,
+                approved: data.blockchain?.approved || 'NONE',
+                cached: data.cached
+            });
 
             if (!data.metadata) {
                 console.warn(`  ⚠️ Keine Metadata für ${contractAddress}:${tokenId}`);
@@ -215,12 +228,19 @@ export class MarketplaceMetadataSync {
 
             // ✅ Only update sync timestamp in marketplace_items (keep it clean!)
             const marketplaceCollection = await getCollection('marketplace_items');
-            await marketplaceCollection.updateOne(
+            const marketplaceUpdateResult = await marketplaceCollection.updateOne(
                 { contractAddress, tokenId },
-                { $set: { 'lastSync.metadata': new Date() } }
+                { 
+                    $set: { 
+                        'lastSync.metadata': new Date(),
+                        'lastSync.approval': new Date(), // Track approval sync separately
+                        approved: data.blockchain?.approved || null, // Also store in marketplace_items for quick access
+                        approvedAddress: data.blockchain?.approved || null
+                    } 
+                }
             );
 
-            console.log(`  ✅ Metadata synced to nft_metadata: ${data.metadata.name || tokenId}`);
+            console.log(`  ✅ Updated: ${data.metadata?.name || tokenId} | Approval: ${data.blockchain?.approved || 'NULL'} | Matched: ${marketplaceUpdateResult.matchedCount} | Modified: ${marketplaceUpdateResult.modifiedCount}`);
 
         } catch (error) {
             const contractAddress = nft.contractAddress || nft.nftAddress || 'unknown';
