@@ -1,5 +1,5 @@
 export { WalletDashboard } from './WalletDashboard';
-export { WalletBalanceCard } from './WalletBalanceCard';
-export { ProceedsCard } from './ProceedsCard';
-export { QuickActionsCard } from './QuickActionsCard';
+export { WalletHeader } from './WalletHeader';
+export { WalletStats } from './WalletStats';
+export { StatCard } from './StatCard';
 export { WalletNFTsList } from './WalletNFTsList';

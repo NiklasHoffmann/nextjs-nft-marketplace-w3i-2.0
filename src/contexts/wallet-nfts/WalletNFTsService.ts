@@ -50,6 +50,14 @@ export interface WalletNFT extends ExternalNFT {
         category?: string;
         rarity?: string;
     };
+    // Stats from nft_stats collection
+    stats?: {
+        likeCount?: number;
+        viewCount?: number;
+        averageRating?: number;
+        watchlistCount?: number;
+        ratingCount?: number;
+    };
     // Data quality flags
     hasMarketplaceData: boolean;
     hasInsightsData: boolean;
@@ -87,7 +95,7 @@ export class WalletNFTsService {
                         contractSymbol: nft.contract?.symbol,
                         tokenType: nft.contract?.contractType || 'ERC721',
                         totalSupply: nft.contract?.totalSupply,
-                        owner: nft.contract?.owner || nft.currentOwner, // Fallback to currentOwner if contract.owner is not set
+                        owner: nft.contract?.owner || nft.currentOwner,
                         tokenURI: nft.contract?.tokenURI,
                         approved: nft.contract?.approved,
                         ownerBalance: nft.contract?.ownerBalance,
@@ -97,7 +105,15 @@ export class WalletNFTsService {
                         seller: nft.listings?.[0]?.seller,
                         hasMarketplaceData: !!nft.listings?.length,
                         hasInsightsData: !!nft.insights,
-                        insights: nft.insights
+                        insights: nft.insights,
+                        // Stats from API response (loaded via $lookup in /api/user/nfts)
+                        stats: nft.stats ? {
+                            likeCount: nft.stats.likeCount,
+                            viewCount: nft.stats.viewCount,
+                            averageRating: nft.stats.averageRating,
+                            watchlistCount: nft.stats.watchlistCount,
+                            ratingCount: nft.stats.ratingCount
+                        } : undefined
                     };
                 });
 

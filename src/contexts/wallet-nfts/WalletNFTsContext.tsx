@@ -35,6 +35,7 @@ interface WalletNFTsContextType {
     totalCount: number;
     listedCount: number;
     unlistedCount: number;
+    totalListedValue: number; // Total ETH value of listed NFTs
 
     // Actions
     refresh: () => Promise<void>;
@@ -153,11 +154,34 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
     }, [state.nfts]);
 
     // Computed stats
-    const stats = useMemo(() => ({
-        totalCount: state.nfts.length,
-        listedCount: state.nfts.filter(nft => nft.isListed).length,
-        unlistedCount: state.nfts.filter(nft => !nft.isListed).length
-    }), [state.nfts]);
+    const stats = useMemo(() => {
+        const listedNFTs = state.nfts.filter(nft => nft.isListed);
+
+        // Calculate total value of listed NFTs
+        const totalValue = listedNFTs.reduce((sum, nft) => {
+            if (nft.listingPrice) {
+                try {
+                    // listingPrice is already a bigint from the service
+                    const price = typeof nft.listingPrice === 'string'
+                        ? BigInt(nft.listingPrice)
+                        : nft.listingPrice;
+                    // Convert to ETH (divide by 10^18)
+                    const ethValue = Number(price) / 1e18;
+                    return sum + ethValue;
+                } catch (e) {
+                    return sum;
+                }
+            }
+            return sum;
+        }, 0);
+
+        return {
+            totalCount: state.nfts.length,
+            listedCount: listedNFTs.length,
+            unlistedCount: state.nfts.filter(nft => !nft.isListed).length,
+            totalListedValue: totalValue
+        };
+    }, [state.nfts]);
 
     const value: WalletNFTsContextType = {
         nfts: state.nfts,
@@ -166,6 +190,7 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
         totalCount: stats.totalCount,
         listedCount: stats.listedCount,
         unlistedCount: stats.unlistedCount,
+        totalListedValue: stats.totalListedValue,
         refresh,
         clear,
         getNFT,
