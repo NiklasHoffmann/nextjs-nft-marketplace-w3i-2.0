@@ -163,36 +163,36 @@ export async function GET(request: NextRequest) {
                 listingId: listing.listingId,
                 isListed: listing.active,
                 active: listing.active,
-                
+
                 // Pricing (v1 & v2)
                 price: listing.price || listing.priceTotal,
                 priceTotal: listing.priceTotal,
                 unitPrice: listing.unitPrice,
-                
+
                 // Parties
                 seller: listing.seller,
                 buyer: listing.buyer || null,
-                
+
                 // Swap Data
                 desiredContractAddress: listing.desiredContractAddress || listing.desiredTokenAddress,
                 desiredTokenAddress: listing.desiredTokenAddress,
                 desiredTokenId: listing.desiredTokenId,
                 desiredErc1155Quantity: listing.desiredErc1155Quantity,
-                
+
                 // v2 Fields
                 tokenStandard: listing.tokenStandard,
                 listingType: listing.listingType,
                 status: listing.status,
-                
+
                 // ERC1155
                 erc1155QuantityListed: listing.erc1155QuantityListed,
                 remainingQuantity: listing.remainingQuantity,
-                
+
                 // Advanced
                 buyerWhitelistEnabled: listing.buyerWhitelistEnabled,
                 partialBuyEnabled: listing.partialBuyEnabled,
                 feeRate: listing.feeRate,
-                
+
                 // Chain & Timestamps
                 chainId: listing.chainId,
                 createdAt: listing.createdAt,

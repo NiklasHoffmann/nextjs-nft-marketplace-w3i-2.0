@@ -256,43 +256,51 @@ export async function GET(request: NextRequest) {
                     metadata: '$nftData.metadata',
                     contract: '$nftData.contract',
                     insights: '$insightsData',
-                    // Stats are loaded via StatsContext (not from API)
+                    
+                    // Stats for sorting and filtering
+                    stats: {
+                        viewCount: { $ifNull: ['$statsData.viewCount', 0] },
+                        likeCount: { $ifNull: ['$statsData.likeCount', 0] },
+                        watchlistCount: { $ifNull: ['$statsData.watchlistCount', 0] },
+                        averageRating: { $ifNull: ['$statsData.averageRating', 0] },
+                        ratingCount: { $ifNull: ['$statsData.ratingCount', 0] }
+                    },
 
                     // Nested marketplace object with ALL v2 fields
                     marketplace: {
                         // Core Listing
                         listingId: '$listingId',
                         isListed: '$isListed',
-                        
+
                         // Pricing (v1 & v2)
                         price: '$price',
                         priceTotal: '$priceTotal',
                         unitPrice: '$unitPrice',
-                        
+
                         // Parties
                         seller: '$seller',
                         buyer: '$buyer',
-                        
+
                         // Swap Data
                         desiredContractAddress: '$desiredContractAddress',
                         desiredTokenAddress: '$desiredTokenAddress',
                         desiredTokenId: '$desiredTokenId',
                         desiredErc1155Quantity: '$desiredErc1155Quantity',
-                        
+
                         // v2 Fields
                         tokenStandard: '$tokenStandard',
                         listingType: '$listingType',
                         status: '$status',
-                        
+
                         // ERC1155
                         erc1155QuantityListed: '$erc1155QuantityListed',
                         remainingQuantity: '$remainingQuantity',
-                        
+
                         // Advanced
                         buyerWhitelistEnabled: '$buyerWhitelistEnabled',
                         partialBuyEnabled: '$partialBuyEnabled',
                         feeRate: '$feeRate',
-                        
+
                         // Chain & Timestamps
                         chainId: '$chainId',
                         createdAt: '$createdAt',

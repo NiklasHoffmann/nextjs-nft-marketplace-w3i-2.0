@@ -103,13 +103,13 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
             cardDescriptions: item.insights?.cardDescriptions || null,
             insights: item.insights || undefined,
 
-            // Stats (EnrichedNFTDocument doesn't have stats, they load separately)
-            viewCount: 0,
-            likeCount: 0,
-            favoriteCount: 0,
-            watchlistCount: 0,
-            averageRating: 0,
-            ratingCount: 0,
+            // Stats - use from API response
+            viewCount: (item as any).stats?.viewCount ?? 0,
+            likeCount: (item as any).stats?.likeCount ?? 0,
+            favoriteCount: (item as any).stats?.likeCount ?? 0, // Alias
+            watchlistCount: (item as any).stats?.watchlistCount ?? 0,
+            averageRating: (item as any).stats?.averageRating ?? 0,
+            ratingCount: (item as any).stats?.ratingCount ?? 0,
 
             // Keep nested metadata for NFTCard
             metadata: item.metadata,
@@ -316,7 +316,7 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
                 </div>
 
                 {/* NFT List Area */}
-                <div className="px-8 py-8">
+                <div className="py-8">
                     {/* Error Message */}
                     {itemsError && (
                         <div className="bg-orange-100 border border-orange-300 text-orange-800 px-4 py-3 rounded-lg text-sm mb-6">
