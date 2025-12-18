@@ -24,14 +24,19 @@ export {
 } from './errors';
 
 // Middleware
-export * from './middleware/auth';
-export * from './middleware/validation';
+export * from '../middleware/auth';
+export * from '../middleware/validation';
 export {
     rateLimit,
     isRateLimited,
     resetRateLimit,
     getRemainingRequests,
-    getRateLimitHeaders,
     RATE_LIMITS as RATE_LIMIT_CONFIG,
     type RateLimitConfig
-} from './middleware/rateLimit';
+} from '../middleware/rateLimit';
+
+// Handler
+export * from './handler';
+
+// Helper Functions
+export * from './helpers';

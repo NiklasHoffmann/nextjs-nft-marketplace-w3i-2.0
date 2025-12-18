@@ -2,9 +2,24 @@
  * API Response Helpers
  * 
  * Standard response patterns für alle API Routes
+ * Enhanced with new standardized helpers for consistent API responses
  */
 
 import { NextResponse } from 'next/server';
+
+// ===== TYPE-SAFE RESPONSE TYPES =====
+
+export interface ApiSuccessResponse<T> {
+    success: true;
+    data: T;
+}
+
+export interface ApiErrorResponse {
+    success: false;
+    error: string;
+    code?: string;
+    metadata?: Record<string, any>;
+}
 
 // ===== SUCCESS RESPONSES =====
 
@@ -147,6 +162,35 @@ export function apiCors(response: NextResponse, allowedOrigins: string[] = ['*']
         statusText: response.statusText,
         headers,
     });
+}
+
+// ===== NEW STANDARDIZED HELPERS =====
+
+/**
+ * Create a success response with typed data
+ */
+export function createSuccessResponse<T>(
+    data: T,
+    status: number = 200
+): NextResponse<ApiSuccessResponse<T>> {
+    return NextResponse.json({ success: true, data }, { status });
+}
+
+/**
+ * Create an error response
+ */
+export function createErrorResponse(
+    message: string,
+    status: number = 500,
+    code?: string,
+    metadata?: Record<string, any>
+): NextResponse<ApiErrorResponse> {
+    return NextResponse.json({
+        success: false,
+        error: message,
+        ...(code && { code }),
+        ...(metadata && { metadata }),
+    }, { status });
 }
 
 export function apiOptions(allowedMethods: string[]) {
