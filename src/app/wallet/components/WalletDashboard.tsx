@@ -64,7 +64,7 @@ export function WalletDashboard() {
                 />
 
                 {/* NFT Lists Area - Full Width */}
-                <div className="px-8 py-8">
+                <div className="py-8">
                     <WalletNFTsList
                         nfts={nfts}
                         loading={loading}

@@ -260,8 +260,8 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
                                         key={category}
                                         onClick={() => toggleCategory(category)}
                                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all border-2 ${isSelected
-                                                ? 'bg-blue-600 text-white border-blue-600 shadow-md'
-                                                : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                                            ? 'bg-blue-600 text-white border-blue-600 shadow-md'
+                                            : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
                                             }`}
                                     >
                                         {category}
@@ -380,44 +380,40 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
                 </div>
             )}
 
-            {/* Headline and Count - above NFT list */}
-            <div className="mb-4 md:pl-16 pl-10">
-                <div className="flex items-center justify-between px-8">
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Utilities</h1>
-                        <p className="text-sm text-gray-600 mt-1">
-                            {items.length > 0 ? (
-                                <>
-                                    Showing {items.length} of {pagination?.total || 0} Utilities
-                                    {pagination?.hasMore && <span className="text-gray-400 ml-1">(scroll for more)</span>}
-                                </>
-                            ) : (
-                                `${pagination?.total || 0} Utilities listed`
-                            )}
-                        </p>
-                    </div>
-                    <RefreshButton
-                        onClick={refetch}
-                        loading={loading}
-                        label="Refresh"
-                        loadingLabel="Refreshing..."
-                    />
-                </div>
-            </div>
-
             {/* NFT Gallery */}
             <div className="min-h-[288px] md:pl-16 pl-10">
                 <NFTGallery
                     items={scrollItems}
+                    title="Utilities"
+                    largeTitle={true}
+                    subtitle={
+                        items.length > 0 ? (
+                            <>
+                                Showing {items.length} of {pagination?.total || 0} Utilities
+                                {pagination?.hasMore && <span className="text-gray-400 ml-1">(scroll for more)</span>}
+                            </>
+                        ) : (
+                            `${pagination?.total || 0} Utilities listed`
+                        )
+                    }
+                    actions={
+                        <RefreshButton
+                            onClick={refetch}
+                            loading={loading}
+                            label="Refresh"
+                            loadingLabel="Refreshing..."
+                        />
+                    }
                     loading={loading && items.length === 0}
                     loadingCount={8}
                     enableInsights={true}
                     showStats={true}
                     priority={true}
-                    padding="pl-8 pr-6 pb-4 pt-4"
+                    padding="pr-6 pb-4 pt-4"
                     emptyMessage="No active listings found"
                     enableViewAll={true}
                 />
+
             </div>
 
             {/* Infinite Scroll Trigger - always render to prevent layout shift */}
