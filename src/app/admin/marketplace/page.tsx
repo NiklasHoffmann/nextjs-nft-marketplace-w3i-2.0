@@ -357,273 +357,273 @@ export default function MarketplaceAdminPage() {
 
           {/* Status Messages */}
           {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800 text-sm">{error}</p>
-          </div>
-        )}
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-red-800 text-sm">{error}</p>
+            </div>
+          )}
 
-        {isSuccess && txHash && (
-          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-            <p className="text-green-800 text-sm">
-              Transaction successful! 
-              <a 
-                href={`https://sepolia.etherscan.io/tx/${txHash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-2 underline hover:text-green-900"
-              >
-                View on Etherscan
-              </a>
-            </p>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
-          {/* Innovation Fee Management */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Innovation Fee
-            </h2>
-            <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-2">
-                Current Fee: <span className="font-mono font-semibold">
-                  {currentFee ? `${Number(currentFee) / 1000}%` : 'Loading...'}
-                </span>
+          {isSuccess && txHash && (
+            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+              <p className="text-green-800 text-sm">
+                Transaction successful!
+                <a
+                  href={`https://sepolia.etherscan.io/tx/${txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-2 underline hover:text-green-900"
+                >
+                  View on Etherscan
+                </a>
               </p>
             </div>
-            <form onSubmit={handleSetFee}>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            {/* Innovation Fee Management */}
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Innovation Fee
+              </h2>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  New Fee (denominator: 100,000)
-                </label>
-                <input
-                  type="number"
-                  value={newFee}
-                  onChange={(e) => setNewFee(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="2500 = 2.5%"
-                  min="0"
-                  max="100000"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Current: {newFee} = {parseInt(newFee) / 1000}%
+                <p className="text-sm text-gray-600 mb-2">
+                  Current Fee: <span className="font-mono font-semibold">
+                    {currentFee ? `${Number(currentFee) / 1000}%` : 'Loading...'}
+                  </span>
                 </p>
               </div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-              >
-                {isLoading ? 'Processing...' : 'Set Innovation Fee'}
-              </button>
-            </form>
-          </div>
-
-          {/* Add Single Collection */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Collection
-            </h2>
-            <form onSubmit={handleAddCollection}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Collection Address
-                </label>
-                <input
-                  type="text"
-                  value={singleCollection}
-                  onChange={(e) => setSingleCollection(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono text-sm"
-                  placeholder="0x..."
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={isLoading || !singleCollection}
-                className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-              >
-                {isLoading ? 'Processing...' : 'Add to Whitelist'}
-              </button>
-            </form>
-          </div>
-
-          {/* Batch Operations */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6 lg:col-span-2">
-            <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <svg className="w-5 h-5 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Batch Operations
-            </h2>
-            <form onSubmit={handleBatchAddCollections}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Collection Addresses (one per line)
-                </label>
-                <textarea
-                  value={batchCollections}
-                  onChange={(e) => setBatchCollections(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
-                  placeholder="0x1234...&#10;0x5678...&#10;0xabcd..."
-                  rows={5}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  {batchCollections.split('\n').filter(addr => addr.trim() && isAddress(addr.trim())).length} valid addresses
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  disabled={isLoading || !batchCollections}
-                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isLoading ? 'Processing...' : 'Batch Add Collections'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleBatchRemoveCollections}
-                  disabled={isLoading || !batchCollections}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isLoading ? 'Processing...' : 'Batch Remove Collections'}
-                </button>
-              </div>
-            </form>
-          </div>
-
-          {/* Clean Listing */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <svg className="w-5 h-5 mr-2 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Clean Listing
-            </h2>
-            <form onSubmit={handleCleanListing}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Listing ID
-                </label>
-                <input
-                  type="text"
-                  value={listingIdToClean}
-                  onChange={(e) => setListingIdToClean(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  placeholder="Enter listing ID"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Remove invalid listings (e.g., NFT no longer owned by seller)
-                </p>
-              </div>
-              <button
-                type="submit"
-                disabled={isLoading || !listingIdToClean}
-                className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-              >
-                {isLoading ? 'Processing...' : 'Clean Listing'}
-              </button>
-            </form>
-          </div>
-
-          {/* Buyer Whitelist Management */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              Buyer Whitelist
-            </h2>
-            <form onSubmit={handleAddBuyerWhitelist}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Listing ID
-                </label>
-                <input
-                  type="text"
-                  value={buyerWhitelistListingId}
-                  onChange={(e) => setBuyerWhitelistListingId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  placeholder="Enter listing ID"
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Buyer Addresses (one per line)
-                </label>
-                <textarea
-                  value={buyerAddresses}
-                  onChange={(e) => setBuyerAddresses(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono text-sm"
-                  placeholder="0x1234...&#10;0x5678...&#10;0xabcd..."
-                  rows={4}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  {buyerAddresses.split('\n').filter(addr => addr.trim() && isAddress(addr.trim())).length} valid addresses
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  disabled={isLoading || !buyerWhitelistListingId || !buyerAddresses}
-                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isLoading ? 'Processing...' : 'Add Buyers'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRemoveBuyerWhitelist}
-                  disabled={isLoading || !buyerWhitelistListingId || !buyerAddresses}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isLoading ? 'Processing...' : 'Remove Buyers'}
-                </button>
-              </div>
-            </form>
-          </div>
-
-          {/* Whitelisted Collections List */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <svg className="w-5 h-5 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Whitelisted Collections
-            </h2>
-            <div className="max-h-96 overflow-y-auto">
-              {!whitelistedCollections || (whitelistedCollections as string[]).length === 0 ? (
-                <p className="text-gray-500 text-sm">No whitelisted collections</p>
-              ) : (
-                <div className="space-y-2">
-                  {(whitelistedCollections as string[]).map((collection, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
-                    >
-                      <span className="font-mono text-sm truncate flex-1">{collection}</span>
-                      <button
-                        onClick={() => handleRemoveCollection(collection)}
-                        disabled={isLoading}
-                        className="ml-3 px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
+              <form onSubmit={handleSetFee}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    New Fee (denominator: 100,000)
+                  </label>
+                  <input
+                    type="number"
+                    value={newFee}
+                    onChange={(e) => setNewFee(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="2500 = 2.5%"
+                    min="0"
+                    max="100000"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Current: {newFee} = {parseInt(newFee) / 1000}%
+                  </p>
                 </div>
-              )}
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isLoading ? 'Processing...' : 'Set Innovation Fee'}
+                </button>
+              </form>
             </div>
-          </div>
 
+            {/* Add Single Collection */}
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Collection
+              </h2>
+              <form onSubmit={handleAddCollection}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Collection Address
+                  </label>
+                  <input
+                    type="text"
+                    value={singleCollection}
+                    onChange={(e) => setSingleCollection(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono text-sm"
+                    placeholder="0x..."
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading || !singleCollection}
+                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isLoading ? 'Processing...' : 'Add to Whitelist'}
+                </button>
+              </form>
+            </div>
+
+            {/* Batch Operations */}
+            <div className="bg-white border border-gray-200 rounded-lg p-6 lg:col-span-2">
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Batch Operations
+              </h2>
+              <form onSubmit={handleBatchAddCollections}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Collection Addresses (one per line)
+                  </label>
+                  <textarea
+                    value={batchCollections}
+                    onChange={(e) => setBatchCollections(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+                    placeholder="0x1234...&#10;0x5678...&#10;0xabcd..."
+                    rows={5}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {batchCollections.split('\n').filter(addr => addr.trim() && isAddress(addr.trim())).length} valid addresses
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={isLoading || !batchCollections}
+                    className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isLoading ? 'Processing...' : 'Batch Add Collections'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBatchRemoveCollections}
+                    disabled={isLoading || !batchCollections}
+                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isLoading ? 'Processing...' : 'Batch Remove Collections'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Clean Listing */}
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Clean Listing
+              </h2>
+              <form onSubmit={handleCleanListing}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Listing ID
+                  </label>
+                  <input
+                    type="text"
+                    value={listingIdToClean}
+                    onChange={(e) => setListingIdToClean(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    placeholder="Enter listing ID"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Remove invalid listings (e.g., NFT no longer owned by seller)
+                  </p>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading || !listingIdToClean}
+                  className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isLoading ? 'Processing...' : 'Clean Listing'}
+                </button>
+              </form>
+            </div>
+
+            {/* Buyer Whitelist Management */}
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                Buyer Whitelist
+              </h2>
+              <form onSubmit={handleAddBuyerWhitelist}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Listing ID
+                  </label>
+                  <input
+                    type="text"
+                    value={buyerWhitelistListingId}
+                    onChange={(e) => setBuyerWhitelistListingId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    placeholder="Enter listing ID"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Buyer Addresses (one per line)
+                  </label>
+                  <textarea
+                    value={buyerAddresses}
+                    onChange={(e) => setBuyerAddresses(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono text-sm"
+                    placeholder="0x1234...&#10;0x5678...&#10;0xabcd..."
+                    rows={4}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {buyerAddresses.split('\n').filter(addr => addr.trim() && isAddress(addr.trim())).length} valid addresses
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={isLoading || !buyerWhitelistListingId || !buyerAddresses}
+                    className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isLoading ? 'Processing...' : 'Add Buyers'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRemoveBuyerWhitelist}
+                    disabled={isLoading || !buyerWhitelistListingId || !buyerAddresses}
+                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isLoading ? 'Processing...' : 'Remove Buyers'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Whitelisted Collections List */}
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Whitelisted Collections
+              </h2>
+              <div className="max-h-96 overflow-y-auto">
+                {!whitelistedCollections || (whitelistedCollections as string[]).length === 0 ? (
+                  <p className="text-gray-500 text-sm">No whitelisted collections</p>
+                ) : (
+                  <div className="space-y-2">
+                    {(whitelistedCollections as string[]).map((collection, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                      >
+                        <span className="font-mono text-sm truncate flex-1">{collection}</span>
+                        <button
+                          onClick={() => handleRemoveCollection(collection)}
+                          disabled={isLoading}
+                          className="ml-3 px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+          </div>
         </div>
       </div>
-    </div>
     </div>
   );
 }

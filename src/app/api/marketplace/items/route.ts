@@ -310,6 +310,7 @@ export async function GET(request: NextRequest) {
 
                     // Add sort fields with null handling
                     sortName: { $ifNull: ['$nftData.metadata.name', ''] },
+                    sortPrice: { $toLong: { $ifNull: ['$price', '0'] } }, // Convert string Wei to number for sorting
                     sortCreatedAt: '$createdAt',
                     sortViewCount: { $ifNull: ['$statsData.viewCount', 0] },
                     sortLikeCount: { $ifNull: ['$statsData.likeCount', 0] },
@@ -404,14 +405,14 @@ export async function GET(request: NextRequest) {
         // Build sort
         const sort: any = {};
         const sortField =
-            sortBy === 'price' ? 'marketplace.price' :
+            sortBy === 'price' ? 'sortPrice' : // Use numeric sortPrice field for correct sorting
                 sortBy === 'name' ? 'sortName' :
                     sortBy === 'created' ? 'sortCreatedAt' :
                         sortBy === 'rating' ? 'sortAverageRating' :
                             sortBy === 'views' ? 'sortViewCount' :
                                 sortBy === 'likes' ? 'sortLikeCount' :
                                     sortBy === 'watchlistCount' ? 'sortWatchlistCount' :
-                                        'marketplace.price';
+                                        'sortPrice'; // Default to numeric price
 
         sort[sortField] = sortOrder === 'asc' ? 1 : -1;
         sort.listingId = 1; // Stable tie-breaker
@@ -441,6 +442,7 @@ export async function GET(request: NextRequest) {
                 insightsData: 0,
                 statsData: 0,
                 sortName: 0,
+                sortPrice: 0, // Remove temporary numeric price field
                 sortCreatedAt: 0,
                 sortViewCount: 0,
                 sortLikeCount: 0,

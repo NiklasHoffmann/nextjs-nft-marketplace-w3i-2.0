@@ -81,14 +81,9 @@ export class NFTSyncService {
         console.log('🛑 Stopping NFT Sync Service...');
 
         try {
-            await this.graphSubscription.stop();
+            // Stop v2 sync
+            await this.graphSyncV2.stop();
 
-            // Stop v2 sync if running
-            if (this.graphSyncV2) {
-                await this.graphSyncV2.stop();
-            }
-
-            this.statsSync.styncV2.stop();
             this.statsSync.stop();
             this.insightsSync.stop();
 

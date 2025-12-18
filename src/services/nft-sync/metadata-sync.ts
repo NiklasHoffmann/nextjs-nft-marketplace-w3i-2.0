@@ -17,6 +17,7 @@ interface MetadataApiResponse {
         attributes?: Array<{ trait_type: string; value: string | number }>;
     };
     imageUrl?: string;
+    cached?: boolean;
     blockchain?: {
         tokenURI?: string;
         name?: string;
