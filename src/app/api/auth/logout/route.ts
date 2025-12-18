@@ -1,24 +1,16 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest } from 'next/server';
+import { apiHandler, apiSuccess } from '@/lib/api';
 import { cookies } from 'next/headers';
 
 /**
  * POST /api/auth/logout
- * LÃ¶scht die Admin-Session
+ * Löscht die Admin-Session
  */
-export async function POST(request: NextRequest) {
-    try {
-        const cookieStore = await cookies();
-        cookieStore.delete('admin-session');
+export const POST = apiHandler(async (request: NextRequest) => {
+    const cookieStore = await cookies();
+    cookieStore.delete('admin-session');
 
-        return NextResponse.json({
-            success: true,
-            message: 'Logged out successfully'
-        });
-    } catch (error) {
-        console.error('Error during logout:', error);
-        return NextResponse.json(
-            { error: 'Logout failed' },
-            { status: 500 }
-        );
-    }
-}
+    return apiSuccess({
+        message: 'Logged out successfully'
+    });
+});

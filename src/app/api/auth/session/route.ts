@@ -1,4 +1,5 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest } from 'next/server';
+import { apiHandler, apiSuccess, UnauthorizedError } from '@/lib/api';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
 
@@ -44,37 +45,43 @@ function verifyToken(token: string): any | null {
 
 /**
  * GET /api/auth/session
- * PrÃ¼ft ob eine gÃ¼ltige Admin-Session existiert
+ * Prüft ob eine gültige Admin-Session existiert
  */
-export async function GET(request: NextRequest) {
-    try {
-        const cookieStore = await cookies();
-        const token = cookieStore.get('admin-session')?.value;
+export const GET = apiHandler(async (request: NextRequest) => {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('admin-session')?.value;
 
-        if (!token) {
-            return NextResponse.json({
-                isAuthenticated: false
-            });
-        }
+    console.log('🔍 Session check:', {
+        hasCookie: !!token,
+        cookieName: 'admin-session'
+    });
 
-        const payload = verifyToken(token);
-
-        if (!payload || !payload.isAdmin) {
-            return NextResponse.json({
-                isAuthenticated: false
-            });
-        }
-
-        return NextResponse.json({
-            isAuthenticated: true,
-            address: payload.address,
-            isAdmin: payload.isAdmin
-        });
-
-    } catch (error) {
-        console.error('Session check error:', error);
-        return NextResponse.json({
+    if (!token) {
+        console.log('❌ No session cookie found');
+        return apiSuccess({
             isAuthenticated: false
         });
     }
-}
+
+    const payload = verifyToken(token);
+
+    console.log('🔐 Token verification:', {
+        isValid: !!payload,
+        hasAdmin: payload?.isAdmin,
+        address: payload?.address
+    });
+
+    if (!payload || !payload.isAdmin) {
+        console.log('❌ Invalid token or not admin');
+        return apiSuccess({
+            isAuthenticated: false
+        });
+    }
+
+    console.log('✅ Session valid for:', payload.address);
+    return apiSuccess({
+        isAuthenticated: true,
+        address: payload.address,
+        isAdmin: payload.isAdmin
+    });
+});

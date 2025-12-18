@@ -40,14 +40,32 @@ export default function NFTDatabaseSelector({
     useEffect(() => {
         async function loadNFTs() {
             try {
-                const res = await fetch('/api/admin/nfts/list');
-                if (res.ok) {
-                    const result = await res.json();
-                    console.log('NFT List API Response:', result); // Debug
-                    setNfts(result.data?.nfts || []);
+                console.log('🔍 Loading NFTs from database...');
+                const res = await fetch('/api/admin/nfts/list', {
+                    credentials: 'include' // Include session cookie
+                });
+                
+                console.log('📡 API Response status:', res.status, res.ok);
+                
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    console.error('❌ API Error:', res.status, errorText);
+                    return;
+                }
+                
+                const result = await res.json();
+                console.log('📦 NFT List API Response:', result);
+                
+                if (result.success && result.data?.nfts) {
+                    console.log(`✅ Loaded ${result.data.nfts.length} NFTs from database`);
+                    setNfts(result.data.nfts);
+                } else {
+                    console.warn('⚠️ Unexpected response structure:', result);
+                    setNfts([]);
                 }
             } catch (e) {
-                console.error('Error loading NFTs:', e);
+                console.error('❌ Error loading NFTs:', e);
+                setNfts([]);
             } finally {
                 setLoading(false);
             }

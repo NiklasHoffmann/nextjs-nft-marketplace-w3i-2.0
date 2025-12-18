@@ -1,4 +1,5 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
+import { apiHandler, apiSuccess, parseJsonBody, BadRequestError, UnauthorizedError } from '@/lib/api';
 import { verifyMessage } from 'viem';
 import { isAdminAddress } from '@/config/admin';
 import { cookies } from 'next/headers';
@@ -29,81 +30,72 @@ function createToken(payload: any): string {
  * POST /api/auth/verify
  * Verifiziert die Signatur und erstellt eine Session
  */
-export async function POST(request: NextRequest) {
-    try {
-        const body = await request.json();
-        const { address, signature, message, nonce, timestamp } = body;
+export const POST = apiHandler(async (request: NextRequest) => {
+    const body = await parseJsonBody<{
+        address: string;
+        signature: string;
+        message: string;
+        nonce: string;
+        timestamp: number;
+    }>(request);
 
-        // Validierung
-        if (!address || !signature || !message || !nonce || !timestamp) {
-            return NextResponse.json(
-                { error: 'Missing required fields' },
-                { status: 400 }
-            );
-        }
+    const { address, signature, message, nonce, timestamp } = body;
 
-        // PrÃ¼fe ob Timestamp nicht zu alt ist (max 5 Minuten)
-        const now = Date.now();
-        const age = now - timestamp;
-        if (age > 5 * 60 * 1000) {
-            return NextResponse.json(
-                { error: 'Challenge expired' },
-                { status: 400 }
-            );
-        }
-
-        // Verifiziere Signatur
-        const isValid = await verifyMessage({
-            address: address as `0x${string}`,
-            message,
-            signature: signature as `0x${string}`
-        });
-
-        if (!isValid) {
-            return NextResponse.json(
-                { error: 'Invalid signature' },
-                { status: 401 }
-            );
-        }
-
-        // PrÃ¼fe ob Admin-Adresse
-        const isAdmin = isAdminAddress(address);
-
-        if (!isAdmin) {
-            return NextResponse.json(
-                { error: 'Not an admin address' },
-                { status: 403 }
-            );
-        }
-
-        // Erstelle Token
-        const token = createToken({
-            address: address.toLowerCase(),
-            isAdmin: true,
-            nonce
-        });
-
-        // Setze Session-Cookie
-        const cookieStore = await cookies();
-        cookieStore.set('admin-session', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 60 * 60 * 24, // 24 Stunden
-            path: '/'
-        });
-
-        return NextResponse.json({
-            success: true,
-            address: address.toLowerCase(),
-            isAdmin: true
-        });
-
-    } catch (error) {
-        console.error('Error verifying signature:', error);
-        return NextResponse.json(
-            { error: 'Verification failed' },
-            { status: 500 }
-        );
+    // Validierung
+    if (!address || !signature || !message || !nonce || !timestamp) {
+        throw new BadRequestError('Missing required fields');
     }
-}
+
+    // Prüfe ob Timestamp nicht zu alt ist (max 5 Minuten)
+    const now = Date.now();
+    const age = now - timestamp;
+    if (age > 5 * 60 * 1000) {
+        throw new BadRequestError('Challenge expired');
+    }
+
+    // Verifiziere Signatur
+    const isValid = await verifyMessage({
+        address: address as `0x${string}`,
+        message,
+        signature: signature as `0x${string}`
+    });
+
+    if (!isValid) {
+        throw new UnauthorizedError('Invalid signature');
+    }
+
+    // Prüfe ob Admin-Adresse
+    const isAdmin = isAdminAddress(address);
+
+    if (!isAdmin) {
+        throw new UnauthorizedError('Not an admin address');
+    }
+
+    // Erstelle Token
+    const token = createToken({
+        address: address.toLowerCase(),
+        isAdmin: true,
+        nonce
+    });
+
+    // Setze Session-Cookie
+    const cookieStore = await cookies();
+    cookieStore.set('admin-session', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 60 * 60 * 24, // 24 Stunden
+        path: '/'
+    });
+
+    console.log('✅ Admin session created:', {
+        address: address.toLowerCase(),
+        cookieName: 'admin-session',
+        expiresIn: '24h'
+    });
+
+    return apiSuccess({
+        address: address.toLowerCase(),
+        isAdmin: true
+    });
+});
