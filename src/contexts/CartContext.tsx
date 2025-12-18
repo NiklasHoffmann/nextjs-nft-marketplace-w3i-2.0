@@ -1,13 +1,17 @@
 'use client';
 
 /**
- * Shopping Cart Context for Batch NFT Purchases
+ * Shopping Cart Context for Batch NFT Purchases (Hybrid Storage)
  * 
- * Allows users to add multiple NFTs to cart and purchase them in one transaction
- * to save on gas fees.
+ * Storage Strategy:
+ * - Connected wallet: MongoDB (cross-device sync)
+ * - Not connected: localStorage (fallback)
+ * - Optimistic updates: UI updates instantly, DB syncs in background
+ * - Migration: localStorage → DB when wallet connects
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useAccount } from 'wagmi';
 import { devLog } from '@/utils/devLog';
 import type { ActiveItem } from '@/types';
 
@@ -30,6 +34,7 @@ interface CartContextType {
     removeFromCart: (listingId: string) => void;
     clearCart: () => void;
     isInCart: (listingId: string) => boolean;
+    updateCartItem: (listingId: string, updates: Partial<CartItem>) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -37,37 +42,119 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 const CART_STORAGE_KEY = 'nft-marketplace-cart';
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
+    const { address, isConnected } = useAccount();
     const [items, setItems] = useState<CartItem[]>([]);
+    const [isLoaded, setIsLoaded] = useState(false);
+    const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Load cart from localStorage on mount
+    // Load cart on mount or when wallet connects
     useEffect(() => {
+        const loadCart = async () => {
+            if (isConnected && address) {
+                // Load from MongoDB
+                try {
+                    devLog.info('cart', '📡 Loading cart from MongoDB for:', address);
+                    const response = await fetch(`/api/cart?walletAddress=${address}`);
+                    const data = await response.json();
+
+                    if (data.success && data.data.items) {
+                        devLog.info('cart', '✅ Loaded from DB:', data.data.items.length, 'items');
+                        setItems(data.data.items);
+
+                        // Also update localStorage as cache
+                        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(data.data.items));
+                    }
+                } catch (error) {
+                    devLog.error('cart', '❌ Failed to load from DB, using localStorage:', error);
+                    // Fallback to localStorage
+                    loadFromLocalStorage();
+                }
+            } else {
+                // Load from localStorage
+                loadFromLocalStorage();
+            }
+
+            setIsLoaded(true);
+        };
+
+        loadCart();
+    }, [address, isConnected]);
+
+    // Helper: Load from localStorage
+    const loadFromLocalStorage = () => {
         try {
             const savedCart = localStorage.getItem(CART_STORAGE_KEY);
             if (savedCart) {
                 const parsedCart = JSON.parse(savedCart);
+                devLog.info('cart', '💾 Loaded from localStorage:', parsedCart.length, 'items');
                 setItems(parsedCart);
             }
         } catch (error) {
-            devLog.error('cart', 'Failed to load cart from localStorage:', error);
+            devLog.error('cart', '❌ Failed to load from localStorage:', error);
         }
-    }, []);
+    };
 
-    // Save cart to localStorage whenever it changes
-    useEffect(() => {
+    // Sync cart to storage (localStorage + MongoDB if connected)
+    const syncCart = useCallback((updatedItems: CartItem[]) => {
+        if (!isLoaded) return;
+
+        // Always save to localStorage (instant cache)
         try {
-            localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+            localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updatedItems));
+            devLog.info('cart', '💾 Saved to localStorage:', updatedItems.length, 'items');
         } catch (error) {
-            devLog.error('cart', 'Failed to save cart to localStorage:', error);
+            devLog.error('cart', '❌ Failed to save to localStorage:', error);
         }
-    }, [items]);
 
-    const addToCart = useCallback((item: ActiveItem) => {
-        setItems(prev => {
-            // Check if item already in cart
-            if (prev.some(cartItem => cartItem.listingId === item.listingId)) {
-                devLog.info('cart', 'Item already in cart:', item.listingId);
-                return prev;
+        // Debounced save to MongoDB (if connected)
+        if (isConnected && address) {
+            // Clear previous timeout
+            if (syncTimeoutRef.current) {
+                clearTimeout(syncTimeoutRef.current);
             }
+
+            // Debounce DB sync (500ms)
+            syncTimeoutRef.current = setTimeout(async () => {
+                try {
+                    devLog.info('cart', '📡 Syncing to MongoDB for:', address);
+                    const response = await fetch('/api/cart', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            walletAddress: address,
+                            items: updatedItems
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        devLog.info('cart', '✅ Synced to DB:', updatedItems.length, 'items');
+                    }
+                } catch (error) {
+                    devLog.error('cart', '❌ Failed to sync to DB:', error);
+                }
+            }, 500);
+        }
+    }, [isLoaded, isConnected, address]);
+
+    // Auto-sync when items change
+    useEffect(() => {
+        syncCart(items);
+    }, [items, syncCart]);
+
+    const addToCart = useCallback(async (item: ActiveItem) => {
+        // Check if item already in cart
+        if (items.some(cartItem => cartItem.listingId === item.listingId)) {
+            devLog.info('cart', 'Item already in cart:', item.listingId);
+            return;
+        }
+
+        // Fetch metadata from MongoDB
+        try {
+            devLog.info('cart', 'Fetching metadata for:', item.contractAddress, item.tokenId);
+            const response = await fetch(`/api/nft/detail?contractAddress=${item.contractAddress}&tokenId=${item.tokenId}`);
+            const data = await response.json();
+            devLog.info('cart', 'API Response:', data);
 
             const cartItem: CartItem = {
                 listingId: item.listingId,
@@ -75,26 +162,61 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 tokenId: item.tokenId,
                 price: item.price,
                 seller: item.seller,
-                // These fields might not exist on ActiveItem - will be enhanced later
+                name: data.metadata?.name || data.name || undefined,
+                imageUrl: data.metadata?.image || data.image || undefined
+            };
+
+            devLog.info('cart', 'Added to cart with metadata:', cartItem.name, cartItem.imageUrl);
+            setItems(prev => [...prev, cartItem]);
+        } catch (error) {
+            devLog.error('cart', 'Failed to fetch NFT metadata:', error);
+
+            // Add without metadata as fallback
+            const cartItem: CartItem = {
+                listingId: item.listingId,
+                contractAddress: item.contractAddress,
+                tokenId: item.tokenId,
+                price: item.price,
+                seller: item.seller,
                 name: undefined,
                 imageUrl: undefined
             };
 
-            return [...prev, cartItem];
-        });
-    }, []);
+            setItems(prev => [...prev, cartItem]);
+        }
+    }, [items]);
 
     const removeFromCart = useCallback((listingId: string) => {
         setItems(prev => prev.filter(item => item.listingId !== listingId));
     }, []);
 
-    const clearCart = useCallback(() => {
+    const clearCart = useCallback(async () => {
         setItems([]);
-    }, []);
+
+        // Also clear from DB if connected
+        if (isConnected && address) {
+            try {
+                await fetch(`/api/cart?walletAddress=${address}`, {
+                    method: 'DELETE'
+                });
+                devLog.info('cart', '🗑️ Cleared cart in DB for:', address);
+            } catch (error) {
+                devLog.error('cart', '❌ Failed to clear cart in DB:', error);
+            }
+        }
+    }, [isConnected, address]);
 
     const isInCart = useCallback((listingId: string) => {
         return items.some(item => item.listingId === listingId);
     }, [items]);
+
+    const updateCartItem = useCallback((listingId: string, updates: Partial<CartItem>) => {
+        setItems(prev => prev.map(item =>
+            item.listingId === listingId
+                ? { ...item, ...updates }
+                : item
+        ));
+    }, []);
 
     // Calculate total price
     const totalPrice = items.reduce((sum, item) => {
@@ -116,7 +238,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         addToCart,
         removeFromCart,
         clearCart,
-        isInCart
+        isInCart,
+        updateCartItem
     };
 
     return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
