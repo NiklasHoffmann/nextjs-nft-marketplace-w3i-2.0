@@ -238,10 +238,13 @@ export function NFTGallery({
 
             {/* Grid View */}
             {isGridView ? (
-                <div className={`grid ${gridColumns} ${gap} ${padding} min-h-[288px]`}>
-                    {items.map((item) => {
+                <div 
+                    className={`grid ${gridColumns} ${gap} ${padding} pl-8 min-h-[288px]`}
+                    style={{ paddingBottom: '50px' }} // Space for hover shadows (same as scroll view)
+                >
+                    {items.map((item, index) => {
                         const cardContent = (
-                            <div className={`flex-shrink-0 ${cardWidth} relative ml-8`}>
+                            <div className={`flex-shrink-0 ${cardWidth} relative`}>
                                 <LazyNFTCard
                                     contractAddress={item.contractAddress}
                                     tokenId={item.tokenId}

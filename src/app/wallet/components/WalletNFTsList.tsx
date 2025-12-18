@@ -244,45 +244,65 @@ export function WalletNFTsList({
     return (
         <div>
 
-            {/* Listed NFTs Section - only show if there are listed items */}
-            {listedNFTs.length > 0 && (
-                <div className="mb-8">
-                    <NFTGallery
-                        items={listedNFTs}
-                        title="Listed Utilities"
-                        subtitle={
-                            <span className="flex items-center gap-2">
-                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                <span className="text-green-700">{listedNFTs.length} NFTs</span>
-                            </span>
-                        }
-                        enableInsights={true}
-                        showStats={true}
-                        priority={false}
-                        enableViewAll={true}
-                    />
+            {/* Listed NFTs Section */}
+            <div className="mb-8">
+                <div className="flex items-center justify-between mb-4 px-4">
+                    <div className="flex items-center gap-3">
+                        <h4 className="text-lg font-medium text-green-800 flex items-center gap-2">
+                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                            Listed Utilities ({listedNFTs.length})
+                        </h4>
+                    </div>
                 </div>
-            )}
 
-            {/* Unlisted NFTs Section - only show if there are unlisted items */}
-            {unlistedNFTs.length > 0 && (
-                <div>
-                    <NFTGallery
-                        items={unlistedNFTs}
-                        title="Not Listed"
-                        subtitle={
-                            <span className="flex items-center gap-2">
-                                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                                <span className="text-gray-600">{unlistedNFTs.length} NFTs</span>
-                            </span>
-                        }
-                        enableInsights={true}
-                        showStats={true}
-                        priority={false}
-                        enableViewAll={true}
-                    />
+                <NFTGallery
+                    items={listedNFTs}
+                    enableInsights={true}
+                    showStats={true}
+                    priority={false}
+                    emptyMessage="No listed NFTs"
+                    enableViewAll={true}
+                    emptyComponent={
+                        <div className="text-center py-12 bg-gray-50 rounded-lg">
+                            <div className="text-gray-400 mb-2">
+                                <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <p className="text-gray-500">No listed Utilities</p>
+                        </div>
+                    }
+                />
+            </div>
+
+            {/* Unlisted NFTs Section */}
+            <div>
+                <div className="flex items-center justify-between mb-4 px-4">
+                    <h4 className="text-lg font-medium text-gray-700 flex items-center gap-2">
+                        <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+                        Not Listed ({unlistedNFTs.length})
+                    </h4>
                 </div>
-            )}
+
+                <NFTGallery
+                    items={unlistedNFTs}
+                    enableInsights={true}
+                    showStats={true}
+                    priority={false}
+                    emptyMessage="No unlisted NFTs"
+                    enableViewAll={true}
+                    emptyComponent={
+                        <div className="text-center py-12 bg-gray-50 rounded-lg">
+                            <div className="text-gray-400 mb-2">
+                                <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <p className="text-gray-500">No unlisted Utilities</p>
+                        </div>
+                    }
+                />
+            </div>
         </div>
     );
 }

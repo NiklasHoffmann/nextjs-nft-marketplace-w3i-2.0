@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
+import { LoadingState } from '@/components/core/Loading';
 
 interface ListingProgressOverlayProps {
     nft: AggregatedNFT;
@@ -128,7 +129,7 @@ export function ListingProgressOverlay({ nft, mode, price, currency, isVisible }
                 <div className="space-y-4">
                     {/* Spinner */}
                     <div className="flex justify-center">
-                        <div className={`w-12 h-12 border-4 rounded-full animate-spin ${classes.spinner}`}></div>
+                        <LoadingState size="lg" variant="inline" />
                     </div>
 
                     {/* Progress Steps */}

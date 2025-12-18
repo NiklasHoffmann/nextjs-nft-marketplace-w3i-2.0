@@ -4,12 +4,14 @@ import React, { useState } from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import { useMarketplaceFees } from '../hooks/useMarketplaceFees';
 import { useMarketplaceContracts } from '../hooks/useMarketplaceContracts';
+import { useForm } from '@/hooks/useForm';
 
 export type ListingMode = 'sale' | 'trade' | 'hybrid';
 
 interface UnifiedListingFormProps {
     selectedNFT: AggregatedNFT | null;
     isFullyApproved?: boolean;
+    isWhitelisted?: boolean;
     onSubmit: (data: {
         mode: ListingMode;
         price?: string;
@@ -21,19 +23,8 @@ interface UnifiedListingFormProps {
     }) => void;
 }
 
-export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSubmit }: UnifiedListingFormProps) {
+export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhitelisted = true, onSubmit }: UnifiedListingFormProps) {
     const [mode, setMode] = useState<ListingMode>('sale');
-    const [formData, setFormData] = useState({
-        price: '',
-        currency: 'ETH' as 'ETH' | 'USDC',
-        tradeType: 'specific' as 'specific' | 'collection' | 'open',
-        targetContractAddress: '',
-        targetTokenId: '',
-        targetCollection: '',
-        description: ''
-    });
-
-    const [errors, setErrors] = useState<Record<string, string>>({});
     const [selectedTargetNFT, setSelectedTargetNFT] = useState<AggregatedNFT | null>(null);
     const [isSearching, setIsSearching] = useState(false);
 
@@ -45,84 +36,84 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
         tokenId: selectedNFT?.tokenId
     });
 
-    const validateForm = () => {
-        const newErrors: Record<string, string> = {};
+    // Form management with useForm hook
+    const form = useForm({
+        initialValues: {
+            price: '',
+            currency: 'ETH' as 'ETH' | 'USDC',
+            tradeType: 'specific' as 'specific' | 'collection' | 'open',
+            targetContractAddress: '',
+            targetTokenId: '',
+            targetCollection: '',
+            description: ''
+        },
+        validate: (values) => {
+            const errors: Record<string, string> = {};
 
-        // Validierung basierend auf dem Modus
-        if (mode === 'sale' || mode === 'hybrid') {
-            if (!formData.price || parseFloat(formData.price) <= 0) {
-                newErrors.price = 'Bitte geben Sie einen gültigen Preis ein';
+            // Validierung basierend auf dem Modus
+            if (mode === 'sale' || mode === 'hybrid') {
+                if (!values.price || parseFloat(values.price) <= 0) {
+                    errors.price = 'Bitte geben Sie einen gültigen Preis ein';
+                }
             }
-        }
 
-        if (mode === 'trade' || mode === 'hybrid') {
-            if (formData.tradeType === 'specific' && !selectedTargetNFT) {
-                newErrors.targetNFT = 'Bitte wählen Sie den gewünschten NFT aus';
+            if (mode === 'trade' || mode === 'hybrid') {
+                if (values.tradeType === 'specific' && !selectedTargetNFT) {
+                    // Error wird außerhalb des Forms angezeigt, da selectedTargetNFT kein Form-Feld ist
+                    errors.targetContractAddress = 'Bitte wählen Sie den gewünschten NFT aus';
+                }
+                if (values.tradeType === 'collection' && !values.targetCollection.trim()) {
+                    errors.targetCollection = 'Bitte geben Sie die Collection an';
+                }
             }
-            if (formData.tradeType === 'collection' && !formData.targetCollection.trim()) {
-                newErrors.targetCollection = 'Bitte geben Sie die Collection an';
+
+            if (!values.description.trim()) {
+                errors.description = 'Bitte fügen Sie eine Beschreibung hinzu';
             }
-        }
 
-        if (!formData.description.trim()) {
-            newErrors.description = 'Bitte fügen Sie eine Beschreibung hinzu';
-        }
+            return errors;
+        },
+        onSubmit: (values) => {
+            if (!selectedNFT) {
+                alert('Bitte wählen Sie zuerst einen NFT aus');
+                return;
+            }
 
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-
-        if (!selectedNFT) {
-            alert('Bitte wählen Sie zuerst einen NFT aus');
-            return;
-        }
-
-        if (validateForm()) {
             onSubmit({
                 mode,
-                price: (mode === 'sale' || mode === 'hybrid') ? formData.price : undefined,
-                currency: (mode === 'sale' || mode === 'hybrid') ? formData.currency : undefined,
+                price: (mode === 'sale' || mode === 'hybrid') ? values.price : undefined,
+                currency: (mode === 'sale' || mode === 'hybrid') ? values.currency : undefined,
                 targetNFT: (mode === 'trade' || mode === 'hybrid') ? selectedTargetNFT || undefined : undefined,
-                targetCollection: formData.targetCollection || undefined,
-                tradeType: (mode === 'trade' || mode === 'hybrid') ? formData.tradeType : undefined,
-                description: formData.description
+                targetCollection: values.targetCollection || undefined,
+                tradeType: (mode === 'trade' || mode === 'hybrid') ? values.tradeType : undefined,
+                description: values.description
             });
         }
-    };
-
-    const handleInputChange = (field: string, value: string | boolean) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
-        if (errors[field]) {
-            setErrors(prev => ({ ...prev, [field]: '' }));
-        }
-    };
+    });
 
     const searchNFT = async () => {
-        if (!formData.targetContractAddress || !formData.targetTokenId) return;
+        if (!form.values.targetContractAddress || !form.values.targetTokenId) return;
 
         setIsSearching(true);
         try {
             // Mock search - in production würde hier eine API-Anfrage stattfinden
             const mockResult: AggregatedNFT = {
-                key: `${formData.targetContractAddress}-${formData.targetTokenId}`,
-                contractAddress: formData.targetContractAddress as `0x${string}`,
-                tokenId: formData.targetTokenId,
+                key: `${form.values.targetContractAddress}-${form.values.targetTokenId}`,
+                contractAddress: form.values.targetContractAddress as `0x${string}`,
+                tokenId: form.values.targetTokenId,
                 listed: false,
                 core: {
-                    contractAddress: formData.targetContractAddress as `0x${string}`,
-                    tokenId: formData.targetTokenId,
+                    contractAddress: form.values.targetContractAddress as `0x${string}`,
+                    tokenId: form.values.targetTokenId,
                     tokenURI: null,
-                    name: `Target NFT #${formData.targetTokenId}`,
+                    name: `Target NFT #${form.values.targetTokenId}`,
                     owner: '0xOtherUser' as `0x${string}`,
                     symbol: 'TEST',
                     contractName: 'Test Collection',
                     contractSymbol: 'TEST'
                 },
                 meta: {
-                    name: `Target NFT #${formData.targetTokenId}`,
+                    name: `Target NFT #${form.values.targetTokenId}`,
                     description: 'Target NFT for trade',
                     image: '/media/custom-nft-3.jpg'
                 },
@@ -145,17 +136,12 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
     };
 
     // Gebühren berechnen (nur für Verkauf/Hybrid) - dynamisch vom Contract
-    const fees = formData.price && parseFloat(formData.price) > 0
-        ? calculateFees(parseFloat(formData.price))
+    const fees = form.values.price && parseFloat(form.values.price) > 0
+        ? calculateFees(parseFloat(form.values.price))
         : { marketplaceFee: 0, royaltyFee: 0, youReceive: 0 };
 
-    // Gebühren berechnen (nur für Verkauf/Hybrid)
-    const marketplaceFee = formData.price ? (parseFloat(formData.price) * 0.025).toFixed(4) : '0';
-    const royaltyFee = formData.price ? (parseFloat(formData.price) * 0.075).toFixed(4) : '0';
-    const youReceive = formData.price ? (parseFloat(formData.price) * 0.9).toFixed(4) : '0';
-
     return (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={form.handleSubmit} className="space-y-6">
             {!selectedNFT && (
                 <div className="text-center py-8 text-gray-500">
                     <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -279,38 +265,36 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                                     <input
                                         type="number"
                                         step="0.0001"
-                                        value={formData.price}
-                                        onChange={(e) => handleInputChange('price', e.target.value)}
-                                        className={`flex-1 rounded-lg border ${errors.price ? 'border-red-300' : 'border-gray-300'} px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                                        {...form.getFieldProps('price')}
+                                        className={`flex-1 rounded-lg border ${form.hasError('price') ? 'border-red-300' : 'border-gray-300'} px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500`}
                                         placeholder="0.00"
                                     />
                                     <select
-                                        value={formData.currency}
-                                        onChange={(e) => handleInputChange('currency', e.target.value)}
+                                        {...form.getFieldProps('currency')}
                                         className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     >
                                         <option value="ETH">ETH</option>
                                         <option value="USDC">USDC</option>
                                     </select>
                                 </div>
-                                {errors.price && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.price}</p>
+                                {form.hasError('price') && (
+                                    <p className="mt-1 text-sm text-red-600">{form.getFieldError('price')}</p>
                                 )}
 
                                 {/* Gebühren-Übersicht */}
-                                {formData.price && parseFloat(formData.price) > 0 && (
+                                {form.values.price && parseFloat(form.values.price) > 0 && (
                                     <div className="mt-3 p-3 bg-white rounded-lg border border-blue-200 text-xs space-y-1">
                                         <div className="flex justify-between text-gray-600">
                                             <span>Marketplace-Gebühr ({(innovationFeePercentage * 100).toFixed(2)}%):</span>
-                                            <span>{fees.marketplaceFee.toFixed(4)} {formData.currency}</span>
+                                            <span>{fees.marketplaceFee.toFixed(4)} {form.values.currency}</span>
                                         </div>
                                         <div className="flex justify-between text-gray-600">
                                             <span>Royalty-Gebühr ({(royaltyFeePercentage * 100).toFixed(2)}%):</span>
-                                            <span>{fees.royaltyFee.toFixed(4)} {formData.currency}</span>
+                                            <span>{fees.royaltyFee.toFixed(4)} {form.values.currency}</span>
                                         </div>
                                         <div className="border-t border-gray-200 pt-1 mt-2 flex justify-between font-semibold text-gray-900">
                                             <span>Sie erhalten:</span>
-                                            <span>{fees.youReceive.toFixed(4)} {formData.currency}</span>
+                                            <span>{fees.youReceive.toFixed(4)} {form.values.currency}</span>
                                         </div>
                                     </div>
                                 )}
@@ -338,8 +322,8 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                                         <input
                                             type="radio"
                                             value="specific"
-                                            checked={formData.tradeType === 'specific'}
-                                            onChange={(e) => handleInputChange('tradeType', e.target.value)}
+                                            checked={form.values.tradeType === 'specific'}
+                                            onChange={(e) => form.setFieldValue('tradeType', e.target.value as any)}
                                             className="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
                                         />
                                         <span className="ml-2 text-sm text-gray-700">Bestimmter NFT</span>
@@ -348,8 +332,8 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                                         <input
                                             type="radio"
                                             value="collection"
-                                            checked={formData.tradeType === 'collection'}
-                                            onChange={(e) => handleInputChange('tradeType', e.target.value)}
+                                            checked={form.values.tradeType === 'collection'}
+                                            onChange={(e) => form.setFieldValue('tradeType', e.target.value as any)}
                                             className="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
                                         />
                                         <span className="ml-2 text-sm text-gray-700">Beliebiger NFT aus Collection</span>
@@ -358,8 +342,8 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                                         <input
                                             type="radio"
                                             value="open"
-                                            checked={formData.tradeType === 'open'}
-                                            onChange={(e) => handleInputChange('tradeType', e.target.value)}
+                                            checked={form.values.tradeType === 'open'}
+                                            onChange={(e) => form.setFieldValue('tradeType', e.target.value as any)}
                                             className="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
                                         />
                                         <span className="ml-2 text-sm text-gray-700">Offen für Angebote</span>
@@ -368,7 +352,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                             </div>
 
                             {/* Specific NFT */}
-                            {formData.tradeType === 'specific' && (
+                            {form.values.tradeType === 'specific' && (
                                 <div className="space-y-3">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -376,8 +360,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                                         </label>
                                         <input
                                             type="text"
-                                            value={formData.targetContractAddress}
-                                            onChange={(e) => handleInputChange('targetContractAddress', e.target.value)}
+                                            {...form.getFieldProps('targetContractAddress')}
                                             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
                                             placeholder="0x..."
                                         />
@@ -388,8 +371,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                                         </label>
                                         <input
                                             type="text"
-                                            value={formData.targetTokenId}
-                                            onChange={(e) => handleInputChange('targetTokenId', e.target.value)}
+                                            {...form.getFieldProps('targetTokenId')}
                                             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
                                             placeholder="1"
                                         />
@@ -397,7 +379,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                                     <button
                                         type="button"
                                         onClick={searchNFT}
-                                        disabled={isSearching || !formData.targetContractAddress || !formData.targetTokenId}
+                                        disabled={isSearching || !form.values.targetContractAddress || !form.values.targetTokenId}
                                         className="w-full px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-semibold transition-colors"
                                     >
                                         {isSearching ? 'Suche...' : 'NFT suchen'}
@@ -431,27 +413,23 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                                             </div>
                                         </div>
                                     )}
-                                    {errors.targetNFT && (
-                                        <p className="text-sm text-red-600">{errors.targetNFT}</p>
-                                    )}
                                 </div>
                             )}
 
                             {/* Collection */}
-                            {formData.tradeType === 'collection' && (
+                            {form.values.tradeType === 'collection' && (
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
                                         Collection Address
                                     </label>
                                     <input
                                         type="text"
-                                        value={formData.targetCollection}
-                                        onChange={(e) => handleInputChange('targetCollection', e.target.value)}
-                                        className={`w-full rounded-lg border ${errors.targetCollection ? 'border-red-300' : 'border-gray-300'} px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500`}
+                                        {...form.getFieldProps('targetCollection')}
+                                        className={`w-full rounded-lg border ${form.hasError('targetCollection') ? 'border-red-300' : 'border-gray-300'} px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500`}
                                         placeholder="0x..."
                                     />
-                                    {errors.targetCollection && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.targetCollection}</p>
+                                    {form.hasError('targetCollection') && (
+                                        <p className="mt-1 text-sm text-red-600">{form.getFieldError('targetCollection')}</p>
                                     )}
                                 </div>
                             )}
@@ -464,10 +442,9 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                             Beschreibung *
                         </label>
                         <textarea
-                            value={formData.description}
-                            onChange={(e) => handleInputChange('description', e.target.value)}
+                            {...form.getFieldProps('description')}
                             rows={4}
-                            className={`w-full rounded-lg border ${errors.description ? 'border-red-300' : 'border-gray-300'} px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                            className={`w-full rounded-lg border ${form.hasError('description') ? 'border-red-300' : 'border-gray-300'} px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500`}
                             placeholder={
                                 mode === 'sale'
                                     ? 'Warum verkaufen Sie diesen NFT?'
@@ -476,19 +453,22 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
                                         : 'Beschreiben Sie Ihr Angebot...'
                             }
                         />
-                        {errors.description && (
-                            <p className="mt-1 text-sm text-red-600">{errors.description}</p>
+                        {form.hasError('description') && (
+                            <p className="mt-1 text-sm text-red-600">{form.getFieldError('description')}</p>
                         )}
                     </div>
 
                     {/* Submit Button */}
                     <button
                         type="submit"
-                        className={`w-full px-6 py-3 rounded-lg text-white font-semibold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 ${mode === 'sale'
-                            ? 'bg-blue-600 hover:bg-blue-700'
-                            : mode === 'trade'
-                                ? 'bg-green-600 hover:bg-green-700'
-                                : 'bg-purple-600 hover:bg-purple-700'
+                        disabled={!isWhitelisted || !form.isValid}
+                        className={`w-full px-6 py-3 rounded-lg text-white font-semibold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 ${!isWhitelisted || !form.isValid
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : mode === 'sale'
+                                    ? 'bg-blue-600 hover:bg-blue-700'
+                                    : mode === 'trade'
+                                        ? 'bg-green-600 hover:bg-green-700'
+                                        : 'bg-purple-600 hover:bg-purple-700'
                             }`}
                     >
                         {!isFullyApproved && (

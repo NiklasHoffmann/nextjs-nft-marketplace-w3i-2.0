@@ -65,8 +65,12 @@ export function useNFTInsights(options: UseNFTInsightsOptions = {}): UseNFTInsig
                 throw new Error(result.error || 'Failed to fetch insights');
             }
 
+            // apiHandler wraps response in { success: true, data: {...} }
+            // The actual insights array is in result.data.data
+            const insightsArray = result.data?.data || result.data || [];
+            
             // Set the first result or null if no insights found
-            const insightsData = Array.isArray(result.data) && result.data.length > 0 ? result.data[0] : null;
+            const insightsData = Array.isArray(insightsArray) && insightsArray.length > 0 ? insightsArray[0] : null;
 
             setInsights(insightsData);
 

@@ -226,6 +226,7 @@ function NFTPriceCard({
                         onClose={handleCloseBuyModal}
                         contractAddress={contractAddress}
                         tokenId={tokenId}
+                        listingId={listingId || ''}
                         nftName={nftName}
                         nftImage={nftImage}
                         price={price}
@@ -235,6 +236,7 @@ function NFTPriceCard({
                     <UpdateListingModal
                         isOpen={showUpdateModal}
                         onClose={handleCloseUpdateModal}
+                        listingId={listingId || ''}
                         currentPrice={formattedPrice}
                         contractAddress={contractAddress}
                         tokenId={tokenId}
@@ -245,6 +247,7 @@ function NFTPriceCard({
                     <CancelListingModal
                         isOpen={showCancelModal}
                         onClose={handleCloseCancelModal}
+                        listingId={listingId || ''}
                         contractAddress={contractAddress}
                         tokenId={tokenId}
                         nftName={nftName}

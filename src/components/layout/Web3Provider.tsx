@@ -8,6 +8,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { ReactNode, useState, useEffect } from 'react'
 import { ApolloProvider } from '@apollo/client'
 import apolloClient from '@/config/apolloClient'
+import { LoadingState } from '@/components/core/Loading';
 
 export default function Web3Provider({ children }: { children: ReactNode }) {
     const [mounted, setMounted] = useState(false)
@@ -41,9 +42,7 @@ export default function Web3Provider({ children }: { children: ReactNode }) {
     if (!mounted) {
         return (
             <div className="min-h-screen bg-white">
-                <div className="flex items-center justify-center h-screen">
-                    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-                </div>
+                <LoadingState size="xl" variant="centered" className="h-screen" />
             </div>
         )
     }

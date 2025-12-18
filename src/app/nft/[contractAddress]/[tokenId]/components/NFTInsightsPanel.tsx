@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { canPerformAdminActions } from '@/utils';
 import Link from 'next/link';
+import { LoadingState } from '@/components/core/Loading/LoadingState';
 
 interface NFTInsightsPanelProps {
     contractAddress: string;
@@ -86,7 +87,7 @@ export default function NFTInsightsPanel({ contractAddress, tokenId }: NFTInsigh
         return (
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <LoadingState size="xs" variant="inline" />
                     <span className="text-sm font-medium text-gray-700">Loading insights...</span>
                 </div>
             </div>

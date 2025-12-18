@@ -119,6 +119,9 @@ export class StatsSync {
                 { contractAddress, tokenId },
                 {
                     $set: {
+                        // CRITICAL: Set contractAddress and tokenId explicitly for upsert
+                        contractAddress,
+                        tokenId,
                         likeCount: data.data?.likeCount || 0,
                         favoriteCount: data.data?.favoriteCount || 0,
                         watchlistCount: data.data?.watchlistCount || 0,

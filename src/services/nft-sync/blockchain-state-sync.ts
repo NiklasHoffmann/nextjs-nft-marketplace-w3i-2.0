@@ -192,11 +192,19 @@ export class BlockchainStateSync {
             { contractAddress, tokenId },
             {
                 $set: {
+                    // CRITICAL: Set contractAddress and tokenId explicitly for upsert
+                    contractAddress,
+                    tokenId,
                     'blockchain.owner': state.owner,
                     'blockchain.approved': state.approved,
                     'blockchain.isApprovedForAll': state.isApprovedForAll,
                     'blockchain.lastSyncedAt': now,
                     updatedAt: now
+                },
+                $setOnInsert: {
+                    // Only set these on new document creation
+                    createdAt: now,
+                    metadataLastUpdated: now
                 }
             },
             { upsert: true }

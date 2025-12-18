@@ -43,16 +43,19 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
                     'Expires': '0'
                 }
             });
-            const data: TopScoresResponse = await response.json();
+            const response_1 = await response.json();
 
-            if (!data.success) {
+            if (!response_1.success) {
                 setError('Failed to load scores');
+                setScores([]);
                 return;
             }
 
-            setScores(data.scores);
+            // API wraps data in { success: true, data: { scores: [...], total: ... } }
+            setScores(response_1.data?.scores || []);
         } catch (err) {
             setError('Network error');
+            setScores([]);
             console.error('Error fetching scores:', err);
         } finally {
             setLoading(false);
@@ -61,8 +64,9 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
     };
 
     useEffect(() => {
-        // Nur beim ersten Laden den vollen Loader zeigen
-        fetchScores(loading);
+        // Beim ersten Laden (loading=true) oder Filter-Wechsel
+        fetchScores(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filter, walletAddress, refreshTrigger]);
 
     // Wenn die Wallet-Adresse sich ändert und wir auf "My Scores" sind,
@@ -181,7 +185,7 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
                 scrollbarWidth: 'thin',
                 scrollbarColor: '#CBD5E1 #F1F5F9'
             }}>
-                {scores.length === 0 ? (
+                {!scores || scores.length === 0 ? (
                     <div className="text-center py-12 text-gray-500">
                         <p className="text-lg mb-2">
                             {filter === 'week' && '📅 Keine Scores in den letzten 7 Tagen'}

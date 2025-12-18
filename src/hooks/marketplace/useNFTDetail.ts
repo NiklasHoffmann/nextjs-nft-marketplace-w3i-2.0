@@ -182,7 +182,10 @@ export function useNFTDetail(options: UseNFTDetailOptions): UseNFTDetailReturn {
                 throw new Error(`API error: ${response.status}`);
             }
 
-            const nftData = await response.json();
+            const result = await response.json();
+            
+            // apiHandler wraps response in { success: true, data: {...} }
+            const nftData = result.success ? result.data : result;
 
             // Convert /api/nft/detail response to EnrichedNFTDocument format
             const enrichedNFT: EnrichedNFTDocument = {

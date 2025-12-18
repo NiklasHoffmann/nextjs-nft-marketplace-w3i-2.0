@@ -64,6 +64,9 @@ export class IPFSMetadataLazySync {
                 { contractAddress, tokenId },
                 {
                     $set: {
+                        // CRITICAL: Set contractAddress and tokenId explicitly for upsert
+                        contractAddress,
+                        tokenId,
                         metadata,
                         metadataFetchedAt: new Date(),
                         'contract.tokenURI': tokenURI,

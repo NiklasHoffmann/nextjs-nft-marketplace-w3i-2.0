@@ -119,10 +119,9 @@ export class WalletNFTsService {
 
                 // Step 2: Background sync (verify ownership)
                 devLog.info('🔄 Step 2/2: Background sync starting...');
-                fetch(`/api/user/nfts/sync`, {
+                fetch(`/api/user/nfts/sync?userId=${walletAddress}`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ walletAddress })
+                    headers: { 'Content-Type': 'application/json' }
                 })
                     .then(res => res.json())
                     .then(syncResult => {

@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
+import { useForm } from '@/hooks/useForm';
 
 interface BatchListingFormProps {
     userNFTs: AggregatedNFT[];
@@ -23,15 +24,58 @@ export function BatchListingForm({ userNFTs, onSubmit, onBack, marketplaceAddres
     const [contractFilter, setContractFilter] = useState('');
     const [selectedNFTs, setSelectedNFTs] = useState<Set<string>>(new Set());
     const [pricingType, setPricingType] = useState<'fixed' | 'variable'>('fixed');
-    const [formData, setFormData] = useState({
-        fixedPrice: '',
-        startPrice: '',
-        endPrice: '',
-        currency: 'ETH' as 'ETH' | 'USDC',
-        description: ''
+    const [notWhitelistedCollections, setNotWhitelistedCollections] = useState<Array<{ address: string, name?: string }>>([]);
+
+    const form = useForm({
+        initialValues: {
+            fixedPrice: '',
+            startPrice: '',
+            endPrice: '',
+            currency: 'ETH' as 'ETH' | 'USDC',
+            description: ''
+        },
+        validate: (values) => {
+            const errors: Record<string, string> = {};
+
+            if (selectedNFTs.size === 0) {
+                errors.selection = 'Bitte wählen Sie mindestens einen NFT aus';
+            }
+
+            if (pricingType === 'fixed') {
+                if (!values.fixedPrice || parseFloat(values.fixedPrice) <= 0) {
+                    errors.fixedPrice = 'Bitte geben Sie einen gültigen Preis ein';
+                }
+            } else {
+                if (!values.startPrice || parseFloat(values.startPrice) <= 0) {
+                    errors.startPrice = 'Bitte geben Sie einen Start-Preis ein';
+                }
+                if (!values.endPrice || parseFloat(values.endPrice) <= 0) {
+                    errors.endPrice = 'Bitte geben Sie einen End-Preis ein';
+                }
+                if (values.startPrice && values.endPrice && parseFloat(values.endPrice) <= parseFloat(values.startPrice)) {
+                    errors.endPrice = 'End-Preis muss höher als Start-Preis sein';
+                }
+            }
+
+            if (!values.description.trim()) {
+                errors.description = 'Bitte fügen Sie eine Beschreibung hinzu';
+            }
+
+            return errors;
+        },
+        onSubmit: (values) => {
+            const selected = userNFTs.filter(nft => selectedNFTs.has(nft.key));
+            onSubmit({
+                selectedNFTs: selected,
+                pricingType,
+                fixedPrice: pricingType === 'fixed' ? values.fixedPrice : undefined,
+                startPrice: pricingType === 'variable' ? values.startPrice : undefined,
+                endPrice: pricingType === 'variable' ? values.endPrice : undefined,
+                currency: values.currency,
+                description: values.description
+            });
+        }
     });
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [notWhitelistedCollections, setNotWhitelistedCollections] = useState<Array<{address: string, name?: string}>>([]);
 
     // Filter NFTs by contract address
     const filteredNFTs = useMemo(() => {
@@ -108,24 +152,35 @@ export function BatchListingForm({ userNFTs, onSubmit, onBack, marketplaceAddres
             console.log('📋 Unique collections to check:', Array.from(uniqueCollections.keys()));
 
             // Check each collection
-            const notWhitelisted: Array<{address: string, name?: string}> = [];
+            const notWhitelisted: Array<{ address: string, name?: string }> = [];
             for (const [address, name] of uniqueCollections) {
                 try {
                     console.log('🔎 Checking collection:', address, name);
                     const response = await fetch('/api/marketplace/whitelist-check', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
+                        body: JSON.stringify({
                             marketplaceAddress,
-                            collectionAddress: address 
+                            collectionAddress: address
                         })
                     });
 
                     if (response.ok) {
-                        const data = await response.json();
-                        console.log('✅ Whitelist check result:', address, data.isWhitelisted);
-                        if (!data.isWhitelisted) {
+                        const result = await response.json();
+                        console.log('✅ Full response for', address, ':', JSON.stringify(result, null, 2));
+                        console.log('✅ result.data:', result.data);
+                        console.log('✅ result.data?.isWhitelisted:', result.data?.isWhitelisted);
+                        console.log('✅ result.isWhitelisted:', result.isWhitelisted);
+
+                        // API returns { success: true, data: { isWhitelisted: boolean } }
+                        const isWhitelisted = result.data?.isWhitelisted ?? result.isWhitelisted;
+                        console.log('✅ Final isWhitelisted value:', isWhitelisted, 'Type:', typeof isWhitelisted);
+
+                        if (!isWhitelisted) {
+                            console.log('❌ Adding to notWhitelisted:', address);
                             notWhitelisted.push({ address, name });
+                        } else {
+                            console.log('✅ Collection IS whitelisted, skipping:', address);
                         }
                     } else {
                         // Development: Bei Fehler annehmen dass whitelisted (optimistisch)
@@ -140,6 +195,7 @@ export function BatchListingForm({ userNFTs, onSubmit, onBack, marketplaceAddres
             }
 
             console.log('⚠️ Not whitelisted collections:', notWhitelisted);
+            console.log('⚠️ Setting notWhitelistedCollections state to:', notWhitelisted.length, 'items');
             setNotWhitelistedCollections(notWhitelisted);
         };
 
@@ -147,72 +203,18 @@ export function BatchListingForm({ userNFTs, onSubmit, onBack, marketplaceAddres
             console.log('🚀 Starting whitelist check for', selectedNFTs.size, 'NFTs');
             checkWhitelist();
         } else {
+            console.log('🚀 No NFTs selected, clearing whitelist warnings');
             setNotWhitelistedCollections([]);
         }
     }, [selectedNFTs, userNFTs, marketplaceAddress]);
 
-    const handleInputChange = (field: string, value: string) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
-        if (errors[field]) {
-            setErrors(prev => ({ ...prev, [field]: '' }));
-        }
-    };
-
-    const validateForm = () => {
-        const newErrors: Record<string, string> = {};
-
-        if (selectedNFTs.size === 0) {
-            newErrors.selection = 'Bitte wählen Sie mindestens einen NFT aus';
-        }
-
-        if (pricingType === 'fixed') {
-            if (!formData.fixedPrice || parseFloat(formData.fixedPrice) <= 0) {
-                newErrors.fixedPrice = 'Bitte geben Sie einen gültigen Preis ein';
-            }
-        } else {
-            if (!formData.startPrice || parseFloat(formData.startPrice) <= 0) {
-                newErrors.startPrice = 'Bitte geben Sie einen Start-Preis ein';
-            }
-            if (!formData.endPrice || parseFloat(formData.endPrice) <= 0) {
-                newErrors.endPrice = 'Bitte geben Sie einen End-Preis ein';
-            }
-            if (formData.startPrice && formData.endPrice && parseFloat(formData.endPrice) <= parseFloat(formData.startPrice)) {
-                newErrors.endPrice = 'End-Preis muss höher als Start-Preis sein';
-            }
-        }
-
-        if (!formData.description.trim()) {
-            newErrors.description = 'Bitte fügen Sie eine Beschreibung hinzu';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-
-        if (validateForm()) {
-            const selected = userNFTs.filter(nft => selectedNFTs.has(nft.key));
-            onSubmit({
-                selectedNFTs: selected,
-                pricingType,
-                fixedPrice: pricingType === 'fixed' ? formData.fixedPrice : undefined,
-                startPrice: pricingType === 'variable' ? formData.startPrice : undefined,
-                endPrice: pricingType === 'variable' ? formData.endPrice : undefined,
-                currency: formData.currency,
-                description: formData.description
-            });
-        }
-    };
-
     // Calculate price for each NFT based on pricing strategy
     const calculatePrice = (index: number, total: number): string => {
         if (pricingType === 'fixed') {
-            return formData.fixedPrice;
+            return form.values.fixedPrice;
         }
-        const start = parseFloat(formData.startPrice) || 0;
-        const end = parseFloat(formData.endPrice) || 0;
+        const start = parseFloat(form.values.startPrice) || 0;
+        const end = parseFloat(form.values.endPrice) || 0;
         if (total === 1) return start.toFixed(4);
         const increment = (end - start) / (total - 1);
         return (start + increment * index).toFixed(4);
@@ -231,7 +233,7 @@ export function BatchListingForm({ userNFTs, onSubmit, onBack, marketplaceAddres
     }, [userNFTs, selectedNFTs]);
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={form.handleSubmit} className="space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
@@ -338,9 +340,9 @@ export function BatchListingForm({ userNFTs, onSubmit, onBack, marketplaceAddres
                         </button>
                     </div>
 
-                    {errors.selection && (
+                    {(form.errors as any).selection && (
                         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
-                            {errors.selection}
+                            {(form.errors as any).selection}
                         </div>
                     )}
 
@@ -474,22 +476,20 @@ export function BatchListingForm({ userNFTs, onSubmit, onBack, marketplaceAddres
                                 <input
                                     type="number"
                                     step="0.0001"
-                                    value={formData.fixedPrice}
-                                    onChange={(e) => handleInputChange('fixedPrice', e.target.value)}
-                                    className={`flex-1 rounded-l-lg border ${errors.fixedPrice ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
+                                    {...form.getFieldProps('fixedPrice')}
+                                    className={`flex-1 rounded-l-lg border ${form.hasError('fixedPrice') ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
                                     placeholder="0.00"
                                 />
                                 <select
-                                    value={formData.currency}
-                                    onChange={(e) => handleInputChange('currency', e.target.value)}
+                                    {...form.getFieldProps('currency')}
                                     className="rounded-r-lg border border-l-0 border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm"
                                 >
                                     <option value="ETH">ETH</option>
                                     <option value="USDC">USDC</option>
                                 </select>
                             </div>
-                            {errors.fixedPrice && (
-                                <p className="mt-1 text-sm text-red-600">{errors.fixedPrice}</p>
+                            {form.hasError('fixedPrice') && (
+                                <p className="mt-1 text-sm text-red-600">{form.getFieldError('fixedPrice')}</p>
                             )}
                         </div>
                     )}
@@ -505,22 +505,20 @@ export function BatchListingForm({ userNFTs, onSubmit, onBack, marketplaceAddres
                                     <input
                                         type="number"
                                         step="0.0001"
-                                        value={formData.startPrice}
-                                        onChange={(e) => handleInputChange('startPrice', e.target.value)}
-                                        className={`flex-1 rounded-l-lg border ${errors.startPrice ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
+                                        {...form.getFieldProps('startPrice')}
+                                        className={`flex-1 rounded-l-lg border ${form.hasError('startPrice') ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
                                         placeholder="1.00"
                                     />
                                     <select
-                                        value={formData.currency}
-                                        onChange={(e) => handleInputChange('currency', e.target.value)}
+                                        {...form.getFieldProps('currency')}
                                         className="rounded-r-lg border border-l-0 border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm"
                                     >
                                         <option value="ETH">ETH</option>
                                         <option value="USDC">USDC</option>
                                     </select>
                                 </div>
-                                {errors.startPrice && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.startPrice}</p>
+                                {form.hasError('startPrice') && (
+                                    <p className="mt-1 text-sm text-red-600">{form.getFieldError('startPrice')}</p>
                                 )}
                             </div>
 
@@ -532,22 +530,21 @@ export function BatchListingForm({ userNFTs, onSubmit, onBack, marketplaceAddres
                                     <input
                                         type="number"
                                         step="0.0001"
-                                        value={formData.endPrice}
-                                        onChange={(e) => handleInputChange('endPrice', e.target.value)}
-                                        className={`flex-1 rounded-l-lg border ${errors.endPrice ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
+                                        {...form.getFieldProps('endPrice')}
+                                        className={`flex-1 rounded-l-lg border ${form.hasError('endPrice') ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
                                         placeholder="10.00"
                                     />
                                     <div className="rounded-r-lg border border-l-0 border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-600">
-                                        {formData.currency}
+                                        {form.values.currency}
                                     </div>
                                 </div>
-                                {errors.endPrice && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.endPrice}</p>
+                                {form.hasError('endPrice') && (
+                                    <p className="mt-1 text-sm text-red-600">{form.getFieldError('endPrice')}</p>
                                 )}
                             </div>
 
                             {/* Price Preview */}
-                            {formData.startPrice && formData.endPrice && selectedNFTs.size > 0 && (
+                            {form.values.startPrice && form.values.endPrice && selectedNFTs.size > 0 && (
                                 <div className="bg-gradient-to-r from-green-50 to-green-100 border-green-200 rounded-lg p-3 border">
                                     <p className="text-xs font-medium text-green-900 mb-2">Preis-Vorschau:</p>
                                     <div className="space-y-1 text-xs text-green-800">
@@ -559,7 +556,7 @@ export function BatchListingForm({ userNFTs, onSubmit, onBack, marketplaceAddres
                                                         {nft.meta?.name || `NFT #${nft.tokenId}`}
                                                     </span>
                                                     <span className="font-semibold ml-2">
-                                                        {calculatePrice(idx, selectedNFTsList.length)} {formData.currency}
+                                                        {calculatePrice(idx, selectedNFTsList.length)} {form.values.currency}
                                                     </span>
                                                 </div>
                                             ))}
@@ -569,7 +566,7 @@ export function BatchListingForm({ userNFTs, onSubmit, onBack, marketplaceAddres
                                             <span>
                                                 {selectedNFTsList.reduce((sum, _, idx) => {
                                                     return sum + parseFloat(calculatePrice(idx, selectedNFTsList.length));
-                                                }, 0).toFixed(4)} {formData.currency}
+                                                }, 0).toFixed(4)} {form.values.currency}
                                             </span>
                                         </div>
                                     </div>
@@ -584,14 +581,13 @@ export function BatchListingForm({ userNFTs, onSubmit, onBack, marketplaceAddres
                             Beschreibung *
                         </label>
                         <textarea
-                            value={formData.description}
-                            onChange={(e) => handleInputChange('description', e.target.value)}
+                            {...form.getFieldProps('description')}
                             rows={3}
-                            className={`w-full rounded-xl border ${errors.description ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
+                            className={`w-full rounded-xl border ${form.hasError('description') ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
                             placeholder="Beschreiben Sie Ihre Batch-Listings..."
                         />
-                        {errors.description && (
-                            <p className="mt-1 text-sm text-red-600">{errors.description}</p>
+                        {form.hasError('description') && (
+                            <p className="mt-1 text-sm text-red-600">{form.getFieldError('description')}</p>
                         )}
                     </div>
 

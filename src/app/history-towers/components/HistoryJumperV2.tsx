@@ -145,7 +145,7 @@ export default function HistoryJumperV2({ onGameStateChange, onLeaderboardRefres
 
         // Create platforms using PhysicsEngine
         if (physics) {
-            s.platforms = physics.createInitialPlatforms()
+            s.platforms = physics.createInitialPlatforms() || []
         } else {
             // Fallback: manual creation
             s.platforms = []
@@ -166,7 +166,9 @@ export default function HistoryJumperV2({ onGameStateChange, onLeaderboardRefres
         s.vy = 0
         s.grounded = true
 
-        s.nextSpawnY = s.platforms[s.platforms.length - 1]?.y || HEIGHT - 80 - 70 * 9
+        s.nextSpawnY = (s.platforms && s.platforms.length > 0) 
+            ? (s.platforms[s.platforms.length - 1]?.y || HEIGHT - 80 - 70 * 9)
+            : HEIGHT - 80 - 70 * 9
         s.distanceClimbed = 0
         s.backgroundScroll = 0
         s.platformsClimbed = 0  // Reset platform counter

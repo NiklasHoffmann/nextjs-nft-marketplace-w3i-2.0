@@ -98,6 +98,7 @@ export function SellPage() {
     const [batchTransactionData, setBatchTransactionData] = useState<BatchTransactionData | null>(null);
     const [showApprovalDialog, setShowApprovalDialog] = useState(false);
     const [showWhitelistWarning, setShowWhitelistWarning] = useState(false);
+    const [isWhitelisted, setIsWhitelisted] = useState(true);
     const [showListingProgress, setShowListingProgress] = useState(false);
 
     // Ref to prevent showing same error multiple times
@@ -265,6 +266,7 @@ export function SellPage() {
         // If NFT is deselected, hide whitelist warning
         if (!nft) {
             setShowWhitelistWarning(false);
+            setIsWhitelisted(true);
             return;
         }
 
@@ -281,16 +283,20 @@ export function SellPage() {
 
             if (response.ok) {
                 const data = await response.json();
-                setShowWhitelistWarning(!data.isWhitelisted);
+                const whitelisted = data.data?.isWhitelisted ?? data.isWhitelisted ?? false;
+                setShowWhitelistWarning(!whitelisted);
+                setIsWhitelisted(whitelisted);
             } else {
                 // Development: Bei Fehler annehmen dass whitelisted (optimistisch)
                 console.warn('⚠️ Whitelist check failed (assuming whitelisted for development):', response.status);
                 setShowWhitelistWarning(false);
+                setIsWhitelisted(true);
             }
         } catch (error) {
             // Development: Bei Fehler annehmen dass whitelisted (optimistisch)
             console.warn('⚠️ Whitelist check error (assuming whitelisted for development):', error);
             setShowWhitelistWarning(false);
+            setIsWhitelisted(true);
         }
     };
 
@@ -499,6 +505,7 @@ export function SellPage() {
                                 <UnifiedListingForm
                                     selectedNFT={selectedNFT}
                                     isFullyApproved={isFullyApproved}
+                                    isWhitelisted={isWhitelisted}
                                     onSubmit={handleFormSubmit}
                                 />
                             </div>
