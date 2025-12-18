@@ -358,21 +358,21 @@ export default function OverviewTab({ contractAddress,
                     </div>
 
                     {/* Swap Target (if applicable) */}
-                    {(nftDetails.listingType === 'SWAP_AND_ETH' || nftDetails.listingType === 'PURE_SWAP') && 
-                     (nftDetails.desiredTokenAddress || nftDetails.desiredContractAddress) && (
-                        <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                            <h4 className="text-sm font-semibold text-yellow-900 mb-2">🔄 Swap Requirements</h4>
-                            <div className="space-y-1 text-xs text-yellow-800">
-                                <p><span className="font-medium">Desired NFT:</span> {nftDetails.desiredTokenAddress || nftDetails.desiredContractAddress}</p>
-                                {nftDetails.desiredTokenId && (
-                                    <p><span className="font-medium">Token ID:</span> {nftDetails.desiredTokenId}</p>
-                                )}
-                                {nftDetails.desiredErc1155Quantity && (
-                                    <p><span className="font-medium">Quantity:</span> {nftDetails.desiredErc1155Quantity}</p>
-                                )}
+                    {(nftDetails.listingType === 'SWAP_AND_ETH' || nftDetails.listingType === 'PURE_SWAP') &&
+                        (nftDetails.desiredTokenAddress || nftDetails.desiredContractAddress) && (
+                            <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                                <h4 className="text-sm font-semibold text-yellow-900 mb-2">🔄 Swap Requirements</h4>
+                                <div className="space-y-1 text-xs text-yellow-800">
+                                    <p><span className="font-medium">Desired NFT:</span> {nftDetails.desiredTokenAddress || nftDetails.desiredContractAddress}</p>
+                                    {nftDetails.desiredTokenId && (
+                                        <p><span className="font-medium">Token ID:</span> {nftDetails.desiredTokenId}</p>
+                                    )}
+                                    {nftDetails.desiredErc1155Quantity && (
+                                        <p><span className="font-medium">Quantity:</span> {nftDetails.desiredErc1155Quantity}</p>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
                 </div>
             )}
 

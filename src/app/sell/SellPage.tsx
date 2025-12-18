@@ -99,7 +99,7 @@ export function SellPage() {
     const [showApprovalDialog, setShowApprovalDialog] = useState(false);
     const [showWhitelistWarning, setShowWhitelistWarning] = useState(false);
     const [showListingProgress, setShowListingProgress] = useState(false);
-    
+
     // Ref to prevent showing same error multiple times
     const lastErrorRef = useRef<string | null>(null);
 
@@ -107,8 +107,8 @@ export function SellPage() {
     useEffect(() => {
         if (urlContract && urlTokenId && allNFTs.length > 0 && !selectedNFT) {
             const nftToSelect = allNFTs.find(
-                nft => nft.contractAddress.toLowerCase() === urlContract.toLowerCase() && 
-                       nft.tokenId === urlTokenId
+                nft => nft.contractAddress.toLowerCase() === urlContract.toLowerCase() &&
+                    nft.tokenId === urlTokenId
             );
             if (nftToSelect) {
                 handleNFTSelect(nftToSelect);
@@ -120,10 +120,10 @@ export function SellPage() {
     useEffect(() => {
         if (listingSuccess && listingTxHash) {
             console.log('✅ Transaction confirmed on blockchain!', listingTxHash);
-            
+
             // Clear all pending notifications (removes "Transaction Pending" info notification)
             notifications.clearAll();
-            
+
             notifications.success(
                 'Listing Created!',
                 `Your NFT is now listed on the marketplace`,
@@ -147,39 +147,39 @@ export function SellPage() {
         if (listingError) {
             // Create unique error identifier to prevent duplicate notifications
             const errorId = listingError.message + ((listingError as any).details || '') + Date.now();
-            
+
             // Only show error if it's different from the last one
             if (lastErrorRef.current !== errorId) {
                 lastErrorRef.current = errorId;
-                
+
                 console.error('🔴 [SellPage] Transaction error detected:', listingError);
-                
+
                 // Clear all pending notifications (removes "Transaction Pending" info notification)
                 notifications.clearAll();
-                
+
                 // Extract error details
                 const errorMessage = listingError.message || (listingError as any).shortMessage || 'Failed to create listing';
                 const errorDetails = (listingError as any).details || '';
                 const errorName = listingError.name || '';
-                
+
                 // Determine error type for user-friendly messaging
-                const isUserRejection = 
-                    errorMessage.toLowerCase().includes('user rejected') || 
+                const isUserRejection =
+                    errorMessage.toLowerCase().includes('user rejected') ||
                     errorMessage.toLowerCase().includes('user denied') ||
                     errorMessage.toLowerCase().includes('user cancelled') ||
                     errorName === 'UserRejectedRequestError';
-                
-                const isGasError = 
+
+                const isGasError =
                     errorMessage.toLowerCase().includes('gas') ||
                     errorMessage.toLowerCase().includes('insufficient funds');
-                
-                const isContractRevert = 
+
+                const isContractRevert =
                     errorMessage.toLowerCase().includes('revert') ||
                     errorMessage.toLowerCase().includes('execution reverted');
-                
+
                 let title = 'Transaction Failed';
                 let message = errorMessage;
-                
+
                 if (isUserRejection) {
                     title = 'Transaction Cancelled';
                     message = 'You cancelled the transaction in your wallet';
@@ -190,7 +190,7 @@ export function SellPage() {
                     title = 'Gas Error';
                     message = `Gas-related error: ${errorMessage}`;
                 }
-                
+
                 console.error('🔴 Error Type:', {
                     title,
                     message,
@@ -199,9 +199,9 @@ export function SellPage() {
                     isContractRevert,
                     rawError: listingError
                 });
-                
+
                 notifications.error(title, message, { duration: 10000 });
-                
+
                 // Hide listing progress overlay on error
                 setShowListingProgress(false);
             }
@@ -223,19 +223,19 @@ export function SellPage() {
                 tokenId: selectedNFT.core?.tokenId || selectedNFT.tokenId
             } : null
         });
-        
+
         const checkWhitelist = async (address: string): Promise<boolean> => {
             try {
                 // Create a one-time API call for whitelist check
                 const result = await fetch('/api/marketplace/whitelist-check', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
+                    body: JSON.stringify({
                         marketplaceAddress,
-                        collectionAddress: address 
+                        collectionAddress: address
                     })
                 });
-                
+
                 if (!result.ok) return false;
                 const data = await result.json();
                 return data.isWhitelisted || false;
@@ -244,7 +244,7 @@ export function SellPage() {
                 return false;
             }
         };
-        
+
         return new ListingService(
             marketplaceAddress,
             createListing,
@@ -273,9 +273,9 @@ export function SellPage() {
             const response = await fetch('/api/marketplace/whitelist-check', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     marketplaceAddress,
-                    collectionAddress: nft.core.contractAddress 
+                    collectionAddress: nft.core.contractAddress
                 })
             });
 
@@ -383,7 +383,7 @@ export function SellPage() {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Sticky Header */}
-            <SellHeader 
+            <SellHeader
                 listingType={listingType}
                 nftCount={allNFTs.length}
                 listedCount={listedCount}
@@ -399,111 +399,111 @@ export function SellPage() {
                         showToggle={!showPreview}
                     />
 
-                {/* Approval Dialog */}
-                {showApprovalDialog && selectedNFT && (
-                    <ApprovalDialog
-                        nft={selectedNFT}
-                        isBatchMode={listingType === 'batch'}
-                        onApproveSingle={handleApproveSingle}
-                        onApproveAll={handleApproveAll}
-                        onCancel={() => setShowApprovalDialog(false)}
-                    />
-                )}
+                    {/* Approval Dialog */}
+                    {showApprovalDialog && selectedNFT && (
+                        <ApprovalDialog
+                            nft={selectedNFT}
+                            isBatchMode={listingType === 'batch'}
+                            onApproveSingle={handleApproveSingle}
+                            onApproveAll={handleApproveAll}
+                            onCancel={() => setShowApprovalDialog(false)}
+                        />
+                    )}
 
-                {/* Preview Mode */}
-                {showPreview ? (
-                    listingType === 'batch' && batchTransactionData ? (
-                        <BatchTransactionPreview
-                            data={batchTransactionData}
-                            onConfirm={handleTransactionConfirm}
-                            onCancel={() => setShowPreview(false)}
-                            isLoading={isLoading}
+                    {/* Preview Mode */}
+                    {showPreview ? (
+                        listingType === 'batch' && batchTransactionData ? (
+                            <BatchTransactionPreview
+                                data={batchTransactionData}
+                                onConfirm={handleTransactionConfirm}
+                                onCancel={() => setShowPreview(false)}
+                                isLoading={isLoading}
+                            />
+                        ) : (
+                            <TransactionPreview
+                                data={transactionData}
+                                onConfirm={handleTransactionConfirm}
+                                onCancel={() => setShowPreview(false)}
+                                isLoading={isLoading}
+                            />
+                        )
+                    ) : listingType === 'batch' ? (
+                        /* Batch Listing Mode */
+                        <BatchListingForm
+                            userNFTs={filteredNFTs}
+                            onSubmit={handleBatchFormSubmit}
+                            onBack={() => setListingType('single')}
+                            marketplaceAddress={marketplaceAddress}
                         />
                     ) : (
-                        <TransactionPreview
-                            data={transactionData}
-                            onConfirm={handleTransactionConfirm}
-                            onCancel={() => setShowPreview(false)}
-                            isLoading={isLoading}
-                        />
-                    )
-                ) : listingType === 'batch' ? (
-                    /* Batch Listing Mode */
-                    <BatchListingForm
-                        userNFTs={filteredNFTs}
-                        onSubmit={handleBatchFormSubmit}
-                        onBack={() => setListingType('single')}
-                        marketplaceAddress={marketplaceAddress}
-                    />
-                ) : (
-                    /* Single Listing Mode */
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        {/* Batch Listing Info Banner */}
-                        <BatchListingInfoBanner onBatchClick={() => setListingType('batch')} />
+                        /* Single Listing Mode */
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            {/* Batch Listing Info Banner */}
+                            <BatchListingInfoBanner onBatchClick={() => setListingType('batch')} />
 
-                        {/* NFT Selection Panel */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                </svg>
-                                Wählen Sie Ihren NFT
+                            {/* NFT Selection Panel */}
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                    </svg>
+                                    Wählen Sie Ihren NFT
+                                    {!nftsLoading && allNFTs.length > 0 && (
+                                        <span className="ml-auto text-sm font-normal text-gray-500">
+                                            {filteredNFTs.length} / {allNFTs.length} NFT{allNFTs.length !== 1 ? 's' : ''}
+                                        </span>
+                                    )}
+                                </h2>
+
+                                {/* Search and Filters */}
                                 {!nftsLoading && allNFTs.length > 0 && (
-                                    <span className="ml-auto text-sm font-normal text-gray-500">
-                                        {filteredNFTs.length} / {allNFTs.length} NFT{allNFTs.length !== 1 ? 's' : ''}
-                                    </span>
-                                )}
-                            </h2>
-
-                            {/* Search and Filters */}
-                            {!nftsLoading && allNFTs.length > 0 && (
-                                <NFTSearchFilter
-                                    filterOptions={filterOptions}
-                                    onFilterChange={updateFilter}
-                                    unlistedCount={allNFTs.filter((nft) => !nft.listed).length}
-                                />
-                            )}
-
-                            {/* Whitelist Warning */}
-                            {showWhitelistWarning && selectedNFT && (
-                                <div className="mb-4">
-                                    <WhitelistWarning
-                                        collectionName={selectedNFT.core.contractName || undefined}
-                                        collectionAddress={selectedNFT.core.contractAddress}
-                                        onClose={() => setShowWhitelistWarning(false)}
+                                    <NFTSearchFilter
+                                        filterOptions={filterOptions}
+                                        onFilterChange={updateFilter}
+                                        unlistedCount={allNFTs.filter((nft) => !nft.listed).length}
                                     />
-                                </div>
-                            )}
+                                )}
 
-                            {/* Error Display */}
-                            {nftsError && <ErrorDisplay error={nftsError} />}
+                                {/* Whitelist Warning */}
+                                {showWhitelistWarning && selectedNFT && (
+                                    <div className="mb-4">
+                                        <WhitelistWarning
+                                            collectionName={selectedNFT.core.contractName || undefined}
+                                            collectionAddress={selectedNFT.core.contractAddress}
+                                            onClose={() => setShowWhitelistWarning(false)}
+                                        />
+                                    </div>
+                                )}
 
-                            {/* NFT Selector */}
-                            <NFTUserSelector
-                                userNFTs={filteredNFTs}
-                                selectedNFT={selectedNFT}
-                                onSelect={handleNFTSelect}
-                                isLoading={nftsLoading}
-                            />
+                                {/* Error Display */}
+                                {nftsError && <ErrorDisplay error={nftsError} />}
+
+                                {/* NFT Selector */}
+                                <NFTUserSelector
+                                    userNFTs={filteredNFTs}
+                                    selectedNFT={selectedNFT}
+                                    onSelect={handleNFTSelect}
+                                    isLoading={nftsLoading}
+                                />
+                            </div>
+
+                            {/* Listing Form Panel */}
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
+                                    Listing-Details
+                                </h2>
+
+                                <UnifiedListingForm
+                                    selectedNFT={selectedNFT}
+                                    isFullyApproved={isFullyApproved}
+                                    onSubmit={handleFormSubmit}
+                                />
+                            </div>
                         </div>
-
-                        {/* Listing Form Panel */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                                <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                </svg>
-                                Listing-Details
-                            </h2>
-
-                            <UnifiedListingForm
-                                selectedNFT={selectedNFT}
-                                isFullyApproved={isFullyApproved}
-                                onSubmit={handleFormSubmit}
-                            />
-                        </div>
-                    </div>
-                )}
+                    )}
                 </div>
             </main>
 

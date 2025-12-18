@@ -49,7 +49,7 @@ export function ContractInfoSection({ contract, isApprovedForAll }: ContractInfo
     const marketplaceAddress = getMarketplaceAddress(chainId);
     console.log('🏷️ ContractInfoSection - contract:', contract);
     console.log('🏷️ ContractInfoSection - isApprovedForAll:', isApprovedForAll);
-    
+
     // Check Token-Level Approval (getApproved)
     const hasTokenApproval = contract.approved && marketplaceAddress
         ? contract.approved.toLowerCase() === marketplaceAddress.toLowerCase()

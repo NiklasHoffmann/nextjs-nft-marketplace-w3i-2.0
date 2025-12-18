@@ -40,7 +40,7 @@ export function SellHeader({ listingType, nftCount = 0, listedCount = 0, unliste
                                 {listingType === 'batch' ? 'Batch Listing' : 'Sell & Trade NFTs'}
                             </h1>
                             <p className="text-xs text-gray-600 mt-0.5">
-                                {listingType === 'batch' 
+                                {listingType === 'batch'
                                     ? `List multiple NFTs at once • ${nftCount} NFT${nftCount !== 1 ? 's' : ''} available`
                                     : 'List your NFTs for sale or trade with other collectors'
                                 }

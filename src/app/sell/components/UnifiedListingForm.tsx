@@ -145,7 +145,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, onSub
     };
 
     // Gebühren berechnen (nur für Verkauf/Hybrid) - dynamisch vom Contract
-    const fees = formData.price && parseFloat(formData.price) > 0 
+    const fees = formData.price && parseFloat(formData.price) > 0
         ? calculateFees(parseFloat(formData.price))
         : { marketplaceFee: 0, royaltyFee: 0, youReceive: 0 };
 

@@ -158,7 +158,7 @@ export function NFTFilterSidebar({
     // Update parent when filters change (debounced for search and numeric inputs)
     // Use JSON.stringify to do deep comparison and avoid unnecessary calls
     const filtersString = useMemo(() => JSON.stringify(filters), [filters]);
-    
+
     useEffect(() => {
         onFiltersChange(filters);
     }, [filtersString]); // Only trigger when filter values actually change

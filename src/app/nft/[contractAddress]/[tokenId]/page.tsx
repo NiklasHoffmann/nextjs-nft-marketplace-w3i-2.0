@@ -107,36 +107,36 @@ function NFTDetailPage() {
             contractAddress,
             tokenId,
             isListed: nftData.marketplace?.isListed || false,
-            
+
             // Pricing (v1 & v2)
             price: nftData.marketplace?.price || "0",
             priceTotal: nftData.marketplace?.priceTotal,
             unitPrice: nftData.marketplace?.unitPrice,
-            
+
             // Parties
             seller: nftData.marketplace?.seller || nftData.contract?.owner || "",
             buyer: nftData.marketplace?.buyer ?? undefined,
-            
+
             // Swap Data
             desiredContractAddress: nftData.marketplace?.desiredContractAddress || nftData.marketplace?.desiredTokenAddress || "",
             desiredTokenAddress: nftData.marketplace?.desiredTokenAddress,
             desiredTokenId: nftData.marketplace?.desiredTokenId ? String(nftData.marketplace.desiredTokenId) : "",
             desiredErc1155Quantity: nftData.marketplace?.desiredErc1155Quantity,
-            
+
             // v2 Fields
             tokenStandard: nftData.marketplace?.tokenStandard || 'ERC721',
             listingType: nftData.marketplace?.listingType,
             status: nftData.marketplace?.status,
-            
+
             // ERC1155
             erc1155QuantityListed: nftData.marketplace?.erc1155QuantityListed,
             remainingQuantity: nftData.marketplace?.remainingQuantity,
-            
+
             // Advanced
             buyerWhitelistEnabled: nftData.marketplace?.buyerWhitelistEnabled,
             partialBuyEnabled: nftData.marketplace?.partialBuyEnabled,
             feeRate: nftData.marketplace?.feeRate,
-            
+
             // Chain & Timestamps
             chainId: nftData.marketplace?.chainId,
             createdAt: nftData.marketplace?.createdAt,
