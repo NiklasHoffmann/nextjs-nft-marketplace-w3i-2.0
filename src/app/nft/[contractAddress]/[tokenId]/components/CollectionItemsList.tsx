@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { formatEther } from '@/utils';
 import { CollectionItemsListProps } from '@/types';
 import { formatNFTDisplayName, truncateAddress } from '@/utils';
+import { OptimizedNFTImage } from '@/components/nft';
 
 interface CollectionNFT {
     contractAddress: string;
@@ -120,10 +121,15 @@ export default function CollectionItemsList({
                     >
                         <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl mb-3 overflow-hidden group-hover:shadow-lg transition-all duration-200">
                             {item.metadata?.image ? (
-                                <img
-                                    src={item.metadata.image}
+                                <OptimizedNFTImage
+                                    imageUrl={item.metadata.image}
+                                    tokenId={item.tokenId}
                                     alt={item.metadata?.name || `#${item.tokenId}`}
                                     className="w-full h-full object-cover"
+                                    fill={false}
+                                    width={300}
+                                    height={300}
+                                    priority={false}
                                 />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center">
