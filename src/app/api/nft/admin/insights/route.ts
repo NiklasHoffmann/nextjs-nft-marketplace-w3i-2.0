@@ -1,29 +1,47 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+/**
+ * Admin NFT Insights API Route (REFACTORED - WITH AUTH)
+ * 
+ * Uses new standardized API infrastructure:
+ * - apiHandler wrapper for error handling
+ * - withAdmin middleware for authentication ✅
+ * - Custom error classes
+ * - Type-safe responses
+ * 
+ * Routes:
+ * - POST /api/nft/admin/insights - Create insight (ADMIN ONLY)
+ * - PUT /api/nft/admin/insights - Update insight (ADMIN ONLY)
+ * - DELETE /api/nft/admin/insights - Delete insight (ADMIN ONLY)
+ */
+
+import { NextRequest } from 'next/server';
+import { z } from 'zod';
 import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { apiHandler } from '@/lib/api/handler';
+import { withAdmin } from '@/lib/middleware/auth';
+import { apiBadRequest, apiNotFound, apiSuccess } from '@/lib/api/responses';
 import type { NFTProjectDescriptions, NFTFunctionalitiesDescriptions } from '@/types/features/nft-insights';
-import { apiBadRequest, apiSuccess, apiError, apiInternalError } from '@/lib/api/responses';
+
+// ===== TYPES =====
 
 interface AdminNFTInsight {
   _id?: ObjectId;
   contractAddress: string;
   tokenId: string;
-  customTitle?: string; // New consistent field name
-  title: string; // Legacy support
+  customTitle?: string;
+  title: string;
   description?: string;
-  descriptions?: string[]; // Legacy array of descriptions
-  projectDescriptions?: NFTProjectDescriptions; // Enhanced project-specific descriptions
-  functionalitiesDescriptions?: NFTFunctionalitiesDescriptions; // Enhanced functionalities descriptions
-  specificDescriptions?: NFTProjectDescriptions; // Legacy support - maps to projectDescriptions
-  cardDescriptions?: string[]; // NFT Card descriptions (max 3, with character limit)
+  descriptions?: string[];
+  projectDescriptions?: NFTProjectDescriptions;
+  functionalitiesDescriptions?: NFTFunctionalitiesDescriptions;
+  specificDescriptions?: NFTProjectDescriptions;
+  cardDescriptions?: string[];
   category?: string;
   tags?: string[];
   rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-  // Social/Partnership Information
   projectWebsite?: string;
   projectTwitter?: string;
   projectDiscord?: string;
-  // Partnerships
   partnerships?: string[];
   partnershipDetails?: string;
   createdBy: string;
@@ -31,179 +49,197 @@ interface AdminNFTInsight {
   updatedAt: string;
 }
 
-// Admin routes for Create, Update, Delete only
-// For reading insights, use /api/nft/insights
+// ===== VALIDATION SCHEMAS =====
 
-// POST /api/nft/admin/insights - Create admin insight for NFT
-export async function POST(request: NextRequest) {
-  try {
-    const data = await request.json();
+const createInsightSchema = z.object({
+  contractAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid contract address'),
+  tokenId: z.string().regex(/^\d*$/, 'Token ID must be a number or empty').optional().default(''),
+  customTitle: z.string().optional(),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  descriptions: z.array(z.string()).optional(),
+  projectDescriptions: z.any().optional(), // TODO: Add proper schema
+  functionalitiesDescriptions: z.any().optional(),
+  specificDescriptions: z.any().optional(),
+  cardDescriptions: z.array(z.string()).optional(),
+  category: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  rarity: z.enum(['common', 'uncommon', 'rare', 'epic', 'legendary']).optional(),
+  projectWebsite: z.string().url().optional().or(z.literal('')),
+  projectTwitter: z.string().optional(),
+  projectDiscord: z.string().optional(),
+  partnerships: z.array(z.string()).optional(),
+  partnershipDetails: z.string().optional(),
+});
 
-    // TODO: Add admin authentication check here
+const updateInsightSchema = z.object({
+  _id: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid ObjectId'),
+}).merge(createInsightSchema.partial());
 
-    // Validation - only contractAddress is required
-    if (!data.contractAddress) {
-      return apiBadRequest('contractAddress is required');
-    }
+const deleteInsightSchema = z.object({
+  contractAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+  tokenId: z.string().regex(/^\d*$/),
+});
 
-    // Token ID validation - only validate format if provided
-    if (data.tokenId && !/^\d+$/.test(data.tokenId.toString())) {
-      return apiBadRequest('tokenId must be a valid number if provided');
-    }
+// ===== ROUTE HANDLERS =====
 
-    const collection = await getCollection('admin_nft_insights');
+/**
+ * POST /api/nft/admin/insights
+ * Create new NFT insight (ADMIN ONLY - Auto-authenticated)
+ */
+export const POST = apiHandler(async (req: NextRequest) => {
+  // Apply admin middleware for authentication
+  await withAdmin(req);
 
-    const insight: Omit<AdminNFTInsight, '_id'> = {
-      contractAddress: data.contractAddress.toLowerCase(),
-      tokenId: data.tokenId || '', // Allow empty for collection-wide insights
-      customTitle: data.customTitle || '', // Allow empty custom title
-      title: data.title || data.customTitle || '', // Legacy support
-      description: data.description,
-      descriptions: data.descriptions || [], // Legacy descriptions array
-      projectDescriptions: data.projectDescriptions, // Enhanced project descriptions
-      functionalitiesDescriptions: data.functionalitiesDescriptions, // Enhanced functionalities descriptions
-      specificDescriptions: data.specificDescriptions || data.projectDescriptions, // Legacy support
-      cardDescriptions: data.cardDescriptions || [], // NFT Card descriptions
-      category: data.category,
-      tags: data.tags || [],
-      rarity: data.rarity,
-      // Social/Partnership Information
-      projectWebsite: data.projectWebsite,
-      projectTwitter: data.projectTwitter,
-      projectDiscord: data.projectDiscord,
-      // Partnerships
-      partnerships: data.partnerships || [],
-      partnershipDetails: data.partnershipDetails,
-      createdBy: data.createdBy || 'admin', // TODO: Get from auth
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+  // Get authenticated admin address
+  // @ts-ignore - added by withAdmin middleware
+  const adminAddress = req.userAddress as string;
 
-    const result = await collection.insertOne(insight);
-    const created = await collection.findOne({ _id: result.insertedId });
-    return apiSuccess(created);
+  // Parse and validate request body
+  const body = await req.json();
+  const parseResult = createInsightSchema.safeParse(body);
 
-  } catch (error) {
-    console.error('Error creating admin NFT insight:', error);
-    return apiInternalError('Failed to create insight');
+  if (!parseResult.success) {
+    return apiBadRequest('Invalid request data', parseResult.error.format());
   }
-}
 
-// PUT /api/nft/admin/insights - Update admin insight for NFT
-export async function PUT(request: NextRequest) {
-  try {
-    const data = await request.json();
-    // TODO: Add admin authentication check here
+  const data = parseResult.data;
+  const collection = await getCollection('admin_nft_insights');
 
-    // Validation - only contractAddress is required for updates
-    if (!data.contractAddress) {
-      return apiBadRequest('contractAddress is required');
-    }
+  const insight: Omit<AdminNFTInsight, '_id'> = {
+    contractAddress: data.contractAddress.toLowerCase(),
+    tokenId: data.tokenId || '',
+    customTitle: data.customTitle || '',
+    title: data.title || data.customTitle || '',
+    description: data.description,
+    descriptions: data.descriptions || [],
+    projectDescriptions: data.projectDescriptions,
+    functionalitiesDescriptions: data.functionalitiesDescriptions,
+    specificDescriptions: data.specificDescriptions || data.projectDescriptions,
+    cardDescriptions: data.cardDescriptions || [],
+    category: data.category,
+    tags: data.tags || [],
+    rarity: data.rarity,
+    projectWebsite: data.projectWebsite,
+    projectTwitter: data.projectTwitter,
+    projectDiscord: data.projectDiscord,
+    partnerships: data.partnerships || [],
+    partnershipDetails: data.partnershipDetails,
+    createdBy: adminAddress, // ✅ Uses authenticated admin address
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
 
-    // Token ID validation - only validate format if provided
-    if (data.tokenId && !/^\d+$/.test(data.tokenId.toString())) {
-      return apiBadRequest('tokenId must be a valid number if provided');
-    }
+  // Check for existing insight
+  const existing = await collection.findOne({
+    contractAddress: insight.contractAddress,
+    tokenId: insight.tokenId,
+  });
 
-    const collection = await getCollection('admin_nft_insights');
-
-    const updateData = {
-      customTitle: data.customTitle || '', // Allow empty custom title
-      title: data.title || data.customTitle || '', // Legacy support
-      description: data.description,
-      descriptions: data.descriptions || [], // Legacy descriptions array
-      projectDescriptions: data.projectDescriptions, // Enhanced project descriptions
-      functionalitiesDescriptions: data.functionalitiesDescriptions, // Enhanced functionalities descriptions
-      specificDescriptions: data.specificDescriptions || data.projectDescriptions, // Legacy support
-      cardDescriptions: data.cardDescriptions || [], // NFT Card descriptions
-      category: data.category,
-      tags: data.tags || [],
-      rarity: data.rarity,
-      // Social/Partnership Information
-      projectWebsite: data.projectWebsite,
-      projectTwitter: data.projectTwitter,
-      projectDiscord: data.projectDiscord,
-      // Partnerships
-      partnerships: data.partnerships || [],
-      partnershipDetails: data.partnershipDetails,
-      updatedAt: new Date().toISOString(),
-    };
-
-    // Build query - handle both collection-wide and NFT-specific insights
-    const query: any = {
-      contractAddress: data.contractAddress.toLowerCase()
-    };
-
-    // Add tokenId to query if provided, otherwise look for collection-wide insights (empty tokenId)
-    if (data.tokenId) {
-      query.tokenId = data.tokenId;
-    } else {
-      query.tokenId = '';
-    }
-
-    const result = await collection.updateOne(
-      query,
-      { $set: updateData },
-      { upsert: true }
-    );
-
-    const updated = await collection.findOne({
-      contractAddress: data.contractAddress.toLowerCase(),
-      tokenId: data.tokenId
-    });
-
-    return apiSuccess(updated);
-
-  } catch (error) {
-    console.error('Error updating admin NFT insight:', error);
-    return apiInternalError('Failed to update insight');
+  if (existing) {
+    return apiBadRequest('Insight already exists for this NFT');
   }
-}
 
-// DELETE /api/nft/admin/insights - Delete admin insight for NFT
-export async function DELETE(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const contractAddress = searchParams.get('contractAddress');
-    const tokenId = searchParams.get('tokenId');
+  const result = await collection.insertOne(insight);
 
-    // TODO: Add admin authentication check here
+  return apiSuccess({
+    _id: result.insertedId.toString(),
+    ...insight,
+  });
+});
 
-    // Validation - only contractAddress is required for deletion
-    if (!contractAddress) {
-      return apiBadRequest('contractAddress is required');
-    }
+/**
+ * PUT /api/nft/admin/insights
+ * Update existing NFT insight (ADMIN ONLY - Auto-authenticated)
+ */
+export const PUT = apiHandler(async (req: NextRequest) => {
+  // Apply admin middleware for authentication
+  await withAdmin(req);
 
-    const collection = await getCollection('admin_nft_insights');
+  // Parse and validate request body
+  const body = await req.json();
+  const parseResult = updateInsightSchema.safeParse(body);
 
-    // Build query - handle both collection-wide and NFT-specific insights
-    const query: any = {
-      contractAddress: contractAddress.toLowerCase()
-    };
-
-    // Add tokenId to query if provided, otherwise look for collection-wide insights (empty tokenId)
-    if (tokenId) {
-      query.tokenId = tokenId;
-    } else {
-      query.tokenId = '';
-    }
-
-    const result = await collection.deleteOne(query);
-
-    if (result.deletedCount === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Insight not found' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Insight deleted successfully'
-    });
-
-  } catch (error) {
-    console.error('Error deleting admin NFT insight:', error);
-    return apiInternalError('Failed to delete insight');
+  if (!parseResult.success) {
+    return apiBadRequest('Invalid request data', parseResult.error.format());
   }
-}
+
+  const data = parseResult.data;
+  const collection = await getCollection('admin_nft_insights');
+
+  const { _id, ...updateData } = data;
+
+  // Find existing insight
+  const existing = await collection.findOne({ _id: new ObjectId(_id) });
+  if (!existing) {
+    return apiNotFound('Insight not found');
+  }
+
+  // Prepare update
+  const update: Partial<AdminNFTInsight> = {
+    ...updateData,
+    updatedAt: new Date().toISOString(),
+  };
+
+  // Handle legacy field synchronization
+  if (update.customTitle) {
+    update.title = update.customTitle;
+  }
+  if (update.projectDescriptions) {
+    update.specificDescriptions = update.projectDescriptions;
+  }
+
+  // Lowercase contract address if present
+  if (update.contractAddress) {
+    update.contractAddress = update.contractAddress.toLowerCase();
+  }
+
+  const result = await collection.findOneAndUpdate(
+    { _id: new ObjectId(_id) },
+    { $set: update },
+    { returnDocument: 'after' }
+  );
+
+  if (!result) {
+    return apiNotFound('Insight not found');
+  }
+
+  return apiSuccess(result);
+});
+
+/**
+ * DELETE /api/nft/admin/insights
+ * Delete NFT insight (ADMIN ONLY - Auto-authenticated)
+ */
+export const DELETE = apiHandler(async (req: NextRequest) => {
+  // Apply admin middleware for authentication
+  await withAdmin(req);
+
+  // Parse query parameters for DELETE
+  const { searchParams } = new URL(req.url);
+  const contractAddress = searchParams.get('contractAddress');
+  const tokenId = searchParams.get('tokenId') || '';
+
+  if (!contractAddress) {
+    return apiBadRequest('Missing contractAddress parameter');
+  }
+
+  // Validate
+  const parseResult = deleteInsightSchema.safeParse({ contractAddress, tokenId });
+  if (!parseResult.success) {
+    return apiBadRequest('Invalid parameters', parseResult.error.format());
+  }
+
+  const collection = await getCollection('admin_nft_insights');
+
+  const result = await collection.deleteOne({
+    contractAddress: contractAddress.toLowerCase(),
+    tokenId: tokenId,
+  });
+
+  if (result.deletedCount === 0) {
+    return apiNotFound('Insight not found');
+  }
+
+  return apiSuccess({ deleted: true });
+});

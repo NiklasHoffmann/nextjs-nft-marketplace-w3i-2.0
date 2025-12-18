@@ -1,5 +1,6 @@
 ﻿// app/api/nft-metadata/route.ts - Optimized Version
 import { NextRequest, NextResponse } from 'next/server';
+import { apiHandler, apiSuccess, getQueryParam, BadRequestError, NotFoundError } from '@/lib/api';
 import { LRUCache } from 'lru-cache';
 import { fetchComprehensiveNFTDataNew } from '@/services/blockchain/nft-fetcher';
 import { createRobustPublicClient, getTimeoutConfig } from '@/services/blockchain/rpc-config';
@@ -18,17 +19,13 @@ const imageCache = new LRUCache<string, string>({
     ttl: 1000 * 60 * 60 * 6, // 6 Stunden TTL fÃ¼r Images
 });
 
-export async function GET(request: NextRequest) {
-    const searchParams = request.nextUrl.searchParams;
-    const contractAddress = searchParams.get('address');
-    const tokenId = searchParams.get('tokenId');
-    const forceRefreshApproval = searchParams.get('refreshApproval') === 'true'; // 🔥 NEW
+export const GET = apiHandler(async (request: NextRequest) => {
+    const contractAddress = getQueryParam(request, 'address');
+    const tokenId = getQueryParam(request, 'tokenId');
+    const forceRefreshApproval = getQueryParam(request, 'refreshApproval') === 'true';
 
     if (!contractAddress || !tokenId) {
-        return NextResponse.json(
-            { error: 'Missing contractAddress or tokenId parameter' },
-            { status: 400 }
-        );
+        throw new BadRequestError('Missing contractAddress or tokenId parameter');
     }
 
     const cacheKey = `${contractAddress}-${tokenId}`;
@@ -97,7 +94,7 @@ export async function GET(request: NextRequest) {
                 totalSupply: blockchainData.totalSupply,
                 owner: blockchainData.owner,
                 ownerBalance: blockchainData.ownerBalance,
-                approved: blockchainData.approvedAddress, // Map to 'approved' for consistency
+                approved: blockchainData.approvedAddress,
             },
             cached: false
         };
@@ -108,16 +105,13 @@ export async function GET(request: NextRequest) {
             imageCache.set(`image-${cacheKey}`, imageUrl);
         }
 
-        return NextResponse.json(result);
+        return apiSuccess(result);
 
     } catch (error) {
         console.error('Error fetching NFT metadata:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch NFT metadata' },
-            { status: 500 }
-        );
+        throw error;
     }
-}
+});
 
 async function processMetadata(tokenURI: string): Promise<{ metadata: any; imageUrl: string | null }> {
     let metadataUri = tokenURI;

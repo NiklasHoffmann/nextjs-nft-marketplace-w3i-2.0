@@ -6,6 +6,8 @@
  */
 
 import { NextRequest } from 'next/server';
+import { apiHandler } from '@/lib/api/handler';
+import { withAuth } from '@/lib/middleware/auth';
 import {
     apiSuccess,
     apiBadRequest,
@@ -25,9 +27,12 @@ import type { EnrichedNFTMetadata } from '@/types/nft-metadata';
  * Retrieve all NFTs owned by wallet from database (instant load)
  * Query params: walletAddress (required), plus filters (same as /api/marketplace/items)
  */
-export async function GET(request: NextRequest) {
-    try {
-        await rateLimit(request, RATE_LIMIT_CONFIG.LENIENT);
+export const GET = apiHandler(async (request: NextRequest) => {
+    await withAuth(request);
+    // @ts-ignore
+    const authenticatedUser = request.userAddress as string;
+
+    await rateLimit(request, RATE_LIMIT_CONFIG.LENIENT);
 
         const walletAddress = getQueryParam(request, 'walletAddress', true);
 
@@ -297,26 +302,16 @@ export async function GET(request: NextRequest) {
 
 
 
-        // Calculate stats
-        const listed = nfts.filter((nft: any) => nft.isListed).length;
-        const unlisted = nfts.length - listed;
+    // Calculate stats
+    const listed = nfts.filter((nft: any) => nft.isListed).length;
+    const unlisted = nfts.length - listed;
 
-        return apiSuccess({
-            nfts: nfts as EnrichedNFTMetadata[],
-            total: nfts.length,
-            listed,
-            unlisted,
-            source: 'database',
-            cached: true
-        });
-
-    } catch (error) {
-        console.error('❌ [User NFTs] Error fetching user NFTs:', error);
-
-        if (error instanceof BadRequestError) {
-            return apiBadRequest(error.message);
-        }
-
-        return apiInternalError('Failed to fetch user NFTs');
-    }
-}
+    return apiSuccess({
+        nfts: nfts as EnrichedNFTMetadata[],
+        total: nfts.length,
+        listed,
+        unlisted,
+        source: 'database',
+        cached: true
+    });
+});

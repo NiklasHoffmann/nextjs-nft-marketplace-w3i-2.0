@@ -27,13 +27,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
+import { apiHandler } from '@/lib/api/handler';
 import type { MarketplaceItemsResponse } from '@/types/marketplace/enriched-nft';
 
-export async function GET(request: NextRequest) {
+export const GET = apiHandler(async (request: NextRequest) => {
     const startTime = Date.now();
-
-    try {
-        const { searchParams } = new URL(request.url);
+    const { searchParams } = new URL(request.url);
 
         // Parse pagination
         const page = parseInt(searchParams.get('page') || '1');
@@ -550,20 +549,8 @@ export async function GET(request: NextRequest) {
             cached: false
         };
 
-        const duration = Date.now() - startTime;
-        console.log(`✅ Marketplace query completed in ${duration}ms (${total} total, ${items.length} returned)`);
+    const duration = Date.now() - startTime;
+    console.log(`✅ Marketplace query completed in ${duration}ms (${total} total, ${items.length} returned)`);
 
-        return NextResponse.json(response);
-    } catch (error) {
-        console.error('❌ Marketplace API error:', error);
-
-        return NextResponse.json(
-            {
-                success: false,
-                error: error instanceof Error ? error.message : 'Unknown error',
-                timestamp: Date.now()
-            },
-            { status: 500 }
-        );
-    }
-}
+    return NextResponse.json(response);
+});

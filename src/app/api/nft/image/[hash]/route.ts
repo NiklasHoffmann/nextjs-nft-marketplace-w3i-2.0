@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { apiHandler, apiSuccess, BadRequestError } from '@/lib/api';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -116,110 +117,98 @@ function updateGatewayStats(gateway: string, success: boolean, time: number) {
 
 /**
  * GET /api/nft/image/[ipfsHash] - Serve cached or download IPFS image
+ * Note: This route is NOT wrapped with apiHandler because it returns binary data, not JSON
  */
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ hash: string }> }
 ) {
+    const { hash: ipfsHash } = await params;
+
+    if (!ipfsHash || ipfsHash.length < 10) {
+        return NextResponse.json({
+            success: false,
+            error: 'Invalid IPFS hash'
+        }, { status: 400 });
+    }
+
+    await ensureCacheDir();
+
+    // Check if already cached
+    const cachedPath = path.join(CACHE_DIR, ipfsHash);
+
     try {
-        const { hash: ipfsHash } = await params;
+        const cached = await fs.readFile(cachedPath);
+        // Removed: console.log for cache hits - use X-Cache-Status header instead
 
-        if (!ipfsHash || ipfsHash.length < 10) {
-            return NextResponse.json({
-                success: false,
-                error: 'Invalid IPFS hash'
-            }, { status: 400 });
-        }
+        // Determine content type from file extension or default to image
+        const ext = path.extname(ipfsHash).toLowerCase();
+        const contentType = ext === '.png' ? 'image/png'
+            : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg'
+                : ext === '.gif' ? 'image/gif'
+                    : ext === '.svg' ? 'image/svg+xml'
+                        : ext === '.webp' ? 'image/webp'
+                            : 'image/png'; // default
 
-        // Removed: console.log for every image request - too spammy!
-
-        await ensureCacheDir();
-
-        // Check if already cached
-        const cachedPath = path.join(CACHE_DIR, ipfsHash);
-
-        try {
-            const cached = await fs.readFile(cachedPath);
-            // Removed: console.log for cache hits - use X-Cache-Status header instead
-
-            // Determine content type from file extension or default to image
-            const ext = path.extname(ipfsHash).toLowerCase();
-            const contentType = ext === '.png' ? 'image/png'
-                : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg'
-                    : ext === '.gif' ? 'image/gif'
-                        : ext === '.svg' ? 'image/svg+xml'
-                            : ext === '.webp' ? 'image/webp'
-                                : 'image/png'; // default
-
-            return new NextResponse(new Uint8Array(cached), {
-                headers: {
-                    'Content-Type': contentType,
-                    'Cache-Control': 'public, max-age=31536000, immutable', // 1 year - images never change
-                    'CDN-Cache-Control': 'public, max-age=31536000', // CDN: 1 year
-                    'Vercel-CDN-Cache-Control': 'public, max-age=31536000', // Vercel Edge: 1 year
-                    'X-Cache-Status': 'HIT',
-                    'Vary': 'Accept', // Enable content negotiation
-                    'ETag': `"${ipfsHash}"`, // Use IPFS hash as ETag
-                    'Access-Control-Allow-Origin': '*', // Allow cross-origin
-                    'Cross-Origin-Resource-Policy': 'cross-origin'
-                }
-            });
-        } catch (err) {
-            // Not cached, need to download (silent - no log spam)
-        }
-
-        // Download from IPFS
-        const imageBuffer = await fetchFromIPFS(ipfsHash);
-
-        if (!imageBuffer) {
-            return NextResponse.json({
-                success: false,
-                error: 'Failed to download image from IPFS'
-            }, { status: 502 });
-        }
-
-        // Save to cache
-        try {
-            await fs.writeFile(cachedPath, new Uint8Array(imageBuffer));
-            // Removed: console.log for successful cache - reduces log spam
-        } catch (err) {
-            console.warn('⚠️ Failed to cache image:', err);
-            // Continue anyway - we have the image
-        }
-
-        // Determine content type from buffer or default
-        let contentType = 'image/png';
-        if (imageBuffer[0] === 0xFF && imageBuffer[1] === 0xD8) {
-            contentType = 'image/jpeg';
-        } else if (imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50) {
-            contentType = 'image/png';
-        } else if (imageBuffer[0] === 0x47 && imageBuffer[1] === 0x49) {
-            contentType = 'image/gif';
-        } else if (imageBuffer.toString('utf8', 0, 5) === '<?xml' || imageBuffer.toString('utf8', 0, 4) === '<svg') {
-            contentType = 'image/svg+xml';
-        }
-
-        return new NextResponse(new Uint8Array(imageBuffer), {
+        return new NextResponse(new Uint8Array(cached), {
             headers: {
                 'Content-Type': contentType,
                 'Cache-Control': 'public, max-age=31536000, immutable', // 1 year - images never change
                 'CDN-Cache-Control': 'public, max-age=31536000', // CDN: 1 year
                 'Vercel-CDN-Cache-Control': 'public, max-age=31536000', // Vercel Edge: 1 year
-                'X-Cache-Status': 'MISS',
+                'X-Cache-Status': 'HIT',
                 'Vary': 'Accept', // Enable content negotiation
                 'ETag': `"${ipfsHash}"`, // Use IPFS hash as ETag
                 'Access-Control-Allow-Origin': '*', // Allow cross-origin
                 'Cross-Origin-Resource-Policy': 'cross-origin'
             }
         });
+    } catch (err) {
+        // Not cached, need to download (silent - no log spam)
+    }
 
-    } catch (error) {
-        console.error('❌ Image proxy error:', error);
+    // Download from IPFS
+    const imageBuffer = await fetchFromIPFS(ipfsHash);
+
+    if (!imageBuffer) {
         return NextResponse.json({
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to proxy image'
-        }, { status: 500 });
+            error: 'Failed to download image from IPFS'
+        }, { status: 502 });
     }
+
+    // Save to cache
+    try {
+        await fs.writeFile(cachedPath, new Uint8Array(imageBuffer));
+    } catch (err) {
+        console.warn('⚠️ Failed to cache image:', err);
+    }
+
+    // Determine content type from buffer or default
+    let contentType = 'image/png';
+    if (imageBuffer[0] === 0xFF && imageBuffer[1] === 0xD8) {
+        contentType = 'image/jpeg';
+    } else if (imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50) {
+        contentType = 'image/png';
+    } else if (imageBuffer[0] === 0x47 && imageBuffer[1] === 0x49) {
+        contentType = 'image/gif';
+    } else if (imageBuffer.toString('utf8', 0, 5) === '<?xml' || imageBuffer.toString('utf8', 0, 4) === '<svg') {
+        contentType = 'image/svg+xml';
+    }
+
+    return new NextResponse(new Uint8Array(imageBuffer), {
+        headers: {
+            'Content-Type': contentType,
+            'Cache-Control': 'public, max-age=31536000, immutable',
+            'CDN-Cache-Control': 'public, max-age=31536000',
+            'Vercel-CDN-Cache-Control': 'public, max-age=31536000',
+            'X-Cache-Status': 'MISS',
+            'Vary': 'Accept',
+            'ETag': `\"${ipfsHash}\"`,
+            'Access-Control-Allow-Origin': '*',
+            'Cross-Origin-Resource-Policy': 'cross-origin'
+        }
+    });
 }
 
 /**
@@ -227,54 +216,42 @@ export async function GET(
  */
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: Promise<{ hash: string }> }
+    context: { params: Promise<{ hash: string }> }
 ) {
-    try {
-        const { hash: ipfsHash } = await params;
+    return apiHandler(async () => {
+        const { hash: ipfsHash } = await context.params;
 
-        if (ipfsHash === 'all') {
-            // Clear all cached images (admin operation)
-            const files = await fs.readdir(CACHE_DIR);
-            let deleted = 0;
+    if (ipfsHash === 'all') {
+        // Clear all cached images (admin operation)
+        const files = await fs.readdir(CACHE_DIR);
+        let deleted = 0;
 
-            for (const file of files) {
-                try {
-                    await fs.unlink(path.join(CACHE_DIR, file));
-                    deleted++;
-                } catch (err) {
-                    console.warn(`⚠️ Failed to delete ${file}:`, err);
-                }
+        for (const file of files) {
+            try {
+                await fs.unlink(path.join(CACHE_DIR, file));
+                deleted++;
+            } catch (err) {
+                console.warn(`⚠️ Failed to delete ${file}:`, err);
             }
-
-            return NextResponse.json({
-                success: true,
-                deleted,
-                message: `Cleared ${deleted} cached images`
-            });
         }
 
-        // Delete specific image
-        const cachedPath = path.join(CACHE_DIR, ipfsHash);
-
-        try {
-            await fs.unlink(cachedPath);
-            return NextResponse.json({
-                success: true,
-                message: 'Cached image deleted',
-                ipfsHash
-            });
-        } catch (err) {
-            return NextResponse.json({
-                success: false,
-                error: 'Image not in cache'
-            }, { status: 404 });
-        }
-
-    } catch (error) {
-        console.error('❌ Image delete error:', error);
-        return NextResponse.json({
-            success: false,
-            error: error instanceof Error ? error.message : 'Failed to delete image'
-        }, { status: 500 });
+        return apiSuccess({
+            deleted,
+            message: `Cleared ${deleted} cached images`
+        });
     }
+
+    // Delete specific image
+    const cachedPath = path.join(CACHE_DIR, ipfsHash);
+
+    try {
+        await fs.unlink(cachedPath);
+        return apiSuccess({
+            message: 'Cached image deleted',
+            ipfsHash
+        });
+    } catch (err) {
+        throw new BadRequestError('Image not in cache');
+    }
+    }, { admin: true })(request);
 }

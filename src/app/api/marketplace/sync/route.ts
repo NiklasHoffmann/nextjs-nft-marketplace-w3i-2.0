@@ -1,11 +1,12 @@
 /**
  * NFT Sync Service Status & Control API
  * 
- * GET /api/marketplace/sync - Get sync service status
- * POST /api/marketplace/sync - Start/stop sync service
+ * GET /api/marketplace/sync - Get sync service status (Admin only)
+ * POST /api/marketplace/sync - Start/stop sync service (Admin only)
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { apiHandler, apiSuccess, BadRequestError } from '@/lib/api';
 import { getNFTSyncService } from '@/services/nft-sync';
 
 // Auto-start service on module load (server-side only)
@@ -33,71 +34,37 @@ if (typeof window === 'undefined') {
     }
 }
 
-export async function GET(request: NextRequest) {
-    try {
-        const syncService = getNFTSyncService();
-        const status = syncService.getStatus();
+export const GET = apiHandler(async (request: NextRequest) => {
+    const syncService = getNFTSyncService();
+    const status = syncService.getStatus();
 
-        return NextResponse.json({
-            success: true,
-            data: status,
+    return apiSuccess({
+        ...status,
+        timestamp: Date.now()
+    });
+}, { admin: true });
+
+export const POST = apiHandler(async (request: NextRequest) => {
+    const body = await request.json();
+    const { action } = body; // 'start' or 'stop'
+
+    if (!action || (action !== 'start' && action !== 'stop')) {
+        throw new BadRequestError('Invalid action. Use "start" or "stop"');
+    }
+
+    const syncService = getNFTSyncService();
+
+    if (action === 'start') {
+        await syncService.start();
+        return apiSuccess({
+            message: 'Sync service started',
             timestamp: Date.now()
         });
-    } catch (error) {
-        console.error('❌ Sync status error:', error);
-
-        return NextResponse.json(
-            {
-                success: false,
-                error: error instanceof Error ? error.message : 'Unknown error',
-                timestamp: Date.now()
-            },
-            { status: 500 }
-        );
+    } else {
+        await syncService.stop();
+        return apiSuccess({
+            message: 'Sync service stopped',
+            timestamp: Date.now()
+        });
     }
-}
-
-export async function POST(request: NextRequest) {
-    try {
-        const body = await request.json();
-        const { action } = body; // 'start' or 'stop'
-
-        const syncService = getNFTSyncService();
-
-        if (action === 'start') {
-            await syncService.start();
-            return NextResponse.json({
-                success: true,
-                message: 'Sync service started',
-                timestamp: Date.now()
-            });
-        } else if (action === 'stop') {
-            await syncService.stop();
-            return NextResponse.json({
-                success: true,
-                message: 'Sync service stopped',
-                timestamp: Date.now()
-            });
-        } else {
-            return NextResponse.json(
-                {
-                    success: false,
-                    error: 'Invalid action. Use "start" or "stop"',
-                    timestamp: Date.now()
-                },
-                { status: 400 }
-            );
-        }
-    } catch (error) {
-        console.error('❌ Sync control error:', error);
-
-        return NextResponse.json(
-            {
-                success: false,
-                error: error instanceof Error ? error.message : 'Unknown error',
-                timestamp: Date.now()
-            },
-            { status: 500 }
-        );
-    }
-}
+}, { admin: true });

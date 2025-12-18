@@ -16,6 +16,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
+import { apiHandler } from '@/lib/api/handler';
+import { withAuth } from '@/lib/middleware/auth';
+import { apiBadRequest } from '@/lib/api/responses';
 
 interface CartItem {
     listingId: string;
@@ -33,49 +36,41 @@ interface UserCart {
     updatedAt: Date;
 }
 
-export async function GET(request: NextRequest) {
-    try {
-        const { searchParams } = new URL(request.url);
-        const walletAddress = searchParams.get('walletAddress')?.toLowerCase();
+export const GET = apiHandler(async (request: NextRequest) => {
+    await withAuth(request);
+    // @ts-ignore
+    const authenticatedUser = request.userAddress as string;
+    
+    const { searchParams } = new URL(request.url);
+    const walletAddress = searchParams.get('walletAddress')?.toLowerCase();
 
-        if (!walletAddress) {
-            return NextResponse.json(
-                { error: 'Missing walletAddress' },
-                { status: 400 }
-            );
-        }
-
-        const carts = await getCollection('user_carts');
-        const cart = await carts.findOne({ walletAddress }) as UserCart | null;
-
-        return NextResponse.json({
-            success: true,
-            data: {
-                items: cart?.items || [],
-                updatedAt: cart?.updatedAt || null
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ [Cart API] GET failed:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch cart' },
-            { status: 500 }
-        );
+    if (!walletAddress) {
+        return apiBadRequest('Missing walletAddress');
     }
-}
 
-export async function POST(request: NextRequest) {
-    try {
-        const body = await request.json();
-        const { walletAddress, items } = body;
+    const carts = await getCollection('user_carts');
+    const cart = await carts.findOne({ walletAddress }) as UserCart | null;
 
-        if (!walletAddress || !Array.isArray(items)) {
-            return NextResponse.json(
-                { error: 'Missing walletAddress or items' },
-                { status: 400 }
-            );
+    return NextResponse.json({
+        success: true,
+        data: {
+            items: cart?.items || [],
+            updatedAt: cart?.updatedAt || null
         }
+    });
+});
+
+export const POST = apiHandler(async (request: NextRequest) => {
+    await withAuth(request);
+    // @ts-ignore
+    const authenticatedUser = request.userAddress as string;
+
+    const body = await request.json();
+    const { walletAddress, items } = body;
+
+    if (!walletAddress || !Array.isArray(items)) {
+        return apiBadRequest('Missing walletAddress or items');
+    }
 
         const normalizedAddress = walletAddress.toLowerCase();
         const carts = await getCollection('user_carts');
@@ -93,52 +88,36 @@ export async function POST(request: NextRequest) {
             { upsert: true }
         );
 
-        console.log(`✅ [Cart API] Saved cart for ${normalizedAddress}:`, items.length, 'items');
+    console.log(`✅ [Cart API] Saved cart for ${normalizedAddress}:`, items.length, 'items');
 
-        return NextResponse.json({
-            success: true,
-            data: {
-                itemCount: items.length,
-                updatedAt: new Date()
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ [Cart API] POST failed:', error);
-        return NextResponse.json(
-            { error: 'Failed to save cart' },
-            { status: 500 }
-        );
-    }
-}
-
-export async function DELETE(request: NextRequest) {
-    try {
-        const { searchParams } = new URL(request.url);
-        const walletAddress = searchParams.get('walletAddress')?.toLowerCase();
-
-        if (!walletAddress) {
-            return NextResponse.json(
-                { error: 'Missing walletAddress' },
-                { status: 400 }
-            );
+    return NextResponse.json({
+        success: true,
+        data: {
+            itemCount: items.length,
+            updatedAt: new Date()
         }
+    });
+});
 
-        const carts = await getCollection('user_carts');
-        await carts.deleteOne({ walletAddress });
+export const DELETE = apiHandler(async (request: NextRequest) => {
+    await withAuth(request);
+    // @ts-ignore
+    const authenticatedUser = request.userAddress as string;
 
-        console.log(`🗑️ [Cart API] Cleared cart for ${walletAddress}`);
+    const { searchParams } = new URL(request.url);
+    const walletAddress = searchParams.get('walletAddress')?.toLowerCase();
 
-        return NextResponse.json({
-            success: true,
-            message: 'Cart cleared'
-        });
-
-    } catch (error) {
-        console.error('❌ [Cart API] DELETE failed:', error);
-        return NextResponse.json(
-            { error: 'Failed to clear cart' },
-            { status: 500 }
-        );
+    if (!walletAddress) {
+        return apiBadRequest('Missing walletAddress');
     }
-}
+
+    const carts = await getCollection('user_carts');
+    await carts.deleteOne({ walletAddress });
+
+    console.log(`🗑️ [Cart API] Cleared cart for ${walletAddress}`);
+
+    return NextResponse.json({
+        success: true,
+        message: 'Cart cleared'
+    });
+});

@@ -1,5 +1,7 @@
 ﻿import { NextRequest } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
+import { apiHandler } from '@/lib/api/handler';
+import { withAuth } from '@/lib/middleware/auth';
 import {
     getCachedInteractions,
     setCachedInteractions,
@@ -14,7 +16,6 @@ import {
     getQueryParam,
     parseJsonBody,
     isValidAddress,
-    isValidTokenId,
     BadRequestError
 } from '@/lib/api';
 
@@ -50,139 +51,128 @@ interface CombinedUserInteractionsResponse {
     error?: string;
 }
 
-// GET /api/user/interactions - Get all user interactions for an NFT
-export async function GET(request: NextRequest) {
-    try {
-        // Apply rate limiting (lenient for read operations)
-        await rateLimit(request, RATE_LIMIT_CONFIG.LENIENT);
+// GET /api/user/interactions - Get all user interactions for an NFT (AUTH REQUIRED)
+export const GET = apiHandler(async (request: NextRequest) => {
+    // Require authentication
+    await withAuth(request);
+    // @ts-ignore - added by withAuth middleware
+    const authenticatedUser = request.userAddress as string;
+    
+    // Apply rate limiting (lenient for read operations)
+    await rateLimit(request, RATE_LIMIT_CONFIG.LENIENT);
 
-        // Extract and validate parameters
-        const userId = getQueryParam(request, 'userId', true);
-        const contractAddress = getQueryParam(request, 'contractAddress', true);
-        const tokenId = getQueryParam(request, 'tokenId', true);
+    // Extract and validate parameters
+    const userId = getQueryParam(request, 'userId', true);
+    const contractAddress = getQueryParam(request, 'contractAddress', true);
+    const tokenId = getQueryParam(request, 'tokenId', true);
 
-        if (!isValidAddress(contractAddress)) {
-            throw new BadRequestError('Invalid contract address format');
-        }
-        if (!isValidTokenId(tokenId)) {
-            throw new BadRequestError('Invalid token ID format');
-        }
+    if (!isValidAddress(contractAddress)) {
+        throw new BadRequestError('Invalid contract address format');
+    }
 
-        // Fetch from all user collections
-        const [favoritesCollection, ratingsCollection, watchlistCollection, personalNotesCollection] = await Promise.all([
-            getCollection('user_likes'),
-            getCollection('user_ratings'),
-            getCollection('user_watchlist'),
-            getCollection('user_personal_notes'),
-        ]);
+    // Fetch from all user collections
+    const [favoritesCollection, ratingsCollection, watchlistCollection, personalNotesCollection] = await Promise.all([
+        getCollection('user_likes'),
+        getCollection('user_ratings'),
+        getCollection('user_watchlist'),
+        getCollection('user_personal_notes'),
+    ]);
 
-        if (!userId) {
-            throw new BadRequestError('User ID is required');
-        }
+    if (!userId) {
+        throw new BadRequestError('User ID is required');
+    }
 
-        const lowerUserId = userId.toLowerCase();
-        const lowerContractAddress = contractAddress.toLowerCase();
+    const lowerUserId = userId.toLowerCase();
+    const lowerContractAddress = contractAddress.toLowerCase();
 
-        // Check cache first
-        const cachedData = getCachedInteractions(lowerUserId, lowerContractAddress, tokenId);
-        if (cachedData) {
-            return apiSuccess({ ...cachedData, cached: true });
-        }
+    // Check cache first
+    const cachedData = getCachedInteractions(lowerUserId, lowerContractAddress, tokenId);
+    if (cachedData) {
+        return apiSuccess({ ...cachedData, cached: true });
+    }
 
-        // Query all collections in parallel
-        const [favoriteDoc, ratingDoc, watchlistDoc, personalNotesDoc] = await Promise.all([
-            favoritesCollection.findOne({
-                userId: lowerUserId,
-                contractAddress: lowerContractAddress,
-                tokenId: tokenId
-            }),
-            ratingsCollection.findOne({
-                userId: lowerUserId,
-                contractAddress: lowerContractAddress,
-                tokenId: tokenId
-            }),
-            watchlistCollection.findOne({
-                userId: lowerUserId,
-                contractAddress: lowerContractAddress,
-                tokenId: tokenId
-            }),
-            personalNotesCollection.findOne({
-                userId: lowerUserId,
-                contractAddress: lowerContractAddress,
-                tokenId: tokenId
-            })
-        ]);
-
-        // Combine all data into a single response
-        const combinedData: UserInteractionData = {
+    // Query all collections in parallel
+    const [favoriteDoc, ratingDoc, watchlistDoc, personalNotesDoc] = await Promise.all([
+        favoritesCollection.findOne({
             userId: lowerUserId,
             contractAddress: lowerContractAddress,
-            tokenId: tokenId,
+            tokenId: tokenId
+        }),
+        ratingsCollection.findOne({
+            userId: lowerUserId,
+            contractAddress: lowerContractAddress,
+            tokenId: tokenId
+        }),
+        watchlistCollection.findOne({
+            userId: lowerUserId,
+            contractAddress: lowerContractAddress,
+            tokenId: tokenId
+        }),
+        personalNotesCollection.findOne({
+            userId: lowerUserId,
+            contractAddress: lowerContractAddress,
+            tokenId: tokenId
+        })
+    ]);
 
-            // Favorites
-            isFavorite: !!favoriteDoc,
-            favoriteAddedAt: favoriteDoc?.addedAt,
+    // Combine all data into a single response
+    const combinedData: UserInteractionData = {
+        userId: lowerUserId,
+        contractAddress: lowerContractAddress,
+        tokenId: tokenId,
 
-            // Public Ratings (for community averages)
-            rating: ratingDoc?.rating,
-            ratedAt: ratingDoc?.ratedAt,
+        // Favorites
+        isFavorite: !!favoriteDoc,
+        favoriteAddedAt: favoriteDoc?.addedAt,
 
-            // Watchlist
-            isWatchlisted: !!watchlistDoc,
-            watchlistAddedAt: watchlistDoc?.addedAt,
+        // Public Ratings (for community averages)
+        rating: ratingDoc?.rating,
+        ratedAt: ratingDoc?.ratedAt,
 
-            // Private Personal Data (separate from public ratings)
-            personalNotes: personalNotesDoc?.personalNotes || '',
-            strategy: personalNotesDoc?.strategy,
-            investmentGoal: personalNotesDoc?.investmentGoal,
-            riskLevel: personalNotesDoc?.riskLevel,
+        // Watchlist
+        isWatchlisted: !!watchlistDoc,
+        watchlistAddedAt: watchlistDoc?.addedAt,
 
-            lastUpdated: new Date().toISOString()
-        };
+        // Private Personal Data (separate from public ratings)
+        personalNotes: personalNotesDoc?.personalNotes || '',
+        strategy: personalNotesDoc?.strategy,
+        investmentGoal: personalNotesDoc?.investmentGoal,
+        riskLevel: personalNotesDoc?.riskLevel,
 
-        // Cache the combined data
-        setCachedInteractions(lowerUserId, lowerContractAddress, tokenId, combinedData);
+        lastUpdated: new Date().toISOString()
+    };
 
-        return apiSuccess(combinedData);
+    // Cache the combined data
+    setCachedInteractions(lowerUserId, lowerContractAddress, tokenId, combinedData);
 
-    } catch (error) {
-        console.error('Error fetching user interactions:', error);
-        console.error('Error details:', {
-            message: error instanceof Error ? error.message : 'Unknown error',
-            stack: error instanceof Error ? error.stack : 'No stack trace',
-            type: error?.constructor?.name
-        });
+    return apiSuccess(combinedData);
+});
 
-        if (error instanceof BadRequestError) {
-            return apiBadRequest(error.message);
-        }
 
-        // Return more detailed error in development
-        const errorMessage = error instanceof Error ? error.message : 'Failed to fetch user interactions';
-        return apiInternalError(errorMessage);
+// POST /api/user/interactions - Update user interactions (AUTH REQUIRED)
+export const POST = apiHandler(async (request: NextRequest) => {
+    // Require authentication
+    await withAuth(request);
+    // @ts-ignore
+    const authenticatedUser = request.userAddress as string;
+    
+    const body = await request.json();
+    const { userId, contractAddress, tokenId, ...updates } = body;
+
+    if (!userId || !contractAddress || !tokenId) {
+        return apiBadRequest('userId, contractAddress, and tokenId are required');
     }
-}
 
-// POST /api/user/interactions - Update user interactions (batch update)
-export async function POST(request: NextRequest) {
-    try {
-        const body = await request.json();
-        const { userId, contractAddress, tokenId, ...updates } = body;
+    const lowerUserId = userId.toLowerCase();
+    const lowerContractAddress = contractAddress.toLowerCase();
+    const timestamp = new Date().toISOString();
 
-        if (!userId || !contractAddress || !tokenId) {
-            return apiBadRequest('userId, contractAddress, and tokenId are required');
-        }
-
-        const lowerUserId = userId.toLowerCase();
-        const lowerContractAddress = contractAddress.toLowerCase();
-        const timestamp = new Date().toISOString();
-
-        // Get collections
-        const [favoritesCollection, ratingsCollection, watchlistCollection, personalNotesCollection] = await Promise.all([
-            getCollection('user_likes'),
-            getCollection('user_ratings'),
-            getCollection('user_watchlist'),
-            getCollection('user_personal_notes'),
+    // Get collections
+    const [favoritesCollection, ratingsCollection, watchlistCollection, personalNotesCollection] = await Promise.all([
+        getCollection('user_likes'),
+        getCollection('user_ratings'),
+        getCollection('user_watchlist'),
+        getCollection('user_personal_notes'),
         ]);
 
         const results = [];
@@ -563,19 +553,10 @@ export async function POST(request: NextRequest) {
             } : null,
             results
         });
+});
 
-    } catch (error) {
-        console.error('Error updating user interactions:', error);
-
-        if (error instanceof BadRequestError) {
-            return apiBadRequest(error.message);
-        }
-
-        return apiInternalError('Failed to update user interactions');
-    }
-}
-
-// PUT /api/user/interactions - Alias for POST (for convenience)
-export async function PUT(request: NextRequest) {
+// PUT /api/user/interactions - Alias for POST (AUTH REQUIRED)
+export const PUT = apiHandler(async (request: NextRequest) => {
+    // Re-use POST logic with auth
     return POST(request);
-}
+});

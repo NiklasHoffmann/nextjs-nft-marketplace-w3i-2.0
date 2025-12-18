@@ -1,85 +1,77 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
-import { apiSuccess, apiError, apiInternalError } from '@/lib/api/responses';
+import { apiHandler } from '@/lib/api/handler';
+import { apiSuccess } from '@/lib/api/responses';
 
 // GET /api/nft/insights - Read-only access to NFT insights
 // For admin CUD operations, use /api/nft/admin/insights
-export async function GET(request: NextRequest) {
-    try {
-        const { searchParams } = new URL(request.url);
-        // Extract query parameters
-        const contractAddress = searchParams.get('contractAddress');
-        const tokenId = searchParams.get('tokenId');
-        const category = searchParams.get('category');
-        const tags = searchParams.get('tags')?.split(',');
-        const createdBy = searchParams.get('createdBy');
-        const limit = parseInt(searchParams.get('limit') || '20');
-        const skip = parseInt(searchParams.get('skip') || '0');
-        const sortBy = searchParams.get('sortBy') || 'updatedAt';
-        const sortOrder = searchParams.get('sortOrder') === 'asc' ? 1 : -1;
+export const GET = apiHandler(async (request: NextRequest) => {
+    const { searchParams } = new URL(request.url);
 
-        const collection = await getCollection('admin_nft_insights');
+    // Extract query parameters
+    const contractAddress = searchParams.get('contractAddress');
+    const tokenId = searchParams.get('tokenId');
+    const category = searchParams.get('category');
+    const tags = searchParams.get('tags')?.split(',');
+    const createdBy = searchParams.get('createdBy');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const skip = parseInt(searchParams.get('skip') || '0');
+    const sortBy = searchParams.get('sortBy') || 'updatedAt';
+    const sortOrder = searchParams.get('sortOrder') === 'asc' ? 1 : -1;
 
-        // Build filter object
-        const filter: any = {};
+    const collection = await getCollection('admin_nft_insights');
 
-        if (contractAddress) {
-            filter.contractAddress = contractAddress.toLowerCase();
-        }
+    // Build filter object
+    const filter: any = {};
 
-        // Important: tokenId can be empty string for collection-wide insights
-        // We need to check if tokenId parameter exists (not just if it's truthy)
-        if (tokenId !== null && tokenId !== undefined) {
-            filter.tokenId = tokenId; // Can be "" for collection-wide or "123" for specific NFT
-        }
-
-        if (category) {
-            filter.category = category;
-        }
-
-        if (tags && tags.length > 0) {
-            filter.tags = { $in: tags };
-        }
-
-        if (createdBy) {
-            filter.createdBy = createdBy.toLowerCase();
-        }
-
-        // Build sort object
-        const sort: any = {};
-        sort[sortBy] = sortOrder;
-
-        // Execute query
-        const results = await collection
-            .find(filter)
-            .sort(sort)
-            .skip(skip)
-            .limit(limit)
-            .toArray();
-
-
-        // Check if there are more results
-        const totalCount = await collection.countDocuments(filter);
-        const hasMore = skip + results.length < totalCount;
-
-        const response = {
-            success: true,
-            data: results,
-            dataCount: results.length,
-            totalCount,
-            hasMore,
-            pagination: {
-                skip,
-                limit,
-                sortBy,
-                sortOrder: sortOrder === 1 ? 'asc' : 'desc'
-            }
-        };
-
-        return NextResponse.json(response);
-
-    } catch (error) {
-        console.error('GET /api/nft/insights error:', error);
-        return apiInternalError('Failed to fetch insights');
+    if (contractAddress) {
+        filter.contractAddress = contractAddress.toLowerCase();
     }
-}
+
+    // Important: tokenId can be empty string for collection-wide insights
+    // We need to check if tokenId parameter exists (not just if it's truthy)
+    if (tokenId !== null && tokenId !== undefined) {
+        filter.tokenId = tokenId; // Can be "" for collection-wide or "123" for specific NFT
+    }
+
+    if (category) {
+        filter.category = category;
+    }
+
+    if (tags && tags.length > 0) {
+        filter.tags = { $in: tags };
+    }
+
+    if (createdBy) {
+        filter.createdBy = createdBy.toLowerCase();
+    }
+
+    // Build sort object
+    const sort: any = {};
+    sort[sortBy] = sortOrder;
+
+    // Execute query
+    const results = await collection
+        .find(filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .toArray();
+
+    // Check if there are more results
+    const totalCount = await collection.countDocuments(filter);
+    const hasMore = skip + results.length < totalCount;
+
+    return apiSuccess({
+        data: results,
+        dataCount: results.length,
+        totalCount,
+        hasMore,
+        pagination: {
+            skip,
+            limit,
+            sortBy,
+            sortOrder: sortOrder === 1 ? 'asc' : 'desc'
+        }
+    });
+});

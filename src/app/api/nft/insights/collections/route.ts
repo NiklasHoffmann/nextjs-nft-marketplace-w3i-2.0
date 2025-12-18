@@ -1,21 +1,19 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest } from 'next/server';
+import { apiHandler, apiSuccess, getQueryParam } from '@/lib/api';
 import { getCollection } from '@/lib/mongodb';
-import { apiSuccess, apiError, apiInternalError } from '@/lib/api/responses';
 
 // GET /api/insights/collection - Read-only access to Collection insights
 // For admin CUD operations, use /api/nft/admin/insights/collections
-export async function GET(request: NextRequest) {
-    try {
-        const { searchParams } = new URL(request.url);
-        // Extract query parameters
-        const contractAddress = searchParams.get('contractAddress');
-        const category = searchParams.get('category');
-        const tags = searchParams.get('tags')?.split(',');
-        const createdBy = searchParams.get('createdBy');
-        const limit = parseInt(searchParams.get('limit') || '20');
-        const skip = parseInt(searchParams.get('skip') || '0');
-        const sortBy = searchParams.get('sortBy') || 'updatedAt';
-        const sortOrder = searchParams.get('sortOrder') === 'asc' ? 1 : -1;
+export const GET = apiHandler(async (request: NextRequest) => {
+    // Extract query parameters
+    const contractAddress = getQueryParam(request, 'contractAddress');
+    const category = getQueryParam(request, 'category');
+    const tags = getQueryParam(request, 'tags')?.split(',');
+    const createdBy = getQueryParam(request, 'createdBy');
+    const limit = parseInt(getQueryParam(request, 'limit') || '20');
+    const skip = parseInt(getQueryParam(request, 'skip') || '0');
+    const sortBy = getQueryParam(request, 'sortBy') || 'updatedAt';
+    const sortOrder = getQueryParam(request, 'sortOrder') === 'asc' ? 1 : -1;
 
         const collection = await getCollection('admin_collection_insights');
 
@@ -42,37 +40,28 @@ export async function GET(request: NextRequest) {
         const sort: any = {};
         sort[sortBy] = sortOrder;
 
-        // Execute query
-        const results = await collection
-            .find(filter)
-            .sort(sort)
-            .skip(skip)
-            .limit(limit)
-            .toArray();
+    // Execute query
+    const results = await collection
+        .find(filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .toArray();
 
+    // Check if there are more results
+    const totalCount = await collection.countDocuments(filter);
+    const hasMore = skip + results.length < totalCount;
 
-        // Check if there are more results
-        const totalCount = await collection.countDocuments(filter);
-        const hasMore = skip + results.length < totalCount;
-
-        const response = {
-            success: true,
-            data: results,
-            dataCount: results.length,
-            totalCount,
-            hasMore,
-            pagination: {
-                skip,
-                limit,
-                sortBy,
-                sortOrder: sortOrder === 1 ? 'asc' : 'desc'
-            }
-        };
-
-        return NextResponse.json(response);
-
-    } catch (error) {
-        console.error('GET /api/insights/collection error:', error);
-        return apiInternalError('Failed to fetch collection insights');
-    }
-}
+    return apiSuccess({
+        data: results,
+        dataCount: results.length,
+        totalCount,
+        hasMore,
+        pagination: {
+            skip,
+            limit,
+            sortBy,
+            sortOrder: sortOrder === 1 ? 'asc' : 'desc'
+        }
+    });
+});

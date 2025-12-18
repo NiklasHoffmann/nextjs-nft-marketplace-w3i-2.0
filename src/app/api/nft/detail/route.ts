@@ -15,26 +15,22 @@
  * - Stats: Real-time from MongoDB
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { apiHandler, apiSuccess, getQueryParam, BadRequestError } from '@/lib/api';
 import { getCollection } from '@/lib/mongodb';
 import { blockchainStateSync } from '@/services/nft-sync/blockchain-state-sync';
 import { ipfsMetadataLazySync } from '@/services/nft-sync/ipfs-metadata-lazy-sync';
 
-export async function GET(request: NextRequest) {
+export const GET = apiHandler(async (request: NextRequest) => {
     const startTime = Date.now();
 
-    try {
-        const { searchParams } = new URL(request.url);
-        const contractAddress = searchParams.get('contractAddress');
-        const tokenId = searchParams.get('tokenId');
-        const forceRefresh = searchParams.get('refresh') === 'true';
+    const contractAddress = getQueryParam(request, 'contractAddress');
+    const tokenId = getQueryParam(request, 'tokenId');
+    const forceRefresh = getQueryParam(request, 'refresh') === 'true';
 
-        if (!contractAddress || !tokenId) {
-            return NextResponse.json(
-                { error: 'Missing contractAddress or tokenId' },
-                { status: 400 }
-            );
-        }
+    if (!contractAddress || !tokenId) {
+        throw new BadRequestError('Missing contractAddress or tokenId');
+    }
 
         // Step 1: Get from nft_metadata
         const nftMetadata = await getCollection('nft_metadata');
@@ -204,23 +200,15 @@ export async function GET(request: NextRequest) {
             loadTime: Date.now() - startTime
         };
 
-        // Increment view count
-        await nftStats.updateOne(
-            { contractAddress, tokenId },
-            {
-                $inc: { viewCount: 1 },
-                $set: { lastViewedAt: new Date() }
-            },
-            { upsert: true }
-        );
+    // Increment view count
+    await nftStats.updateOne(
+        { contractAddress, tokenId },
+        {
+            $inc: { viewCount: 1 },
+            $set: { lastViewedAt: new Date() }
+        },
+        { upsert: true }
+    );
 
-        return NextResponse.json(response);
-
-    } catch (error) {
-        console.error('❌ Error fetching NFT detail:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch NFT detail', details: error instanceof Error ? error.message : 'Unknown error' },
-            { status: 500 }
-        );
-    }
-}
+    return apiSuccess(response);
+});

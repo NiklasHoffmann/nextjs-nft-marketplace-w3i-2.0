@@ -9,15 +9,11 @@
 
 import { NextRequest } from 'next/server';
 import {
+    apiHandler,
     apiSuccess,
-    apiBadRequest,
-    apiInternalError,
-    rateLimit,
-    RATE_LIMIT_CONFIG,
-    parseJsonBody,
-    isValidAddress,
     BadRequestError
 } from '@/lib/api';
+import { withAuth } from '@/lib/middleware/auth';
 import {
     getNFTsByOwner,
     updateNFTOwnership,
@@ -79,38 +75,33 @@ async function discoverNFTsViaAlchemy(walletAddress: string): Promise<NFTIdentif
  * POST /api/user/nfts/sync
  * 
  * Sync wallet NFTs to database
- * Body: { walletAddress: string }
+ * Requires authentication - wallet must match authenticated user
  */
-export async function POST(request: NextRequest) {
+export const POST = apiHandler(async (request: NextRequest) => {
     const startTime = Date.now();
 
-    try {
-        await rateLimit(request, RATE_LIMIT_CONFIG.STANDARD);
+    // Require authentication
+    await withAuth(request);
 
-        const body = await parseJsonBody<{ walletAddress: string }>(request);
-        const { walletAddress } = body;
+    // Get authenticated wallet address from withAuth middleware
+    // @ts-ignore - added by withAuth middleware
+    const walletAddress = request.userAddress?.toLowerCase();
 
-        if (!walletAddress) {
-            throw new BadRequestError('walletAddress is required');
-        }
+    if (!walletAddress) {
+        throw new BadRequestError('Authentication required');
+    }
 
-        if (!isValidAddress(walletAddress)) {
-            throw new BadRequestError('Invalid wallet address format');
-        }
+    console.log(`🔄 [NFT Sync] Starting sync for wallet: ${walletAddress}`);
 
-        const lowerWalletAddress = walletAddress.toLowerCase();
-
-        console.log(`🔄 [NFT Sync] Starting sync for wallet: ${lowerWalletAddress}`);
-
-        // STEP 1: Discovery - Get current NFTs from Alchemy (cheap, no metadata)
-        console.log('📡 [NFT Sync] Fetching NFT list from Alchemy (discovery only)...');
-        const alchemyNFTs = await discoverNFTsViaAlchemy(lowerWalletAddress);
+    // STEP 1: Discovery - Get current NFTs from Alchemy (cheap, no metadata)
+    console.log('📡 [NFT Sync] Fetching NFT list from Alchemy (discovery only)...');
+    const alchemyNFTs = await discoverNFTsViaAlchemy(walletAddress);
 
         console.log(`✅ [NFT Sync] Found ${alchemyNFTs.length} NFTs in wallet`);
 
-        // STEP 2: Get existing NFTs from database
-        console.log('🗄️  [NFT Sync] Checking database for existing NFTs...');
-        const existingNFTs = await getNFTsByOwner(lowerWalletAddress);
+    // STEP 2: Get existing NFTs from database
+    console.log('🗄️  [NFT Sync] Checking database for existing NFTs...');
+    const existingNFTs = await getNFTsByOwner(walletAddress);
         const existingMap = new Map(
             existingNFTs.map(nft => [`${nft.contractAddress}-${nft.tokenId}`, nft])
         );
@@ -229,9 +220,9 @@ export async function POST(request: NextRequest) {
                                 ownerBalance: blockchainData.ownerBalance || null,
                                 approvedAddress: blockchainData.approvedAddress || null
                             },
-                            currentOwner: lowerWalletAddress,
+                            currentOwner: walletAddress,
                             ownerHistory: [{
-                                owner: lowerWalletAddress,
+                                owner: walletAddress,
                                 acquiredAt: new Date().toISOString(),
                                 source: 'unknown'
                             }],
@@ -271,7 +262,7 @@ export async function POST(request: NextRequest) {
                 try {
                     await updateNFTOwnership(
                         nft.contractAddress, nft.tokenId,
-                        lowerWalletAddress,
+                        walletAddress,
                         'unknown'
                     );
                     result.unchanged++;
@@ -304,23 +295,13 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        result.duration = Date.now() - startTime;
+    result.duration = Date.now() - startTime;
 
-        console.log(`✅ [NFT Sync] Sync completed in ${result.duration}ms:
+    console.log(`✅ [NFT Sync] Sync completed in ${result.duration}ms:
   - New: ${result.new}
   - Unchanged: ${result.unchanged}
   - Transferred: ${result.transferred}
   - Errors: ${result.errors.length}`);
 
-        return apiSuccess(result);
-
-    } catch (error) {
-        console.error('❌ [NFT Sync] Error syncing user NFTs:', error);
-
-        if (error instanceof BadRequestError) {
-            return apiBadRequest(error.message);
-        }
-
-        return apiInternalError('Failed to sync user NFTs');
-    }
-}
+    return apiSuccess(result);
+}, { auth: true });

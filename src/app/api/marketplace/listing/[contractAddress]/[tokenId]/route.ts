@@ -5,7 +5,8 @@
  * Bypasses CSP restrictions by running on the server.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { apiHandler, apiSuccess, BadRequestError } from '@/lib/api';
 import { ApolloClient, InMemoryCache } from '@apollo/client';
 import { GET_ACTIVE_ITEMS } from '@/constants/subgraph.queries';
 
@@ -25,20 +26,17 @@ interface RouteParams {
 export async function GET(
   request: NextRequest,
   context: RouteParams
-): Promise<NextResponse> {
-  try {
-    const { contractAddress, tokenId } = await context.params;
+) {
+    return apiHandler(async () => {
+        const { contractAddress, tokenId } = await context.params;
 
-    if (!contractAddress || !tokenId) {
-      return NextResponse.json(
-        { error: 'Missing contractAddress or tokenId parameter' },
-        { status: 400 }
-      );
-    }
+        if (!contractAddress || !tokenId) {
+            throw new BadRequestError('Missing contractAddress or tokenId parameter');
+        }
 
-    // Normalize addresses for comparison
-    const normalizedAddress = contractAddress.toLowerCase();
-    const normalizedTokenId = tokenId.toLowerCase();
+        // Normalize addresses for comparison
+        const normalizedAddress = contractAddress.toLowerCase();
+        const normalizedTokenId = tokenId.toLowerCase();
 
     // Create Apollo Client for server-side query
     const client = new ApolloClient({
@@ -58,18 +56,11 @@ export async function GET(
 
     if (error) {
       console.error('❌ TheGraph query error:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch marketplace data', details: error.message },
-        { status: 500 }
-      );
+      throw new Error(`Failed to fetch marketplace data: ${error.message}`);
     }
 
     // Filter for the specific NFT (field is 'items', not 'activeItems')
     const items = data?.items || [];
-
-    // Log first few items to see structure
-    if (items.length > 0) {
-    }
 
     const listing = items.find(
       (item: any) =>
@@ -77,16 +68,13 @@ export async function GET(
         item.tokenId === tokenId // tokenId is a string in GraphQL, not lowercase
     );
 
-    if (listing) {
-    }
-
     if (!listing) {
       // NFT not listed - return null, not an error
-      return NextResponse.json({ listing: null }, { status: 200 });
+      return apiSuccess({ listing: null });
     }
 
     // Return the listing data
-    return NextResponse.json({
+    return apiSuccess({
       listing: {
         listingId: listing.listingId,
         contractAddress: listing.contractAddress,
@@ -99,14 +87,5 @@ export async function GET(
         desiredTokenId: listing.desiredTokenId,
       },
     });
-  } catch (error) {
-    console.error('Marketplace listing API error:', error);
-    return NextResponse.json(
-      {
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    );
-  }
+    })(request);
 }

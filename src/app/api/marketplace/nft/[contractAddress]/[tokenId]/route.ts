@@ -20,25 +20,23 @@
  * - Stats loaded via StatsContext (not included)
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { apiHandler, apiSuccess, BadRequestError } from '@/lib/api';
 import { getDatabase } from '@/lib/mongodb';
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: Promise<{ contractAddress: string; tokenId: string }> }
+    context: { params: Promise<{ contractAddress: string; tokenId: string }> }
 ) {
-    try {
-        const { contractAddress, tokenId } = await params;
+    return apiHandler(async () => {
+        const { contractAddress, tokenId } = await context.params;
 
-        if (!contractAddress || !tokenId) {
-            return NextResponse.json(
-                { success: false, error: 'Missing contractAddress or tokenId' },
-                { status: 400 }
-            );
-        }
+    if (!contractAddress || !tokenId) {
+        throw new BadRequestError('Missing contractAddress or tokenId');
+    }
 
-        const db = await getDatabase();
-        const collection = db.collection('marketplace_items');
+    const db = await getDatabase();
+    const collection = db.collection('marketplace_items');
 
         // Aggregation pipeline with triple $lookup
         const pipeline = [
@@ -159,28 +157,23 @@ export async function GET(
         const nft = results[0];
 
         if (!nft) {
-            return NextResponse.json(
-                { success: false, error: 'NFT not found in marketplace' },
-                { status: 404 }
-            );
+            throw new BadRequestError('NFT not found in marketplace');
         }
 
         // Transform to API response format
-        const response = {
-            success: true,
-            data: {
-                contractAddress: nft.contractAddress,
-                tokenId: nft.tokenId,
-                listingId: nft.listingId,
-                price: nft.price,
-                seller: nft.seller,
-                isListed: nft.isListed,
+        return apiSuccess({
+            contractAddress: nft.contractAddress,
+            tokenId: nft.tokenId,
+            listingId: nft.listingId,
+            price: nft.price,
+            seller: nft.seller,
+            isListed: nft.isListed,
 
-                metadata: {
-                    name: nft.metadata?.name || `NFT #${nft.tokenId}`,
-                    description: nft.metadata?.description || null,
-                    image: nft.metadata?.image || null,
-                    animationUrl: nft.metadata?.animationUrl || null,
+            metadata: {
+                name: nft.metadata?.name || `NFT #${nft.tokenId}`,
+                description: nft.metadata?.description || null,
+                image: nft.metadata?.image || null,
+                animationUrl: nft.metadata?.animationUrl || null,
                     externalUrl: nft.metadata?.externalUrl || null,
                     attributes: nft.metadata?.attributes || [],
                 },
@@ -225,21 +218,12 @@ export async function GET(
                 } : null,
 
                 // Data quality flags
-                dataQuality: {
-                    hasMetadata: !!nft.metadata,
-                    hasInsights: !!nft.insights,
-                    metadataSource: nft.metadata ? 'blockchain' : 'none',
-                },
-            }
-        };
-
-        return NextResponse.json(response);
-
-    } catch (error) {
-        console.error('Error fetching NFT detail:', error);
-        return NextResponse.json(
-            { success: false, error: 'Internal server error' },
-            { status: 500 }
-        );
-    }
+            // Data quality flags
+            dataQuality: {
+                hasMetadata: !!nft.metadata,
+                hasInsights: !!nft.insights,
+                metadataSource: nft.metadata ? 'blockchain' : 'none',
+            },
+        });
+    })(request);
 }

@@ -1,4 +1,5 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest } from 'next/server';
+import { apiHandler, apiSuccess, parseJsonBody, getQueryParam, BadRequestError } from '@/lib/api';
 import { getCollection } from '@/lib/mongodb';
 import type { GameScore, GameScoreSubmission, ScoreSubmitResponse, TopScoresResponse } from '@/types/game';
 
@@ -67,173 +68,109 @@ function validateScoreData(data: GameScoreSubmission): { valid: boolean; error?:
 }
 
 // POST /api/game/scores - Submit a new score
-export async function POST(request: NextRequest) {
-    try {
-        const body = await request.json() as GameScoreSubmission;
+export const POST = apiHandler(async (request: NextRequest) => {
+    const body = await parseJsonBody<GameScoreSubmission>(request);
 
-        // Get identifier for rate limiting (IP or wallet address)
-        const identifier = body.walletAddress ||
-            request.headers.get('x-forwarded-for') ||
-            request.headers.get('x-real-ip') ||
-            'unknown';
+    // Get identifier for rate limiting (IP or wallet address)
+    const identifier = body.walletAddress ||
+        request.headers.get('x-forwarded-for') ||
+        request.headers.get('x-real-ip') ||
+        'unknown';
 
-        // Check rate limit
-        if (!checkRateLimit(identifier)) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: `Rate limit exceeded. Maximum ${MAX_SUBMISSIONS_PER_HOUR} submissions per hour.`
-                },
-                { status: 429 }
-            );
-        }
-
-        // Validate data
-        const validation = validateScoreData(body);
-        if (!validation.valid) {
-            return NextResponse.json(
-                { success: false, message: validation.error },
-                { status: 400 }
-            );
-        }
-
-        // Prepare score document
-        const scoreDocument: Omit<GameScore, '_id'> = {
-            score: body.score,
-            level: body.level,
-            platformsClimbed: body.platformsClimbed,
-            playerName: body.playerName,
-            walletAddress: body.walletAddress,
-            createdAt: new Date(),
-        };
-
-        // Insert into database
-        const collection = await getCollection('game_scores');
-        const result = await collection.insertOne(scoreDocument);
-
-        // Check if this is a top score (top 10)
-        const topScores = await collection
-            .find()
-            .sort({ score: -1 })
-            .limit(10)
-            .toArray() as unknown as GameScore[];
-
-        const isTopScore = topScores.some(score =>
-            score._id?.toString() === result.insertedId.toString()
-        );
-
-        const rank = isTopScore
-            ? topScores.findIndex(score => score._id?.toString() === result.insertedId.toString()) + 1
-            : undefined;
-
-        const response: ScoreSubmitResponse = {
-            success: true,
-            message: isTopScore
-                ? `Congratulations! You achieved rank #${rank} on the leaderboard!`
-                : 'Score submitted successfully!',
-            score: { ...scoreDocument, _id: result.insertedId.toString() },
-            isTopScore,
-            rank,
-        };
-
-        return NextResponse.json(response, { status: 201 });
-
-    } catch (error) {
-        console.error('Error submitting score:', error);
-        return NextResponse.json(
-            { success: false, message: 'Failed to submit score' },
-            { status: 500 }
-        );
+    // Check rate limit
+    if (!checkRateLimit(identifier)) {
+        throw new BadRequestError(`Rate limit exceeded. Maximum ${MAX_SUBMISSIONS_PER_HOUR} submissions per hour.`);
     }
-}
+
+    // Validate data
+    const validation = validateScoreData(body);
+    if (!validation.valid) {
+        throw new BadRequestError(validation.error || 'Invalid score data');
+    }
+
+    // Prepare score document
+    const scoreDocument: Omit<GameScore, '_id'> = {
+        score: body.score,
+        level: body.level,
+        platformsClimbed: body.platformsClimbed,
+        playerName: body.playerName,
+        walletAddress: body.walletAddress,
+        createdAt: new Date(),
+    };
+
+    // Insert into database
+    const collection = await getCollection('game_scores');
+    const result = await collection.insertOne(scoreDocument);
+
+    // Check if this is a top score (top 10)
+    const topScores = await collection
+        .find()
+        .sort({ score: -1 })
+        .limit(10)
+        .toArray() as unknown as GameScore[];
+
+    const isTopScore = topScores.some(score =>
+        score._id?.toString() === result.insertedId.toString()
+    );
+
+    const rank = isTopScore
+        ? topScores.findIndex(score => score._id?.toString() === result.insertedId.toString()) + 1
+        : undefined;
+
+    return apiSuccess({
+        message: isTopScore
+            ? `Congratulations! You achieved rank #${rank} on the leaderboard!`
+            : 'Score submitted successfully!',
+        score: { ...scoreDocument, _id: result.insertedId.toString() },
+        isTopScore,
+        rank,
+    });
+});
 
 // GET /api/game/scores - Get top scores or user scores
-export async function GET(request: NextRequest) {
-    try {
-        const searchParams = request.nextUrl.searchParams;
-        const type = searchParams.get('type') || 'top'; // 'top', 'user', 'week'
-        const walletAddress = searchParams.get('address');
-        const limit = parseInt(searchParams.get('limit') || '10');
+export const GET = apiHandler(async (request: NextRequest) => {
+    const type = getQueryParam(request, 'type') || 'top';
+    const walletAddress = getQueryParam(request, 'address');
+    const limit = parseInt(getQueryParam(request, 'limit') || '10');
 
-        const collection = await getCollection('game_scores');
+    const collection = await getCollection('game_scores');
 
-        if (type === 'user' && walletAddress) {
-            // Get user's scores
-            const scores = await collection
-                .find({ walletAddress })
-                .sort({ score: -1 })
-                .limit(20)
-                .toArray() as unknown as GameScore[];
-
-            const personalBest = scores[0] || undefined;
-
-            return NextResponse.json({
-                success: true,
-                scores,
-                personalBest,
-            }, {
-                headers: {
-                    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-                    'Pragma': 'no-cache',
-                    'Expires': '0',
-                }
-            });
-        }
-
-        if (type === 'week') {
-            // Get top scores from the last 7 days
-            const weekAgo = new Date();
-            weekAgo.setDate(weekAgo.getDate() - 7);
-
-            const scores = await collection
-                .find({ createdAt: { $gte: weekAgo } })
-                .sort({ score: -1 })
-                .limit(limit)
-                .toArray() as unknown as GameScore[];
-
-            const total = await collection.countDocuments({ createdAt: { $gte: weekAgo } });
-
-            return NextResponse.json({
-                success: true,
-                scores,
-                total,
-            }, {
-                headers: {
-                    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-                    'Pragma': 'no-cache',
-                    'Expires': '0',
-                }
-            });
-        }
-
-        // Default: top scores all-time
+    if (type === 'user' && walletAddress) {
         const scores = await collection
-            .find()
+            .find({ walletAddress })
+            .sort({ score: -1 })
+            .limit(20)
+            .toArray() as unknown as GameScore[];
+
+        return apiSuccess({
+            scores,
+            personalBest: scores[0] || undefined,
+        });
+    }
+
+    if (type === 'week') {
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+
+        const scores = await collection
+            .find({ createdAt: { $gte: weekAgo } })
             .sort({ score: -1 })
             .limit(limit)
             .toArray() as unknown as GameScore[];
 
-        const total = await collection.countDocuments();
+        const total = await collection.countDocuments({ createdAt: { $gte: weekAgo } });
 
-        const response: TopScoresResponse = {
-            success: true,
-            scores,
-            total,
-        };
-
-        return NextResponse.json(response, {
-            headers: {
-                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0',
-            }
-        });
-
-    } catch (error) {
-        console.error('Error fetching scores:', error);
-        return NextResponse.json(
-            { success: false, message: 'Failed to fetch scores' },
-            { status: 500 }
-        );
+        return apiSuccess({ scores, total });
     }
-}
+
+    // Default: top scores all-time
+    const scores = await collection
+        .find()
+        .sort({ score: -1 })
+        .limit(limit)
+        .toArray() as unknown as GameScore[];
+
+    const total = await collection.countDocuments();
+
+    return apiSuccess({ scores, total });
+});

@@ -1,26 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { apiHandler, apiSuccess, getQueryParam } from '@/lib/api';
 import { getCollection } from '@/lib/mongodb';
-import { apiSuccess, apiError, apiInternalError } from '@/lib/api/responses';
 
 /**
  * GET /api/collections
  * 
  * Aggregates collection statistics directly from marketplace_items
  * Includes preview images from multiple NFTs and social stats
- * 
- * Query params:
- * - includeInsights: boolean (default true) - Include admin insights
- * - minItems: number (default 0) - Minimum item count filter
- * - sortBy: string (default 'itemCount') - Sort field
- * - sortOrder: 'asc' | 'desc' (default 'desc')
  */
-export async function GET(request: NextRequest) {
-    try {
-        const { searchParams } = new URL(request.url);
-        const includeInsights = searchParams.get('includeInsights') !== 'false';
-        const minItems = parseInt(searchParams.get('minItems') || '0');
-        const sortBy = searchParams.get('sortBy') || 'itemCount';
-        const sortOrder = searchParams.get('sortOrder') === 'asc' ? 1 : -1;
+export const GET = apiHandler(async (request: NextRequest) => {
+    const includeInsights = getQueryParam(request, 'includeInsights') !== 'false';
+    const minItems = parseInt(getQueryParam(request, 'minItems') || '0');
+    const sortBy = getQueryParam(request, 'sortBy') || 'itemCount';
+    const sortOrder = getQueryParam(request, 'sortOrder') === 'asc' ? 1 : -1;
 
         console.log('🔍 [Collections API] Aggregating from marketplace_items...');
         const startTime = Date.now();
@@ -185,18 +177,13 @@ export async function GET(request: NextRequest) {
             };
         });
 
-        const totalTime = Date.now() - startTime;
-        console.log(`📊 [Collections API] Total processing time: ${totalTime}ms`);
-        console.log(`📸 [Collections API] Preview images loaded for ${transformedCollections.filter((c: any) => c.previewImages.length > 0).length} collections`);
+    const totalTime = Date.now() - startTime;
+    console.log(`📊 [Collections API] Total processing time: ${totalTime}ms`);
+    console.log(`📸 [Collections API] Preview images loaded for ${transformedCollections.filter((c: any) => c.previewImages.length > 0).length} collections`);
 
-        return apiSuccess({
-            collections: transformedCollections,
-            count: transformedCollections.length,
-            timestamp: new Date().toISOString()
-        });
-
-    } catch (error) {
-        console.error('❌ [Collections API] Error:', error);
-        return apiInternalError(error instanceof Error ? error.message : 'Failed to fetch collections');
-    }
-}
+    return apiSuccess({
+        collections: transformedCollections,
+        count: transformedCollections.length,
+        timestamp: new Date().toISOString()
+    });
+});

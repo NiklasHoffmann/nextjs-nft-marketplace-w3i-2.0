@@ -5,32 +5,35 @@
  * Used by batch listing to verify all collections
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { createPublicClient, http, getAddress } from 'viem';
 import { sepolia } from 'viem/chains';
 import marketplaceAbi from '@/constants/marketplace.abi.json';
+import { apiHandler } from '@/lib/api/handler';
+import { apiSuccess, apiBadRequest } from '@/lib/api/responses';
 
 const publicClient = createPublicClient({
     chain: sepolia,
     transport: http()
 });
 
-export async function POST(request: NextRequest) {
+export const POST = apiHandler(async (request: NextRequest) => {
     try {
-        const { marketplaceAddress, collectionAddress } = await request.json();
+        const body = await request.json();
+        const { marketplaceAddress, collectionAddress } = body;
+
+        console.log('[Whitelist Check] Request body:', body);
 
         if (!marketplaceAddress || !collectionAddress) {
-            return NextResponse.json(
-                { error: 'Missing required parameters' },
-                { status: 400 }
-            );
+            console.error('[Whitelist Check] Missing parameters:', { marketplaceAddress, collectionAddress });
+            return apiBadRequest('Missing required parameters');
         }
 
         // Ensure addresses are properly checksummed
         const checksummedMarketplace = getAddress(marketplaceAddress);
         const checksummedCollection = getAddress(collectionAddress);
 
-        console.log('Checking whitelist:', {
+        console.log('[Whitelist Check] Checking whitelist:', {
             marketplace: checksummedMarketplace,
             collection: checksummedCollection
         });
@@ -43,21 +46,20 @@ export async function POST(request: NextRequest) {
             args: [checksummedCollection]
         });
 
-        console.log('Whitelist result:', isWhitelisted);
+        console.log('[Whitelist Check] Contract response:', isWhitelisted);
+        console.log('[Whitelist Check] Response type:', typeof isWhitelisted);
 
-        return NextResponse.json({
-            isWhitelisted: isWhitelisted as boolean,
+        const result = {
+            isWhitelisted: Boolean(isWhitelisted),
             collectionAddress: checksummedCollection,
             marketplaceAddress: checksummedMarketplace
-        });
-    } catch (error: any) {
-        console.error('Whitelist check error:', error);
-        return NextResponse.json(
-            { 
-                error: error.message || 'Failed to check whitelist status',
-                details: error.shortMessage || error.reason
-            },
-            { status: 500 }
-        );
+        };
+
+        console.log('[Whitelist Check] Returning:', result);
+
+        return apiSuccess(result);
+    } catch (error) {
+        console.error('[Whitelist Check] Error:', error);
+        throw error;
     }
-}
+});
