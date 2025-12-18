@@ -170,6 +170,14 @@ export interface NFTScrollListProps {
     enableViewAll?: boolean;
     /** Grid Columns für "View All" Mode */
     gridColumns?: string;
+    /** Additional header content (e.g., stats, refresh button) */
+    headerContent?: ReactNode;
+    /** Use large title style (h1 text-3xl) instead of small (h3 text-lg) */
+    largeTitle?: boolean;
+    /** Subtitle/stats text shown below title */
+    subtitle?: string | ReactNode;
+    /** Action buttons (e.g., Refresh) shown in top-right corner */
+    actions?: ReactNode;
 }
 
 // ===== FILTERABLE ITEMS =====

@@ -31,7 +31,11 @@ export function NFTGallery({
     linkBuilder = (item) => `/nft/${item.contractAddress}/${item.tokenId}`,
     onCardClick,
     enableViewAll = false,
-    gridColumns = 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+    gridColumns = 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
+    headerContent,
+    largeTitle = false,
+    subtitle,
+    actions
 }: NFTScrollListProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [canScrollLeft, setCanScrollLeft] = useState(false)
@@ -178,41 +182,66 @@ export function NFTGallery({
 
     return (
         <div className={`${className} transition-all duration-200`}>
-            {/* Title and View Toggle */}
-            <div className="flex items-center justify-between mb-4">
-                {title && (
-                    <h3 className="text-lg font-medium text-gray-900">{title}</h3>
-                )}
-                {enableViewAll && items.length > 0 && (
-                    <button
-                        onClick={() => setIsGridView(!isGridView)}
-                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-                    >
-                        {isGridView ? (
-                            <>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                </svg>
-                                Scroll View
-                            </>
+            {/* Title Row - Title (left) + Actions (right) */}
+            {(title || actions) && (
+                <div className="flex items-center justify-between mb-2 mx-8">
+                    {title && (
+                        largeTitle ? (
+                            <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
                         ) : (
-                            <>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                                </svg>
-                                View All
-                            </>
-                        )}
-                    </button>
-                )}
-            </div>
+                            <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+                        )
+                    )}
+                    {actions && <div>{actions}</div>}
+                </div>
+            )}
+
+            {/* Subtitle Row - Subtitle/Stats (left) + View All Button (right) */}
+            {(subtitle || enableViewAll) && (
+                <div className="flex items-center justify-between mb-4 mx-8">
+                    {subtitle && (
+                        <div className="text-sm text-gray-600">
+                            {subtitle}
+                        </div>
+                    )}
+                    {enableViewAll && (
+                        <button
+                            onClick={() => setIsGridView(!isGridView)}
+                            disabled={items.length === 0}
+                            className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${items.length === 0
+                                ? 'text-gray-400 cursor-not-allowed'
+                                : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50'
+                                }`}
+                        >
+                            {isGridView ? (
+                                <>
+                                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                    </svg>
+                                    Scroll View
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                    </svg>
+                                    View All
+                                </>
+                            )}
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* Optional header content (deprecated, use subtitle + actions instead) */}
+            {headerContent}
 
             {/* Grid View */}
             {isGridView ? (
                 <div className={`grid ${gridColumns} ${gap} ${padding} min-h-[288px]`}>
                     {items.map((item) => {
                         const cardContent = (
-                            <div className={`flex-shrink-0 ${cardWidth} relative`}>
+                            <div className={`flex-shrink-0 ${cardWidth} relative ml-8`}>
                                 <LazyNFTCard
                                     contractAddress={item.contractAddress}
                                     tokenId={item.tokenId}
@@ -287,7 +316,7 @@ export function NFTGallery({
                     {/* Horizontal Scroll Container */}
                     <div
                         ref={scrollContainerRef}
-                        className={`flex ${gap} overflow-x-auto snap-x snap-mandatory scroll-smooth ${padding}`}
+                        className={`flex ${gap} overflow-x-auto snap-x snap-mandatory scroll-smooth ${padding} pl-8`}
                         style={{
                             scrollbarWidth: 'none',
                             msOverflowStyle: 'none',
