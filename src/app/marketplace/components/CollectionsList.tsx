@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCollectionsV2 } from '@/hooks/marketplace/useMarketplaceV2';
 import { useAdminStatus, useHorizontalScroll } from '@/hooks';
 import { ScrollButtons, RefreshButton, AdminDebugPanel } from '@/components/ui';
+import { LoadingState } from '@/components/core/Loading';
 import { CollectionCard } from './CollectionCard';
 import CollectionCardSkeleton from './CollectionCard/CollectionCardSkeleton';
 import type { NFTSortOptions, NFTFilters } from '@/types/marketplace';
@@ -113,7 +114,7 @@ export function CollectionsList({ currentSort, onSortChange, filters }: Collecti
                     <div className="flex items-center justify-between">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-900">Collections</h2>
-                            <p className="text-sm text-gray-600 mt-1">Loading collections...</p>
+                            <LoadingState size="xs" variant="inline" message="Loading collections..." />
                         </div>
                     </div>
                 </div>
