@@ -6,6 +6,7 @@ import { formatEther } from '@/utils';
 import { CollectionItemsListProps } from '@/types';
 import { formatNFTDisplayName, truncateAddress } from '@/utils';
 import { OptimizedNFTImage } from '@/components/nft';
+import { LoadingState } from '@/components/core/Loading';
 
 interface CollectionNFT {
     contractAddress: string;
@@ -80,8 +81,8 @@ export default function CollectionItemsList({
                         {collection || truncateAddress(contractAddress)}
                     </div>
                 </div>
-                <div className="text-center py-8 text-gray-500">
-                    <div className="animate-pulse">Loading collection items...</div>
+                <div className="py-8">
+                    <LoadingState size="sm" message="Loading collection items..." />
                 </div>
             </div>
         );

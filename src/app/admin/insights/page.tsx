@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { AdminNFTInsightsManager } from "../components";
+import { LoadingState } from '@/components/core/Loading';
 
 function AdminContent() {
     return (
@@ -41,18 +42,7 @@ export default function AdminPage() {
                     <div className="max-w-6xl mx-auto">
                         <div className="mb-8">
                             <h1 className="text-3xl font-bold text-gray-900">NFT Insights</h1>
-                            <p className="mt-2 text-gray-600">Loading...</p>
-                        </div>
-                        <div className="bg-white border border-gray-200 rounded-lg p-6">
-                            <div className="animate-pulse">
-                                <div className="h-6 bg-gray-200 rounded w-1/4 mb-4"></div>
-                                <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
-                                <div className="space-y-4">
-                                    <div className="h-10 bg-gray-200 rounded"></div>
-                                    <div className="h-10 bg-gray-200 rounded"></div>
-                                    <div className="h-32 bg-gray-200 rounded"></div>
-                                </div>
-                            </div>
+                            <LoadingState size="md" message="Loading insights manager..." />
                         </div>
                     </div>
                 </div>

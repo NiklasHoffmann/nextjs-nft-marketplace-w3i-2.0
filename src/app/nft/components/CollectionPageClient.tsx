@@ -11,6 +11,7 @@ import { useCollections } from '@/contexts/collections/CollectionsContext'
 import { useNFTFilters } from '@/hooks/nfts/useNFTFilters'
 import { NFTFilterSidebar, NFTGallery } from '@/components'
 import { StatCard } from '@/app/wallet/components/StatCard'
+import { LoadingState } from '@/components/core/Loading'
 import { convertToScrollItems, convertToFilterableItems } from '@/utils/marketplace'
 import type { NFTFilters, NFTSortOptions } from '@/types/marketplace'
 
@@ -186,7 +187,7 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
         return (
             <div className="min-h-screen flex flex-col bg-gray-50">
                 <div className="flex justify-center items-center min-h-[400px] pt-[66px]">
-                    <div className="text-gray-500">Loading collection...</div>
+                    <LoadingState size="md" message="Loading collection..." />
                 </div>
             </div>
         )
