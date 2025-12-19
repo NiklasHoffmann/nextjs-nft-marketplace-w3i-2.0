@@ -12,6 +12,7 @@ import { useNFTFilters } from '@/hooks/nfts/useNFTFilters'
 import { NFTFilterSidebar, NFTGallery } from '@/components'
 import { StatCard } from '@/app/wallet/components/StatCard'
 import { LoadingState } from '@/components/core/Loading'
+import { EmptyState } from '@/components/core/Empty'
 import { convertToScrollItems, convertToFilterableItems } from '@/utils/marketplace'
 import type { NFTFilters, NFTSortOptions } from '@/types/marketplace'
 
@@ -340,26 +341,24 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
                             emptyMessage="No NFTs found"
                         />
                     ) : (
-                        <div className="flex flex-col items-center justify-center py-16">
-                            <div className="text-6xl mb-4">🖼️</div>
-                            <h3 className="text-xl font-bold mb-2 text-gray-900">No NFTs Found</h3>
-                            <p className="text-gray-600 mb-4 text-center">
-                                {filters.searchTerm || filters.categories.length > 0 || filters.rarities.length > 0
+                        <EmptyState
+                            icon="🖼️"
+                            title="No NFTs Found"
+                            description={
+                                filters.searchTerm || filters.categories.length > 0 || filters.rarities.length > 0
                                     ? 'Try adjusting your filters'
-                                    : 'No items listed in this collection'}
-                            </p>
-                            {(filters.searchTerm || filters.categories.length > 0 || filters.rarities.length > 0) && (
-                                <button
-                                    onClick={() => {
+                                    : 'No items listed in this collection'
+                            }
+                            action={
+                                (filters.searchTerm || filters.categories.length > 0 || filters.rarities.length > 0) ? {
+                                    label: 'Clear Filters',
+                                    onClick: () => {
                                         setFilters({ categories: [], rarities: [], searchTerm: '' })
                                         setSort({ field: 'price', direction: 'desc' })
-                                    }}
-                                    className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                                >
-                                    Clear Filters
-                                </button>
-                            )}
-                        </div>
+                                    }
+                                } : undefined
+                            }
+                        />
                     )}
                 </div>
             </main>
