@@ -6,8 +6,8 @@ import { useCollectionsV2 } from '@/hooks/marketplace/useMarketplaceV2';
 import { useAdminStatus, useHorizontalScroll } from '@/hooks';
 import { ScrollButtons, RefreshButton, AdminDebugPanel } from '@/components/ui';
 import { LoadingState } from '@/components/core/Loading';
+import { BaseCard } from '@/components/core/Card/BaseCard';
 import { CollectionCard } from './CollectionCard';
-import CollectionCardSkeleton from './CollectionCard/CollectionCardSkeleton';
 import type { NFTSortOptions, NFTFilters } from '@/types/marketplace';
 
 interface CollectionsListProps {
@@ -123,7 +123,7 @@ export function CollectionsList({ currentSort, onSortChange, filters }: Collecti
                 <div className="relative overflow-visible pb-4">
                     <div className="flex gap-6 pb-4 pt-4 pl-8 pr-6">
                         {Array.from({ length: 4 }, (_, i) => (
-                            <CollectionCardSkeleton key={i} />
+                            <BaseCard key={i} size="md" loading={true} />
                         ))}
                     </div>
                 </div>
