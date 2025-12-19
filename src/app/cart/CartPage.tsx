@@ -14,6 +14,7 @@ import { useCart } from '@/contexts';
 import { formatEther } from '@/utils';
 import Link from 'next/link';
 import { ButtonSpinner } from '@/components/core/Loading';
+import { EmptyState } from '@/components/core/Empty';
 import { CartHeader } from './components';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 
@@ -134,15 +135,11 @@ export function CartPage() {
 
                 <main className="pt-[66px]">
                     <div className="max-w-4xl mx-auto px-8 py-16">
-                        <div className="text-center py-16">
-                            <svg className="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 0h12a2 2 0 002-2V9a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                            </svg>
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">Wallet Connection Required</h3>
-                            <p className="text-sm text-gray-500">
-                                Please connect your wallet to view your shopping cart.
-                            </p>
-                        </div>
+                        <EmptyState
+                            icon="🔒"
+                            title="Wallet Connection Required"
+                            description="Please connect your wallet to view your shopping cart."
+                        />
                     </div>
                 </main>
             </div>
@@ -157,24 +154,15 @@ export function CartPage() {
 
                 <main className="pt-[66px]">
                     <div className="max-w-4xl mx-auto px-8 py-16">
-                        <div className="text-center py-16">
-                            <svg className="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
-                            <h3 className="text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h3>
-                            <p className="text-gray-600 mb-6">
-                                Add some NFTs to your cart to get started with batch purchasing!
-                            </p>
-                            <Link
-                                href="/marketplace"
-                                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                            >
-                                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                                Browse Marketplace
-                            </Link>
-                        </div>
+                        <EmptyState
+                            icon="🛒"
+                            title="Your cart is empty"
+                            description="Add some NFTs to your cart to get started with batch purchasing!"
+                            action={{
+                                label: 'Browse Marketplace',
+                                onClick: () => router.push('/marketplace')
+                            }}
+                        />
                     </div>
                 </main>
             </div>

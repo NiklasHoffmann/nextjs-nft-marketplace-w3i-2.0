@@ -2,6 +2,7 @@
 
 import { AdminNFTInsight, AdminCollectionInsight } from '@/types';
 import { TitleDescriptionPair } from '@/types/features/nft-insights';
+import { EmptyState } from '@/components/core/Empty';
 
 interface FunctionalitiesTabProps {
     adminInsights?: AdminNFTInsight;
@@ -28,13 +29,12 @@ export default function FunctionalitiesTab({ adminInsights, collectionInsights, 
 
     if (!insights) {
         return (
-            <div className="text-center py-12">
-                <div className="text-gray-400 text-6xl mb-4">⚙️</div>
-                <p className="text-gray-500 text-lg mb-2">Keine Funktionalitäts-Informationen verfügbar</p>
-                <p className="text-gray-400 text-sm">
-                    Weder NFT-spezifische noch Collection-weite Funktionalitäts-Insights wurden erstellt.
-                </p>
-            </div>
+            <EmptyState
+                icon="⚙️"
+                title="Keine Funktionalitäts-Informationen verfügbar"
+                description="Weder NFT-spezifische noch Collection-weite Funktionalitäts-Insights wurden erstellt."
+                size="sm"
+            />
         );
     }
 
@@ -43,16 +43,15 @@ export default function FunctionalitiesTab({ adminInsights, collectionInsights, 
 
     if (!hasFunctionalityInfo) {
         return (
-            <div className="text-center py-12">
-                <div className="text-gray-400 text-6xl mb-4">⚙️</div>
-                <p className="text-gray-500 text-lg mb-2">Keine Funktionalitäts-Beschreibungen verfügbar</p>
-                <p className="text-gray-400 text-sm">
-                    {isCollectionLevel
-                        ? "Für diese Collection wurden noch keine Funktionalitäts-Insights erstellt."
-                        : "Für dieses NFT wurden noch keine Funktionalitäts-Insights erstellt."
-                    }
-                </p>
-            </div>
+            <EmptyState
+                icon="⚙️"
+                title="Keine Funktionalitäts-Beschreibungen verfügbar"
+                description={isCollectionLevel
+                    ? "Für diese Collection wurden noch keine Funktionalitäts-Insights erstellt."
+                    : "Für dieses NFT wurden noch keine Funktionalitäts-Insights erstellt."
+                }
+                size="sm"
+            />
         );
     }
 

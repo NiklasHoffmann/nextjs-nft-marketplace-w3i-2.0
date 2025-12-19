@@ -2,6 +2,9 @@
 
 import { AdminNFTInsight, AdminCollectionInsight } from '@/types';
 import { TitleDescriptionPair } from '@/types/features/nft-insights';
+import { EmptyState } from '@/components/core/Empty';
+import React from 'react';
+import Link from 'next/link';
 
 interface ProjektTabProps {
   adminInsights?: AdminNFTInsight;
@@ -28,13 +31,12 @@ export default function ProjektTab({ adminInsights, collectionInsights, loading 
 
   if (!insights) {
     return (
-      <div className="text-center py-12">
-        <div className="text-gray-400 text-6xl mb-4">📋</div>
-        <p className="text-gray-500 text-lg mb-2">Keine Projekt-Informationen verfügbar</p>
-        <p className="text-gray-400 text-sm">
-          Weder NFT-spezifische noch Collection-weite Insights wurden erstellt.
-        </p>
-      </div>
+      <EmptyState
+        icon="📋"
+        title="Keine Projekt-Informationen verfügbar"
+        description="Weder NFT-spezifische noch Collection-weite Insights wurden erstellt."
+        size="sm"
+      />
     );
   }
 
