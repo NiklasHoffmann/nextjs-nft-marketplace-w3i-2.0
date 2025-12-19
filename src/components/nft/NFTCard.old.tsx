@@ -1,0 +1,840 @@
+﻿// Enhanced NFT Card with Optimized Marketplace Integration and 3D Tilt Effect
+"use client";
+
+import React, { useMemo, memo, useCallback, useRef, useState, useEffect } from 'react';
+import { useRouter } from "next/navigation";
+import { useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
+import { useETHPrice } from "@/contexts/CurrencyContext";
+import { formatEther } from "@/utils";
+import { devLog } from '@/utils/devLog';
+import type { NFTStatsUpdateEvent } from '@/types/events';
+import OptimizedNFTImage from './OptimizedNFTImage';
+import { BaseCard } from '@/components/core/Card/BaseCard';
+import type { AggregatedNFT } from '@/types/core/core-nft-modern';
+
+// ===== INTERFACES =====
+
+// New simplified interface with AggregatedNFT
+interface NFTCardProps {
+  /** Complete NFT data from AggregatedNFT system */
+  nft: AggregatedNFT;
+  /** Display options */
+  showStats?: boolean;
+  className?: string;
+  priority?: boolean;
+  enableInsights?: boolean;
+}
+
+// Legacy interface for backward compatibility
+interface LegacyNFTCardProps {
+  contractAddress: string;
+  tokenId: string;
+  // Marketplace props (passed from useActiveItems for efficiency)
+  listingId?: string;
+  price?: string;
+  seller?: string;
+  buyer?: string | null;
+  isListed?: boolean;
+  desiredContractAddress?: string;
+  desiredTokenId?: string;
+  // MongoDB-optimierte Daten (optional - verhindert API calls!)
+  metadata?: {
+    name?: string | null;
+    description?: string | null;
+    image?: string | null;
+    animationUrl?: string | null;
+    externalUrl?: string | null;
+    attributes?: Array<{ trait_type: string; value: string | number }>;
+  };
+  insights?: {
+    customTitle?: string | null;
+    category?: string | null;
+    tags?: string[];
+    rarity?: string | null;
+    cardDescriptions?: string[];
+    projectDescriptions?: any;
+    functionalitiesDescriptions?: any;
+    projectWebsite?: string | null;
+    projectTwitter?: string | null;
+    projectDiscord?: string | null;
+    partnerships?: string[];
+  };
+  contract?: {
+    // New field names (from nft_metadata collection)
+    name?: string | null;
+    symbol?: string | null;
+    // Legacy field names (backward compatibility)
+    contractName?: string | null;
+    contractSymbol?: string | null;
+    totalSupply?: number | bigint | null;
+    owner?: string | null;
+    tokenURI?: string | null;
+    approved?: string | null;
+    ownerBalance?: number | bigint | null;
+  };
+  // Stats werden über StatsContext geladen (nicht über Props!)
+  // Display options
+  showStats?: boolean;
+  className?: string;
+  priority?: boolean;
+  enableInsights?: boolean;
+}
+
+// Union type for transition period
+type NFTCardAllProps = NFTCardProps | LegacyNFTCardProps;
+
+// ===== TYPE GUARDS =====
+
+function isLegacyProps(props: NFTCardAllProps): props is LegacyNFTCardProps {
+  return 'contractAddress' in props && 'tokenId' in props && !('nft' in props);
+}
+
+function isNewProps(props: NFTCardAllProps): props is NFTCardProps {
+  return 'nft' in props;
+}
+const PriceDisplay = memo(({ price, desiredContractAddress }: {
+  price: string | null;
+  desiredContractAddress?: string | null;
+}) => {
+  const ethPrice = useMemo(() =>
+    price ? parseFloat(formatEther(price)) : 0, [price]
+  );
+  const { convertedPrice, loading } = useETHPrice(ethPrice);
+
+  if (!price) return null;
+
+  const isSwap = desiredContractAddress && desiredContractAddress !== "0x0000000000000000000000000000000000000000";
+
+  return (
+    <div className="bg-white/95 backdrop-blur-sm p-2 rounded-md shadow-2xl border border-gray-200/60 ring-1 ring-gray-300/20">
+      <div className="flex justify-between items-center">
+        <div className="text-left">
+          <div className="text-orange font-semibold text-lg">{formatEther(price)} ETH</div>
+          {loading ? (
+            <div className="text-xs text-gray-500">Lädt...</div>
+          ) : (
+            <div className="text-xs text-gray-600">˜ {convertedPrice}</div>
+          )}
+        </div>
+        {/* Sell/Swap Indicator - enhanced styling */}
+        <div className="bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${isSwap ? 'bg-orange' : 'bg-forestgreen'}`}></div>
+            <span className={`text-xs font-medium ${isSwap ? 'text-orange' : 'text-forestgreen'}`}>
+              {isSwap ? 'Swap' : 'Sell'}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+PriceDisplay.displayName = 'PriceDisplay';
+
+/**
+ * Optimized NFT Card with unified AggregatedNFT approach
+ * 
+ * Now supports both new AggregatedNFT interface and legacy props for smooth migration.
+ * The new interface dramatically simplifies the component with a single nft prop.
+ */
+export function NFTCard(props: NFTCardAllProps) {
+  const router = useRouter();
+
+
+
+  // ===== PROPS NORMALIZATION =====
+
+  // Extract common display options
+  const {
+    showStats = true,
+    className = "",
+    priority = false,
+    enableInsights = true
+  } = props;
+
+  // Handle both new and legacy prop formats
+  let nft: AggregatedNFT;
+  let contractAddress: string | undefined;
+  let tokenId: string | undefined;
+
+  // Legacy props for backward compatibility
+  let listingId: string | null = null;
+  let price: string | null = null;
+  let seller: string | null = null;
+  let buyer: string | null = null;
+  let isListed: boolean = false;
+  let desiredContractAddress: `0x${string}` | undefined;
+  let desiredTokenId: string | null = null;
+
+  if (isNewProps(props)) {
+    // New simplified interface - just use the AggregatedNFT
+    nft = props.nft;
+    contractAddress = nft.core.contractAddress;
+    tokenId = nft.core.tokenId;
+  } else {
+    // Legacy interface - extract all props and construct AggregatedNFT
+    contractAddress = props.contractAddress;
+    tokenId = props.tokenId;
+    listingId = props.listingId || null;
+    price = props.price || null;
+    seller = props.seller || null;
+    buyer = props.buyer || null;
+    isListed = props.isListed || false;
+    desiredContractAddress = props.desiredContractAddress as `0x${string}` | undefined;
+    desiredTokenId = props.desiredTokenId || null;
+
+    // Create minimal AggregatedNFT from legacy props
+    nft = {
+      key: `${contractAddress}-${tokenId}` as `${string}-${string}`,
+      contractAddress: contractAddress as `0x${string}`,
+      tokenId,
+      listed: isListed,
+      listing: isListed && listingId ? {
+        listingId,
+        contractAddress: contractAddress as `0x${string}`,
+        tokenId,
+        isListed,
+        price: price || '0',
+        seller: seller as `0x${string}`,
+        buyer: buyer as `0x${string}` | null,
+        desiredContractAddress: desiredContractAddress || contractAddress as `0x${string}`,
+        desiredTokenId: desiredTokenId
+      } : undefined,
+      core: {
+        contractAddress: contractAddress as `0x${string}`,
+        tokenId,
+        tokenURI: null,
+        name: null,
+        owner: null,
+        symbol: null
+      },
+      meta: undefined,
+      social: undefined,
+      insight: undefined,
+      sources: {
+        blockchain: false,
+        metadata: false,
+        marketplace: true,
+        social: false,
+        insights: false
+      },
+      lastUpdated: Date.now()
+    };
+  }
+
+  // Early return if essential props are missing (MUST be before any hooks!)
+  if (!contractAddress || !tokenId) {
+    devLog.error('NFTCard: Missing contractAddress or tokenId', { contractAddress, tokenId, props });
+    return null;
+  }
+
+  // MongoDB-optimized data from props (prevents API calls)
+  const hasMongoDBData = isLegacyProps(props) && (props.metadata || props.insights || props.contract);
+
+  // REACTIVE Context Access - automatically re-renders when NFT data changes!
+  // NFT data comes from props (MongoDB), no context needed
+  const contextData = null;
+  const contextLoading = false;
+  const contextError = null;
+
+  // Get stats using the simplified hook - automatically loads and stays reactive
+  const { stats: liveStats, loading: statsLoading } = useNFTUserStats(contractAddress, tokenId);
+
+  // MongoDB data optimization - no API calls needed when all data is present
+
+  // Track if we ever had data to prevent skeleton flickering on refresh
+  const hadDataRef = useRef(false);
+  const isLoadingRef = useRef(contextLoading);
+  const loadAttemptedRef = useRef(!!contextData);
+
+  // Stats are now loaded automatically by useNFTUserStats hook
+
+  useEffect(() => {
+    if (contextData) {
+      hadDataRef.current = true;
+      isLoadingRef.current = false;
+      loadAttemptedRef.current = true;
+    } else {
+      isLoadingRef.current = contextLoading;
+    }
+  }, [contextData, contextLoading]);
+
+  // useModernNFT already handles loading automatically with autoLoad=true
+  // No need for manual load useEffect anymore!
+  // DEPRECATED: Silent refresh removed - all data comes from props now
+  const handleHover = useCallback(() => {
+    // No-op - data refresh handled by parent components
+  }, []);
+
+  // MongoDB-optimized props (legacy interface)
+  const mongoMetadata = isLegacyProps(props) ? props.metadata : undefined;
+  const mongoInsights = isLegacyProps(props) ? props.insights : undefined;
+  const mongoContract = isLegacyProps(props) ? props.contract : undefined;
+
+  // Hybrid data approach: MongoDB props > context data > defaults
+  // When MongoDB data available, use ONLY MongoDB (no context fallback needed!)
+  const displayData = useMemo(() => {
+    // If we have MongoDB data, use it exclusively (optimization!)
+    if (hasMongoDBData) {
+      return {
+        // Core identification
+        contractAddress,
+        tokenId,
+
+        // Marketplace data (from props)
+        listingId: listingId || null,
+        price: price || null,
+        seller: seller || null,
+        buyer: buyer || null,
+        isListed: isListed ?? false,
+        desiredContractAddress: desiredContractAddress || null,
+        desiredTokenId: desiredTokenId || null,
+
+        // Metadata - ONLY MongoDB (no API calls!)
+        name: mongoMetadata?.name || `NFT #${tokenId}`,
+        imageUrl: mongoMetadata?.image || null,
+
+        // Contract info - ONLY MongoDB
+        contractInfo: mongoContract ? {
+          name: mongoContract.name || null,
+          symbol: mongoContract.symbol || null,
+          totalSupply: mongoContract.totalSupply || null,
+          owner: mongoContract.owner || null
+        } : null,
+
+        // Insights data - ONLY MongoDB
+        customTitle: mongoInsights?.customTitle || null,
+        category: mongoInsights?.category || null,
+        cardDescriptions: mongoInsights?.cardDescriptions || null,
+        rarity: mongoInsights?.rarity || null,
+
+        // Stats - ALWAYS use live stats from NFTStatsContext (real-time!)
+        likeCount: liveStats?.likeCount ?? null,
+        watchlistCount: liveStats?.watchlistCount ?? null,
+        averageRating: liveStats?.averageRating ?? null,
+
+        // No loading state - we have data!
+        isLoading: false,
+      };
+    }
+
+    // Fallback: No MongoDB data, use AggregatedNFT data (new approach)
+    return {
+      // Core identification
+      contractAddress,
+      tokenId,
+
+      // Marketplace data (props have priority)
+      listingId: listingId || nft.listing?.listingId || null,
+      price: price || nft.listing?.price || null,
+      seller: seller || nft.listing?.seller || null,
+      buyer: buyer || nft.listing?.buyer || null,
+      isListed: isListed ?? nft.listed ?? false,
+      desiredContractAddress: desiredContractAddress || nft.listing?.desiredContractAddress || null,
+      desiredTokenId: desiredTokenId || nft.listing?.desiredTokenId || null,
+
+      // Metadata - from nft data
+      name: nft.meta?.name || nft.core?.name || `NFT #${tokenId}`,
+      imageUrl: nft.meta?.image || null,
+
+      // Contract info - from nft.core
+      contractInfo: nft.core ? {
+        name: nft.core.name || null,
+        symbol: nft.core.symbol || null,
+        totalSupply: null, // Not available in core
+        owner: nft.core.owner || null
+      } : null,
+
+      // Insights data - from nft.insight
+      customTitle: nft.insight?.customTitle || null,
+      category: nft.insight?.category || null,
+      cardDescriptions: nft.insight?.cardDescription ? [nft.insight.cardDescription] : null,
+      rarity: nft.insight?.rarity || null,
+
+      // Stats - use live stats from state
+      likeCount: liveStats?.likeCount ?? nft.social?.likeCount ?? null,
+      watchlistCount: liveStats?.watchlistCount ?? nft.social?.watchlistCount ?? null,
+      averageRating: liveStats?.averageRating ?? nft.social?.averageRating ?? null,
+
+      // Loading state - no loading needed since we have nft data
+      isLoading: false,
+    };
+  }, [
+    contractAddress, tokenId, listingId, price, seller,
+    buyer, isListed, desiredContractAddress, desiredTokenId,
+    contextData, liveStats, hasMongoDBData,
+    mongoMetadata, mongoInsights, mongoContract
+  ]);
+
+
+
+  // 3D Tilt Effect State and Logic
+  const cardRef = useRef<HTMLDivElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const leaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isHoveringRef = useRef(false);
+  const isFirstHoverRef = useRef(true);
+  const [currentRotation, setCurrentRotation] = useState({ rotateX: 0, rotateY: 0 });
+  const [tiltStyle, setTiltStyle] = useState({
+    transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg)',
+    transformOrigin: 'center center',
+    transition: 'transform 0.1s ease-out',
+  });
+
+  // Calculate tilt based on mouse position with RAF optimization
+  const calculateTilt = useCallback((clientX: number, clientY: number) => {
+    if (!cardRef.current || !isHoveringRef.current) return;
+
+    // Cancel previous animation frame
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+
+    // Use RAF for smooth 60fps animations
+    animationFrameRef.current = requestAnimationFrame(() => {
+      const card = cardRef.current;
+      if (!card || !isHoveringRef.current) return;
+
+      const rect = card.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      // Calculate raw rotation values
+      const maxTilt = 15;
+      let rotateY = ((clientX - centerX) / (rect.width / 2)) * maxTilt;
+      let rotateX = ((centerY - clientY) / (rect.height / 2)) * maxTilt;
+
+      // Smooth clamping to prevent harsh jumps at edges
+      const dampingFactor = 0.8; // Reduce intensity near edges
+      const edgeThreshold = 0.85; // Start damping when 85% from center
+
+      // Calculate distance from center (0 = center, 1 = edge)
+      const distanceFromCenterX = Math.abs((clientX - centerX) / (rect.width / 2));
+      const distanceFromCenterY = Math.abs((clientY - centerY) / (rect.height / 2));
+
+      // Apply smooth damping near edges
+      if (distanceFromCenterX > edgeThreshold) {
+        const dampingX = 1 - ((distanceFromCenterX - edgeThreshold) / (1 - edgeThreshold)) * (1 - dampingFactor);
+        rotateY *= dampingX;
+      }
+
+      if (distanceFromCenterY > edgeThreshold) {
+        const dampingY = 1 - ((distanceFromCenterY - edgeThreshold) / (1 - edgeThreshold)) * (1 - dampingFactor);
+        rotateX *= dampingY;
+      }
+
+      // Smooth clamp to prevent extreme values
+      rotateY = Math.max(-maxTilt, Math.min(maxTilt, rotateY));
+      rotateX = Math.max(-maxTilt, Math.min(maxTilt, rotateX));
+
+      // Apply smooth tilt transformation with fixed transform-origin
+      setCurrentRotation({ rotateX, rotateY });
+      setTiltStyle({
+        transform: `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`,
+        transformOrigin: 'center center', // Fixed rotation point
+        transition: isFirstHoverRef.current ? 'transform 0.4s ease-out' : 'none',
+      });
+
+      // After first hover, disable the smooth entry transition
+      if (isFirstHoverRef.current) {
+        setTimeout(() => {
+          isFirstHoverRef.current = false;
+        }, 400); // Match the transition duration
+      }
+    });
+  }, []);
+
+  // Reset tilt to neutral position with debouncing
+  const resetTilt = useCallback(() => {
+    // Cancel any pending animation frame
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+
+    setCurrentRotation({ rotateX: 0, rotateY: 0 });
+    setTiltStyle({
+      transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)',
+      transformOrigin: 'center center',
+      transition: 'transform 0.3s ease-out',
+    });
+  }, []);
+
+  // Mouse event handlers for 3D tilt with debouncing
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (isHoveringRef.current) {
+      calculateTilt(e.clientX, e.clientY);
+    }
+  }, [calculateTilt]);
+
+  const handleMouseEnterCard = useCallback((e: React.MouseEvent) => {
+    // Clear any pending leave timeout
+    if (leaveTimeoutRef.current) {
+      clearTimeout(leaveTimeoutRef.current);
+      leaveTimeoutRef.current = null;
+    }
+
+    isHoveringRef.current = true;
+    handleHover();
+    calculateTilt(e.clientX, e.clientY);
+  }, [handleHover, calculateTilt]);
+
+  const handleMouseLeave = useCallback(() => {
+    // Set flag immediately but delay the actual reset
+    isHoveringRef.current = false;
+
+    // Clear any existing timeout
+    if (leaveTimeoutRef.current) {
+      clearTimeout(leaveTimeoutRef.current);
+    }
+
+    // Add a small delay to prevent flickering at edges
+    leaveTimeoutRef.current = setTimeout(() => {
+      if (!isHoveringRef.current) {
+        // Reset first hover flag for next time
+        isFirstHoverRef.current = true;
+        resetTilt();
+      }
+    }, 100); // 100ms delay
+  }, [resetTilt]);
+
+  // Touch event handlers for mobile devices
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    isHoveringRef.current = true;
+    const touch = e.touches[0];
+    if (touch) {
+      calculateTilt(touch.clientX, touch.clientY);
+    }
+  }, [calculateTilt]);
+
+  const handleTouchEnd = useCallback(() => {
+    isHoveringRef.current = false;
+    resetTilt();
+  }, [resetTilt]);
+
+  // Cleanup animation frames and timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (leaveTimeoutRef.current) {
+        clearTimeout(leaveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Navigation handler - use direct values instead of closure
+  const handleClick = useCallback(() => {
+    // Get fresh values from nft object to avoid stale closure
+    const currentContractAddress = isNewProps(props)
+      ? props.nft.core.contractAddress
+      : props.contractAddress;
+    const currentTokenId = isNewProps(props)
+      ? props.nft.core.tokenId
+      : props.tokenId;
+
+    // Prevent navigation if contractAddress is missing
+    if (!currentContractAddress || currentContractAddress === 'undefined' || !currentTokenId) {
+      console.error('NFTCard: Cannot navigate - invalid parameters', {
+        contractAddress: currentContractAddress,
+        tokenId: currentTokenId
+      });
+      return;
+    }
+
+    const targetUrl = `/nft/${currentContractAddress}/${currentTokenId}`;
+    console.log('NFTCard: Navigating to', targetUrl);
+
+    // Use window.location instead of router.push to bypass Next.js routing issues
+    window.location.href = targetUrl;
+  }, [props]);
+
+  // Focus handler for accessibility
+  const handleFocus = useCallback(() => {
+    handleHover();
+  }, [handleHover]);
+
+  // Determine final category - use displayData
+  const finalCategory = useMemo(() => {
+    if (enableInsights && displayData?.category) {
+      return [displayData.category];
+    }
+    if (!enableInsights) {
+      return null;
+    }
+    return null;
+  }, [enableInsights, displayData?.category]);
+
+  // Determine final description - use displayData descriptions
+  const finalDescription = useMemo(() => {
+    if (enableInsights && displayData?.cardDescriptions && displayData.cardDescriptions.length > 0) {
+      return displayData.cardDescriptions;
+    }
+    if (!enableInsights) {
+      return null;
+    }
+    return null;
+  }, [enableInsights, displayData?.cardDescriptions]);
+
+  const categories = finalCategory && Array.isArray(finalCategory)
+    ? finalCategory.filter(cat => cat && cat.trim().length > 0) // Filter out empty/whitespace-only categories
+    : [];
+  const descriptions = finalDescription && Array.isArray(finalDescription)
+    ? finalDescription.filter(desc => typeof desc === 'string' && desc.trim().length > 0) // Filter out empty/whitespace-only descriptions
+    : [];
+
+  // Rarity-based background colors (simplified approach)
+  const getRarityBackground = useMemo(() => {
+    if (!enableInsights || !displayData?.rarity) {
+      return 'bg-secondary'; // Default background
+    }
+
+    switch (displayData.rarity) {
+      case 'legendary':
+        return 'bg-yellow-200'; // Golden background
+      case 'epic':
+        return 'bg-purple-200'; // Purple background
+      case 'rare':
+        return 'bg-blue-200'; // Blue background
+      case 'uncommon':
+        return 'bg-green-200'; // Green background
+      default:
+        return 'bg-gray-200'; // Common background
+    }
+  }, [enableInsights, displayData?.rarity]);
+
+  // Loading state - show clean skeleton instead of bg-primary flashing
+  if (displayData.isLoading) {
+    return <BaseCard loading={true} size="md" className={className} />;
+  }
+
+  // Error state - simplified since context handles errors internally
+  // Only show error if we attempted to load but still don't have data and aren't loading
+  if (!contextData && !displayData.isLoading && loadAttemptedRef.current) {
+    return (
+      <div className={`bg-red-50 border border-red-200 rounded-xl p-4 ${className}`}>
+        <p className="text-red-600 text-sm">Failed to load NFT</p>
+        <button
+          onClick={() => {
+            // Reload page to retry - data comes from parent now
+            window.location.reload();
+          }}
+          className="mt-2 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={cardRef}
+      className="group cursor-pointer transform-gpu"
+      onClick={handleClick}
+      onMouseMove={handleMouseMove}
+      onMouseEnter={handleMouseEnterCard}
+      onMouseLeave={handleMouseLeave}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      style={tiltStyle}
+    >
+      <div className={`hover:shadow-[0_15px_30px_-8px_rgba(0,0,0,0.4)] hover:scale-[1.02] transition-all duration-300 ease-out rounded-lg shadow-xl flex flex-col flex-end gap-2 w-full h-72 relative will-change-transform origin-center border border-black ${getRarityBackground}`}>
+        {/* Content container - neutral background when no image, bg-secondary when image loaded */}
+        <div className={`absolute inset-2 shadow-lg rounded-md overflow-hidden flex flex-col h-[calc(100%-16px)] ${displayData.imageUrl ? 'bg-secondary' : 'bg-gray-100'}`}>
+          {/* Blurred Background Image */}
+          {displayData.imageUrl && (
+            <div className="absolute inset-0 overflow-hidden rounded-md">
+              <OptimizedNFTImage
+                imageUrl={displayData.imageUrl}
+                tokenId={`${tokenId}-bg`}
+                className="object-cover will-change-transform rounded-md"
+                fill={true}
+                priority={priority} // Use the same priority as the main image
+                width={200}
+                height={200}
+              />
+              {/* CSS-based blur overlay for better performance */}
+              <div className="absolute inset-0 backdrop-blur-sm bg-white/30 rounded-md"></div>
+            </div>
+          )}
+
+          {/* Content overlay with fixed layout */}
+          <div className="relative z-10 flex flex-col h-full p-1 gap-1">
+            {/* NFT Name Header at top - enhanced with better shadows and borders */}
+            <div className="flex-shrink-0">
+              <div className="bg-white/95 backdrop-blur-md p-2 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    {/* Collection Symbol/Address */}
+                    <h3 className="text-sm font-semibold text-gray-900 truncate">
+                      {displayData.contractInfo?.symbol || `${(contractAddress || '').slice(0, 6)}...${(contractAddress || '').slice(-4)}`}
+                    </h3>
+                    {/* NFT Name: customTitle > metadata name > contract name */}
+                    <p className="text-xs text-gray-600 truncate">
+                      {displayData.customTitle || displayData.name || displayData.contractInfo?.name || `#${tokenId}`}
+                    </p>
+                  </div>
+                  {/* Contract Info and Rarity indicators 
+                  <div className="flex flex-col items-end gap-1 ml-2">*/}
+                  {/* Rarity Indicator 
+                    {enableInsights && contextData?.insight?.rarity && (
+                      <div className={`px-1.5 py-0.5 rounded text-xs font-medium ${contextData.insight.rarity === 'legendary' ? 'bg-yellow-100 text-yellow-700' :
+                        contextData.insight.rarity === 'epic' ? 'bg-purple-100 text-purple-700' :
+                          contextData.insight.rarity === 'rare' ? 'bg-blue-100 text-blue-700' :
+                            contextData.insight.rarity === 'uncommon' ? 'bg-green-100 text-green-700' :
+                              'bg-gray-100 text-gray-700'
+                        }`}>
+                        {contextData.insight.rarity.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>*/}
+                  {/* Average Rating Stars - enhanced styling */}
+                  {displayData.averageRating && displayData.averageRating > 0 && (
+                    <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-md border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center gap-1 ml-2">
+                      <div className="flex items-center gap-0.5">
+                        {Array.from({ length: 5 }, (_, i) => (
+                          <svg
+                            key={i}
+                            className={`w-2.5 h-2.5 ${displayData.averageRating && i < Math.round(displayData.averageRating) ? 'text-yellow-400' : 'text-gray-300'}`}
+                            fill="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                          </svg>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Sharp Image and Description side by side - 50/50 split */}
+            <div className="flex-1 flex gap-1 min-h-0">
+              {/* Left: Image - 50% - full height, auto width, center-aligned */}
+              {displayData.imageUrl && (
+                <div className="w-1/2 flex justify-center items-stretch overflow-hidden">
+                  <div className="rounded-md border-2 border-white/50 backdrop-blur-sm overflow-hidden relative h-full">
+                    <OptimizedNFTImage
+                      imageUrl={displayData.imageUrl}
+                      tokenId={tokenId}
+                      className="object-contain h-full w-auto"
+                      fill={false}
+                      width={240}
+                      height={240}
+                      priority={priority}
+                    />
+                    {/* Subtle inner glow */}
+                    <div className="absolute inset-0 rounded-md ring-1 ring-white/20 pointer-events-none"></div>
+                  </div>
+                </div>
+              )}
+
+              {/* Right: Description - 50% - fills available space */}
+              {descriptions.length > 0 && (
+                <div className="w-1/2">
+                  <div
+                    className="bg-white/95 backdrop-blur-sm pr-1 pt-1 rounded-md shadow-lg text-xs h-full overflow-hidden text-right break-words hyphens-auto"
+                    lang="de"
+                  >
+                    {descriptions[0]}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Categories and Social Stats */}
+            <div className="flex-shrink-0">
+              <div className="flex items-center gap-1">
+                {/* Categories - left side */}
+                {categories.length > 0 && (
+                  <div className="flex flex-wrap gap-1 min-w-0">
+                    {categories.slice(0, 1).map((cat, index) => (
+                      <div key={index} className={`backdrop-blur-sm px-2 py-1 rounded-md shadow-md border h-6 flex items-center ring-1 ${enableInsights && nft?.insight?.category ?
+                        'bg-purple-100/95 border-purple-200/60 ring-purple-300/20' :
+                        'bg-white/95 border-gray-200/60 ring-gray-300/20'
+                        }`}>
+                        <span className={`text-xs font-medium truncate ${enableInsights && nft?.insight?.category ? 'text-purple-700' : 'text-gray-700'
+                          }`}>
+                          {cat}
+                        </span>
+                      </div>
+                    ))}
+                    {categories.length > 1 && (
+                      <div className={`backdrop-blur-sm px-2 py-1 rounded-md shadow-md border h-6 flex items-center ring-1 ${enableInsights && nft?.insight?.category ?
+                        'bg-purple-100/95 border-purple-200/60 ring-purple-300/20' :
+                        'bg-white/95 border-gray-200/60 ring-gray-300/20'
+                        }`}>
+                        <span className={`text-xs font-medium ${enableInsights && nft?.insight?.category ? 'text-purple-600' : 'text-gray-500'
+                          }`}>
+                          +{categories.length - 1}
+                        </span>
+                      </div>
+                    )}
+                    {/* Insights indicator badge 
+                    {enableInsights && (contextData?.insight?.customTitle || contextData?.insight?.category || contextData?.insight?.cardDescription || contextData?.insight?.rarity) && (
+                      <div className="bg-purple-500/90 backdrop-blur-sm px-1.5 py-0.5 rounded-md shadow-sm border border-purple-400/40 h-6 flex items-center">
+                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                        </svg>
+                      </div>
+                    )}*/}
+                  </div>
+                )}
+
+                {/* Flexible spacer to push social stats to the right */}
+                <div className="flex-1"></div>
+
+                {/* Social Stats - always right side */}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {/* Like Count - enhanced styling */}
+                  <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-md border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center gap-1">
+                    <svg className="w-3 h-3 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                    </svg>
+                    <span className="text-xs font-medium text-gray-700">
+                      {displayData.likeCount || 0}
+                    </span>
+                  </div>
+
+                  {/* Watchlist Count - enhanced styling */}
+                  <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-md border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center gap-1">
+                    <svg className="w-3 h-3 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                    <span className="text-xs font-medium text-gray-700">
+                      {displayData.watchlistCount || 0}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Price Display - always at bottom */}
+            <div className="flex-shrink-0">
+              {displayData.isListed && displayData.price ? (
+                <PriceDisplay
+                  price={displayData.price}
+                  desiredContractAddress={displayData.desiredContractAddress}
+                />
+              ) : (
+                /* Not Listed Placeholder - 62px height, centered vertically and horizontally */
+                <div className="bg-gray-100/95 backdrop-blur-sm p-2 rounded-md shadow-2xl border border-gray-300/60 ring-1 ring-gray-400/20 h-[62px]">
+                  <div className="flex justify-center items-center h-full">
+                    <div className="text-gray-500 font-medium text-lg leading-tight">Not Listed</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div >
+    </div >
+  );
+}
+
+// Memoize component to prevent unnecessary re-renders
+export default memo(NFTCard);
