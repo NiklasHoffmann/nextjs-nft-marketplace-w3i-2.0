@@ -56,7 +56,7 @@ export const CollectionCard = React.memo(({
                     contractName={collection.contractName}
                 />
             }
-            image={
+            content={
                 <CollectionCardPreview
                     previewImages={collection.previewImages}
                     contractAddress={collection.contractAddress}
