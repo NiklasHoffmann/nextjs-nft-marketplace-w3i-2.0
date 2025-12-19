@@ -40,13 +40,8 @@ interface ListedNFTsListPropsExtended extends ListedNFTsListProps {
 }
 
 export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, onFiltersChange }: ListedNFTsListPropsExtended = {}) {
-    const [isClient, setIsClient] = useState(false);
     const loadMoreRef = useRef<HTMLDivElement>(null);
     const isLoadingMore = useRef(false);
-
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
 
     // Get search term from URL
     const searchParams = useSearchParams();
@@ -127,9 +122,8 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
     });
 
     // Convert MongoDB items to NFTScrollItem format
+    // Note: Intentionally NOT depending on 'loading' to avoid re-renders during sort operations
     const scrollItems: NFTScrollItem[] = useMemo(() => {
-        console.log('[ListedNFTsList] useMemo - items:', items.length, 'loading:', loading);
-
         return items
             .filter(item => item.contractAddress && item.contractAddress !== 'undefined' && item.contractAddress.trim() !== '')
             .map((item) => ({
@@ -232,16 +226,8 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
         loadAllFiltered();
     }, [pagination?.total, pagination?.hasMore, items.length, loadMore]);
 
-    if (!isClient) {
-        return (
-            <div className="w-full md:pl-16 pl-10">
-                <div className="max-w-7xl mx-auto px-12 mb-6">
-                    <h1 className="text-4xl font-bold text-gray-900">Recently Listed</h1>
-                    <p className="text-sm text-gray-600 pl-2 mt-2">Loading marketplace data...</p>
-                </div>
-            </div>
-        );
-    }
+    // Remove isClient check to prevent title flickering - component is client-only already
+    // This eliminates the flash of smaller title before hydration
 
     return (
         <div className="w-full">

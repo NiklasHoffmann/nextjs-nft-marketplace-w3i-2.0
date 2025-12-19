@@ -144,17 +144,36 @@ export function NFTGallery({
         return () => container.removeEventListener('scroll', updateScrollButtons)
     }, [items])
 
-    // Loading state - Show accurate NFTCardSkeleton
+    // Loading state - Match NFTCard dimensions with proper aspect ratio
     if (loading) {
         return (
             <div className={className}>
                 {title && (
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">{title}</h3>
+                    largeTitle ? (
+                        <h1 className="text-3xl font-bold text-gray-900 mb-4 mx-8">{title}</h1>
+                    ) : (
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">{title}</h3>
+                    )
+                )}
+                {subtitle && (
+                    <p className="text-sm text-gray-600 mb-4 mx-8">{subtitle}</p>
                 )}
                 <div className={`flex ${gap} ${padding} overflow-hidden`}>
                     {Array.from({ length: loadingCount }).map((_, i) => (
                         <div key={i} className={`flex-shrink-0 ${cardWidth}`}>
-                            <BaseCard loading={true} size="md" />
+                            {/* Match NFTCard's actual dimensions */}
+                            <div className="w-full aspect-[3/4] rounded-xl bg-white border border-gray-200 shadow-sm">
+                                <div className="w-full h-full p-4 animate-pulse">
+                                    {/* Image placeholder - top portion */}
+                                    <div className="w-full aspect-square bg-gray-200 rounded-lg mb-3" />
+                                    {/* Title */}
+                                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+                                    {/* Subtitle */}
+                                    <div className="h-3 bg-gray-200 rounded w-1/2 mb-3" />
+                                    {/* Price */}
+                                    <div className="h-5 bg-gray-200 rounded w-2/3" />
+                                </div>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -196,14 +215,12 @@ export function NFTGallery({
                 </div>
             )}
 
-            {/* Subtitle Row - Subtitle/Stats (left) + View All Button (right) */}
+            {/* Subtitle Row - Always rendered to prevent layout shift, min-height reserves space */}
             {(subtitle || enableViewAll) && (
-                <div className="flex items-center justify-between mb-4 mx-8">
-                    {subtitle && (
-                        <div className="text-sm text-gray-600">
-                            {subtitle}
-                        </div>
-                    )}
+                <div className="flex items-center justify-between mb-4 mx-8 min-h-[1.75rem]">
+                    <div className="text-sm text-gray-600">
+                        {subtitle || '\u00A0'}
+                    </div>
                     {enableViewAll && (
                         <button
                             onClick={() => setIsGridView(!isGridView)}
