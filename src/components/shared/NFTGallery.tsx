@@ -7,7 +7,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { LazyNFTCard, NFTCard } from '@/components/nft'
-import NFTCardSkeleton from '@/components/ui/NFTCardSkeleton'
+import { BaseCard } from '@/components/core/Card/BaseCard'
 import { ScrollButtons } from '@/components/ui/ScrollButtons'
 import type { NFTScrollItem, NFTScrollListProps } from '@/types/marketplace'
 
@@ -154,7 +154,7 @@ export function NFTGallery({
                 <div className={`flex ${gap} ${padding} overflow-hidden`}>
                     {Array.from({ length: loadingCount }).map((_, i) => (
                         <div key={i} className={`flex-shrink-0 ${cardWidth}`}>
-                            <NFTCardSkeleton />
+                            <BaseCard loading={true} size="md" />
                         </div>
                     ))}
                 </div>

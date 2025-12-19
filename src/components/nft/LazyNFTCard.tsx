@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { lazy, Suspense, memo } from 'react';
-import NFTCardSkeleton from '@/components/ui/NFTCardSkeleton';
+import { BaseCard } from '@/components/core/Card/BaseCard';
 
 // Lazy load NFTCard component for better code splitting
 const NFTCard = lazy(() => import('./NFTCard'));
@@ -59,11 +59,11 @@ interface LazyNFTCardProps {
  * LazyNFTCard - Code-split NFTCard with accurate skeleton
  * 
  * Uses lazy loading to reduce initial bundle size.
- * Shows accurate NFTCardSkeleton while loading that matches the final card layout.
+ * Shows BaseCard loading state while loading that matches the final card layout.
  */
 const LazyNFTCard = memo((props: LazyNFTCardProps) => {
   return (
-    <Suspense fallback={<NFTCardSkeleton className={props.className} />}>
+    <Suspense fallback={<BaseCard loading={true} size="md" className={props.className} />}>
       <NFTCard {...props} />
     </Suspense>
   );

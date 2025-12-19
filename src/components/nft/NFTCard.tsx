@@ -9,7 +9,7 @@ import { formatEther } from "@/utils";
 import { devLog } from '@/utils/devLog';
 import type { NFTStatsUpdateEvent } from '@/types/events';
 import OptimizedNFTImage from './OptimizedNFTImage';
-import NFTCardSkeleton from '@/components/ui/NFTCardSkeleton';
+import { BaseCard } from '@/components/core/Card/BaseCard';
 import type { AggregatedNFT } from '@/types/core/core-nft-modern';
 
 // ===== INTERFACES =====
@@ -607,7 +607,7 @@ export function NFTCard(props: NFTCardAllProps) {
 
   // Loading state - show clean skeleton instead of bg-primary flashing
   if (displayData.isLoading) {
-    return <NFTCardSkeleton className={className} />;
+    return <BaseCard loading={true} size="md" className={className} />;
   }
 
   // Error state - simplified since context handles errors internally
