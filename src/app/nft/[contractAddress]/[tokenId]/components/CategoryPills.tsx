@@ -291,8 +291,8 @@ function CategoryPills({
                 <Link
                     href={`/admin/insights?contractAddress=${contractAddress}&tokenId=${tokenId}`}
                     className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${hasEmptyInsights
-                            ? 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200'
-                            : 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200'
+                        ? 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200'
+                        : 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200'
                         }`}
                 >
                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

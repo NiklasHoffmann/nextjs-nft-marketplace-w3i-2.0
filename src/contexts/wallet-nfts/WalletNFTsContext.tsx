@@ -23,6 +23,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useAccount } from 'wagmi';
 import { devLog } from '@/utils/devLog';
 import { WalletNFTsService, type WalletNFT } from './WalletNFTsService';
+import { onDataInvalidation, type InvalidationEventDetail } from '@/services/DataInvalidationService';
 import { WalletNFTsCache, type WalletNFTsState } from './WalletNFTsCache';
 
 interface WalletNFTsContextType {
@@ -119,6 +120,33 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
         setState(WalletNFTsCache.createInitialState());
         cache.invalidate();
     }, [cache]);
+
+    /**
+     * Listen for data invalidation events from other parts of the app
+     * (e.g., after listing, purchasing, or canceling NFTs)
+     */
+    useEffect(() => {
+        const unsubscribe = onDataInvalidation((detail: InvalidationEventDetail) => {
+            devLog.info('wallet-nfts', `🔔 Received invalidation event:`, detail);
+
+            // Refresh wallet NFTs if:
+            // 1. Manual refresh or graph update (affects all)
+            // 2. Listing/purchase/cancel involving current wallet's NFT
+            // 3. Transfer involving current wallet
+            const shouldRefresh =
+                detail.type === 'manual-refresh' ||
+                detail.type === 'graph-update' ||
+                (detail.walletAddress && address && detail.walletAddress.toLowerCase() === address.toLowerCase());
+
+            if (shouldRefresh && address) {
+                devLog.info('wallet-nfts', `🔄 Auto-refreshing wallet NFTs after ${detail.type}`);
+                cache.invalidate(address);
+                fetchWalletNFTs(address);
+            }
+        });
+
+        return unsubscribe;
+    }, [address, cache, fetchWalletNFTs]);
 
     /**
      * Get single NFT

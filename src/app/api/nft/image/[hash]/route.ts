@@ -221,37 +221,37 @@ export async function DELETE(
     return apiHandler(async () => {
         const { hash: ipfsHash } = await context.params;
 
-    if (ipfsHash === 'all') {
-        // Clear all cached images (admin operation)
-        const files = await fs.readdir(CACHE_DIR);
-        let deleted = 0;
+        if (ipfsHash === 'all') {
+            // Clear all cached images (admin operation)
+            const files = await fs.readdir(CACHE_DIR);
+            let deleted = 0;
 
-        for (const file of files) {
-            try {
-                await fs.unlink(path.join(CACHE_DIR, file));
-                deleted++;
-            } catch (err) {
-                console.warn(`⚠️ Failed to delete ${file}:`, err);
+            for (const file of files) {
+                try {
+                    await fs.unlink(path.join(CACHE_DIR, file));
+                    deleted++;
+                } catch (err) {
+                    console.warn(`⚠️ Failed to delete ${file}:`, err);
+                }
             }
+
+            return apiSuccess({
+                deleted,
+                message: `Cleared ${deleted} cached images`
+            });
         }
 
-        return apiSuccess({
-            deleted,
-            message: `Cleared ${deleted} cached images`
-        });
-    }
+        // Delete specific image
+        const cachedPath = path.join(CACHE_DIR, ipfsHash);
 
-    // Delete specific image
-    const cachedPath = path.join(CACHE_DIR, ipfsHash);
-
-    try {
-        await fs.unlink(cachedPath);
-        return apiSuccess({
-            message: 'Cached image deleted',
-            ipfsHash
-        });
-    } catch (err) {
-        throw new BadRequestError('Image not in cache');
-    }
+        try {
+            await fs.unlink(cachedPath);
+            return apiSuccess({
+                message: 'Cached image deleted',
+                ipfsHash
+            });
+        } catch (err) {
+            throw new BadRequestError('Image not in cache');
+        }
     }, { admin: true })(request);
 }

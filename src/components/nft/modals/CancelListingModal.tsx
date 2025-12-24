@@ -8,6 +8,9 @@
 import { memo, useState, useCallback } from 'react';
 import { BaseModal } from '@/components/core/Modal';
 import { useTransactionService } from '@/services/blockchain';
+import { useMarketplaceItems } from '@/contexts/marketplace-items';
+import { useWalletNFTs } from '@/contexts/wallet-nfts';
+import { useAccount } from 'wagmi';
 
 interface CancelListingModalProps {
     isOpen: boolean;
@@ -28,8 +31,11 @@ function CancelListingModal({
 }: CancelListingModalProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Transaction service
+    // Hooks
+    const { address } = useAccount();
     const txService = useTransactionService();
+    const { removeNFT } = useMarketplaceItems();
+    const { refresh: refreshWallet } = useWalletNFTs();
 
     const handleConfirm = useCallback(async () => {
         setIsSubmitting(true);
@@ -46,6 +52,26 @@ function CancelListingModal({
                 },
                 onError: (error) => {
                     console.error('❌ Cancel error:', error);
+                },
+                onPostTransaction: async () => {
+                    // Force immediate sync from TheGraph via API
+                    console.log('🔄 Triggering immediate marketplace sync...');
+                    try {
+                        await fetch('/api/marketplace/sync', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'force' })
+                        });
+                        console.log('✅ Marketplace sync triggered');
+                    } catch (error) {
+                        console.error('❌ Failed to trigger sync:', error);
+                    }
+
+                    // Remove NFT from marketplace cache
+                    removeNFT(contractAddress, tokenId);
+
+                    // Refresh seller's wallet (NFT goes back to wallet)
+                    await refreshWallet();
                 }
             });
 

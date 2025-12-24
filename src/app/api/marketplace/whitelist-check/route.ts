@@ -33,10 +33,10 @@ export const POST = apiHandler(async (request: NextRequest) => {
         const checksummedMarketplace = getAddress(marketplaceAddress);
         const checksummedCollection = getAddress(collectionAddress);
 
-        console.log('[Whitelist Check] Checking whitelist:', {
-            marketplace: checksummedMarketplace,
-            collection: checksummedCollection
-        });
+        console.log('🔍 [Whitelist Check] ==================');
+        console.log('📍 Marketplace:', checksummedMarketplace);
+        console.log('📍 Collection:', checksummedCollection);
+        console.log('📍 Collection (lowercase):', collectionAddress.toLowerCase());
 
         // Call isCollectionWhitelisted on marketplace contract
         const isWhitelisted = await publicClient.readContract({
@@ -46,8 +46,10 @@ export const POST = apiHandler(async (request: NextRequest) => {
             args: [checksummedCollection]
         });
 
-        console.log('[Whitelist Check] Contract response:', isWhitelisted);
-        console.log('[Whitelist Check] Response type:', typeof isWhitelisted);
+        console.log('✅ Contract response (raw):', isWhitelisted);
+        console.log('✅ Contract response (type):', typeof isWhitelisted);
+        console.log('✅ Contract response (boolean):', Boolean(isWhitelisted));
+        console.log('==================\n');
 
         const result = {
             isWhitelisted: Boolean(isWhitelisted),

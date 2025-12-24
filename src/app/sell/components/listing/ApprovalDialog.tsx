@@ -10,6 +10,7 @@
 'use client';
 
 import React from 'react';
+import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 
 interface ApprovalDialogProps {
@@ -52,19 +53,21 @@ export function ApprovalDialog({
                 {/* NFT Info */}
                 <div className="bg-gray-50 rounded-lg p-4 mb-6">
                     <div className="flex items-center gap-3">
-                        {nft.meta?.image && (
-                            <img
-                                src={nft.meta.image}
-                                alt={nft.meta.name || `NFT #${nft.tokenId}`}
-                                className="w-16 h-16 rounded-lg object-cover"
+                        <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
+                            <OptimizedNFTImage
+                                imageUrl={nft.meta?.image || '/media/custom-nft.jpg'}
+                                tokenId={nft.tokenId}
+                                alt={nft.meta?.name || `NFT #${nft.tokenId}`}
+                                fill
+                                className="object-cover"
                             />
-                        )}
+                        </div>
                         <div className="flex-1 min-w-0">
                             <p className="font-semibold text-gray-900 truncate">
                                 {nft.meta?.name || `NFT #${nft.tokenId}`}
                             </p>
                             <p className="text-sm text-gray-600 truncate">
-                                {nft.core.contractName || 'Unknown Collection'}
+                                {nft.core?.contractName || 'Unknown Collection'}
                             </p>
                         </div>
                     </div>
@@ -111,7 +114,7 @@ export function ApprovalDialog({
                                     </span>
                                 </p>
                                 <p className="text-sm text-gray-600 mt-1">
-                                    {isBatchMode 
+                                    {isBatchMode
                                         ? 'Required for batch listing. Approve once, list multiple NFTs without additional approvals.'
                                         : 'One transaction, then list any NFT from this collection freely.'
                                     }

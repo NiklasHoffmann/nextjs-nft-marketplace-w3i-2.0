@@ -46,10 +46,10 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
 export const POST = apiHandler(async (request: NextRequest) => {
     const body = await request.json();
-    const { action } = body; // 'start' or 'stop'
+    const { action } = body; // 'start', 'stop', or 'force'
 
-    if (!action || (action !== 'start' && action !== 'stop')) {
-        throw new BadRequestError('Invalid action. Use "start" or "stop"');
+    if (!action || !['start', 'stop', 'force'].includes(action)) {
+        throw new BadRequestError('Invalid action. Use "start", "stop", or "force"');
     }
 
     const syncService = getNFTSyncService();
@@ -60,11 +60,22 @@ export const POST = apiHandler(async (request: NextRequest) => {
             message: 'Sync service started',
             timestamp: Date.now()
         });
-    } else {
+    } else if (action === 'stop') {
         await syncService.stop();
         return apiSuccess({
             message: 'Sync service stopped',
             timestamp: Date.now()
         });
     }
-}, { admin: true });
+
+    // action === 'force'
+    console.log('🔄 [API] Force sync triggered');
+    await syncService.syncOnce();
+    return apiSuccess({
+        message: 'Immediate sync completed',
+        timestamp: Date.now()
+    });
+}, {
+    // Admin required for start/stop, but force sync is public
+    admin: false
+});

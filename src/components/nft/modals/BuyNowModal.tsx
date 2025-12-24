@@ -9,10 +9,13 @@
  */
 'use client';
 import { memo, useState, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { formatEther } from '@/utils';
 import { useMarketplaceFees } from '@/app/sell/hooks/useMarketplaceFees';
 import { useMarketplaceContracts } from '@/app/sell/hooks/useMarketplaceContracts';
 import { useTransactionService } from '@/services/blockchain';
+import { useMarketplaceItems } from '@/contexts/marketplace-items';
+import { useWalletNFTs } from '@/contexts/wallet-nfts';
 import { BaseModal } from '@/components/core/Modal';
 import { LoadingState } from '@/components/core/Loading';
 
@@ -47,10 +50,14 @@ function BuyNowModal({
 }: BuyNowModalProps) {
     const [isPurchasing, setIsPurchasing] = useState(false);
     const [purchaseStep, setPurchaseStep] = useState<'review' | 'processing' | 'success' | 'error'>('review');
+    const [transactionStep, setTransactionStep] = useState<'preparing' | 'approving' | 'signing' | 'pending' | 'confirming' | 'success' | 'error'>('preparing');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    // Get dynamic fees from contract
+    // Hooks
+    const router = useRouter();
     const { marketplaceAddress } = useMarketplaceContracts();
+    const { removeNFT } = useMarketplaceItems();
+    const { refresh: refreshWallet } = useWalletNFTs();
 
     // Transaction service
     const txService = useTransactionService();
@@ -96,19 +103,73 @@ function BuyNowModal({
                 listingId,
                 price: formatEther(price),
                 seller,
+                buyer,
                 contractAddress,
                 tokenId,
                 desiredContractAddress,
                 desiredTokenId,
                 onProgress: (step) => {
-                    if (step === 'signing' || step === 'pending') {
+                    console.log('🔄 Transaction step:', step);
+                    if (step !== 'idle') {
+                        setTransactionStep(step);
+                    }
+
+                    if (step === 'preparing') {
                         setPurchaseStep('processing');
+                    } else if (step === 'signing') {
+                        setPurchaseStep('processing');
+                    } else if (step === 'pending') {
+                        setPurchaseStep('processing');
+                    } else if (step === 'success') {
+                        setPurchaseStep('success');
                     } else if (step === 'error') {
                         setPurchaseStep('error');
                     }
                 },
                 onError: (error) => {
+                    console.error('❌ Transaction error:', error);
                     setErrorMessage(error);
+                    setTransactionStep('error');
+                },
+                onSuccess: () => {
+                    // Redirect to wallet immediately
+                    router.push('/wallet');
+                },
+                onPostTransaction: async () => {
+                    // Force immediate sync from TheGraph via API
+                    console.log('🔄 Triggering immediate marketplace sync...');
+                    try {
+                        await fetch('/api/marketplace/sync', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'force' })
+                        });
+                        console.log('✅ Marketplace sync triggered');
+                    } catch (error) {
+                        console.error('❌ Failed to trigger sync:', error);
+                    }
+
+                    // Update NFT ownership in nft_metadata collection (fetch from blockchain)
+                    console.log('🔄 Updating NFT ownership from blockchain...');
+                    try {
+                        await fetch('/api/nft/update-owner', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contractAddress,
+                                tokenId
+                            })
+                        });
+                        console.log('✅ Ownership updated from blockchain');
+                    } catch (error) {
+                        console.error('❌ Failed to update ownership:', error);
+                    }
+
+                    // Remove NFT from marketplace cache
+                    removeNFT(contractAddress, tokenId);
+
+                    // Invalidate buyer's wallet cache (will refresh on wallet page)
+                    await refreshWallet();
                 }
             });
 
@@ -116,11 +177,8 @@ function BuyNowModal({
                 setPurchaseStep('success');
                 console.log('✅ Purchase successful! TX:', result.txHash);
 
-                // Auto close after 3 seconds on success
-                setTimeout(() => {
-                    onClose();
-                    setPurchaseStep('review');
-                }, 3000);
+                // Modal will auto-close and redirect via onSuccess callback
+                // Keep modal open for 2s to show success message
             } else {
                 throw new Error(result.error || 'Transaction failed');
             }
@@ -131,12 +189,13 @@ function BuyNowModal({
         } finally {
             setIsPurchasing(false);
         }
-    }, [listingId, contractAddress, tokenId, price, seller, desiredContractAddress, desiredTokenId, calculations.total, txService, onClose]);
+    }, [listingId, contractAddress, tokenId, price, seller, desiredContractAddress, desiredTokenId, buyer, calculations.total, txService, router, removeNFT, refreshWallet]);
 
     const handleClose = useCallback(() => {
         if (!isPurchasing) {
             onClose();
             setPurchaseStep('review');
+            setTransactionStep('preparing');
             setErrorMessage(null);
         }
     }, [isPurchasing, onClose]);
@@ -280,13 +339,117 @@ function BuyNowModal({
                 {purchaseStep === 'processing' && (
                     <div className="text-center py-8">
                         <LoadingState size="xl" variant="inline" className="mb-4 inline-block" />
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">Processing Transaction</h3>
-                        <p className="text-gray-600 mb-4">Please confirm the transaction in your wallet...</p>
-                        <div className="space-y-2 text-sm text-gray-500">
-                            <p>• Waiting for wallet confirmation</p>
-                            <p>• Broadcasting transaction to blockchain</p>
-                            <p>• Waiting for confirmation</p>
+
+                        {/* Dynamic title based on transaction step */}
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                            {transactionStep === 'preparing' && 'Preparing Transaction...'}
+                            {transactionStep === 'signing' && 'Waiting for Confirmation'}
+                            {transactionStep === 'pending' && 'Processing Transaction...'}
+                            {transactionStep === 'confirming' && 'Confirming on Blockchain...'}
+                        </h3>
+
+                        {/* Dynamic description */}
+                        <p className="text-gray-600 mb-6">
+                            {transactionStep === 'preparing' && 'Setting up your transaction...'}
+                            {transactionStep === 'signing' && 'Please confirm the transaction in your MetaMask wallet'}
+                            {transactionStep === 'pending' && 'Your transaction has been submitted to the blockchain'}
+                            {transactionStep === 'confirming' && 'Waiting for blockchain confirmation...'}
+                        </p>
+
+                        {/* Progress steps */}
+                        <div className="space-y-3 text-left max-w-md mx-auto">
+                            {/* Step 1: Preparing */}
+                            <div className={`flex items-center gap-3 p-3 rounded-lg ${transactionStep === 'preparing' ? 'bg-blue-50 border border-blue-200' :
+                                    ['signing', 'pending', 'confirming', 'success'].includes(transactionStep) ? 'bg-green-50 border border-green-200' :
+                                        'bg-gray-50 border border-gray-200'
+                                }`}>
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${transactionStep === 'preparing' ? 'bg-blue-500' :
+                                        ['signing', 'pending', 'confirming', 'success'].includes(transactionStep) ? 'bg-green-500' :
+                                            'bg-gray-300'
+                                    }`}>
+                                    {['signing', 'pending', 'confirming', 'success'].includes(transactionStep) ? (
+                                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                    ) : transactionStep === 'preparing' ? (
+                                        <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                                    ) : (
+                                        <div className="w-2 h-2 bg-gray-400 rounded-full" />
+                                    )}
+                                </div>
+                                <span className={`text-sm font-medium ${transactionStep === 'preparing' ? 'text-blue-900' :
+                                        ['signing', 'pending', 'confirming', 'success'].includes(transactionStep) ? 'text-green-900' :
+                                            'text-gray-600'
+                                    }`}>Preparing transaction</span>
+                            </div>
+
+                            {/* Step 2: Wallet Confirmation */}
+                            <div className={`flex items-center gap-3 p-3 rounded-lg ${transactionStep === 'signing' ? 'bg-blue-50 border border-blue-200' :
+                                    ['pending', 'confirming', 'success'].includes(transactionStep) ? 'bg-green-50 border border-green-200' :
+                                        'bg-gray-50 border border-gray-200'
+                                }`}>
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${transactionStep === 'signing' ? 'bg-blue-500' :
+                                        ['pending', 'confirming', 'success'].includes(transactionStep) ? 'bg-green-500' :
+                                            'bg-gray-300'
+                                    }`}>
+                                    {['pending', 'confirming', 'success'].includes(transactionStep) ? (
+                                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                    ) : transactionStep === 'signing' ? (
+                                        <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                                    ) : (
+                                        <div className="w-2 h-2 bg-gray-400 rounded-full" />
+                                    )}
+                                </div>
+                                <span className={`text-sm font-medium ${transactionStep === 'signing' ? 'text-blue-900' :
+                                        ['pending', 'confirming', 'success'].includes(transactionStep) ? 'text-green-900' :
+                                            'text-gray-600'
+                                    }`}>Confirm in wallet</span>
+                            </div>
+
+                            {/* Step 3: Blockchain Confirmation */}
+                            <div className={`flex items-center gap-3 p-3 rounded-lg ${['pending', 'confirming'].includes(transactionStep) ? 'bg-blue-50 border border-blue-200' :
+                                    transactionStep === 'success' ? 'bg-green-50 border border-green-200' :
+                                        'bg-gray-50 border border-gray-200'
+                                }`}>
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${['pending', 'confirming'].includes(transactionStep) ? 'bg-blue-500' :
+                                        transactionStep === 'success' ? 'bg-green-500' :
+                                            'bg-gray-300'
+                                    }`}>
+                                    {transactionStep === 'success' ? (
+                                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                    ) : ['pending', 'confirming'].includes(transactionStep) ? (
+                                        <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                                    ) : (
+                                        <div className="w-2 h-2 bg-gray-400 rounded-full" />
+                                    )}
+                                </div>
+                                <span className={`text-sm font-medium ${['pending', 'confirming'].includes(transactionStep) ? 'text-blue-900' :
+                                        transactionStep === 'success' ? 'text-green-900' :
+                                            'text-gray-600'
+                                    }`}>Blockchain confirmation</span>
+                            </div>
                         </div>
+
+                        {/* Additional info for signing step */}
+                        {transactionStep === 'signing' && (
+                            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div className="flex items-start gap-3">
+                                    <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                    </svg>
+                                    <div className="text-left">
+                                        <p className="text-sm font-medium text-blue-900">Check your wallet</p>
+                                        <p className="text-sm text-blue-700 mt-1">
+                                            A MetaMask popup should appear. If you don't see it, click the MetaMask extension icon.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -320,9 +483,47 @@ function BuyNowModal({
                             </svg>
                         </div>
                         <h3 className="text-xl font-semibold text-gray-900 mb-2">Transaction Failed</h3>
-                        <p className="text-gray-600 mb-6">
-                            {errorMessage || 'Something went wrong. Please try again.'}
-                        </p>
+
+                        {/* Detailed error message with common scenarios */}
+                        <div className="mb-6">
+                            {errorMessage?.includes('insufficient funds') ? (
+                                <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-left">
+                                    <p className="text-sm font-medium text-red-900 mb-2">💸 Insufficient Funds</p>
+                                    <p className="text-sm text-red-700">
+                                        Your wallet doesn't have enough ETH to complete this purchase.
+                                        You need at least <span className="font-semibold">{calculations.total.toFixed(4)} ETH</span> (including gas fees).
+                                    </p>
+                                    <p className="text-sm text-red-600 mt-2">
+                                        Please add funds to your wallet and try again.
+                                    </p>
+                                </div>
+                            ) : errorMessage?.includes('User denied') || errorMessage?.includes('user rejected') ? (
+                                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-left">
+                                    <p className="text-sm font-medium text-yellow-900 mb-2">❌ Transaction Rejected</p>
+                                    <p className="text-sm text-yellow-700">
+                                        You cancelled the transaction in your wallet.
+                                    </p>
+                                </div>
+                            ) : errorMessage?.includes('timeout') ? (
+                                <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg text-left">
+                                    <p className="text-sm font-medium text-orange-900 mb-2">⏱️ Transaction Timeout</p>
+                                    <p className="text-sm text-orange-700">
+                                        The transaction took too long to confirm. This could be due to network congestion.
+                                    </p>
+                                    <p className="text-sm text-orange-600 mt-2">
+                                        Please try again or increase the gas fee for faster confirmation.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-left">
+                                    <p className="text-sm font-medium text-gray-900 mb-2">⚠️ Error Details</p>
+                                    <p className="text-sm text-gray-700 break-words">
+                                        {errorMessage || 'An unexpected error occurred. Please try again.'}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
                         <div className="flex gap-3 justify-center">
                             <button
                                 onClick={handleClose}
@@ -333,6 +534,7 @@ function BuyNowModal({
                             <button
                                 onClick={() => {
                                     setPurchaseStep('review');
+                                    setTransactionStep('preparing');
                                     setErrorMessage(null);
                                 }}
                                 className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"

@@ -40,7 +40,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
     await withAuth(request);
     // @ts-ignore
     const authenticatedUser = request.userAddress as string;
-    
+
     const { searchParams } = new URL(request.url);
     const walletAddress = searchParams.get('walletAddress')?.toLowerCase();
 
@@ -72,21 +72,21 @@ export const POST = apiHandler(async (request: NextRequest) => {
         return apiBadRequest('Missing walletAddress or items');
     }
 
-        const normalizedAddress = walletAddress.toLowerCase();
-        const carts = await getCollection('user_carts');
+    const normalizedAddress = walletAddress.toLowerCase();
+    const carts = await getCollection('user_carts');
 
-        // Upsert cart (replace entire cart)
-        await carts.updateOne(
-            { walletAddress: normalizedAddress },
-            {
-                $set: {
-                    walletAddress: normalizedAddress,
-                    items,
-                    updatedAt: new Date()
-                }
-            },
-            { upsert: true }
-        );
+    // Upsert cart (replace entire cart)
+    await carts.updateOne(
+        { walletAddress: normalizedAddress },
+        {
+            $set: {
+                walletAddress: normalizedAddress,
+                items,
+                updatedAt: new Date()
+            }
+        },
+        { upsert: true }
+    );
 
     console.log(`✅ [Cart API] Saved cart for ${normalizedAddress}:`, items.length, 'items');
 

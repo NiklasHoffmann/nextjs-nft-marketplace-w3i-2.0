@@ -29,6 +29,7 @@ export interface ListingV2 {
     desiredTokenAddress?: string;    // Bytes (swap target)
     desiredTokenId?: string;         // BigInt as string (swap target)
     desiredErc1155Quantity?: string; // BigInt as string (swap 1155)
+    currency: string;                // Address (Bytes) - payment token (0x0 = ETH)
     seller: string;                  // Address (Bytes)
     status: ListingStatus;           // LISTED | PARTIALLY_FILLED | SOLD_OUT | CANCELED | INVALIDATED
     active: boolean;                 // Convenience flag
@@ -91,11 +92,11 @@ export function formatListingIdV2(listingId: string | number, chainId: number = 
  */
 export function parseListingIdV2(id: string): { chainId: number; listingId: string } {
     const [chainId, listingId] = id.split('-');
-    
+
     if (!chainId || !listingId) {
         throw new Error(`Invalid listing ID format: ${id}`);
     }
-    
+
     return {
         chainId: parseInt(chainId),
         listingId

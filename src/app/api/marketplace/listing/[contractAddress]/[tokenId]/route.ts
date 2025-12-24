@@ -27,16 +27,16 @@ export async function GET(
   request: NextRequest,
   context: RouteParams
 ) {
-    return apiHandler(async () => {
-        const { contractAddress, tokenId } = await context.params;
+  return apiHandler(async () => {
+    const { contractAddress, tokenId } = await context.params;
 
-        if (!contractAddress || !tokenId) {
-            throw new BadRequestError('Missing contractAddress or tokenId parameter');
-        }
+    if (!contractAddress || !tokenId) {
+      throw new BadRequestError('Missing contractAddress or tokenId parameter');
+    }
 
-        // Normalize addresses for comparison
-        const normalizedAddress = contractAddress.toLowerCase();
-        const normalizedTokenId = tokenId.toLowerCase();
+    // Normalize addresses for comparison
+    const normalizedAddress = contractAddress.toLowerCase();
+    const normalizedTokenId = tokenId.toLowerCase();
 
     // Create Apollo Client for server-side query
     const client = new ApolloClient({
@@ -87,5 +87,5 @@ export async function GET(
         desiredTokenId: listing.desiredTokenId,
       },
     });
-    })(request);
+  })(request);
 }

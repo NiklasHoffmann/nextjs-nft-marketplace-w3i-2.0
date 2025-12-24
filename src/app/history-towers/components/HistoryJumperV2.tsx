@@ -166,7 +166,7 @@ export default function HistoryJumperV2({ onGameStateChange, onLeaderboardRefres
         s.vy = 0
         s.grounded = true
 
-        s.nextSpawnY = (s.platforms && s.platforms.length > 0) 
+        s.nextSpawnY = (s.platforms && s.platforms.length > 0)
             ? (s.platforms[s.platforms.length - 1]?.y || HEIGHT - 80 - 70 * 9)
             : HEIGHT - 80 - 70 * 9
         s.distanceClimbed = 0

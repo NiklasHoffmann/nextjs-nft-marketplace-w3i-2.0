@@ -5,7 +5,7 @@
 "use client";
 
 import { useState } from 'react';
-import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { parseEther } from 'viem';
 import marketplaceAbi from '@/constants/marketplace.abi.json';
 
@@ -15,16 +15,37 @@ interface PurchaseListingParams {
   expectedDesiredTokenAddress?: string;
   expectedDesiredTokenId?: string;
   desiredErc1155Holder?: string; // for swap transactions
+  onProgress?: (step: 'preparing' | 'signing' | 'pending' | 'success', txHash?: string) => void; // Progress callback with optional hash
 }
 
 export function useMarketplacePurchase(marketplaceAddress: string) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [submittedHash, setSubmittedHash] = useState<`0x${string}` | undefined>(undefined);
+
+  const publicClient = usePublicClient();
 
   // Write contract hooks
-  const { writeContract, data: txHash } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash: txHash,
+  const { writeContractAsync, error: writeError } = useWriteContract();
+  const {
+    isLoading: isConfirming,
+    isSuccess,
+    error: receiptError,
+    status: receiptStatus
+  } = useWaitForTransactionReceipt({
+    hash: submittedHash, // Use the hash we stored
+  });
+
+  // Combine errors from both hooks
+  const combinedError = error || (writeError ? String(writeError) : null) || (receiptError ? String(receiptError) : null);
+
+  console.log('🔍 Hook state:', {
+    submittedHash,
+    isConfirming,
+    isSuccess,
+    receiptStatus,
+    hasReceiptError: !!receiptError,
+    receiptError: receiptError ? String(receiptError) : null
   });
 
   const purchaseListing = async ({
@@ -32,34 +53,89 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
     expectedPrice,
     expectedDesiredTokenAddress = "0x0000000000000000000000000000000000000000",
     expectedDesiredTokenId = "0",
-    desiredErc1155Holder = "0x0000000000000000000000000000000000000000"
+    desiredErc1155Holder = "0x0000000000000000000000000000000000000000",
+    onProgress
   }: PurchaseListingParams) => {
     try {
       setIsLoading(true);
       setError(null);
 
+      onProgress?.('preparing');
+
       const isSwap = expectedDesiredTokenAddress !== "0x0000000000000000000000000000000000000000";
       const ethValue = isSwap ? BigInt(0) : parseEther(expectedPrice);
 
-      await writeContract({
+      console.log('🚀 Calling writeContractAsync with:', {
+        listingId,
+        expectedPrice,
+        expectedCurrency: '0x0000000000000000000000000000000000000000',
+        isSwap,
+        ethValue: ethValue.toString(),
+        expectedDesiredTokenAddress,
+        expectedDesiredTokenId
+      });
+
+      onProgress?.('signing');
+
+      // Use writeContractAsync which returns the transaction hash directly
+      const hash = await writeContractAsync({
         address: marketplaceAddress as `0x${string}`,
         abi: marketplaceAbi,
         functionName: 'purchaseListing',
         args: [
           BigInt(listingId), // listingId
           parseEther(expectedPrice), // expectedPrice
-          BigInt("1"), // expectedErc1155Quantity (always 1 for ERC721)
+          "0x0000000000000000000000000000000000000000", // expectedCurrency (0x0 for ETH)
+          BigInt("0"), // expectedErc1155Quantity (0 for ERC721, quantity for ERC1155)
           expectedDesiredTokenAddress, // expectedDesiredTokenAddress
           BigInt(expectedDesiredTokenId), // expectedDesiredTokenId
-          BigInt("0"), // expectedDesiredErc1155Quantity (not needed for ERC721)
-          BigInt("1"), // erc1155PurchaseQuantity (always 1 for ERC721)
+          BigInt("0"), // expectedDesiredErc1155Quantity (not needed for pure ETH sales)
+          BigInt("0"), // erc1155PurchaseQuantity (0 for ERC721, quantity for ERC1155)
           desiredErc1155Holder // desiredErc1155Holder (for swaps)
         ],
         value: ethValue,
-        gas: BigInt(400000)
+        gas: BigInt(500000) // Safe limit: high enough for NFT purchases, well below 16.7M cap
       });
+
+      console.log('✅ Transaction submitted! Hash:', hash);
+      setSubmittedHash(hash); // Store hash for useWaitForTransactionReceipt
+
+      onProgress?.('pending', hash);
+
+      // Manually check the transaction receipt
+      // This helps catch reverted transactions immediately
+      if (publicClient) {
+        console.log('🔍 Waiting for transaction receipt:', hash);
+        const receipt = await publicClient.waitForTransactionReceipt({
+          hash,
+          timeout: 120_000 // 2 minutes
+        });
+
+        console.log('📋 Transaction receipt:', {
+          status: receipt.status,
+          blockNumber: receipt.blockNumber,
+          gasUsed: receipt.gasUsed.toString()
+        });
+
+        if (receipt.status === 'reverted') {
+          const errorMsg = 'Transaction reverted on blockchain. The NFT may have been sold, removed, or the price changed.';
+          console.error('❌', errorMsg);
+          setError(errorMsg);
+          throw new Error(errorMsg);
+        }
+
+        onProgress?.('success', hash);
+      }
+
+      return hash;
     } catch (err: any) {
-      setError(err.message || 'Failed to purchase listing');
+      const errorMessage = err.message || 'Failed to purchase listing';
+      console.error('❌ useMarketplacePurchase error:', {
+        message: errorMessage,
+        error: err,
+        stack: err.stack
+      });
+      setError(errorMessage);
       throw err;
     } finally {
       setIsLoading(false);
@@ -76,7 +152,7 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
     isSwapListing,
     isLoading: isLoading || isConfirming,
     isSuccess,
-    error,
-    txHash
+    error: combinedError, // Now includes writeError AND receiptError
+    txHash: submittedHash // Return the submitted hash
   };
 }

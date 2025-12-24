@@ -31,12 +31,12 @@ export async function GET(
     return apiHandler(async () => {
         const { contractAddress, tokenId } = await context.params;
 
-    if (!contractAddress || !tokenId) {
-        throw new BadRequestError('Missing contractAddress or tokenId');
-    }
+        if (!contractAddress || !tokenId) {
+            throw new BadRequestError('Missing contractAddress or tokenId');
+        }
 
-    const db = await getDatabase();
-    const collection = db.collection('marketplace_items');
+        const db = await getDatabase();
+        const collection = db.collection('marketplace_items');
 
         // Aggregation pipeline with triple $lookup
         const pipeline = [
@@ -174,50 +174,50 @@ export async function GET(
                 description: nft.metadata?.description || null,
                 image: nft.metadata?.image || null,
                 animationUrl: nft.metadata?.animationUrl || null,
-                    externalUrl: nft.metadata?.externalUrl || null,
-                    attributes: nft.metadata?.attributes || [],
-                },
+                externalUrl: nft.metadata?.externalUrl || null,
+                attributes: nft.metadata?.attributes || [],
+            },
 
-                contract: {
-                    contractName: nft.contract?.name || null,
-                    contractSymbol: nft.contract?.symbol || null,
-                    totalSupply: nft.contract?.totalSupply || null,
-                    tokenURI: nft.contract?.tokenURI || null,
-                    contractType: nft.contract?.contractType || 'ERC721',
-                    owner: nft.contract?.owner || null,
-                    ownerBalance: nft.contract?.ownerBalance || null,
-                    approved: nft.contract?.approved || nft.contract?.approvedAddress || null, // ✅ ERC-721 approval status
-                    approvedAddress: nft.contract?.approved || nft.contract?.approvedAddress || null, // ✅ For backward compatibility
-                },
+            contract: {
+                contractName: nft.contract?.name || null,
+                contractSymbol: nft.contract?.symbol || null,
+                totalSupply: nft.contract?.totalSupply || null,
+                tokenURI: nft.contract?.tokenURI || null,
+                contractType: nft.contract?.contractType || 'ERC721',
+                owner: nft.contract?.owner || null,
+                ownerBalance: nft.contract?.ownerBalance || null,
+                approved: nft.contract?.approved || nft.contract?.approvedAddress || null, // ✅ ERC-721 approval status
+                approvedAddress: nft.contract?.approved || nft.contract?.approvedAddress || null, // ✅ For backward compatibility
+            },
 
-                marketplace: {
-                    isListed: nft.isListed,
-                    price: nft.price,
-                    seller: nft.seller,
-                    listingId: nft.listingId,
-                    listedAt: nft.listedAt,
-                    desiredContractAddress: nft.desiredContractAddress || null,
-                    desiredTokenId: nft.desiredTokenId || null,
-                    isValid: nft.isValid ?? true,
-                    invalidReasons: nft.invalidReasons || null,
-                    invalidatedAt: nft.invalidatedAt || null,
-                },
+            marketplace: {
+                isListed: nft.isListed,
+                price: nft.price,
+                seller: nft.seller,
+                listingId: nft.listingId,
+                listedAt: nft.listedAt,
+                desiredContractAddress: nft.desiredContractAddress || null,
+                desiredTokenId: nft.desiredTokenId || null,
+                isValid: nft.isValid ?? true,
+                invalidReasons: nft.invalidReasons || null,
+                invalidatedAt: nft.invalidatedAt || null,
+            },
 
-                insights: nft.insights ? {
-                    customTitle: nft.insights.customTitle || null,
-                    category: nft.insights.category || null,
-                    tags: nft.insights.tags || [],
-                    rarity: nft.insights.rarity || null,
-                    cardDescriptions: nft.insights.cardDescriptions || [],
-                    projectDescriptions: nft.insights.projectDescriptions || null,
-                    functionalitiesDescriptions: nft.insights.functionalitiesDescriptions || null,
-                    projectWebsite: nft.insights.projectWebsite || null,
-                    projectTwitter: nft.insights.projectTwitter || null,
-                    projectDiscord: nft.insights.projectDiscord || null,
-                    partnerships: nft.insights.partnerships || [],
-                } : null,
+            insights: nft.insights ? {
+                customTitle: nft.insights.customTitle || null,
+                category: nft.insights.category || null,
+                tags: nft.insights.tags || [],
+                rarity: nft.insights.rarity || null,
+                cardDescriptions: nft.insights.cardDescriptions || [],
+                projectDescriptions: nft.insights.projectDescriptions || null,
+                functionalitiesDescriptions: nft.insights.functionalitiesDescriptions || null,
+                projectWebsite: nft.insights.projectWebsite || null,
+                projectTwitter: nft.insights.projectTwitter || null,
+                projectDiscord: nft.insights.projectDiscord || null,
+                partnerships: nft.insights.partnerships || [],
+            } : null,
 
-                // Data quality flags
+            // Data quality flags
             // Data quality flags
             dataQuality: {
                 hasMetadata: !!nft.metadata,

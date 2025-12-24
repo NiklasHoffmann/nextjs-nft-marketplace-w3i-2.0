@@ -20,19 +20,28 @@ export class ListingService {
     private ensureApprovalFn: any;
     private checkWhitelistFn: any;
     private notifications: any;
+    private onProgressCallback?: (step: 'whitelist' | 'approval' | 'signing' | 'pending' | 'success' | 'error', txHash?: string) => void;
 
     constructor(
         marketplaceAddress: `0x${string}`,
         createListingFn: any,
         ensureApprovalFn: any,
         checkWhitelistFn: any,
-        notifications: any
+        notifications: any,
+        onProgress?: (step: 'whitelist' | 'approval' | 'signing' | 'pending' | 'success' | 'error', txHash?: string) => void
     ) {
         this.marketplaceAddress = marketplaceAddress;
         this.createListingFn = createListingFn;
         this.ensureApprovalFn = ensureApprovalFn;
         this.checkWhitelistFn = checkWhitelistFn;
         this.notifications = notifications;
+        this.onProgressCallback = onProgress;
+    }
+
+    private reportProgress(step: 'whitelist' | 'approval' | 'signing' | 'pending' | 'success' | 'error', txHash?: string) {
+        if (this.onProgressCallback) {
+            this.onProgressCallback(step, txHash);
+        }
     }
 
     /**
@@ -52,51 +61,41 @@ export class ListingService {
             throw new Error('Missing required data for sale listing');
         }
 
-        const notifId = this.notifications.loading(
-            'Creating Sale Listing',
-            'Preparing your NFT for sale...'
-        );
-
         try {
             // 1. Check collection whitelist
+            this.reportProgress('whitelist');
             console.log('🔍 [Step 1] Checking whitelist for:', data.selectedNFT.contractAddress);
             const isWhitelisted = await this.checkWhitelistFn(data.selectedNFT.contractAddress);
             console.log('✓ Whitelist status:', isWhitelisted);
             if (!isWhitelisted) {
-                this.notifications.removeNotification(notifId);
-                this.notifications.error(
-                    'Collection Not Whitelisted',
-                    'This collection is not approved for listing on the marketplace. Please contact an admin to request approval.'
-                );
-                return; // Exit gracefully
+                this.reportProgress('error');
+                throw new Error('Collection Not Whitelisted');
             }
 
             // 2. Ensure approval (smart - only if needed)
+            this.reportProgress('approval');
             console.log('🔍 [Step 2] Checking/Ensuring NFT approval');
             console.log('📋 Approval params:', {
                 nftContract: data.selectedNFT.contractAddress,
                 tokenId: data.selectedNFT.tokenId,
                 marketplace: this.marketplaceAddress
             });
-            
+
             if (!this.ensureApprovalFn) {
                 console.error('❌ ensureApprovalFn is not defined!');
                 throw new Error('Approval function not available');
             }
-            
+
             const approved = await this.ensureApprovalFn();
             console.log('✓ Approval status:', approved);
             if (!approved) {
                 console.warn('⚠️ User cancelled approval');
-                this.notifications.removeNotification(notifId);
-                this.notifications.warning(
-                    'Approval Cancelled',
-                    'NFT approval was cancelled. Your listing was not created.'
-                );
-                return; // Exit gracefully
+                this.reportProgress('error');
+                throw new Error('Approval Cancelled');
             }
 
             // 3. Create listing
+            this.reportProgress('signing');
             console.log('🔍 [Step 3] Creating listing with params:', {
                 tokenAddress: data.selectedNFT.contractAddress,
                 tokenId: data.selectedNFT.tokenId,
@@ -114,25 +113,9 @@ export class ListingService {
             });
 
             console.log('✅ [Step 3] Listing transaction sent to wallet');
-            // Update to pending state - waiting for blockchain confirmation
-            this.notifications.removeNotification(notifId);
-            this.notifications.info(
-                'Transaction Pending',
-                'Waiting for blockchain confirmation...',
-                { duration: 0 } // Don't auto-dismiss - SellPage useEffect will handle success/error
-            );
         } catch (error: any) {
-            console.error('❌ [ListingService] Error during listing:', {
-                message: error.message,
-                code: error.code,
-                data: error.data,
-                stack: error.stack
-            });
-            this.notifications.removeNotification(notifId);
-            this.notifications.error(
-                'Listing Failed',
-                error.message || 'Failed to create listing'
-            );
+            this.reportProgress('error');
+            console.error('❌ [ListingService] Error during listing:', error.message);
             throw error;
         }
     }
@@ -145,32 +128,17 @@ export class ListingService {
             throw new Error('Missing required data for trade offer');
         }
 
-        const notifId = this.notifications.loading(
-            'Creating Trade Offer',
-            'Preparing your NFT for trade...'
-        );
-
         try {
             // 1. Check collection whitelist
             const isWhitelisted = await this.checkWhitelistFn(data.selectedNFT.contractAddress);
             if (!isWhitelisted) {
-                this.notifications.removeNotification(notifId);
-                this.notifications.error(
-                    'Collection Not Whitelisted',
-                    'This collection is not approved for listing on the marketplace. Please contact an admin to request approval.'
-                );
-                return; // Exit gracefully
+                throw new Error('Collection Not Whitelisted');
             }
 
             // 2. Ensure approval (smart - only if needed)
             const approved = await this.ensureApprovalFn();
             if (!approved) {
-                this.notifications.removeNotification(notifId);
-                this.notifications.warning(
-                    'Approval Cancelled',
-                    'NFT approval was cancelled. Your listing was not created.'
-                );
-                return; // Exit gracefully
+                throw new Error('Approval Cancelled');
             }
 
             // 3. Create trade listing
@@ -183,20 +151,7 @@ export class ListingService {
                 buyerWhitelistEnabled: false,
                 allowedBuyers: []
             });
-
-            // Update to pending state - waiting for blockchain confirmation
-            this.notifications.removeNotification(notifId);
-            this.notifications.info(
-                'Transaction Pending',
-                'Waiting for blockchain confirmation...',
-                { duration: 0 } // Don't auto-dismiss - SellPage useEffect will handle success/error
-            );
         } catch (error: any) {
-            this.notifications.removeNotification(notifId);
-            this.notifications.error(
-                'Trade Offer Failed',
-                error.message || 'Failed to create trade offer'
-            );
             throw error;
         }
     }
@@ -209,32 +164,17 @@ export class ListingService {
             throw new Error('Missing required data for hybrid offer');
         }
 
-        const notifId = this.notifications.loading(
-            'Creating Hybrid Offer',
-            'Preparing your NFT for hybrid listing...'
-        );
-
         try {
             // 1. Check collection whitelist
             const isWhitelisted = await this.checkWhitelistFn(data.selectedNFT.contractAddress);
             if (!isWhitelisted) {
-                this.notifications.removeNotification(notifId);
-                this.notifications.error(
-                    'Collection Not Whitelisted',
-                    'This collection is not approved for listing on the marketplace. Please contact an admin to request approval.'
-                );
-                return; // Exit gracefully
+                throw new Error('Collection Not Whitelisted');
             }
 
             // 2. Ensure approval
             const approved = await this.ensureApprovalFn();
             if (!approved) {
-                this.notifications.removeNotification(notifId);
-                this.notifications.warning(
-                    'Approval Cancelled',
-                    'NFT approval was cancelled. Your hybrid offer was not created.'
-                );
-                return; // Exit gracefully
+                throw new Error('Approval Cancelled');
             }
 
             // 3. Create hybrid listing
@@ -247,20 +187,7 @@ export class ListingService {
                 buyerWhitelistEnabled: false,
                 allowedBuyers: []
             });
-
-            // Update to pending state - waiting for blockchain confirmation
-            this.notifications.removeNotification(notifId);
-            this.notifications.info(
-                'Transaction Pending',
-                'Waiting for blockchain confirmation...',
-                { duration: 0 } // Don't auto-dismiss - SellPage useEffect will handle success/error
-            );
         } catch (error: any) {
-            this.notifications.removeNotification(notifId);
-            this.notifications.error(
-                'Hybrid Offer Failed',
-                error.message || 'Failed to create hybrid offer'
-            );
             throw error;
         }
     }
@@ -273,11 +200,6 @@ export class ListingService {
             throw new Error('No NFTs selected for batch listing');
         }
 
-        const notifId = this.notifications.loading(
-            'Creating Batch Listings',
-            `Preparing ${data.selectedNFTs.length} NFTs for listing...`
-        );
-
         try {
             // 1. Check all collections are whitelisted
             const whitelistChecks = await Promise.all(
@@ -286,28 +208,25 @@ export class ListingService {
 
             const notWhitelisted = data.selectedNFTs.filter((_, i) => !whitelistChecks[i]);
             if (notWhitelisted.length > 0) {
-                this.notifications.removeNotification(notifId);
                 throw new Error(`${notWhitelisted.length} collection(s) not whitelisted`);
             }
 
             // 2. Ensure approval for all (recommend approveAll)
             const approved = await this.ensureApprovalFn(true); // preferAll = true
             if (!approved) {
-                this.notifications.removeNotification(notifId);
                 throw new Error('Approval was cancelled or failed');
             }
 
             // 3. Create listings sequentially
             const results = { success: 0, failed: 0 };
-            let currentNotifId = notifId;
-            
+
             for (let i = 0; i < data.selectedNFTs.length; i++) {
                 const nft = data.selectedNFTs[i];
                 if (!nft) {
                     results.failed++;
                     continue;
                 }
-                
+
                 const price = this.calculateBatchPrice(data, i);
 
                 try {
@@ -321,42 +240,14 @@ export class ListingService {
                         allowedBuyers: []
                     });
                     results.success++;
-                    
-                    // Update progress during batch processing
-                    const progress = results.success + results.failed;
-                    const total = data.selectedNFTs.length;
-                    this.notifications.removeNotification(currentNotifId);
-                    currentNotifId = this.notifications.loading(
-                        'Creating Batch Listings',
-                        `Processing ${progress}/${total} NFTs...`
-                    );
                 } catch (err) {
                     results.failed++;
                     console.error(`Failed to list NFT ${nft.tokenId}:`, err);
                 }
             }
 
-            this.notifications.removeNotification(currentNotifId);
-            
-            if (results.failed === 0) {
-                this.notifications.success(
-                    'Batch Listing Complete!',
-                    `Successfully listed ${results.success} NFTs`,
-                    { duration: 8000 }
-                );
-            } else {
-                this.notifications.warning(
-                    'Batch Listing Partial Success',
-                    `Listed ${results.success} NFTs, ${results.failed} failed`,
-                    { duration: 10000 }
-                );
-            }
+            console.log(`Batch listing complete: ${results.success} success, ${results.failed} failed`);
         } catch (error: any) {
-            this.notifications.removeNotification(notifId);
-            this.notifications.error(
-                'Batch Listing Failed',
-                error.message || 'Failed to create batch listings'
-            );
             throw error;
         }
     }

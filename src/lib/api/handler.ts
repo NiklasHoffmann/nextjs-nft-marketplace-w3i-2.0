@@ -85,7 +85,7 @@ export function apiHandler<T = any>(
 
             // Build middleware chain
             const middlewareChain = [...middleware];
-            
+
             // Auto-add auth/admin middleware
             if (admin) {
                 const { withAdmin } = await import('../middleware/auth');

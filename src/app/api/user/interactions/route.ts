@@ -57,7 +57,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
     await withAuth(request);
     // @ts-ignore - added by withAuth middleware
     const authenticatedUser = request.userAddress as string;
-    
+
     // Apply rate limiting (lenient for read operations)
     await rateLimit(request, RATE_LIMIT_CONFIG.LENIENT);
 
@@ -155,7 +155,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
     await withAuth(request);
     // @ts-ignore
     const authenticatedUser = request.userAddress as string;
-    
+
     const body = await request.json();
     const { userId, contractAddress, tokenId, ...updates } = body;
 
@@ -173,386 +173,386 @@ export const POST = apiHandler(async (request: NextRequest) => {
         getCollection('user_ratings'),
         getCollection('user_watchlist'),
         getCollection('user_personal_notes'),
-        ]);
+    ]);
 
-        const results = [];
-        const statUpdates = []; // Track stat updates to execute atomically
+    const results = [];
+    const statUpdates = []; // Track stat updates to execute atomically
 
-        // Update favorites if specified (TOGGLE logic)
-        if (updates.isFavorite !== undefined) {
-            const existingFavorite = await favoritesCollection.findOne({
+    // Update favorites if specified (TOGGLE logic)
+    if (updates.isFavorite !== undefined) {
+        const existingFavorite = await favoritesCollection.findOne({
+            userId: lowerUserId,
+            contractAddress: lowerContractAddress,
+            tokenId
+        });
+
+        if (existingFavorite) {
+            // Remove favorite
+            const result = await favoritesCollection.deleteOne({
                 userId: lowerUserId,
                 contractAddress: lowerContractAddress,
                 tokenId
             });
+            results.push({ type: 'favorite', action: 'removed', result });
 
-            if (existingFavorite) {
-                // Remove favorite
-                const result = await favoritesCollection.deleteOne({
-                    userId: lowerUserId,
-                    contractAddress: lowerContractAddress,
-                    tokenId
-                });
-                results.push({ type: 'favorite', action: 'removed', result });
-
-                // Queue atomic stat update
-                statUpdates.push({
-                    contractAddress: lowerContractAddress,
-                    tokenId,
-                    field: 'likeCount',
-                    increment: false
-                });
-            } else {
-                // Add favorite
-                const result = await favoritesCollection.updateOne(
-                    { userId: lowerUserId, contractAddress: lowerContractAddress, tokenId },
-                    {
-                        $set: {
-                            userId: lowerUserId,
-                            contractAddress: lowerContractAddress,
-                            tokenId,
-                            addedAt: timestamp
-                        }
-                    },
-                    { upsert: true }
-                );
-                results.push({ type: 'favorite', action: 'added', result });
-
-                // Queue atomic stat update
-                statUpdates.push({
-                    contractAddress: lowerContractAddress,
-                    tokenId,
-                    field: 'likeCount',
-                    increment: true
-                });
-            }
-        }
-
-        // Update rating if specified (PUBLIC ratings only)
-        if (typeof updates.rating === 'number' && updates.rating >= 0 && updates.rating <= 5) {
-            if (updates.rating === 0) {
-                // Get old rating before removing
-                const oldRating = await ratingsCollection.findOne({
-                    userId: lowerUserId,
-                    contractAddress: lowerContractAddress,
-                    tokenId
-                });
-
-                // Remove rating when rating is 0
-                const result = await ratingsCollection.deleteOne({
-                    userId: lowerUserId,
-                    contractAddress: lowerContractAddress,
-                    tokenId
-                });
-                results.push({ type: 'rating', action: 'removed', result });
-
-                // Queue rating recalculation (remove old rating from average)
-                if (oldRating) {
-                    statUpdates.push({
-                        contractAddress: lowerContractAddress,
-                        tokenId,
-                        field: 'rating',
-                        action: 'remove',
-                        oldValue: oldRating.rating
-                    });
-                }
-            } else {
-                // Check if updating existing rating
-                const oldRating = await ratingsCollection.findOne({
-                    userId: lowerUserId,
-                    contractAddress: lowerContractAddress,
-                    tokenId
-                });
-
-                // Add or update rating when rating is 1-5
-                const result = await ratingsCollection.updateOne(
-                    { userId: lowerUserId, contractAddress: lowerContractAddress, tokenId },
-                    {
-                        $set: {
-                            userId: lowerUserId,
-                            contractAddress: lowerContractAddress,
-                            tokenId,
-                            rating: updates.rating,
-                            isPublic: true, // All ratings are public for community averages
-                            ratedAt: timestamp
-                        }
-                    },
-                    { upsert: true }
-                );
-                results.push({ type: 'rating', action: 'updated', result });
-
-                // Queue rating recalculation
-                statUpdates.push({
-                    contractAddress: lowerContractAddress,
-                    tokenId,
-                    field: 'rating',
-                    action: oldRating ? 'update' : 'add',
-                    newValue: updates.rating,
-                    oldValue: oldRating?.rating
-                });
-            }
-        }
-
-        // Update personal notes independently (PRIVATE data)
-        if (typeof updates.personalNotes === 'string' ||
-            typeof updates.strategy === 'string' ||
-            typeof updates.investmentGoal === 'string' ||
-            typeof updates.riskLevel === 'string') {
-
-            const personalDataUpdate: any = {
-                userId: lowerUserId,
+            // Queue atomic stat update
+            statUpdates.push({
                 contractAddress: lowerContractAddress,
                 tokenId,
-                lastUpdated: timestamp
-            };
-
-            if (typeof updates.personalNotes === 'string') {
-                personalDataUpdate.personalNotes = updates.personalNotes;
-            }
-            if (typeof updates.strategy === 'string') {
-                personalDataUpdate.strategy = updates.strategy;
-            }
-            if (typeof updates.investmentGoal === 'string') {
-                personalDataUpdate.investmentGoal = updates.investmentGoal;
-            }
-            if (typeof updates.riskLevel === 'string') {
-                personalDataUpdate.riskLevel = updates.riskLevel;
-            }
-
-            const result = await personalNotesCollection.updateOne(
+                field: 'likeCount',
+                increment: false
+            });
+        } else {
+            // Add favorite
+            const result = await favoritesCollection.updateOne(
                 { userId: lowerUserId, contractAddress: lowerContractAddress, tokenId },
                 {
-                    $set: personalDataUpdate,
-                    $setOnInsert: {
-                        createdAt: timestamp
+                    $set: {
+                        userId: lowerUserId,
+                        contractAddress: lowerContractAddress,
+                        tokenId,
+                        addedAt: timestamp
                     }
                 },
                 { upsert: true }
             );
-            results.push({ type: 'personal_notes', action: 'updated', result });
-        }
+            results.push({ type: 'favorite', action: 'added', result });
 
-        // Update watchlist if specified (TOGGLE logic)
-        if (updates.isWatchlisted !== undefined) {
-            const existingWatchlist = await watchlistCollection.findOne({
+            // Queue atomic stat update
+            statUpdates.push({
+                contractAddress: lowerContractAddress,
+                tokenId,
+                field: 'likeCount',
+                increment: true
+            });
+        }
+    }
+
+    // Update rating if specified (PUBLIC ratings only)
+    if (typeof updates.rating === 'number' && updates.rating >= 0 && updates.rating <= 5) {
+        if (updates.rating === 0) {
+            // Get old rating before removing
+            const oldRating = await ratingsCollection.findOne({
                 userId: lowerUserId,
                 contractAddress: lowerContractAddress,
                 tokenId
             });
 
-            if (existingWatchlist) {
-                // Remove from watchlist
-                const result = await watchlistCollection.deleteOne({
-                    userId: lowerUserId,
-                    contractAddress: lowerContractAddress,
-                    tokenId
-                });
-                results.push({ type: 'watchlist', action: 'removed', result });
+            // Remove rating when rating is 0
+            const result = await ratingsCollection.deleteOne({
+                userId: lowerUserId,
+                contractAddress: lowerContractAddress,
+                tokenId
+            });
+            results.push({ type: 'rating', action: 'removed', result });
 
-                // Queue atomic stat update
+            // Queue rating recalculation (remove old rating from average)
+            if (oldRating) {
                 statUpdates.push({
                     contractAddress: lowerContractAddress,
                     tokenId,
-                    field: 'watchlistCount',
-                    increment: false
+                    field: 'rating',
+                    action: 'remove',
+                    oldValue: oldRating.rating
                 });
-            } else {
-                // Add to watchlist
-                const result = await watchlistCollection.updateOne(
-                    { userId: lowerUserId, contractAddress: lowerContractAddress, tokenId },
+            }
+        } else {
+            // Check if updating existing rating
+            const oldRating = await ratingsCollection.findOne({
+                userId: lowerUserId,
+                contractAddress: lowerContractAddress,
+                tokenId
+            });
+
+            // Add or update rating when rating is 1-5
+            const result = await ratingsCollection.updateOne(
+                { userId: lowerUserId, contractAddress: lowerContractAddress, tokenId },
+                {
+                    $set: {
+                        userId: lowerUserId,
+                        contractAddress: lowerContractAddress,
+                        tokenId,
+                        rating: updates.rating,
+                        isPublic: true, // All ratings are public for community averages
+                        ratedAt: timestamp
+                    }
+                },
+                { upsert: true }
+            );
+            results.push({ type: 'rating', action: 'updated', result });
+
+            // Queue rating recalculation
+            statUpdates.push({
+                contractAddress: lowerContractAddress,
+                tokenId,
+                field: 'rating',
+                action: oldRating ? 'update' : 'add',
+                newValue: updates.rating,
+                oldValue: oldRating?.rating
+            });
+        }
+    }
+
+    // Update personal notes independently (PRIVATE data)
+    if (typeof updates.personalNotes === 'string' ||
+        typeof updates.strategy === 'string' ||
+        typeof updates.investmentGoal === 'string' ||
+        typeof updates.riskLevel === 'string') {
+
+        const personalDataUpdate: any = {
+            userId: lowerUserId,
+            contractAddress: lowerContractAddress,
+            tokenId,
+            lastUpdated: timestamp
+        };
+
+        if (typeof updates.personalNotes === 'string') {
+            personalDataUpdate.personalNotes = updates.personalNotes;
+        }
+        if (typeof updates.strategy === 'string') {
+            personalDataUpdate.strategy = updates.strategy;
+        }
+        if (typeof updates.investmentGoal === 'string') {
+            personalDataUpdate.investmentGoal = updates.investmentGoal;
+        }
+        if (typeof updates.riskLevel === 'string') {
+            personalDataUpdate.riskLevel = updates.riskLevel;
+        }
+
+        const result = await personalNotesCollection.updateOne(
+            { userId: lowerUserId, contractAddress: lowerContractAddress, tokenId },
+            {
+                $set: personalDataUpdate,
+                $setOnInsert: {
+                    createdAt: timestamp
+                }
+            },
+            { upsert: true }
+        );
+        results.push({ type: 'personal_notes', action: 'updated', result });
+    }
+
+    // Update watchlist if specified (TOGGLE logic)
+    if (updates.isWatchlisted !== undefined) {
+        const existingWatchlist = await watchlistCollection.findOne({
+            userId: lowerUserId,
+            contractAddress: lowerContractAddress,
+            tokenId
+        });
+
+        if (existingWatchlist) {
+            // Remove from watchlist
+            const result = await watchlistCollection.deleteOne({
+                userId: lowerUserId,
+                contractAddress: lowerContractAddress,
+                tokenId
+            });
+            results.push({ type: 'watchlist', action: 'removed', result });
+
+            // Queue atomic stat update
+            statUpdates.push({
+                contractAddress: lowerContractAddress,
+                tokenId,
+                field: 'watchlistCount',
+                increment: false
+            });
+        } else {
+            // Add to watchlist
+            const result = await watchlistCollection.updateOne(
+                { userId: lowerUserId, contractAddress: lowerContractAddress, tokenId },
+                {
+                    $set: {
+                        userId: lowerUserId,
+                        contractAddress: lowerContractAddress,
+                        tokenId,
+                        addedAt: timestamp
+                    }
+                },
+                { upsert: true }
+            );
+            results.push({ type: 'watchlist', action: 'added', result });
+
+            // Queue atomic stat update
+            statUpdates.push({
+                contractAddress: lowerContractAddress,
+                tokenId,
+                field: 'watchlistCount',
+                increment: true
+            });
+        }
+    }
+
+    // Execute all stat updates atomically
+    if (statUpdates.length > 0) {
+        const statsCollection = await getCollection('nft_stats');
+
+        for (const update of statUpdates) {
+            if (update.field === 'rating') {
+                // Special handling for ratings - need to recalculate average
+                const ratingsCollection = await getCollection('user_ratings');
+                const allRatings = await ratingsCollection.find({
+                    contractAddress: update.contractAddress,  // user_ratings uses contractAddress field
+                    tokenId: update.tokenId,
+                    isPublic: true
+                }).toArray();
+
+                const ratingCount = allRatings.length;
+                const averageRating = ratingCount > 0
+                    ? allRatings.reduce((sum, r) => sum + r.rating, 0) / ratingCount
+                    : 0;
+
+                await statsCollection.updateOne(
+                    { contractAddress: update.contractAddress, tokenId: update.tokenId },
                     {
                         $set: {
-                            userId: lowerUserId,
-                            contractAddress: lowerContractAddress,
-                            tokenId,
-                            addedAt: timestamp
+                            averageRating: Math.round(averageRating * 10) / 10,
+                            ratingCount,
+                            lastUpdated: timestamp
+                        },
+                        $setOnInsert: {
+                            contractAddress: update.contractAddress,
+                            tokenId: update.tokenId,
+                            viewCount: 0,
+                            likeCount: 0,
+                            watchlistCount: 0,
+                            createdAt: timestamp
                         }
                     },
                     { upsert: true }
                 );
-                results.push({ type: 'watchlist', action: 'added', result });
-
-                // Queue atomic stat update
-                statUpdates.push({
-                    contractAddress: lowerContractAddress,
-                    tokenId,
-                    field: 'watchlistCount',
-                    increment: true
+            } else {
+                // Check if stats document exists
+                const existingDoc = await statsCollection.findOne({
+                    contractAddress: update.contractAddress,
+                    tokenId: update.tokenId
                 });
-            }
-        }
 
-        // Execute all stat updates atomically
-        if (statUpdates.length > 0) {
-            const statsCollection = await getCollection('nft_stats');
-
-            for (const update of statUpdates) {
-                if (update.field === 'rating') {
-                    // Special handling for ratings - need to recalculate average
-                    const ratingsCollection = await getCollection('user_ratings');
-                    const allRatings = await ratingsCollection.find({
-                        contractAddress: update.contractAddress,  // user_ratings uses contractAddress field
-                        tokenId: update.tokenId,
-                        isPublic: true
-                    }).toArray();
-
-                    const ratingCount = allRatings.length;
-                    const averageRating = ratingCount > 0
-                        ? allRatings.reduce((sum, r) => sum + r.rating, 0) / ratingCount
-                        : 0;
-
-                    await statsCollection.updateOne(
-                        { contractAddress: update.contractAddress, tokenId: update.tokenId },
-                        {
-                            $set: {
-                                averageRating: Math.round(averageRating * 10) / 10,
-                                ratingCount,
-                                lastUpdated: timestamp
-                            },
-                            $setOnInsert: {
-                                contractAddress: update.contractAddress,
-                                tokenId: update.tokenId,
-                                viewCount: 0,
-                                likeCount: 0,
-                                watchlistCount: 0,
-                                createdAt: timestamp
+                if (existingDoc) {
+                    // Document exists - use $inc with $max to prevent negative values
+                    if (update.increment) {
+                        // Increment by 1
+                        await statsCollection.updateOne(
+                            { contractAddress: update.contractAddress, tokenId: update.tokenId },
+                            {
+                                $inc: { [update.field]: 1 },
+                                $set: { lastUpdated: timestamp }
                             }
-                        },
-                        { upsert: true }
-                    );
-                } else {
-                    // Check if stats document exists
-                    const existingDoc = await statsCollection.findOne({
-                        contractAddress: update.contractAddress,
-                        tokenId: update.tokenId
-                    });
-
-                    if (existingDoc) {
-                        // Document exists - use $inc with $max to prevent negative values
-                        if (update.increment) {
-                            // Increment by 1
-                            await statsCollection.updateOne(
-                                { contractAddress: update.contractAddress, tokenId: update.tokenId },
-                                {
-                                    $inc: { [update.field]: 1 },
-                                    $set: { lastUpdated: timestamp }
-                                }
-                            );
-                        } else {
-                            // Decrement by 1, but ensure it doesn't go below 0
-                            const currentValue = existingDoc[update.field as keyof typeof existingDoc] as number || 0;
-                            const newValue = Math.max(0, currentValue - 1);
-
-                            await statsCollection.updateOne(
-                                { contractAddress: update.contractAddress, tokenId: update.tokenId },
-                                {
-                                    $set: {
-                                        [update.field]: newValue,
-                                        lastUpdated: timestamp
-                                    }
-                                }
-                            );
-                        }
+                        );
                     } else {
-                        // Document doesn't exist - create with initial value
-                        const initialValue = update.increment ? 1 : 0;
+                        // Decrement by 1, but ensure it doesn't go below 0
+                        const currentValue = existingDoc[update.field as keyof typeof existingDoc] as number || 0;
+                        const newValue = Math.max(0, currentValue - 1);
 
-                        await statsCollection.insertOne({
-                            contractAddress: update.contractAddress,
-                            tokenId: update.tokenId,
-                            viewCount: 0,
-                            likeCount: update.field === 'likeCount' ? initialValue : 0,
-                            watchlistCount: update.field === 'watchlistCount' ? initialValue : 0,
-                            averageRating: 0,
-                            ratingCount: 0,
-                            createdAt: timestamp,
-                            lastUpdated: timestamp
-                        });
+                        await statsCollection.updateOne(
+                            { contractAddress: update.contractAddress, tokenId: update.tokenId },
+                            {
+                                $set: {
+                                    [update.field]: newValue,
+                                    lastUpdated: timestamp
+                                }
+                            }
+                        );
                     }
+                } else {
+                    // Document doesn't exist - create with initial value
+                    const initialValue = update.increment ? 1 : 0;
+
+                    await statsCollection.insertOne({
+                        contractAddress: update.contractAddress,
+                        tokenId: update.tokenId,
+                        viewCount: 0,
+                        likeCount: update.field === 'likeCount' ? initialValue : 0,
+                        watchlistCount: update.field === 'watchlistCount' ? initialValue : 0,
+                        averageRating: 0,
+                        ratingCount: 0,
+                        createdAt: timestamp,
+                        lastUpdated: timestamp
+                    });
                 }
             }
         }
+    }
 
-        // Fetch updated data to return to client
-        const [favoriteDoc, ratingDoc, watchlistDoc, personalNotesDoc] = await Promise.all([
-            favoritesCollection.findOne({
-                userId: lowerUserId,
-                contractAddress: lowerContractAddress,
-                tokenId: tokenId
-            }),
-            ratingsCollection.findOne({
-                userId: lowerUserId,
-                contractAddress: lowerContractAddress,
-                tokenId: tokenId
-            }),
-            watchlistCollection.findOne({
-                userId: lowerUserId,
-                contractAddress: lowerContractAddress,
-                tokenId: tokenId
-            }),
-            personalNotesCollection.findOne({
-                userId: lowerUserId,
-                contractAddress: lowerContractAddress,
-                tokenId: tokenId
-            })
-        ]);
-
-        // Combine all data into a single response
-        const combinedData: UserInteractionData = {
+    // Fetch updated data to return to client
+    const [favoriteDoc, ratingDoc, watchlistDoc, personalNotesDoc] = await Promise.all([
+        favoritesCollection.findOne({
             userId: lowerUserId,
             contractAddress: lowerContractAddress,
-            tokenId: tokenId,
-
-            // Favorites
-            isFavorite: !!favoriteDoc,
-            favoriteAddedAt: favoriteDoc?.addedAt,
-
-            // Public Ratings (for community averages)
-            rating: ratingDoc?.rating,
-            ratedAt: ratingDoc?.ratedAt,
-
-            // Watchlist
-            isWatchlisted: !!watchlistDoc,
-            watchlistAddedAt: watchlistDoc?.addedAt,
-
-            // Private Personal Data (separate from public ratings)
-            personalNotes: personalNotesDoc?.personalNotes || '',
-            strategy: personalNotesDoc?.strategy,
-            investmentGoal: personalNotesDoc?.investmentGoal,
-            riskLevel: personalNotesDoc?.riskLevel,
-
-            lastUpdated: timestamp
-        };
-
-        // IMPORTANT: Cache the updated data FIRST before returning
-        setCachedInteractions(lowerUserId, lowerContractAddress, tokenId, combinedData);
-
-        // Invalidate ALL related caches (stats + interactions) to ensure UI updates immediately
-        // This fixes the delayed update issue where stats (favoriteCount, watchlistCount, etc.) 
-        // weren't refreshing until cache TTL expired
-        invalidateAllCachesForNFT(lowerContractAddress, tokenId, lowerUserId);
-
-        // CRITICAL FIX: Fetch and return the updated stats IMMEDIATELY after atomic DB updates
-        // This prevents race conditions where the client fetches stats before DB write is committed
-        const statsCollection = await getCollection('nft_stats');
-        const updatedStats = await statsCollection.findOne({
-            contractAddress: lowerContractAddress,  // nft_stats uses contractAddress field
             tokenId: tokenId
-        });
+        }),
+        ratingsCollection.findOne({
+            userId: lowerUserId,
+            contractAddress: lowerContractAddress,
+            tokenId: tokenId
+        }),
+        watchlistCollection.findOne({
+            userId: lowerUserId,
+            contractAddress: lowerContractAddress,
+            tokenId: tokenId
+        }),
+        personalNotesCollection.findOne({
+            userId: lowerUserId,
+            contractAddress: lowerContractAddress,
+            tokenId: tokenId
+        })
+    ]);
 
-        return apiSuccess({
-            message: 'User interactions updated successfully',
-            data: combinedData,
-            stats: updatedStats ? {
-                likeCount: updatedStats.likeCount || 0,
-                watchlistCount: updatedStats.watchlistCount || 0,
-                averageRating: updatedStats.averageRating || 0,
-                ratingCount: updatedStats.ratingCount || 0,
-                viewCount: updatedStats.viewCount || 0,
-                lastUpdated: updatedStats.lastUpdated
-            } : null,
-            results
-        });
+    // Combine all data into a single response
+    const combinedData: UserInteractionData = {
+        userId: lowerUserId,
+        contractAddress: lowerContractAddress,
+        tokenId: tokenId,
+
+        // Favorites
+        isFavorite: !!favoriteDoc,
+        favoriteAddedAt: favoriteDoc?.addedAt,
+
+        // Public Ratings (for community averages)
+        rating: ratingDoc?.rating,
+        ratedAt: ratingDoc?.ratedAt,
+
+        // Watchlist
+        isWatchlisted: !!watchlistDoc,
+        watchlistAddedAt: watchlistDoc?.addedAt,
+
+        // Private Personal Data (separate from public ratings)
+        personalNotes: personalNotesDoc?.personalNotes || '',
+        strategy: personalNotesDoc?.strategy,
+        investmentGoal: personalNotesDoc?.investmentGoal,
+        riskLevel: personalNotesDoc?.riskLevel,
+
+        lastUpdated: timestamp
+    };
+
+    // IMPORTANT: Cache the updated data FIRST before returning
+    setCachedInteractions(lowerUserId, lowerContractAddress, tokenId, combinedData);
+
+    // Invalidate ALL related caches (stats + interactions) to ensure UI updates immediately
+    // This fixes the delayed update issue where stats (favoriteCount, watchlistCount, etc.) 
+    // weren't refreshing until cache TTL expired
+    invalidateAllCachesForNFT(lowerContractAddress, tokenId, lowerUserId);
+
+    // CRITICAL FIX: Fetch and return the updated stats IMMEDIATELY after atomic DB updates
+    // This prevents race conditions where the client fetches stats before DB write is committed
+    const statsCollection = await getCollection('nft_stats');
+    const updatedStats = await statsCollection.findOne({
+        contractAddress: lowerContractAddress,  // nft_stats uses contractAddress field
+        tokenId: tokenId
+    });
+
+    return apiSuccess({
+        message: 'User interactions updated successfully',
+        data: combinedData,
+        stats: updatedStats ? {
+            likeCount: updatedStats.likeCount || 0,
+            watchlistCount: updatedStats.watchlistCount || 0,
+            averageRating: updatedStats.averageRating || 0,
+            ratingCount: updatedStats.ratingCount || 0,
+            viewCount: updatedStats.viewCount || 0,
+            lastUpdated: updatedStats.lastUpdated
+        } : null,
+        results
+    });
 });
 
 // PUT /api/user/interactions - Alias for POST (AUTH REQUIRED)

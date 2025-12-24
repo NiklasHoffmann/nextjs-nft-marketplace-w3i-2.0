@@ -13,19 +13,25 @@
  * - Optimistic updates for user interactions
  */
 
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { devLog } from '@/utils/devLog';
 import type { EnrichedNFTDocument, MarketplaceItemsResponse } from '@/types/marketplace/enriched-nft';
 import type { NFTStatsUpdateDetail } from '@/types/events';
 import { MarketplaceItemsService, type CacheEntry } from './MarketplaceItemsService';
 import { MarketplaceItemsCache } from './MarketplaceItemsCache';
 import { emitStatsUpdate } from './MarketplaceItemsEvents';
+import { onDataInvalidation, type InvalidationEventDetail } from '@/services/DataInvalidationService';
 
 interface MarketplaceItemsContextType {
     // Cache operations
     getCached: (filterKey: string) => CacheEntry | null;
     setCache: (filterKey: string, data: MarketplaceItemsResponse['data']) => void;
     invalidateCache: (filterKey?: string) => void;
+
+    // NEW: Post-transaction invalidation
+    removeListing: (listingId: string) => void;
+    removeNFT: (contractAddress: string, tokenId: string) => void;
+    refreshMarketplace: () => Promise<void>;
 
     // Selective refresh operations
     refreshItemStats: (contractAddress: string, tokenId: string) => Promise<void>;
@@ -61,6 +67,31 @@ export function MarketplaceItemsProvider({ children }: { children: React.ReactNo
      */
     const invalidateCache = useCallback((filterKey?: string) => {
         service.invalidate(filterKey);
+    }, [service]);
+
+    /**
+     * NEW: Remove specific listing by listingId (post-transaction)
+     */
+    const removeListing = useCallback((listingId: string) => {
+        devLog.info('marketplace-items', `🗑️ Removing listing ${listingId} from cache`);
+        service.removeListing(listingId);
+    }, [service]);
+
+    /**
+     * NEW: Remove specific NFT by contract + tokenId (post-transaction)
+     */
+    const removeNFT = useCallback((contractAddress: string, tokenId: string) => {
+        devLog.info('marketplace-items', `🗑️ Removing NFT ${contractAddress}/${tokenId} from cache`);
+        service.removeNFT(contractAddress, tokenId);
+    }, [service]);
+
+    /**
+     * NEW: Force refresh all marketplace data (re-fetch from API)
+     */
+    const refreshMarketplace = useCallback(async () => {
+        devLog.info('marketplace-items', `🔄 Force refreshing marketplace data...`);
+        service.invalidate(); // Clear all caches
+        devLog.success('marketplace-items', `✅ Marketplace cache cleared`);
     }, [service]);
 
     /**
@@ -141,10 +172,63 @@ export function MarketplaceItemsProvider({ children }: { children: React.ReactNo
         service.updateItemInCache(filterKey, contractAddress, tokenId, updates);
     }, [service]);
 
+    /**
+     * Listen for data invalidation events from other parts of the app
+     */
+    useEffect(() => {
+        const unsubscribe = onDataInvalidation((detail: InvalidationEventDetail) => {
+            devLog.info('marketplace-items', `🔔 Received invalidation event:`, detail);
+
+            switch (detail.type) {
+                case 'listing-created':
+                    // Invalidate all caches to show new listing
+                    devLog.info('marketplace-items', `🔄 Invalidating cache after listing created`);
+                    service.invalidate();
+                    break;
+
+                case 'listing-canceled':
+                    // Remove specific NFT from cache
+                    if (detail.contractAddress && detail.tokenId) {
+                        devLog.info('marketplace-items', `🗑️ Removing NFT after cancel`);
+                        service.removeNFT(detail.contractAddress, detail.tokenId);
+                    }
+                    break;
+
+                case 'nft-purchased':
+                    // Remove purchased NFT from all listings
+                    if (detail.contractAddress && detail.tokenId) {
+                        devLog.info('marketplace-items', `🗑️ Removing NFT after purchase`);
+                        service.removeNFT(detail.contractAddress, detail.tokenId);
+                    }
+                    break;
+
+                case 'nft-transferred':
+                    // Refresh to show correct ownership
+                    if (detail.contractAddress && detail.tokenId) {
+                        devLog.info('marketplace-items', `🔄 Refreshing after transfer`);
+                        service.removeNFT(detail.contractAddress, detail.tokenId);
+                    }
+                    break;
+
+                case 'graph-update':
+                case 'manual-refresh':
+                    // Full refresh
+                    devLog.info('marketplace-items', `🔄 Full invalidation after ${detail.type}`);
+                    service.invalidate();
+                    break;
+            }
+        });
+
+        return unsubscribe;
+    }, [service]);
+
     const value: MarketplaceItemsContextType = {
         getCached,
         setCache: setCacheEntry,
         invalidateCache,
+        removeListing,
+        removeNFT,
+        refreshMarketplace,
         refreshItemStats,
         refreshItemListing,
         updateItemInCache

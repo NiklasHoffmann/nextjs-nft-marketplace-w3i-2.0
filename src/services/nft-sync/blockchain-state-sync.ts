@@ -68,8 +68,6 @@ export class BlockchainStateSync {
         marketplaceAddress?: string
     ): Promise<BlockchainState> {
         try {
-            console.log(`🔄 [Blockchain Sync] Fetching state for ${contractAddress}/${tokenId}`);
-
             // Fetch owner and approved in parallel
             const [owner, approved] = await Promise.all([
                 this.client.readContract({
@@ -86,10 +84,10 @@ export class BlockchainStateSync {
                 })
             ]);
 
-            console.log(`  📡 Blockchain response:`);
-            console.log(`     Owner: ${owner}`);
-            console.log(`     Approved (getApproved): ${approved}`);
-            console.log(`     Marketplace address: ${marketplaceAddress || 'NOT PROVIDED'}`);
+            // console.log(`  📡 Blockchain response:`);
+            // console.log(`     Owner: ${owner}`);
+            // console.log(`     Approved (getApproved): ${approved}`);
+            // console.log(`     Marketplace address: ${marketplaceAddress || 'NOT PROVIDED'}`);
 
             // Optionally check isApprovedForAll if marketplace address provided
             let isApprovedForAll = false;
@@ -101,7 +99,7 @@ export class BlockchainStateSync {
                         functionName: 'isApprovedForAll',
                         args: [owner as `0x${string}`, marketplaceAddress as `0x${string}`]
                     });
-                    console.log(`     IsApprovedForAll: ${isApprovedForAll}`);
+                    // console.log(`     IsApprovedForAll: ${isApprovedForAll}`);
                 } catch (error) {
                     console.warn(`  ⚠️ Could not check isApprovedForAll:`, error);
                 }
@@ -117,10 +115,10 @@ export class BlockchainStateSync {
             // Update both collections
             await this.updateCollections(contractAddress, tokenId, state);
 
-            console.log(`  ✅ State synced and saved to DB:`);
-            console.log(`     Owner: ${owner.slice(0, 6)}...${owner.slice(-4)}`);
-            console.log(`     Approved: ${approved === '0x0000000000000000000000000000000000000000' ? 'NULL (0x000...)' : approved}`);
-            console.log(`     IsApprovedForAll: ${isApprovedForAll}`);
+            // console.log(`  ✅ State synced and saved to DB:`);
+            // console.log(`     Owner: ${owner.slice(0, 6)}...${owner.slice(-4)}`);
+            // console.log(`     Approved: ${approved === '0x0000000000000000000000000000000000000000' ? 'NULL (0x000...)' : approved}`);
+            // console.log(`     IsApprovedForAll: ${isApprovedForAll}`);
 
             return state;
 
@@ -134,7 +132,7 @@ export class BlockchainStateSync {
      * Sync blockchain state for multiple NFTs (batch)
      */
     async syncBatch(nfts: Array<{ contractAddress: string; tokenId: string }>, marketplaceAddress?: string) {
-        console.log(`🔄 [Blockchain Sync] Syncing batch of ${nfts.length} NFTs`);
+        // console.log(`🔄 [Blockchain Sync] Syncing batch of ${nfts.length} NFTs`);
 
         const BATCH_SIZE = 5; // Process 5 at once to avoid rate limits
         const results: Array<{ success: boolean; nft: any; error?: any }> = [];

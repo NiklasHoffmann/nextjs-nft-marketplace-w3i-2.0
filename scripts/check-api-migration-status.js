@@ -11,7 +11,7 @@ const apiDir = path.join(__dirname, '..', 'src', 'app', 'api');
 
 function findRouteFiles(dir, files = []) {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
-    
+
     for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
         if (entry.isDirectory()) {
@@ -20,23 +20,23 @@ function findRouteFiles(dir, files = []) {
             files.push(fullPath);
         }
     }
-    
+
     return files;
 }
 
 function analyzeRoute(filePath) {
     const content = fs.readFileSync(filePath, 'utf-8');
     const relativePath = path.relative(apiDir, filePath).replace(/\\/g, '/').replace('/route.ts', '');
-    
+
     // Check for apiHandler pattern
     const hasApiHandler = /export const \w+ = apiHandler/.test(content);
-    
+
     // Check for legacy pattern
     const hasLegacyExport = /export async function (GET|POST|PUT|DELETE|PATCH)/.test(content);
-    
+
     // Check for auth
     const hasAuth = /\{ auth: true \}|\{ admin: true \}|withAuth|withAdmin/.test(content);
-    
+
     // Get HTTP methods
     const methods = [];
     const methodRegex = /export (?:async function|const) (GET|POST|PUT|DELETE|PATCH)/g;
@@ -44,7 +44,7 @@ function analyzeRoute(filePath) {
     while ((match = methodRegex.exec(content)) !== null) {
         methods.push(match[1]);
     }
-    
+
     return {
         path: relativePath,
         methods,

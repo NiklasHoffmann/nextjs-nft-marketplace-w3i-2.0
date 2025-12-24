@@ -69,13 +69,20 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
 
             console.log('🔍 AdminAuthGuard session check:', {
                 ok: response.ok,
-                status: response.status
+                status: response.status,
+                currentAddress: address?.toLowerCase()
             });
 
             if (response.ok) {
                 const data = await response.json();
-                console.log('📋 Session data:', data);
-                
+                console.log('📋 Session data:', {
+                    success: data.success,
+                    isAuthenticated: data.data?.isAuthenticated,
+                    sessionAddress: data.data?.address?.toLowerCase(),
+                    currentAddress: address.toLowerCase(),
+                    match: data.data?.address?.toLowerCase() === address.toLowerCase()
+                });
+
                 // apiHandler wrappt Response in { success: true, data: {...} }
                 if (data.success && data.data?.isAuthenticated && data.data?.address?.toLowerCase() === address.toLowerCase()) {
                     // Session gültig
@@ -83,6 +90,12 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
                     setIsAuthorized(true);
                     setIsChecking(false);
                     return;
+                } else {
+                    console.warn('⚠️ Session check failed:', {
+                        hasSuccess: data.success,
+                        isAuth: data.data?.isAuthenticated,
+                        addressMatch: data.data?.address?.toLowerCase() === address.toLowerCase()
+                    });
                 }
             }
 
@@ -104,10 +117,10 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
      */
     const redirectToLogin = () => {
         setIsChecking(false);
-        
+
         // Encode current path for redirect after login
         const redirectUrl = encodeURIComponent(pathname || '/admin');
-        
+
         setTimeout(() => {
             router.push(`/admin/login?redirect=${redirectUrl}` as any);
         }, 1500);

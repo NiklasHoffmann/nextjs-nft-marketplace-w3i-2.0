@@ -96,7 +96,7 @@ export default function AdminLoginPage() {
                 throw new Error('Challenge-Generierung fehlgeschlagen');
             }
             const challengeData = await challengeRes.json();
-            
+
             if (!challengeData.success || !challengeData.data) {
                 throw new Error('Ungültige Challenge-Antwort');
             }
@@ -105,21 +105,21 @@ export default function AdminLoginPage() {
 
             let signature: string;
             try {
-                signature = await signMessageAsync({ 
+                signature = await signMessageAsync({
                     message,
                     account: address as `0x${string}`,
                 });
             } catch (signErr: any) {
-                if (signErr?.message?.includes('User rejected') || 
+                if (signErr?.message?.includes('User rejected') ||
                     signErr?.message?.includes('User denied') ||
                     signErr?.name === 'UserRejectedRequestError') {
                     throw new Error('User rejected');
                 }
-                
+
                 if (signErr?.message?.includes("Cannot read properties of undefined (reading 'raw')")) {
                     throw new Error('Wallet nicht vollständig initialisiert. Bitte Wallet trennen, Seite neu laden und erneut verbinden.');
                 }
-                
+
                 throw new Error(`Signatur fehlgeschlagen: ${signErr?.message || 'Unbekannter Fehler'}`);
             }
 
@@ -142,15 +142,15 @@ export default function AdminLoginPage() {
             }
 
             const verifyData = await verifyRes.json();
-            
+
             if (!verifyData.success) {
                 throw new Error(verifyData.error || 'Verifikation fehlgeschlagen');
             }
 
             setShowSuccess(true);
-            
+
             await new Promise(resolve => setTimeout(resolve, 500));
-            
+
             setTimeout(() => {
                 router.push(redirectTo as any);
             }, 1000);
@@ -202,7 +202,7 @@ export default function AdminLoginPage() {
                                 <div className="flex justify-center">
                                     <Web3ConnectButton />
                                 </div>
-                                
+
                                 {isConnected && address && (
                                     <div className="mt-3 p-3 bg-gray-50 rounded-lg">
                                         <div className="flex items-center justify-between text-xs">
@@ -224,7 +224,7 @@ export default function AdminLoginPage() {
                             {isConnected && address && (
                                 <div className="mb-6">
                                     <label className="block text-sm font-medium text-gray-700 mb-3">2. Signatur zur Authentifizierung</label>
-                                    
+
                                     {!signMessageAsync || !connector || !connectorClient ? (
                                         <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                                             <p className="text-sm text-yellow-800 font-medium mb-2">⚠️ Wallet noch nicht vollständig bereit</p>
@@ -245,13 +245,12 @@ export default function AdminLoginPage() {
                                             <button
                                                 onClick={handleLogin}
                                                 disabled={isSigning || isChecking || !isAdminAddress(address)}
-                                                className={`w-full py-3 px-4 rounded-lg font-medium transition-all ${
-                                                    isSigning || isChecking
+                                                className={`w-full py-3 px-4 rounded-lg font-medium transition-all ${isSigning || isChecking
                                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                                         : isAdminAddress(address)
                                                             ? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg'
                                                             : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                }`}
+                                                    }`}
                                             >
                                                 {isSigning ? (
                                                     <span className="flex items-center justify-center">
@@ -288,8 +287,8 @@ export default function AdminLoginPage() {
                                     <div className="text-sm">
                                         <p className="font-medium text-blue-900 mb-1">Sicherheitshinweis</p>
                                         <p className="text-blue-700 text-xs leading-relaxed">
-                                            Die Signatur kostet kein Gas und sendet keine Transaktion. 
-                                            Sie dient ausschließlich zur Authentifizierung deiner Wallet-Adresse. 
+                                            Die Signatur kostet kein Gas und sendet keine Transaktion.
+                                            Sie dient ausschließlich zur Authentifizierung deiner Wallet-Adresse.
                                             Die Session ist 24 Stunden gültig.
                                         </p>
                                     </div>

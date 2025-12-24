@@ -278,4 +278,80 @@ export class MarketplaceItemsCache {
             error
         };
     }
+
+    /**
+     * NEW: Remove specific listing by listingId from all cache entries
+     */
+    removeListing(listingId: string): void {
+        devLog.info('cache', `🗑️ Removing listing ${listingId} from all cache entries`);
+
+        let removedCount = 0;
+        const allKeys = Array.from(this.state.entries.keys());
+
+        allKeys.forEach(key => {
+            const entry = this.state.entries.get(key);
+            if (!entry) return;
+
+            const filtered = entry.data.items.filter(
+                item => item.marketplace.listingId !== listingId
+            );
+
+            if (filtered.length !== entry.data.items.length) {
+                this.state.entries.set(key, {
+                    ...entry,
+                    data: {
+                        ...entry.data,
+                        items: filtered,
+                        pagination: {
+                            ...entry.data.pagination,
+                            total: filtered.length
+                        }
+                    },
+                    timestamp: Date.now()
+                });
+                removedCount++;
+                devLog.debug('cache', `✅ Removed listing from cache key: ${key}`);
+            }
+        });
+
+        devLog.success('cache', `✅ Removed listing from ${removedCount} cache entries`);
+    }
+
+    /**
+     * NEW: Remove specific NFT by contract address + tokenId from all cache entries
+     */
+    removeNFT(contractAddress: string, tokenId: string): void {
+        devLog.info('cache', `🗑️ Removing NFT ${contractAddress}/${tokenId} from all cache entries`);
+
+        let removedCount = 0;
+        const allKeys = Array.from(this.state.entries.keys());
+
+        allKeys.forEach(key => {
+            const entry = this.state.entries.get(key);
+            if (!entry) return;
+
+            const filtered = entry.data.items.filter(
+                item => !(item.contractAddress === contractAddress && item.tokenId === tokenId)
+            );
+
+            if (filtered.length !== entry.data.items.length) {
+                this.state.entries.set(key, {
+                    ...entry,
+                    data: {
+                        ...entry.data,
+                        items: filtered,
+                        pagination: {
+                            ...entry.data.pagination,
+                            total: filtered.length
+                        }
+                    },
+                    timestamp: Date.now()
+                });
+                removedCount++;
+                devLog.debug('cache', `✅ Removed NFT from cache key: ${key}`);
+            }
+        });
+
+        devLog.success('cache', `✅ Removed NFT from ${removedCount} cache entries`);
+    }
 }

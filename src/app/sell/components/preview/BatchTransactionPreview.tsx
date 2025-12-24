@@ -2,8 +2,7 @@
 
 import React from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
-import { useMarketplaceFees } from '../hooks/useMarketplaceFees';
-import { useMarketplaceContracts } from '../hooks/useMarketplaceContracts';
+import { useMarketplaceFees, useMarketplaceContracts } from '../../hooks';
 import { ButtonSpinner } from '@/components/core/Loading';
 
 interface BatchTransactionData {

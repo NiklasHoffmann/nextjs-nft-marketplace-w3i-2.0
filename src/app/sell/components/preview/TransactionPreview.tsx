@@ -2,9 +2,8 @@
 
 import React from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
-import type { ListingMode } from './UnifiedListingForm';
-import { useMarketplaceFees } from '../hooks/useMarketplaceFees';
-import { useMarketplaceContracts } from '../hooks/useMarketplaceContracts';
+import type { ListingMode } from '../../types';
+import { useMarketplaceFees, useMarketplaceContracts } from '../../hooks';
 import { ButtonSpinner } from '@/components/core/Loading';
 
 interface TransactionData {
@@ -267,10 +266,10 @@ export function TransactionPreview({ data, onConfirm, onCancel, isLoading }: Tra
                     onClick={onConfirm}
                     disabled={isLoading}
                     className={`flex-1 py-3 px-6 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-300 font-semibold shadow-lg hover:shadow-2xl transform hover:scale-105 ${mode === 'sale'
-                            ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 focus:ring-blue-500'
-                            : mode === 'trade'
-                                ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 focus:ring-green-500'
-                                : 'bg-gradient-to-r from-purple-600 to-purple-700 text-white hover:from-purple-700 hover:to-purple-800 focus:ring-purple-500'
+                        ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 focus:ring-blue-500'
+                        : mode === 'trade'
+                            ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 focus:ring-green-500'
+                            : 'bg-gradient-to-r from-purple-600 to-purple-700 text-white hover:from-purple-700 hover:to-purple-800 focus:ring-purple-500'
                         } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                     {isLoading ? (

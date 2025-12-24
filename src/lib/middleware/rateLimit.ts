@@ -54,10 +54,10 @@ export const RATE_LIMITS = {
  * Standard key generator: IP + User-Agent
  */
 function getDefaultKey(request: NextRequest): string {
-    const ip = request.headers.get('x-forwarded-for') || 
-               request.headers.get('x-real-ip') ||
-               'unknown';
-    
+    const ip = request.headers.get('x-forwarded-for') ||
+        request.headers.get('x-real-ip') ||
+        'unknown';
+
     const userAgent = request.headers.get('user-agent') || 'unknown';
     return `${ip}-${userAgent}`;
 }
@@ -113,7 +113,7 @@ export function isRateLimited(
     const now = Date.now();
 
     const entry = rateLimitStore.get(key);
-    
+
     if (!entry || entry.resetTime < now) {
         return false;
     }
@@ -132,7 +132,7 @@ export function getRemainingRequests(
     const now = Date.now();
 
     const entry = rateLimitStore.get(key);
-    
+
     if (!entry || entry.resetTime < now) {
         return config.maxRequests;
     }
@@ -156,13 +156,13 @@ export function resetRateLimit(request: NextRequest): void {
 export const RATE_LIMIT_CONFIG = {
     /** Standard API Calls (60/minute) */
     STANDARD: RATE_LIMITS.STANDARD,
-    
+
     /** Read-Only Operations (120/minute) */
     LENIENT: RATE_LIMITS.LENIENT,
-    
+
     /** Write Operations (10/minute) */
     STRICT: RATE_LIMITS.STRICT,
-    
+
     /** Expensive Operations wie Blockchain Calls (5/minute) */
     VERY_STRICT: RATE_LIMITS.VERY_STRICT,
 } as const;

@@ -13,6 +13,7 @@
 import { memo, useState, useCallback } from 'react';
 import { BaseModal } from '@/components/core/Modal';
 import { useTransactionService } from '@/services/blockchain';
+import { useMarketplaceItems } from '@/contexts/marketplace-items';
 import { useForm } from '@/hooks/useForm';
 
 interface UpdateListingModalProps {
@@ -40,6 +41,7 @@ function UpdateListingModal({
 }: UpdateListingModalProps) {
     // Transaction service
     const txService = useTransactionService();
+    const { refreshMarketplace } = useMarketplaceItems();
 
     // Listing type: 'sale' or 'swap'
     const [listingType, setListingType] = useState<'sale' | 'swap'>(
@@ -105,6 +107,23 @@ function UpdateListingModal({
                 },
                 onError: (error) => {
                     console.error('❌ Update error:', error);
+                },
+                onPostTransaction: async () => {
+                    // Force immediate sync from TheGraph via API
+                    console.log('🔄 Triggering immediate marketplace sync...');
+                    try {
+                        await fetch('/api/marketplace/sync', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'force' })
+                        });
+                        console.log('✅ Marketplace sync triggered');
+                    } catch (error) {
+                        console.error('❌ Failed to trigger sync:', error);
+                    }
+
+                    // Refresh marketplace to show updated price/swap details
+                    await refreshMarketplace();
                 }
             });
 

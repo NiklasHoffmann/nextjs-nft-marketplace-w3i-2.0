@@ -18,7 +18,7 @@ export function filterNFTs(
 ): AggregatedNFT[] {
     const { searchTerm = '', showOnlyUnlisted = false } = options;
 
-    return nfts.filter(nft => {
+    const filtered = nfts.filter(nft => {
         // Filter by listing status
         if (showOnlyUnlisted && nft.listed) {
             return false;
@@ -36,4 +36,14 @@ export function filterNFTs(
 
         return true;
     });
+
+    // Log filtering statistics
+    if (showOnlyUnlisted) {
+        const listedCount = nfts.filter(n => n.listed).length;
+        if (listedCount > 0) {
+            console.log(`🔍 Filtered out ${listedCount} already listed NFTs`);
+        }
+    }
+
+    return filtered;
 }

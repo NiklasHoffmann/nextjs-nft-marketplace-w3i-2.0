@@ -2,8 +2,7 @@
 
 import React, { useState } from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
-import { useMarketplaceFees } from '../hooks/useMarketplaceFees';
-import { useMarketplaceContracts } from '../hooks/useMarketplaceContracts';
+import { useMarketplaceContracts, useMarketplaceFees } from '../../hooks';
 import { useForm } from '@/hooks/useForm';
 
 export type ListingMode = 'sale' | 'trade' | 'hybrid';
@@ -12,6 +11,8 @@ interface UnifiedListingFormProps {
     selectedNFT: AggregatedNFT | null;
     isFullyApproved?: boolean;
     isWhitelisted?: boolean;
+    whitelistStatus?: 'not-started' | 'checking' | 'done' | 'failed';
+    approvalStatus?: 'not-started' | 'checking' | 'done' | 'failed';
     onSubmit: (data: {
         mode: ListingMode;
         price?: string;
@@ -23,7 +24,7 @@ interface UnifiedListingFormProps {
     }) => void;
 }
 
-export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhitelisted = true, onSubmit }: UnifiedListingFormProps) {
+export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhitelisted = true, whitelistStatus = 'not-started', approvalStatus = 'not-started', onSubmit }: UnifiedListingFormProps) {
     const [mode, setMode] = useState<ListingMode>('sale');
     const [selectedTargetNFT, setSelectedTargetNFT] = useState<AggregatedNFT | null>(null);
     const [isSearching, setIsSearching] = useState(false);
@@ -461,23 +462,38 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                     {/* Submit Button */}
                     <button
                         type="submit"
-                        disabled={!isWhitelisted || !form.isValid}
-                        className={`w-full px-6 py-3 rounded-lg text-white font-semibold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 ${!isWhitelisted || !form.isValid
-                                ? 'bg-gray-400 cursor-not-allowed'
-                                : mode === 'sale'
-                                    ? 'bg-blue-600 hover:bg-blue-700'
-                                    : mode === 'trade'
-                                        ? 'bg-green-600 hover:bg-green-700'
-                                        : 'bg-purple-600 hover:bg-purple-700'
+                        disabled={whitelistStatus !== 'done' || approvalStatus === 'checking' || !form.isValid}
+                        className={`w-full px-6 py-3 rounded-lg text-white font-semibold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 ${whitelistStatus !== 'done' || approvalStatus === 'checking' || !form.isValid
+                            ? 'bg-gray-400 cursor-not-allowed'
+                            : mode === 'sale'
+                                ? 'bg-blue-600 hover:bg-blue-700'
+                                : mode === 'trade'
+                                    ? 'bg-green-600 hover:bg-green-700'
+                                    : 'bg-purple-600 hover:bg-purple-700'
                             }`}
                     >
-                        {!isFullyApproved && (
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                            </svg>
-                        )}
-                        {!isFullyApproved ? (
+                        {whitelistStatus === 'failed' ? (
                             <>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                Collection nicht whitelisted
+                            </>
+                        ) : whitelistStatus === 'checking' ? (
+                            <>
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                Prüfe Whitelist...
+                            </>
+                        ) : approvalStatus === 'checking' ? (
+                            <>
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                Prüfe Approval...
+                            </>
+                        ) : approvalStatus === 'failed' ? (
+                            <>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                </svg>
                                 {mode === 'sale' && 'Approve & List for Sale'}
                                 {mode === 'trade' && 'Approve & Create Trade Offer'}
                                 {mode === 'hybrid' && 'Approve & Create Hybrid Offer'}

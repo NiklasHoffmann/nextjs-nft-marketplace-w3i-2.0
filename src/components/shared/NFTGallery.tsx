@@ -256,7 +256,7 @@ export function NFTGallery({
 
             {/* Grid View */}
             {isGridView ? (
-                <div 
+                <div
                     className={`grid ${gridColumns} ${gap} ${padding} pl-8 min-h-[288px]`}
                     style={{ paddingBottom: '50px' }} // Space for hover shadows (same as scroll view)
                 >

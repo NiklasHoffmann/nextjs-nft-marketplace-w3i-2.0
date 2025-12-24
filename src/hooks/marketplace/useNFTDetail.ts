@@ -183,7 +183,7 @@ export function useNFTDetail(options: UseNFTDetailOptions): UseNFTDetailReturn {
             }
 
             const result = await response.json();
-            
+
             // apiHandler wraps response in { success: true, data: {...} }
             const nftData = result.success ? result.data : result;
 

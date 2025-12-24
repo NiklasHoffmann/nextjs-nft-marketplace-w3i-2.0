@@ -7,6 +7,8 @@ import { useForm } from '@/hooks/useForm';
 
 interface BatchListingFormProps {
     userNFTs: AggregatedNFT[];
+    selectedNFTs?: Set<string>;
+    onSelectedNFTsChange?: (nfts: Set<string>) => void;
     onSubmit: (data: {
         selectedNFTs: AggregatedNFT[];
         pricingType: 'fixed' | 'variable';
@@ -20,9 +22,25 @@ interface BatchListingFormProps {
     marketplaceAddress: string;
 }
 
-export function BatchListingForm({ userNFTs, onSubmit, onBack, marketplaceAddress }: BatchListingFormProps) {
+export function BatchListingForm({ 
+    userNFTs, 
+    selectedNFTs: externalSelectedNFTs,
+    onSelectedNFTsChange,
+    onSubmit, 
+    onBack, 
+    marketplaceAddress 
+}: BatchListingFormProps) {
     const [contractFilter, setContractFilter] = useState('');
-    const [selectedNFTs, setSelectedNFTs] = useState<Set<string>>(new Set());
+    const [internalSelectedNFTs, setInternalSelectedNFTs] = useState<Set<string>>(new Set());
+    const selectedNFTs = externalSelectedNFTs ?? internalSelectedNFTs;
+    const setSelectedNFTs = (nfts: Set<string> | ((prev: Set<string>) => Set<string>)) => {
+        const newNFTs = typeof nfts === 'function' ? nfts(selectedNFTs) : nfts;
+        if (onSelectedNFTsChange) {
+            onSelectedNFTsChange(newNFTs);
+        } else {
+            setInternalSelectedNFTs(newNFTs);
+        }
+    };
     const [pricingType, setPricingType] = useState<'fixed' | 'variable'>('fixed');
     const [notWhitelistedCollections, setNotWhitelistedCollections] = useState<Array<{ address: string, name?: string }>>([]);
 
@@ -418,7 +436,8 @@ export function BatchListingForm({ userNFTs, onSubmit, onBack, marketplaceAddres
                     </div>
                 </div>
 
-                {/* Pricing Configuration */}
+                {/* Pricing Configuration - Only show when NFTs are selected */}
+                {selectedNFTs.size > 0 && (
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 p-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Preis-Konfiguration</h3>
 
@@ -603,6 +622,7 @@ export function BatchListingForm({ userNFTs, onSubmit, onBack, marketplaceAddres
                         }
                     </button>
                 </div>
+                )}
             </div>
         </form>
     );

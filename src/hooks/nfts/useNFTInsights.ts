@@ -68,7 +68,7 @@ export function useNFTInsights(options: UseNFTInsightsOptions = {}): UseNFTInsig
             // apiHandler wraps response in { success: true, data: {...} }
             // The actual insights array is in result.data.data
             const insightsArray = result.data?.data || result.data || [];
-            
+
             // Set the first result or null if no insights found
             const insightsData = Array.isArray(insightsArray) && insightsArray.length > 0 ? insightsArray[0] : null;
 

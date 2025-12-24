@@ -97,203 +97,203 @@ export const POST = apiHandler(async (request: NextRequest) => {
     console.log('📡 [NFT Sync] Fetching NFT list from Alchemy (discovery only)...');
     const alchemyNFTs = await discoverNFTsViaAlchemy(walletAddress);
 
-        console.log(`✅ [NFT Sync] Found ${alchemyNFTs.length} NFTs in wallet`);
+    console.log(`✅ [NFT Sync] Found ${alchemyNFTs.length} NFTs in wallet`);
 
     // STEP 2: Get existing NFTs from database
     console.log('🗄️  [NFT Sync] Checking database for existing NFTs...');
     const existingNFTs = await getNFTsByOwner(walletAddress);
-        const existingMap = new Map(
-            existingNFTs.map(nft => [`${nft.contractAddress}-${nft.tokenId}`, nft])
-        );
+    const existingMap = new Map(
+        existingNFTs.map(nft => [`${nft.contractAddress}-${nft.tokenId}`, nft])
+    );
 
-        console.log(`📊 [NFT Sync] Found ${existingNFTs.length} existing NFTs in database`);
+    console.log(`📊 [NFT Sync] Found ${existingNFTs.length} existing NFTs in database`);
 
-        // STEP 3: Categorize NFTs
-        const newNFTs: Array<{ contractAddress: string; tokenId: string }> = [];
-        const existingToUpdate: Array<{ contractAddress: string; tokenId: string }> = [];
-        const currentNFTKeys = new Set<string>();
+    // STEP 3: Categorize NFTs
+    const newNFTs: Array<{ contractAddress: string; tokenId: string }> = [];
+    const existingToUpdate: Array<{ contractAddress: string; tokenId: string }> = [];
+    const currentNFTKeys = new Set<string>();
 
-        for (const alchemyNFT of alchemyNFTs) {
-            const key = `${alchemyNFT.contractAddress.toLowerCase()}-${alchemyNFT.tokenId}`;
-            currentNFTKeys.add(key);
+    for (const alchemyNFT of alchemyNFTs) {
+        const key = `${alchemyNFT.contractAddress.toLowerCase()}-${alchemyNFT.tokenId}`;
+        currentNFTKeys.add(key);
 
-            if (existingMap.has(key)) {
-                existingToUpdate.push({
-                    contractAddress: alchemyNFT.contractAddress.toLowerCase(),
-                    tokenId: alchemyNFT.tokenId
-                });
-            } else {
-                newNFTs.push({
-                    contractAddress: alchemyNFT.contractAddress.toLowerCase(),
-                    tokenId: alchemyNFT.tokenId
-                });
-            }
+        if (existingMap.has(key)) {
+            existingToUpdate.push({
+                contractAddress: alchemyNFT.contractAddress.toLowerCase(),
+                tokenId: alchemyNFT.tokenId
+            });
+        } else {
+            newNFTs.push({
+                contractAddress: alchemyNFT.contractAddress.toLowerCase(),
+                tokenId: alchemyNFT.tokenId
+            });
         }
+    }
 
-        // Find transferred NFTs (in DB but not in wallet anymore)
-        const transferredNFTs = existingNFTs.filter(
-            nft => !currentNFTKeys.has(`${nft.contractAddress}-${nft.tokenId}`)
-        );
+    // Find transferred NFTs (in DB but not in wallet anymore)
+    const transferredNFTs = existingNFTs.filter(
+        nft => !currentNFTKeys.has(`${nft.contractAddress}-${nft.tokenId}`)
+    );
 
-        console.log(`📈 [NFT Sync] Analysis:
+    console.log(`📈 [NFT Sync] Analysis:
   - New NFTs: ${newNFTs.length}
   - Existing to verify: ${existingToUpdate.length}
   - Transferred out: ${transferredNFTs.length}`);
 
-        const result: NFTMetadataSyncResult = {
-            total: alchemyNFTs.length,
-            new: 0,
-            updated: 0,
-            transferred: 0,
-            unchanged: 0,
-            errors: [],
-            duration: 0
-        };
+    const result: NFTMetadataSyncResult = {
+        total: alchemyNFTs.length,
+        new: 0,
+        updated: 0,
+        transferred: 0,
+        unchanged: 0,
+        errors: [],
+        duration: 0
+    };
 
-        // STEP 4: Process new NFTs (fetch full metadata)
-        if (newNFTs.length > 0) {
-            console.log(`🆕 [NFT Sync] Fetching metadata for ${newNFTs.length} new NFTs...`);
+    // STEP 4: Process new NFTs (fetch full metadata)
+    if (newNFTs.length > 0) {
+        console.log(`🆕 [NFT Sync] Fetching metadata for ${newNFTs.length} new NFTs...`);
 
-            // Process in batches of 3 to avoid rate limits
-            const batchSize = 3;
-            for (let i = 0; i < newNFTs.length; i += batchSize) {
-                const batch = newNFTs.slice(i, i + batchSize);
-                console.log(`  📦 Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(newNFTs.length / batchSize)} (${batch.length} NFTs)`);
+        // Process in batches of 3 to avoid rate limits
+        const batchSize = 3;
+        for (let i = 0; i < newNFTs.length; i += batchSize) {
+            const batch = newNFTs.slice(i, i + batchSize);
+            console.log(`  📦 Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(newNFTs.length / batchSize)} (${batch.length} NFTs)`);
 
-                // Process batch concurrently
-                const batchPromises = batch.map(async (nft) => {
-                    try {
-                        console.log(`    📥 Fetching: ${nft.contractAddress}/${nft.tokenId}`);
-
-                        // Fetch contract data from blockchain
-                        const blockchainData = await fetchComprehensiveNFTDataNew(
-                            nft.contractAddress, nft.tokenId
-                        );
-
-                        if (!blockchainData) {
-                            throw new Error('No data returned from blockchain');
-                        }
-
-                        // Fetch metadata from tokenURI if available
-                        let metadata = {
-                            name: null,
-                            description: null,
-                            image: null,
-                            attributes: []
-                        };
-
-                        if (blockchainData.tokenURI) {
-                            try {
-                                // Resolve IPFS URLs
-                                let metadataURL = blockchainData.tokenURI;
-                                if (metadataURL.startsWith('ipfs://')) {
-                                    metadataURL = metadataURL.replace('ipfs://', 'https://ipfs.io/ipfs/');
-                                }
-
-                                const metadataResponse = await fetch(metadataURL, {
-                                    signal: AbortSignal.timeout(5000)
-                                });
-
-                                if (metadataResponse.ok) {
-                                    const metadataJson = await metadataResponse.json();
-                                    metadata = {
-                                        name: metadataJson.name || null,
-                                        description: metadataJson.description || null,
-                                        image: metadataJson.image || null,
-                                        attributes: metadataJson.attributes || []
-                                    };
-                                }
-                            } catch (metaError) {
-                                console.warn(`    ⚠️  Failed to fetch metadata: ${metaError}`);
-                            }
-                        }
-
-                        // Upsert to nft_metadata
-                        await upsertNFTMetadata(nft.contractAddress, nft.tokenId, {
-                            metadata,
-                            contract: {
-                                name: blockchainData.contractName || null,
-                                symbol: blockchainData.contractSymbol || null,
-                                totalSupply: blockchainData.totalSupply ? parseInt(blockchainData.totalSupply) : null,
-                                tokenURI: blockchainData.tokenURI || null,
-                                owner: blockchainData.owner || null,
-                                ownerBalance: blockchainData.ownerBalance || null,
-                                approvedAddress: blockchainData.approvedAddress || null
-                            },
-                            currentOwner: walletAddress,
-                            ownerHistory: [{
-                                owner: walletAddress,
-                                acquiredAt: new Date().toISOString(),
-                                source: 'unknown'
-                            }],
-                            lastVerified: new Date().toISOString(),
-                            lastMetadataUpdate: new Date().toISOString()
-                        } as any);
-
-                        result.new++;
-                        console.log(`    ✅ Saved: ${nft.contractAddress}/${nft.tokenId}`);
-
-                    } catch (error) {
-                        console.error(`    ❌ Error fetching ${nft.contractAddress}/${nft.tokenId}:`, error);
-                        result.errors.push({
-                            contractAddress: nft.contractAddress,
-                            tokenId: nft.tokenId,
-                            error: error instanceof Error ? error.message : 'Unknown error'
-                        });
-                    }
-                });
-
-                // Wait for batch to complete
-                await Promise.all(batchPromises);
-
-                // Small delay between batches to be rate-limit friendly
-                if (i + batchSize < newNFTs.length) {
-                    console.log('  ⏳ Rate limit pause...');
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                }
-            }
-        }
-
-        // STEP 5: Update existing NFTs (just verify ownership)
-        if (existingToUpdate.length > 0) {
-            console.log(`🔍 [NFT Sync] Verifying ownership for ${existingToUpdate.length} existing NFTs...`);
-
-            for (const nft of existingToUpdate) {
+            // Process batch concurrently
+            const batchPromises = batch.map(async (nft) => {
                 try {
-                    await updateNFTOwnership(
-                        nft.contractAddress, nft.tokenId,
-                        walletAddress,
-                        'unknown'
+                    console.log(`    📥 Fetching: ${nft.contractAddress}/${nft.tokenId}`);
+
+                    // Fetch contract data from blockchain
+                    const blockchainData = await fetchComprehensiveNFTDataNew(
+                        nft.contractAddress, nft.tokenId
                     );
-                    result.unchanged++;
+
+                    if (!blockchainData) {
+                        throw new Error('No data returned from blockchain');
+                    }
+
+                    // Fetch metadata from tokenURI if available
+                    let metadata = {
+                        name: null,
+                        description: null,
+                        image: null,
+                        attributes: []
+                    };
+
+                    if (blockchainData.tokenURI) {
+                        try {
+                            // Resolve IPFS URLs
+                            let metadataURL = blockchainData.tokenURI;
+                            if (metadataURL.startsWith('ipfs://')) {
+                                metadataURL = metadataURL.replace('ipfs://', 'https://ipfs.io/ipfs/');
+                            }
+
+                            const metadataResponse = await fetch(metadataURL, {
+                                signal: AbortSignal.timeout(5000)
+                            });
+
+                            if (metadataResponse.ok) {
+                                const metadataJson = await metadataResponse.json();
+                                metadata = {
+                                    name: metadataJson.name || null,
+                                    description: metadataJson.description || null,
+                                    image: metadataJson.image || null,
+                                    attributes: metadataJson.attributes || []
+                                };
+                            }
+                        } catch (metaError) {
+                            console.warn(`    ⚠️  Failed to fetch metadata: ${metaError}`);
+                        }
+                    }
+
+                    // Upsert to nft_metadata
+                    await upsertNFTMetadata(nft.contractAddress, nft.tokenId, {
+                        metadata,
+                        contract: {
+                            name: blockchainData.contractName || null,
+                            symbol: blockchainData.contractSymbol || null,
+                            totalSupply: blockchainData.totalSupply ? parseInt(blockchainData.totalSupply) : null,
+                            tokenURI: blockchainData.tokenURI || null,
+                            owner: blockchainData.owner || null,
+                            ownerBalance: blockchainData.ownerBalance || null,
+                            approvedAddress: blockchainData.approvedAddress || null
+                        },
+                        currentOwner: walletAddress,
+                        ownerHistory: [{
+                            owner: walletAddress,
+                            acquiredAt: new Date().toISOString(),
+                            source: 'unknown'
+                        }],
+                        lastVerified: new Date().toISOString(),
+                        lastMetadataUpdate: new Date().toISOString()
+                    } as any);
+
+                    result.new++;
+                    console.log(`    ✅ Saved: ${nft.contractAddress}/${nft.tokenId}`);
+
                 } catch (error) {
-                    console.error(`  ❌ Error updating ${nft.contractAddress}/${nft.tokenId}:`, error);
+                    console.error(`    ❌ Error fetching ${nft.contractAddress}/${nft.tokenId}:`, error);
                     result.errors.push({
                         contractAddress: nft.contractAddress,
                         tokenId: nft.tokenId,
                         error: error instanceof Error ? error.message : 'Unknown error'
                     });
                 }
+            });
+
+            // Wait for batch to complete
+            await Promise.all(batchPromises);
+
+            // Small delay between batches to be rate-limit friendly
+            if (i + batchSize < newNFTs.length) {
+                console.log('  ⏳ Rate limit pause...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
+    }
 
-        // STEP 6: Mark transferred NFTs (update ownership to null)
-        if (transferredNFTs.length > 0) {
-            console.log(`📤 [NFT Sync] Marking ${transferredNFTs.length} NFTs as transferred...`);
+    // STEP 5: Update existing NFTs (just verify ownership)
+    if (existingToUpdate.length > 0) {
+        console.log(`🔍 [NFT Sync] Verifying ownership for ${existingToUpdate.length} existing NFTs...`);
 
-            for (const nft of transferredNFTs) {
-                try {
-                    await updateNFTOwnership(
-                        nft.contractAddress, nft.tokenId,
-                        '', // Empty owner = transferred
-                        'transfer'
-                    );
-                    result.transferred++;
-                } catch (error) {
-                    console.error(`  ❌ Error marking transferred ${nft.contractAddress}/${nft.tokenId}:`, error);
-                }
+        for (const nft of existingToUpdate) {
+            try {
+                await updateNFTOwnership(
+                    nft.contractAddress, nft.tokenId,
+                    walletAddress,
+                    'unknown'
+                );
+                result.unchanged++;
+            } catch (error) {
+                console.error(`  ❌ Error updating ${nft.contractAddress}/${nft.tokenId}:`, error);
+                result.errors.push({
+                    contractAddress: nft.contractAddress,
+                    tokenId: nft.tokenId,
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                });
             }
         }
+    }
+
+    // STEP 6: Mark transferred NFTs (update ownership to null)
+    if (transferredNFTs.length > 0) {
+        console.log(`📤 [NFT Sync] Marking ${transferredNFTs.length} NFTs as transferred...`);
+
+        for (const nft of transferredNFTs) {
+            try {
+                await updateNFTOwnership(
+                    nft.contractAddress, nft.tokenId,
+                    '', // Empty owner = transferred
+                    'transfer'
+                );
+                result.transferred++;
+            } catch (error) {
+                console.error(`  ❌ Error marking transferred ${nft.contractAddress}/${nft.tokenId}:`, error);
+            }
+        }
+    }
 
     result.duration = Date.now() - startTime;
 

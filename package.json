@@ -12,6 +12,7 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "cleanup:duplicates": "tsx scripts/maintenance/cleanup-duplicate-interactions.ts",
+    "sync:start": "tsx scripts/start-sync.ts",
     "sync:marketplace": "node scripts/sync-marketplace-data.js",
     "migrate:favoriteCount": "node scripts/migrate-favoriteCount-to-likeCount.js",
     "migrate:nft-metadata": "node scripts/migrate-nft-metadata.js",

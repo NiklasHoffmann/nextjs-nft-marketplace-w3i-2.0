@@ -110,7 +110,7 @@ function isNewProps(props: NFTCardAllProps): props is NFTCardProps {
 /** Get rarity background color class */
 function getRarityBackground(rarity?: string | null, enableInsights?: boolean): string {
   if (!enableInsights || !rarity) return 'bg-gray-200';
-  
+
   switch (rarity.toLowerCase()) {
     case 'legendary': return 'bg-yellow-200';
     case 'epic': return 'bg-purple-200';
@@ -150,7 +150,7 @@ export function NFTCard(props: NFTCardAllProps) {
     // Legacy interface - construct minimal AggregatedNFT
     contractAddress = props.contractAddress;
     tokenId = props.tokenId;
-    
+
     nft = {
       key: `${contractAddress}-${tokenId}` as `${string}-${string}`,
       contractAddress: contractAddress as `0x${string}`,
@@ -231,7 +231,7 @@ export function NFTCard(props: NFTCardAllProps) {
   const contractSymbol = nft.core.symbol || null;
   const contractName = isLegacyProps(props) ? (props.contract?.name || props.contract?.contractName) : null;
   const rarity = nft.insight?.rarity || null;
-  
+
   // Categories and descriptions
   const categories = useMemo(() => {
     const cats: string[] = [];
@@ -261,7 +261,7 @@ export function NFTCard(props: NFTCardAllProps) {
   const averageRating = stats?.averageRating || null;
 
   // Rarity background color
-  const rarityBg = useMemo(() => 
+  const rarityBg = useMemo(() =>
     getRarityBackground(rarity, enableInsights),
     [rarity, enableInsights]
   );
@@ -291,7 +291,7 @@ export function NFTCard(props: NFTCardAllProps) {
       <div className={`hover:shadow-[0_15px_30px_-8px_rgba(0,0,0,0.4)] hover:scale-[1.02] transition-all duration-300 ease-out rounded-lg shadow-xl flex flex-col flex-end gap-2 w-full h-72 relative will-change-transform origin-center border border-black ${rarityBg}`}>
         {/* Content container */}
         <div className={`absolute inset-2 shadow-lg rounded-md overflow-hidden flex flex-col h-[calc(100%-16px)] ${imageUrl ? 'bg-secondary' : 'bg-gray-100'}`}>
-          
+
           {/* Blurred Background Image */}
           {imageUrl && (
             <div className="absolute inset-0 overflow-hidden rounded-md">
@@ -310,7 +310,7 @@ export function NFTCard(props: NFTCardAllProps) {
 
           {/* Content overlay with fixed layout */}
           <div className="relative z-10 flex flex-col h-full p-1 gap-1">
-            
+
             {/* Header */}
             <div className="flex-shrink-0">
               <NFTCardHeader

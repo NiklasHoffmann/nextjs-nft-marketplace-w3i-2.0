@@ -39,6 +39,7 @@ export const GET_ACTIVE_LISTINGS = gql`
             desiredTokenAddress
             desiredTokenId
             desiredErc1155Quantity
+            currency
             seller
             status
             active

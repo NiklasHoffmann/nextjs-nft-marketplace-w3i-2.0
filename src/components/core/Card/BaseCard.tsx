@@ -84,8 +84,8 @@ const sizeConfig = {
         padding: 'p-3'
     },
     md: {
-        width: 'w-80',
-        imageHeight: 'h-64',
+        width: 'w-60',
+        imageHeight: 'h-72',
         padding: 'p-4'
     },
     lg: {
@@ -139,16 +139,16 @@ const CardSkeleton = memo(({ size }: { size: 'sm' | 'md' | 'lg' | 'xl' }) => {
     return (
         <div className={cn(
             config.width,
+            config.imageHeight,
             'bg-white rounded-xl border border-gray-200 overflow-hidden animate-pulse'
         )}>
             {/* Image skeleton */}
-            <div className={cn(config.imageHeight, 'bg-gray-200')} />
+            <div className="h-3/5 bg-gray-200" />
 
             {/* Content skeleton */}
-            <div className={config.padding}>
-                <div className="h-6 bg-gray-200 rounded mb-3 w-3/4" />
-                <div className="h-4 bg-gray-200 rounded mb-2 w-full" />
-                <div className="h-4 bg-gray-200 rounded mb-4 w-5/6" />
+            <div className={cn(config.padding, 'h-2/5 flex flex-col justify-between')}>
+                <div className="h-6 bg-gray-200 rounded w-3/4" />
+                <div className="h-4 bg-gray-200 rounded w-full" />
                 <div className="h-10 bg-gray-200 rounded w-full" />
             </div>
         </div>

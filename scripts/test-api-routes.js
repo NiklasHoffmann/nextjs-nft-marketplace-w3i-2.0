@@ -54,10 +54,10 @@ const tests = [
 // Test runner
 async function runTests() {
     console.log('🧪 Starting API Routes Tests...\n');
-    
+
     let passed = 0;
     let failed = 0;
-    
+
     for (const test of tests) {
         try {
             const url = `${BASE_URL}${test.url}`;
@@ -67,24 +67,24 @@ async function runTests() {
                     'Content-Type': 'application/json'
                 }
             };
-            
+
             if (test.body) {
                 options.body = JSON.stringify(test.body);
             }
-            
+
             console.log(`Testing: ${test.name}`);
             console.log(`  ${test.method} ${test.url}`);
-            
+
             const response = await fetch(url, options);
             const data = await response.json();
-            
+
             // Check status code
             if (response.status !== test.expectedStatus) {
                 console.log(`  ❌ FAILED: Expected status ${test.expectedStatus}, got ${response.status}`);
                 failed++;
                 continue;
             }
-            
+
             // Check error message
             if (test.expectedError && !data.error?.includes(test.expectedError)) {
                 console.log(`  ❌ FAILED: Expected error containing "${test.expectedError}"`);
@@ -92,7 +92,7 @@ async function runTests() {
                 failed++;
                 continue;
             }
-            
+
             // Check data structure
             if (test.expectedData) {
                 if (test.expectedData.success !== undefined && data.success !== test.expectedData.success) {
@@ -101,21 +101,21 @@ async function runTests() {
                     continue;
                 }
             }
-            
+
             console.log(`  ✅ PASSED\n`);
             passed++;
-            
+
         } catch (error) {
             console.log(`  ❌ ERROR: ${error.message}\n`);
             failed++;
         }
     }
-    
+
     // Summary
     console.log('\n' + '='.repeat(50));
     console.log(`Test Results: ${passed} passed, ${failed} failed`);
     console.log('='.repeat(50));
-    
+
     if (failed > 0) {
         process.exit(1);
     }

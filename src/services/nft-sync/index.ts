@@ -107,6 +107,16 @@ export class NFTSyncService {
             insightsSync: this.insightsSync.getStatus()
         };
     }
+
+    /**
+     * Force immediate sync (single run, no polling)
+     * Used after transactions to immediately update marketplace_items
+     */
+    async syncOnce(): Promise<void> {
+        console.log('🔄 [Force Sync] Running immediate sync...');
+        await this.graphSyncV2.syncOnce();
+        console.log('✅ [Force Sync] Immediate sync complete');
+    }
 }
 
 // Singleton instance

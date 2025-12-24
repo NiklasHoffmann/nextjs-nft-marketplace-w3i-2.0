@@ -138,4 +138,18 @@ export class MarketplaceItemsService {
     getCache(): MarketplaceItemsCache {
         return this.cache;
     }
+
+    /**
+     * NEW: Remove specific listing by listingId
+     */
+    removeListing(listingId: string): void {
+        this.cache.removeListing(listingId);
+    }
+
+    /**
+     * NEW: Remove specific NFT by contract address + tokenId
+     */
+    removeNFT(contractAddress: string, tokenId: string): void {
+        this.cache.removeNFT(contractAddress, tokenId);
+    }
 }

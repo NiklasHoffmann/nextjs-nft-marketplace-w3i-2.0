@@ -18,10 +18,10 @@ export default function MarketInsightsTab({
 
     if (loading) {
         return (
-            <LoadingState 
-                size="lg" 
-                variant="centered" 
-                message="Loading market insights..." 
+            <LoadingState
+                size="lg"
+                variant="centered"
+                message="Loading market insights..."
                 className="py-12"
             />
         );

@@ -18,7 +18,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-pro
 function verifyToken(token: string): { address: string; isAdmin: boolean } | null {
     try {
         const [header, payload, signature] = token.split('.');
-        
+
         // Verify signature
         const expectedSignature = crypto
             .createHmac('sha256', JWT_SECRET)
@@ -81,7 +81,7 @@ function extractWalletAddress(req: NextRequest): string | null {
     if (walletAddress && /^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
         return walletAddress.toLowerCase();
     }
-    
+
     const userId = req.nextUrl.searchParams.get('userId');
     if (userId && /^0x[a-fA-F0-9]{40}$/.test(userId)) {
         return userId.toLowerCase();

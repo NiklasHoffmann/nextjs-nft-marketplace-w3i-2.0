@@ -245,118 +245,29 @@ export const GET = apiHandler(async (request: NextRequest) => {
     try {
         const startTime = Date.now();
 
-            // Strategy: Parallel execution for 'auto' mode (best performance)
-            // - Blockchain: Known marketplace contracts (fast, no rate limits)
-            // - Alchemy: Complete wallet inventory (1 API call)
+        // Strategy: Parallel execution for 'auto' mode (best performance)
+        // - Blockchain: Known marketplace contracts (fast, no rate limits)
+        // - Alchemy: Complete wallet inventory (1 API call)
 
-            let blockchainNFTs: ExternalNFT[] = [];
-            let alchemyNFTs: ExternalNFT[] = [];
+        let blockchainNFTs: ExternalNFT[] = [];
+        let alchemyNFTs: ExternalNFT[] = [];
 
-            // PARALLEL execution in auto mode for best performance
-            if (source === 'auto') {
-                console.log('?? [Hybrid] Starting parallel fetch: Blockchain + Alchemy Discovery');
+        // PARALLEL execution in auto mode for best performance
+        if (source === 'auto') {
+            console.log('?? [Hybrid] Starting parallel fetch: Blockchain + Alchemy Discovery');
 
-                const [blockchainResult, alchemyDiscoveryResult] = await Promise.allSettled([
-                    // Step 1: Blockchain query (known contracts with full metadata)
-                    (async () => {
-                        const contracts = await getKnownContractAddresses();
-                        console.log(`  ? Found ${contracts.length} known contracts in marketplace`);
-                        if (contracts.length === 0) return [];
+            const [blockchainResult, alchemyDiscoveryResult] = await Promise.allSettled([
+                // Step 1: Blockchain query (known contracts with full metadata)
+                (async () => {
+                    const contracts = await getKnownContractAddresses();
+                    console.log(`  ? Found ${contracts.length} known contracts in marketplace`);
+                    if (contracts.length === 0) return [];
 
-                        const bcNFTs = await getWalletNFTsFromBlockchain(
-                            walletAddress as Address,
-                            contracts
-                        );
-                        return bcNFTs.map(nft => ({
-                            contractAddress: nft.contractAddress,
-                            tokenId: nft.tokenId,
-                            name: nft.name,
-                            description: nft.description,
-                            image: nft.image,
-                            animationUrl: undefined,
-                            attributes: [],
-                            contractName: nft.contractName,
-                            contractSymbol: nft.contractSymbol,
-                            tokenType: 'ERC721' as const,
-                        }));
-                    })(),
-                    // Step 2: Alchemy discovery (lightweight - only contract+tokenId)
-                    discoverNFTsViaAlchemy(walletAddress)
-                ]);
-
-                // Process blockchain result (known contracts)
-                if (blockchainResult.status === 'fulfilled') {
-                    blockchainNFTs = blockchainResult.value;
-                    console.log(`? Blockchain: ${blockchainNFTs.length} NFTs from known contracts (${Date.now() - startTime}ms)`);
-                } else {
-                    console.warn('?? Blockchain query failed:', blockchainResult.reason);
-                }
-
-                // Process Alchemy discovery result
-                if (alchemyDiscoveryResult.status === 'fulfilled') {
-                    const discoveredNFTs = alchemyDiscoveryResult.value;
-                    console.log(`? Alchemy Discovery: ${discoveredNFTs.length} NFTs found`);
-
-                    // Step 3: Filter out already-fetched NFTs
-                    const knownKeys = new Set(
-                        blockchainNFTs.map(nft => `${nft.contractAddress.toLowerCase()}-${nft.tokenId}`)
-                    );
-
-                    const unknownNFTs = discoveredNFTs.filter(nft => {
-                        const key = `${nft.contractAddress.toLowerCase()}-${nft.tokenId}`;
-                        return !knownKeys.has(key);
-                    });
-
-                    console.log(`  ? ${unknownNFTs.length} unknown NFTs (not in marketplace contracts)`);
-
-                    // Step 4: Fetch metadata for unknown NFTs via blockchain + IPFS
-                    if (unknownNFTs.length > 0) {
-                        const unknownContracts = [...new Set(unknownNFTs.map(n => n.contractAddress))] as Address[];
-                        console.log(`  ? Fetching metadata from ${unknownContracts.length} additional contracts...`);
-
-                        try {
-                            const additionalNFTs = await getWalletNFTsFromBlockchain(
-                                walletAddress as Address,
-                                unknownContracts
-                            );
-
-                            alchemyNFTs = additionalNFTs.map(nft => ({
-                                contractAddress: nft.contractAddress,
-                                tokenId: nft.tokenId,
-                                name: nft.name,
-                                description: nft.description,
-                                image: nft.image,
-                                animationUrl: undefined,
-                                attributes: [],
-                                contractName: nft.contractName,
-                                contractSymbol: nft.contractSymbol,
-                                tokenType: 'ERC721' as const,
-                            }));
-
-                            console.log(`? Additional NFTs: ${alchemyNFTs.length} NFTs fetched via blockchain+IPFS`);
-                        } catch (fetchError) {
-                            console.error('? Failed to fetch additional NFTs:', fetchError);
-                            alchemyNFTs = [];
-                        }
-                    }
-                } else {
-                    console.error('? Alchemy discovery failed:', alchemyDiscoveryResult.reason);
-                    console.error('   Error details:', JSON.stringify(alchemyDiscoveryResult.reason, null, 2));
-                    // No fallback - blockchain-only mode is fine
-                }
-            }
-            // SEQUENTIAL execution for specific source modes
-            else if (source === 'blockchain') {
-                console.log('?? Using blockchain-only mode');
-                const contracts = await getKnownContractAddresses();
-                console.log(`  ? ${contracts.length} known contracts`);
-
-                if (contracts.length > 0) {
                     const bcNFTs = await getWalletNFTsFromBlockchain(
                         walletAddress as Address,
                         contracts
                     );
-                    blockchainNFTs = bcNFTs.map(nft => ({
+                    return bcNFTs.map(nft => ({
                         contractAddress: nft.contractAddress,
                         tokenId: nft.tokenId,
                         name: nft.name,
@@ -368,46 +279,135 @@ export const GET = apiHandler(async (request: NextRequest) => {
                         contractSymbol: nft.contractSymbol,
                         tokenType: 'ERC721' as const,
                     }));
-                    console.log(`? Found ${blockchainNFTs.length} NFTs via blockchain`);
+                })(),
+                // Step 2: Alchemy discovery (lightweight - only contract+tokenId)
+                discoverNFTsViaAlchemy(walletAddress)
+            ]);
+
+            // Process blockchain result (known contracts)
+            if (blockchainResult.status === 'fulfilled') {
+                blockchainNFTs = blockchainResult.value;
+                console.log(`? Blockchain: ${blockchainNFTs.length} NFTs from known contracts (${Date.now() - startTime}ms)`);
+            } else {
+                console.warn('?? Blockchain query failed:', blockchainResult.reason);
+            }
+
+            // Process Alchemy discovery result
+            if (alchemyDiscoveryResult.status === 'fulfilled') {
+                const discoveredNFTs = alchemyDiscoveryResult.value;
+                console.log(`? Alchemy Discovery: ${discoveredNFTs.length} NFTs found`);
+
+                // Step 3: Filter out already-fetched NFTs
+                const knownKeys = new Set(
+                    blockchainNFTs.map(nft => `${nft.contractAddress.toLowerCase()}-${nft.tokenId}`)
+                );
+
+                const unknownNFTs = discoveredNFTs.filter(nft => {
+                    const key = `${nft.contractAddress.toLowerCase()}-${nft.tokenId}`;
+                    return !knownKeys.has(key);
+                });
+
+                console.log(`  ? ${unknownNFTs.length} unknown NFTs (not in marketplace contracts)`);
+
+                // Step 4: Fetch metadata for unknown NFTs via blockchain + IPFS
+                if (unknownNFTs.length > 0) {
+                    const unknownContracts = [...new Set(unknownNFTs.map(n => n.contractAddress))] as Address[];
+                    console.log(`  ? Fetching metadata from ${unknownContracts.length} additional contracts...`);
+
+                    try {
+                        const additionalNFTs = await getWalletNFTsFromBlockchain(
+                            walletAddress as Address,
+                            unknownContracts
+                        );
+
+                        alchemyNFTs = additionalNFTs.map(nft => ({
+                            contractAddress: nft.contractAddress,
+                            tokenId: nft.tokenId,
+                            name: nft.name,
+                            description: nft.description,
+                            image: nft.image,
+                            animationUrl: undefined,
+                            attributes: [],
+                            contractName: nft.contractName,
+                            contractSymbol: nft.contractSymbol,
+                            tokenType: 'ERC721' as const,
+                        }));
+
+                        console.log(`? Additional NFTs: ${alchemyNFTs.length} NFTs fetched via blockchain+IPFS`);
+                    } catch (fetchError) {
+                        console.error('? Failed to fetch additional NFTs:', fetchError);
+                        alchemyNFTs = [];
+                    }
                 }
+            } else {
+                console.error('? Alchemy discovery failed:', alchemyDiscoveryResult.reason);
+                console.error('   Error details:', JSON.stringify(alchemyDiscoveryResult.reason, null, 2));
+                // No fallback - blockchain-only mode is fine
             }
-            else if (source === 'alchemy') {
-                alchemyNFTs = await fetchFromAlchemy(walletAddress);
-                console.log(`? Found ${alchemyNFTs.length} NFTs via Alchemy`);
+        }
+        // SEQUENTIAL execution for specific source modes
+        else if (source === 'blockchain') {
+            console.log('?? Using blockchain-only mode');
+            const contracts = await getKnownContractAddresses();
+            console.log(`  ? ${contracts.length} known contracts`);
+
+            if (contracts.length > 0) {
+                const bcNFTs = await getWalletNFTsFromBlockchain(
+                    walletAddress as Address,
+                    contracts
+                );
+                blockchainNFTs = bcNFTs.map(nft => ({
+                    contractAddress: nft.contractAddress,
+                    tokenId: nft.tokenId,
+                    name: nft.name,
+                    description: nft.description,
+                    image: nft.image,
+                    animationUrl: undefined,
+                    attributes: [],
+                    contractName: nft.contractName,
+                    contractSymbol: nft.contractSymbol,
+                    tokenType: 'ERC721' as const,
+                }));
+                console.log(`? Found ${blockchainNFTs.length} NFTs via blockchain`);
             }
-            else if (source === 'moralis') {
-                alchemyNFTs = await fetchFromMoralis(walletAddress);
-                console.log(`? Found ${alchemyNFTs.length} NFTs via Moralis`);
-            }
-
-            // SIMPLE MERGE: Combine both lists (no deduplication needed now)
-            if (source === 'auto' && (blockchainNFTs.length > 0 || alchemyNFTs.length > 0)) {
-                // In new mode: blockchain + additional (non-overlapping)
-                nfts = [...blockchainNFTs, ...alchemyNFTs];
-                usedSource = 'hybrid';
-
-                const totalTime = Date.now() - startTime;
-                console.log(`? [Hybrid] ${nfts.length} total NFTs (${blockchainNFTs.length} known + ${alchemyNFTs.length} additional) in ${totalTime}ms`);
-            } else if (blockchainNFTs.length > 0) {
-                nfts = blockchainNFTs;
-                usedSource = 'blockchain';
-                console.log(`? Blockchain-only: ${nfts.length} NFTs in ${Date.now() - startTime}ms`);
-            } else if (alchemyNFTs.length > 0) {
-                nfts = alchemyNFTs;
-                usedSource = 'alchemy';
-                console.log(`? Alchemy-only: ${nfts.length} NFTs in ${Date.now() - startTime}ms`);
-            }
-
-            // Empty result is OK (wallet might be empty)
-
-        } catch (apiError) {
-            console.error('❌ API request failed:', apiError);
-            throw apiError;
+        }
+        else if (source === 'alchemy') {
+            alchemyNFTs = await fetchFromAlchemy(walletAddress);
+            console.log(`? Found ${alchemyNFTs.length} NFTs via Alchemy`);
+        }
+        else if (source === 'moralis') {
+            alchemyNFTs = await fetchFromMoralis(walletAddress);
+            console.log(`? Found ${alchemyNFTs.length} NFTs via Moralis`);
         }
 
-        const response: WalletNFTsResponse = {
-            success: true,
-            data: nfts,
+        // SIMPLE MERGE: Combine both lists (no deduplication needed now)
+        if (source === 'auto' && (blockchainNFTs.length > 0 || alchemyNFTs.length > 0)) {
+            // In new mode: blockchain + additional (non-overlapping)
+            nfts = [...blockchainNFTs, ...alchemyNFTs];
+            usedSource = 'hybrid';
+
+            const totalTime = Date.now() - startTime;
+            console.log(`? [Hybrid] ${nfts.length} total NFTs (${blockchainNFTs.length} known + ${alchemyNFTs.length} additional) in ${totalTime}ms`);
+        } else if (blockchainNFTs.length > 0) {
+            nfts = blockchainNFTs;
+            usedSource = 'blockchain';
+            console.log(`? Blockchain-only: ${nfts.length} NFTs in ${Date.now() - startTime}ms`);
+        } else if (alchemyNFTs.length > 0) {
+            nfts = alchemyNFTs;
+            usedSource = 'alchemy';
+            console.log(`? Alchemy-only: ${nfts.length} NFTs in ${Date.now() - startTime}ms`);
+        }
+
+        // Empty result is OK (wallet might be empty)
+
+    } catch (apiError) {
+        console.error('❌ API request failed:', apiError);
+        throw apiError;
+    }
+
+    const response: WalletNFTsResponse = {
+        success: true,
+        data: nfts,
         total: nfts.length,
         source: usedSource
     };

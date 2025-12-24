@@ -43,6 +43,13 @@ import { useMarketplacePurchase } from '@/hooks/marketplace/useMarketplacePurcha
 import { useMarketplaceListing } from '@/hooks/marketplace/useMarketplaceListing';
 import { useMarketplaceContracts } from '@/app/sell/hooks/useMarketplaceContracts';
 import { useNotifications } from '@/contexts/notifications';
+import { formatEther } from 'viem';
+import { usePublicClient } from 'wagmi';
+import {
+    invalidateAfterPurchase,
+    invalidateAfterCancelListing,
+    invalidateAfterListing
+} from '@/services/DataInvalidationService';
 
 // ===== TYPES =====
 
@@ -61,18 +68,22 @@ export interface TransactionResult {
     txHash?: string;
     error?: string;
     receipt?: any;
+    alreadyListed?: boolean;
 }
 
 export interface PurchaseNFTParams {
     listingId: string;
     price: string; // in ETH
     seller: string;
+    buyer?: string; // For data invalidation
     contractAddress: string;
     tokenId: string;
     desiredContractAddress?: string;
     desiredTokenId?: string;
     onProgress?: (step: TransactionStep) => void;
     onError?: (error: string) => void;
+    onSuccess?: (result: TransactionResult) => void;
+    onPostTransaction?: () => Promise<void>;
 }
 
 export interface UpdateListingParams {
@@ -84,6 +95,8 @@ export interface UpdateListingParams {
     newDesiredTokenId?: string;
     onProgress?: (step: TransactionStep) => void;
     onError?: (error: string) => void;
+    onSuccess?: (result: TransactionResult) => void;
+    onPostTransaction?: () => Promise<void>;
 }
 
 export interface CancelListingParams {
@@ -92,6 +105,8 @@ export interface CancelListingParams {
     tokenId: string;
     onProgress?: (step: TransactionStep) => void;
     onError?: (error: string) => void;
+    onSuccess?: (result: TransactionResult) => void;
+    onPostTransaction?: () => Promise<void>;
 }
 
 export interface CreateListingParams {
@@ -102,6 +117,8 @@ export interface CreateListingParams {
     desiredTokenId?: string;
     onProgress?: (step: TransactionStep) => void;
     onError?: (error: string) => void;
+    onSuccess?: (result: TransactionResult) => void;
+    onPostTransaction?: () => Promise<void>;
 }
 
 // ===== ERROR PARSER =====
@@ -166,6 +183,7 @@ export function useTransactionService() {
     const purchaseHook = useMarketplacePurchase(marketplaceAddress);
     const listingHook = useMarketplaceListing(marketplaceAddress);
     const notifications = useNotifications();
+    const publicClient = usePublicClient();
 
     const [currentStep, setCurrentStep] = useState<TransactionStep>('idle');
     const [currentError, setCurrentError] = useState<string | null>(null);
@@ -179,8 +197,12 @@ export function useTransactionService() {
             desiredContractAddress,
             desiredTokenId,
             onProgress,
-            onError
+            onError,
+            onSuccess,
+            onPostTransaction
         } = params;
+
+        let notificationId: string | null = null;
 
         try {
             setCurrentError(null);
@@ -189,36 +211,84 @@ export function useTransactionService() {
             setCurrentStep('preparing');
             onProgress?.('preparing');
 
+            notificationId = notifications.loading(
+                'Preparing Purchase',
+                'Setting up your transaction...'
+            );
+
             console.log('📦 Preparing purchase transaction:', {
                 listingId,
                 price,
                 isSwap: !!desiredContractAddress && desiredContractAddress !== '0x0000000000000000000000000000000000000000'
             });
 
-            // Step 2: Signing
-            setCurrentStep('signing');
-            onProgress?.('signing');
-
-            await purchaseHook.purchaseListing({
+            // Call purchaseListing with progress callback
+            // This will handle all steps (preparing -> signing -> pending -> success)
+            // and only return when the transaction is confirmed on-chain
+            const hash = await purchaseHook.purchaseListing({
                 listingId,
                 expectedPrice: price,
                 expectedDesiredTokenAddress: desiredContractAddress,
-                expectedDesiredTokenId: desiredTokenId
+                expectedDesiredTokenId: desiredTokenId,
+                onProgress: (step, txHash) => {
+                    console.log('📊 Purchase progress:', step, txHash ? `hash: ${txHash}` : '');
+                    setCurrentStep(step);
+                    onProgress?.(step);
+
+                    // Update notifications based on step
+                    if (notificationId) notifications.removeNotification(notificationId);
+                    if (step === 'signing') {
+                        notificationId = notifications.loading(
+                            'Confirm in Wallet',
+                            'Please confirm the transaction in your wallet'
+                        );
+                    } else if (step === 'pending') {
+                        notificationId = notifications.loading(
+                            'Processing Transaction',
+                            'Your purchase is being confirmed on the blockchain...'
+                        );
+                    } else if (step === 'success') {
+                        notificationId = notifications.success(
+                            'Purchase Successful!',
+                            'Your NFT has been transferred to your wallet',
+                            {
+                                txHash: txHash,
+                                duration: 5000
+                            }
+                        );
+                    }
+                }
             });
 
-            // Step 3: Pending/Confirming
-            setCurrentStep('pending');
-            onProgress?.('pending');
+            console.log('✅ Purchase complete! Hash:', hash);
 
-            // Wait for confirmation (handled by wagmi hook)
-            // The hook's isSuccess will trigger success state
-
-            console.log('✅ Purchase transaction submitted');
-
-            return {
+            const result: TransactionResult = {
                 success: true,
-                txHash: purchaseHook.txHash
+                txHash: hash
             };
+
+            // Invalidate data to refresh all NFT lists
+            if (params.contractAddress && params.tokenId && params.buyer) {
+                console.log('🔄 Invalidating data after purchase');
+                invalidateAfterPurchase(
+                    params.contractAddress,
+                    params.tokenId,
+                    params.buyer,
+                    listingId
+                );
+            }
+
+            // Post-transaction updates
+            if (onPostTransaction) {
+                await onPostTransaction();
+            }
+
+            // Success callback
+            if (onSuccess) {
+                onSuccess(result);
+            }
+
+            return result;
 
         } catch (error: any) {
             const errorMessage = parseTransactionError(error);
@@ -228,6 +298,11 @@ export function useTransactionService() {
             setCurrentError(errorMessage);
             onProgress?.('error');
             onError?.(errorMessage);
+
+            // Clear loading notification
+            if (notificationId) {
+                notifications.removeNotification(notificationId);
+            }
 
             notifications.error('Purchase Failed', errorMessage);
 
@@ -247,14 +322,23 @@ export function useTransactionService() {
             newDesiredContractAddress,
             newDesiredTokenId,
             onProgress,
-            onError
+            onError,
+            onSuccess,
+            onPostTransaction
         } = params;
+
+        let notificationId: string | null = null;
 
         try {
             setCurrentError(null);
 
             setCurrentStep('preparing');
             onProgress?.('preparing');
+
+            notificationId = notifications.loading(
+                'Preparing Update',
+                'Setting up listing update...'
+            );
 
             console.log('📝 Preparing update listing transaction:', {
                 listingId,
@@ -265,6 +349,12 @@ export function useTransactionService() {
             setCurrentStep('signing');
             onProgress?.('signing');
 
+            notifications.removeNotification(notificationId);
+            notificationId = notifications.loading(
+                'Confirm in Wallet',
+                'Please confirm the update in your wallet'
+            );
+
             await listingHook.updateListing({
                 listingId,
                 newPrice,
@@ -272,15 +362,77 @@ export function useTransactionService() {
                 newDesiredTokenId: newDesiredTokenId
             });
 
+            console.log('✅ Update listing transaction submitted');
+
             setCurrentStep('pending');
             onProgress?.('pending');
 
-            console.log('✅ Update listing transaction submitted');
+            notifications.removeNotification(notificationId);
+            notificationId = notifications.loading(
+                'Updating Listing',
+                'Your listing is being updated...'
+            );
 
-            return {
+            // Wait for transaction confirmation
+            await new Promise<void>((resolve, reject) => {
+                const checkInterval = setInterval(() => {
+                    if (listingHook.isSuccess) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    } else if (listingHook.error) {
+                        clearInterval(checkInterval);
+                        reject(new Error(String(listingHook.error) || 'Transaction failed'));
+                    }
+                }, 500);
+
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                    reject(new Error('Transaction confirmation timeout'));
+                }, 300000);
+            });
+
+            console.log('✅ Update listing confirmed on blockchain');
+
+            const result: TransactionResult = {
                 success: true,
                 txHash: listingHook.txHash
             };
+
+            // Success
+            setCurrentStep('success');
+            onProgress?.('success');
+
+            notifications.removeNotification(notificationId);
+            notifications.success(
+                'Listing Updated!',
+                'Your listing has been successfully updated',
+                {
+                    txHash: listingHook.txHash,
+                    duration: 5000
+                }
+            );
+
+            // Invalidate data to refresh all NFT lists (update = cancel + create)
+            if (params.contractAddress && params.tokenId) {
+                console.log('🔄 Invalidating data after update listing');
+                invalidateAfterListing(
+                    params.contractAddress,
+                    params.tokenId,
+                    listingId
+                );
+            }
+
+            // Post-transaction updates
+            if (onPostTransaction) {
+                await onPostTransaction();
+            }
+
+            // Success callback
+            if (onSuccess) {
+                onSuccess(result);
+            }
+
+            return result;
 
         } catch (error: any) {
             const errorMessage = parseTransactionError(error);
@@ -290,6 +442,10 @@ export function useTransactionService() {
             setCurrentError(errorMessage);
             onProgress?.('error');
             onError?.(errorMessage);
+
+            if (notificationId) {
+                notifications.removeNotification(notificationId);
+            }
 
             notifications.error('Update Failed', errorMessage);
 
@@ -303,7 +459,15 @@ export function useTransactionService() {
     // ===== CANCEL LISTING =====
 
     const cancelListing = useCallback(async (params: CancelListingParams): Promise<TransactionResult> => {
-        const { listingId, onProgress, onError } = params;
+        const {
+            listingId,
+            onProgress,
+            onError,
+            onSuccess,
+            onPostTransaction
+        } = params;
+
+        let notificationId: string | null = null;
 
         try {
             setCurrentError(null);
@@ -311,22 +475,95 @@ export function useTransactionService() {
             setCurrentStep('preparing');
             onProgress?.('preparing');
 
+            notificationId = notifications.loading(
+                'Preparing Cancellation',
+                'Setting up listing cancellation...'
+            );
+
             console.log('🚫 Preparing cancel listing transaction:', { listingId });
 
             setCurrentStep('signing');
             onProgress?.('signing');
 
+            notifications.removeNotification(notificationId);
+            notificationId = notifications.loading(
+                'Confirm in Wallet',
+                'Please confirm the cancellation in your wallet'
+            );
+
             await listingHook.cancelListing(listingId);
+
+            console.log('✅ Cancel listing transaction submitted');
 
             setCurrentStep('pending');
             onProgress?.('pending');
 
-            console.log('✅ Cancel listing transaction submitted');
+            notifications.removeNotification(notificationId);
+            notificationId = notifications.loading(
+                'Cancelling Listing',
+                'Your listing is being cancelled...'
+            );
 
-            return {
+            // Wait for transaction confirmation
+            await new Promise<void>((resolve, reject) => {
+                const checkInterval = setInterval(() => {
+                    if (listingHook.isSuccess) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    } else if (listingHook.error) {
+                        clearInterval(checkInterval);
+                        reject(new Error(String(listingHook.error) || 'Transaction failed'));
+                    }
+                }, 500);
+
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                    reject(new Error('Transaction confirmation timeout'));
+                }, 300000);
+            });
+
+            console.log('✅ Cancel listing confirmed on blockchain');
+
+            const result: TransactionResult = {
                 success: true,
                 txHash: listingHook.txHash
             };
+
+            // Success
+            setCurrentStep('success');
+            onProgress?.('success');
+
+            notifications.removeNotification(notificationId);
+            notifications.success(
+                'Listing Cancelled!',
+                'Your listing has been successfully cancelled',
+                {
+                    txHash: listingHook.txHash,
+                    duration: 5000
+                }
+            );
+
+            // Invalidate data to refresh all NFT lists
+            if (params.contractAddress && params.tokenId) {
+                console.log('🔄 Invalidating data after cancel listing');
+                invalidateAfterCancelListing(
+                    params.contractAddress,
+                    params.tokenId,
+                    listingId
+                );
+            }
+
+            // Post-transaction updates
+            if (onPostTransaction) {
+                await onPostTransaction();
+            }
+
+            // Success callback
+            if (onSuccess) {
+                onSuccess(result);
+            }
+
+            return result;
 
         } catch (error: any) {
             const errorMessage = parseTransactionError(error);
@@ -336,6 +573,10 @@ export function useTransactionService() {
             setCurrentError(errorMessage);
             onProgress?.('error');
             onError?.(errorMessage);
+
+            if (notificationId) {
+                notifications.removeNotification(notificationId);
+            }
 
             notifications.error('Cancellation Failed', errorMessage);
 
@@ -356,14 +597,23 @@ export function useTransactionService() {
             desiredContractAddress,
             desiredTokenId,
             onProgress,
-            onError
+            onError,
+            onSuccess,
+            onPostTransaction
         } = params;
+
+        let notificationId: string | null = null;
 
         try {
             setCurrentError(null);
 
             setCurrentStep('preparing');
             onProgress?.('preparing');
+
+            notificationId = notifications.loading(
+                'Preparing Listing',
+                'Setting up your NFT listing...'
+            );
 
             console.log('📝 Preparing create listing transaction:', {
                 contractAddress,
@@ -375,7 +625,13 @@ export function useTransactionService() {
             setCurrentStep('signing');
             onProgress?.('signing');
 
-            await listingHook.createListing({
+            notifications.removeNotification(notificationId);
+            notificationId = notifications.loading(
+                'Confirm in Wallet',
+                'Please confirm the listing in your wallet'
+            );
+
+            const txHash = await listingHook.createListing({
                 tokenAddress: contractAddress,
                 tokenId,
                 price,
@@ -383,17 +639,114 @@ export function useTransactionService() {
                 desiredTokenId: desiredTokenId
             });
 
+            console.log('✅ Create listing transaction submitted, hash:', txHash);
+
             setCurrentStep('pending');
             onProgress?.('pending');
 
-            console.log('✅ Create listing transaction submitted');
+            notifications.removeNotification(notificationId);
+            notificationId = notifications.loading(
+                'Creating Listing',
+                'Your listing is being created...'
+            );
 
-            return {
+            // Wait for transaction confirmation directly from blockchain
+            console.log('⏳ Waiting for transaction receipt from blockchain...');
+            
+            if (!publicClient) {
+                throw new Error('Public client not available');
+            }
+
+            const receipt = await publicClient.waitForTransactionReceipt({
+                hash: txHash as `0x${string}`,
+                confirmations: 1,
+                timeout: 300_000 // 5 minutes
+            });
+
+            console.log('✅ Transaction receipt received:', {
+                status: receipt.status,
+                blockNumber: receipt.blockNumber,
+                gasUsed: receipt.gasUsed.toString()
+            });
+
+            if (receipt.status !== 'success') {
+                throw new Error('Transaction reverted on blockchain');
+            }
+
+            console.log('✅ Create listing confirmed on blockchain');
+
+            const result: TransactionResult = {
                 success: true,
-                txHash: listingHook.txHash
+                txHash: txHash
             };
 
+            // Success
+            setCurrentStep('success');
+            onProgress?.('success');
+
+            notifications.removeNotification(notificationId);
+            notifications.success(
+                'Listing Created!',
+                'Your NFT is now listed on the marketplace',
+                {
+                    txHash: txHash,
+                    duration: 5000
+                }
+            );
+
+            // Invalidate data to refresh all NFT lists
+            if (contractAddress && tokenId) {
+                console.log('🔄 Invalidating data after create listing');
+                invalidateAfterListing(
+                    contractAddress,
+                    tokenId
+                );
+            }
+
+            // Post-transaction updates
+            if (onPostTransaction) {
+                await onPostTransaction();
+            }
+
+            // Success callback
+            if (onSuccess) {
+                onSuccess(result);
+            }
+
+            return result;
+
         } catch (error: any) {
+            // Special handling for ALREADY_LISTED error
+            if (error.code === 'ALREADY_LISTED' || error.message === 'ALREADY_LISTED') {
+                console.log('ℹ️ NFT already listed - treating as success');
+                
+                setCurrentStep('success');
+                onProgress?.('success');
+
+                if (notificationId) {
+                    notifications.removeNotification(notificationId);
+                }
+
+                notifications.success(
+                    'NFT bereits gelistet',
+                    'Dieses NFT ist bereits auf dem Marketplace',
+                    { duration: 4000 }
+                );
+
+                // Call success callback with special flag
+                if (onSuccess) {
+                    onSuccess({
+                        success: true,
+                        alreadyListed: true
+                    });
+                }
+
+                return {
+                    success: true,
+                    alreadyListed: true
+                };
+            }
+
             const errorMessage = parseTransactionError(error);
 
             console.error('❌ Create listing failed:', error);
@@ -402,6 +755,10 @@ export function useTransactionService() {
             onProgress?.('error');
             onError?.(errorMessage);
 
+            if (notificationId) {
+                notifications.removeNotification(notificationId);
+            }
+
             notifications.error('Listing Failed', errorMessage);
 
             return {
@@ -409,7 +766,7 @@ export function useTransactionService() {
                 error: errorMessage
             };
         }
-    }, [listingHook, notifications]);
+    }, [listingHook, notifications, publicClient]);
 
     // ===== GETTERS =====
 

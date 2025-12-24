@@ -15,30 +15,30 @@ export const GET = apiHandler(async (request: NextRequest) => {
     const sortBy = getQueryParam(request, 'sortBy') || 'updatedAt';
     const sortOrder = getQueryParam(request, 'sortOrder') === 'asc' ? 1 : -1;
 
-        const collection = await getCollection('admin_collection_insights');
+    const collection = await getCollection('admin_collection_insights');
 
-        // Build filter object
-        const filter: any = {};
+    // Build filter object
+    const filter: any = {};
 
-        if (contractAddress) {
-            filter.contractAddress = contractAddress.toLowerCase();
-        }
+    if (contractAddress) {
+        filter.contractAddress = contractAddress.toLowerCase();
+    }
 
-        if (category) {
-            filter.category = category;
-        }
+    if (category) {
+        filter.category = category;
+    }
 
-        if (tags && tags.length > 0) {
-            filter.tags = { $in: tags };
-        }
+    if (tags && tags.length > 0) {
+        filter.tags = { $in: tags };
+    }
 
-        if (createdBy) {
-            filter.createdBy = createdBy.toLowerCase();
-        }
+    if (createdBy) {
+        filter.createdBy = createdBy.toLowerCase();
+    }
 
-        // Build sort object
-        const sort: any = {};
-        sort[sortBy] = sortOrder;
+    // Build sort object
+    const sort: any = {};
+    sort[sortBy] = sortOrder;
 
     // Execute query
     const results = await collection

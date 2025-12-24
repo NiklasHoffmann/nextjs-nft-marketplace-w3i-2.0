@@ -117,7 +117,13 @@ export function WalletNFTsList({
     // Split into listed and unlisted (server already filtered)
     const { listedNFTs, unlistedNFTs, totalListedValue } = React.useMemo(() => {
         const listed = nftItems.filter((nft) => nft.isListed);
-        const unlisted = nftItems.filter((nft) => !nft.isListed);
+        const unlisted = nftItems.filter((nft) => !nft.isListed)
+            // Sort unlisted by newest first (recently purchased NFT at top)
+            .sort((a, b) => {
+                const dateA = a.syncedAt ? new Date(a.syncedAt).getTime() : 0;
+                const dateB = b.syncedAt ? new Date(b.syncedAt).getTime() : 0;
+                return dateB - dateA; // Newest first
+            });
 
         // Calculate total value of listed NFTs
         const totalValue = listed.reduce((sum, nft) => {

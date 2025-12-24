@@ -20,10 +20,10 @@ export default function Home() {
   if (HOME_CONFIG.ENABLE_REDIRECT) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <LoadingState 
-          size="lg" 
-          variant="centered" 
-          message={`Weiterleitung zu ${HOME_CONFIG.REDIRECT_TARGET}...`} 
+        <LoadingState
+          size="lg"
+          variant="centered"
+          message={`Weiterleitung zu ${HOME_CONFIG.REDIRECT_TARGET}...`}
         />
       </div>
     );

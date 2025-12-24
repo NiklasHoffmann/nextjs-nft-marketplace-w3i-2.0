@@ -30,11 +30,11 @@ export function getQueryParam(request: NextRequest, key: string, required: true)
 export function getQueryParam(request: NextRequest, key: string, required?: false): string | undefined;
 export function getQueryParam(request: NextRequest, key: string, required?: boolean): string | undefined {
     const value = request.nextUrl.searchParams.get(key) || undefined;
-    
+
     if (required && !value) {
         throw new BadRequestError(`Missing required parameter: ${key}`);
     }
-    
+
     return value;
 }
 

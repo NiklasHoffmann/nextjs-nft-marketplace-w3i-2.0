@@ -84,19 +84,19 @@ const deleteCollectionInsightSchema = z.object({
 export const POST = apiHandler(async (req: NextRequest) => {
   // Apply admin middleware for authentication
   await withAdmin(req);
-  
+
   // Get authenticated admin address
   // @ts-ignore - added by withAdmin middleware
   const adminAddress = req.userAddress as string;
-  
+
   // Parse and validate request body
   const body = await req.json();
   const parseResult = createCollectionInsightSchema.safeParse(body);
-  
+
   if (!parseResult.success) {
     return apiBadRequest('Invalid request data', parseResult.error.format());
   }
-  
+
   const data = parseResult.data;
   const collection = await getCollection('admin_collection_insights');
 
@@ -144,15 +144,15 @@ export const POST = apiHandler(async (req: NextRequest) => {
 export const PUT = apiHandler(async (req: NextRequest) => {
   // Apply admin middleware for authentication
   await withAdmin(req);
-  
+
   // Parse and validate request body
   const body = await req.json();
   const parseResult = updateCollectionInsightSchema.safeParse(body);
-  
+
   if (!parseResult.success) {
     return apiBadRequest('Invalid request data', parseResult.error.format());
   }
-  
+
   const data = parseResult.data;
   const collection = await getCollection('admin_collection_insights');
 
@@ -195,7 +195,7 @@ export const PUT = apiHandler(async (req: NextRequest) => {
 export const DELETE = apiHandler(async (req: NextRequest) => {
   // Apply admin middleware for authentication
   await withAdmin(req);
-  
+
   // Parse query parameters
   const { searchParams } = new URL(req.url);
   const contractAddress = searchParams.get('contractAddress');
