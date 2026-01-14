@@ -12,6 +12,7 @@ import { CollectionsProvider } from "@/contexts/collections";
 import { CartProvider } from "@/contexts/CartContext";
 import { NotificationProvider, NotificationContainer } from "@/contexts/notifications";
 import { AdminGuard } from "@/components/auth";
+import { MarketplaceEventsProvider, EventConnectionStatus } from "@/providers/MarketplaceEventsProvider";
 import Navbar from './Navbar';
 import AdminNavbar from './AdminNavbar';
 import Web3Provider from './Web3Provider';
@@ -46,12 +47,18 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col">
       {isAdminRoute ? <AdminNavbar /> : <Navbar />}
+      
+      {/* Real-time connection status indicator (bottom-right corner) */}
+      {!isAdminRoute && <EventConnectionStatus />}
+      
       <main className="flex-1">{children}</main>
     </div>
   );
 }
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
   return (
     <ErrorBoundary
       FallbackComponent={GlobalErrorFallback}
@@ -71,10 +78,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                   <CollectionsProvider>
                     <CurrencyProvider>
                       <CartProvider>
-                        <AdminGuard>
-                          <LayoutContent>{children}</LayoutContent>
-                          <NotificationContainer />
-                        </AdminGuard>
+                        {/* Real-time WebSocket event listener for marketplace */}
+                        <MarketplaceEventsProvider 
+                          autoStart={true}
+                          debug={isDevelopment}
+                        >
+                          <AdminGuard>
+                            <LayoutContent>{children}</LayoutContent>
+                            <NotificationContainer />
+                          </AdminGuard>
+                        </MarketplaceEventsProvider>
                       </CartProvider>
                     </CurrencyProvider>
                   </CollectionsProvider>

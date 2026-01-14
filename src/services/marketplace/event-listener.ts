@@ -331,21 +331,33 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             const args = log.args as any;
 
             switch (log.eventName) {
-                case 'ListingCreated':
+                case 'ListingCreated': {
+                    // Determine listing type based on swap parameters
+                    const hasSwap = args.desiredTokenAddress && 
+                        args.desiredTokenAddress !== '0x0000000000000000000000000000000000000000';
+                    const hasPrice = args.price && args.price > BigInt(0);
+                    
+                    const listingType: 'sale' | 'swap' | 'swap-and-sale' = 
+                        hasSwap && hasPrice ? 'swap-and-sale' :
+                        hasSwap ? 'swap' :
+                        'sale';
+
                     return {
                         eventName: 'ItemListed',
                         ...baseEvent,
+                        listingType,
                         data: {
                             listingId: args.listingId,
-                            tokenAddress: args.tokenAddress,
-                            tokenId: args.tokenId,
                             seller: args.seller,
+                            nftAddress: args.tokenAddress, // Map to expected field name
+                            tokenId: args.tokenId,
                             price: args.price,
-                            erc1155Quantity: args.erc1155Quantity || 1n,
-                            buyerWhitelistEnabled: args.buyerWhitelistEnabled || false,
-                            partialBuyEnabled: args.partialBuyEnabled || false
+                            buyer: '0x0000000000000000000000000000000000000000' as Address, // Default for ETH sales
+                            desiredNftAddress: args.desiredTokenAddress || '0x0000000000000000000000000000000000000000' as Address,
+                            desiredTokenId: args.desiredTokenId || BigInt(0)
                         }
                     } as ProcessedItemListedEvent;
+                }
 
                 case 'ListingPurchased':
                     return {
@@ -353,13 +365,10 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                         ...baseEvent,
                         data: {
                             listingId: args.listingId,
-                            tokenAddress: args.tokenAddress,
-                            tokenId: args.tokenId,
                             buyer: args.buyer,
-                            seller: args.seller,
-                            price: args.price,
-                            erc1155Quantity: args.erc1155Quantity || 1n,
-                            partialBuy: args.partialBuy || false
+                            nftAddress: args.tokenAddress, // Map to expected field name
+                            tokenId: args.tokenId,
+                            price: args.price
                         }
                     } as ProcessedItemBoughtEvent;
 
@@ -369,28 +378,37 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                         ...baseEvent,
                         data: {
                             listingId: args.listingId,
-                            tokenAddress: args.tokenAddress,
-                            tokenId: args.tokenId,
                             seller: args.seller,
-                            triggeredBy: args.triggeredBy
+                            nftAddress: args.tokenAddress, // Map to expected field name
+                            tokenId: args.tokenId
                         }
                     } as ProcessedItemCanceledEvent;
 
-                case 'ListingUpdated':
+                case 'ListingUpdated': {
+                    // Determine new listing type
+                    const hasSwap = args.desiredTokenAddress && 
+                        args.desiredTokenAddress !== '0x0000000000000000000000000000000000000000';
+                    const hasPrice = args.price && args.price > BigInt(0);
+                    
+                    const listingType: 'sale' | 'swap' | 'swap-and-sale' = 
+                        hasSwap && hasPrice ? 'swap-and-sale' :
+                        hasSwap ? 'swap' :
+                        'sale';
+
                     return {
                         eventName: 'ItemUpdated',
                         ...baseEvent,
+                        listingType,
                         data: {
                             listingId: args.listingId,
-                            tokenAddress: args.tokenAddress,
+                            nftAddress: args.tokenAddress, // Map to expected field name
                             tokenId: args.tokenId,
-                            seller: args.seller,
                             newPrice: args.price,
-                            newErc1155Quantity: args.erc1155Quantity || 1n,
-                            newBuyerWhitelistEnabled: args.buyerWhitelistEnabled || false,
-                            newPartialBuyEnabled: args.partialBuyEnabled || false
+                            newDesiredNftAddress: args.desiredTokenAddress || '0x0000000000000000000000000000000000000000' as Address,
+                            newDesiredTokenId: args.desiredTokenId || BigInt(0)
                         }
                     } as ProcessedItemUpdatedEvent;
+                }
 
                 default:
                     console.warn('⚠️ [EventListener] Unknown event:', log.eventName);
@@ -448,11 +466,12 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
      * Get specific callback from config
      */
     private getSpecificCallback(eventName: MarketplaceEventName): MarketplaceEventCallback | undefined {
+        // Type assertion needed because specific callbacks use generic constraint
         switch (eventName) {
-            case 'ItemListed': return this.config.onItemListed;
-            case 'ItemBought': return this.config.onItemBought;
-            case 'ItemCanceled': return this.config.onItemCanceled;
-            case 'ItemUpdated': return this.config.onItemUpdated;
+            case 'ItemListed': return this.config.onItemListed as MarketplaceEventCallback | undefined;
+            case 'ItemBought': return this.config.onItemBought as MarketplaceEventCallback | undefined;
+            case 'ItemCanceled': return this.config.onItemCanceled as MarketplaceEventCallback | undefined;
+            case 'ItemUpdated': return this.config.onItemUpdated as MarketplaceEventCallback | undefined;
             default: return undefined;
         }
     }
