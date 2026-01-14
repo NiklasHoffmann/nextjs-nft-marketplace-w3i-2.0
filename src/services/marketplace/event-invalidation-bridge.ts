@@ -19,10 +19,9 @@
 import {
     invalidateAfterListing,
     invalidateAfterPurchase,
-    invalidateAfterCancellation,
-    invalidateAfterUpdate,
+    invalidateAfterCancelListing,
     type InvalidationEventDetail
-} from '@/lib/data-invalidation';
+} from '@/services/DataInvalidationService';
 import type {
     ProcessedMarketplaceEvent,
     ProcessedItemListedEvent,
@@ -92,7 +91,7 @@ export function handleListingPurchased(event: ProcessedItemBoughtEvent): void {
 
     // Emit custom event for real-time UI updates
     emitOptimisticUpdate({
-        type: 'listing-purchased',
+        type: 'nft-purchased',
         contractAddress: nftAddress,
         tokenId: tokenId.toString(),
         listingId: listingId.toString(),
@@ -119,7 +118,7 @@ export function handleListingCanceled(event: ProcessedItemCanceledEvent): void {
     });
 
     // Invalidate using existing system
-    invalidateAfterCancellation(
+    invalidateAfterCancelListing(
         nftAddress,
         tokenId.toString(),
         listingId.toString()
@@ -127,7 +126,7 @@ export function handleListingCanceled(event: ProcessedItemCanceledEvent): void {
 
     // Emit custom event for real-time UI updates
     emitOptimisticUpdate({
-        type: 'listing-cancelled',
+        type: 'listing-canceled',
         contractAddress: nftAddress,
         tokenId: tokenId.toString(),
         listingId: listingId.toString(),
@@ -151,8 +150,8 @@ export function handleListingUpdated(event: ProcessedItemUpdatedEvent): void {
         newPrice: newPrice.toString()
     });
 
-    // Invalidate using existing system
-    invalidateAfterUpdate(
+    // Invalidate using existing system (use listing function for updates)
+    invalidateAfterListing(
         nftAddress,
         tokenId.toString(),
         listingId.toString()
@@ -160,14 +159,15 @@ export function handleListingUpdated(event: ProcessedItemUpdatedEvent): void {
 
     // Emit custom event for real-time UI updates
     emitOptimisticUpdate({
-        type: 'listing-updated',
+        type: 'listing-created', // Use listing-created type since update is similar
         contractAddress: nftAddress,
         tokenId: tokenId.toString(),
         listingId: listingId.toString(),
         timestamp: event.processedAt,
         metadata: {
             newPrice: newPrice.toString(),
-            listingType: event.listingType
+            listingType: event.listingType,
+            isUpdate: true // Flag to distinguish from new listing
         }
     });
 }
@@ -178,6 +178,7 @@ export function handleListingUpdated(event: ProcessedItemUpdatedEvent): void {
  * Custom event for optimistic UI updates
  */
 interface OptimisticUpdateDetail extends InvalidationEventDetail {
+    type: 'listing-created' | 'nft-purchased' | 'listing-canceled';
     metadata?: Record<string, any>;
 }
 

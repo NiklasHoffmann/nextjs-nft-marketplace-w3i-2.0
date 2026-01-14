@@ -8,12 +8,6 @@
 export async function register() {
     // Only run on server-side (Node.js runtime)
     if (process.env.NEXT_RUNTIME === 'nodejs') {
-        // Skip auto-start in production to avoid startup delays
-        if (process.env.NODE_ENV === 'production') {
-            console.log('🔇 [Instrumentation] Skipping auto-start in production (use manual start: npm run sync:start)');
-            return;
-        }
-
         console.log('\n🔧 [Instrumentation] Starting background services...');
 
         try {
