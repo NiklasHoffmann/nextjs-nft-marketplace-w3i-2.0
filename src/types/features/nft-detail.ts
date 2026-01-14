@@ -74,6 +74,7 @@ export interface NFTDetailHeaderProps {
     collection?: string | null;
     contractSymbol?: string | null;
     contractAddress: string;
+    imageUrl?: string | null;
     isFavorited: boolean;
     onToggleFavorite: () => void;
     onShare: () => void;

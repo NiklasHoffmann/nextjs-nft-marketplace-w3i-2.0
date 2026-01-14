@@ -652,7 +652,7 @@ export function useTransactionService() {
 
             // Wait for transaction confirmation directly from blockchain
             console.log('⏳ Waiting for transaction receipt from blockchain...');
-            
+
             if (!publicClient) {
                 throw new Error('Public client not available');
             }
@@ -719,7 +719,7 @@ export function useTransactionService() {
             // Special handling for ALREADY_LISTED error
             if (error.code === 'ALREADY_LISTED' || error.message === 'ALREADY_LISTED') {
                 console.log('ℹ️ NFT already listed - treating as success');
-                
+
                 setCurrentStep('success');
                 onProgress?.('success');
 

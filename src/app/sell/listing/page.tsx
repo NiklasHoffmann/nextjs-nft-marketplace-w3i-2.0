@@ -155,7 +155,7 @@ export default function ListingPage() {
                 await txService.createListing(listingParams);
             } catch (error: any) {
                 console.error('Transaction failed:', error);
-                
+
                 // Special handling for ALREADY_LISTED error
                 if (error.code === 'ALREADY_LISTED' || error.message === 'ALREADY_LISTED') {
                     console.log('ℹ️ NFT already listed - redirecting to detail page...');
@@ -168,7 +168,7 @@ export default function ListingPage() {
                     }
                     return;
                 }
-                
+
                 setCurrentStep('error');
                 setProgressStep('listing', 'error');
                 setProgressError(error.message || 'Transaction failed');

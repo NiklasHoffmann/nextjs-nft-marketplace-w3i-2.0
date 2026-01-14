@@ -9,19 +9,21 @@
 
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import { ListingFlowProvider, useListingFlow } from './contexts/ListingFlowContext';
 import { SellHeader, FlowSidebar } from './components';
+import { useWalletNFTs } from '@/contexts/wallet-nfts';
 import type { ListingType } from './types';
 
 function SellLayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const { formData, progressData } = useListingFlow();
+    const walletNFTsContext = useWalletNFTs();
 
     // Calculate NFT selection and type first
-    const selectedCount = pathname === '/sell/success' 
-        ? 0 
+    const selectedCount = pathname === '/sell/success'
+        ? 0
         : (formData.selectedNFTs?.length || (formData.selectedNFT ? 1 : 0));
     const listingType: ListingType = (formData.selectedNFTs?.length || 0) > 1 ? 'batch' : 'single';
     const isBatch = listingType === 'batch';
@@ -73,10 +75,16 @@ function SellLayoutContent({ children }: { children: React.ReactNode }) {
 
     const headerConfig = getHeaderConfig();
 
-    // Calculate NFT counts
-    const totalNFTs = formData.userNFTs?.length || 0;
-    const unlistedCount = formData.userNFTs?.filter(nft => !nft.listed && !nft.listing).length || 0;
-    const listedCount = formData.userNFTs?.filter(nft => nft.listed || nft.listing).length || 0;
+    // Calculate NFT counts from WalletNFTsContext directly
+    const totalNFTs = useMemo(() => walletNFTsContext.nfts.length, [walletNFTsContext.nfts]);
+    const listedCount = useMemo(
+        () => walletNFTsContext.nfts.filter(nft => nft.isListed || nft.listingId).length,
+        [walletNFTsContext.nfts]
+    );
+    const unlistedCount = useMemo(
+        () => walletNFTsContext.nfts.filter(nft => !nft.isListed && !nft.listingId).length,
+        [walletNFTsContext.nfts]
+    );
 
     return (
         <div className="min-h-screen bg-gray-50">

@@ -36,12 +36,13 @@ export function NFTGallery({
     headerContent,
     largeTitle = false,
     subtitle,
-    actions
+    actions,
+    defaultGridView = false
 }: NFTScrollListProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [canScrollLeft, setCanScrollLeft] = useState(false)
     const [canScrollRight, setCanScrollRight] = useState(false)
-    const [isGridView, setIsGridView] = useState(false)
+    const [isGridView, setIsGridView] = useState(defaultGridView)
 
 
 
@@ -151,28 +152,42 @@ export function NFTGallery({
             <div className={className}>
                 {title && (
                     largeTitle ? (
-                        <h1 className="text-3xl font-bold text-gray-900 mb-4 mx-8">{title}</h1>
+                        <h1 className="text-3xl font-bold text-gray-900 mb-4 pl-8">{title}</h1>
                     ) : (
                         <h3 className="text-lg font-medium text-gray-900 mb-4">{title}</h3>
                     )
                 )}
                 {subtitle && (
-                    <p className="text-sm text-gray-600 mb-4 mx-8">{subtitle}</p>
+                    <p className="text-sm text-gray-600 mb-4 pl-8">{subtitle}</p>
                 )}
-                <div className={`flex ${gap} ${padding} overflow-hidden`}>
+                <div className={`flex ${gap} ${padding} pl-8 overflow-hidden`}>
                     {Array.from({ length: loadingCount }).map((_, i) => (
                         <div key={i} className={`flex-shrink-0 ${cardWidth}`}>
-                            {/* Match NFTCard's actual dimensions */}
-                            <div className="w-full aspect-[3/4] rounded-xl bg-white border border-gray-200 shadow-sm">
-                                <div className="w-full h-full p-4 animate-pulse">
-                                    {/* Image placeholder - top portion */}
-                                    <div className="w-full aspect-square bg-gray-200 rounded-lg mb-3" />
-                                    {/* Title */}
-                                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-                                    {/* Subtitle */}
-                                    <div className="h-3 bg-gray-200 rounded w-1/2 mb-3" />
-                                    {/* Price */}
-                                    <div className="h-5 bg-gray-200 rounded w-2/3" />
+                            {/* Match NFTCard's exact structure - h-72, border, rounded-lg outer container */}
+                            <div className="w-full h-72 rounded-lg shadow-xl border border-black bg-gray-200 relative">
+                                {/* Inner content container with inset-2 (matches NFTCard structure) */}
+                                <div className="absolute inset-2 shadow-lg rounded-md overflow-hidden bg-white">
+                                    <div className="w-full h-full p-1 flex flex-col gap-1 animate-pulse">
+                                        {/* Header placeholder */}
+                                        <div className="flex-shrink-0 h-8">
+                                            <div className="h-3 bg-gray-200 rounded w-2/3 mb-1" />
+                                            <div className="h-2 bg-gray-200 rounded w-1/2" />
+                                        </div>
+
+                                        {/* Image/Description area */}
+                                        <div className="flex-1 min-h-0 bg-gray-200 rounded-md" />
+
+                                        {/* Footer placeholder */}
+                                        <div className="flex-shrink-0 h-6 flex gap-1">
+                                            <div className="h-5 bg-gray-200 rounded w-16" />
+                                            <div className="h-5 bg-gray-200 rounded w-12" />
+                                        </div>
+
+                                        {/* Price placeholder */}
+                                        <div className="flex-shrink-0 h-8">
+                                            <div className="h-6 bg-gray-200 rounded w-24" />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -204,7 +219,7 @@ export function NFTGallery({
         <div className={`${className} transition-all duration-200`}>
             {/* Title Row - Title (left) + Actions (right) */}
             {(title || actions) && (
-                <div className="flex items-center justify-between mb-2 mx-8">
+                <div className="flex items-center justify-between mb-2 pl-8 pr-8">
                     {title && (
                         largeTitle ? (
                             <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
@@ -218,7 +233,7 @@ export function NFTGallery({
 
             {/* Subtitle Row - Always rendered to prevent layout shift, min-height reserves space */}
             {(subtitle || enableViewAll) && (
-                <div className="flex items-center justify-between mb-4 mx-8 min-h-[1.75rem]">
+                <div className="flex items-center justify-between mb-4 pl-8 pr-8 min-h-[1.75rem]">
                     <div className="text-sm text-gray-600">
                         {subtitle || '\u00A0'}
                     </div>
@@ -303,7 +318,7 @@ export function NFTGallery({
                         if (enableLinks) {
                             return (
                                 <Link
-                                    key={item.listingId || `${item.contractAddress}-${item.tokenId}-${item.seller || 'unlisted'}`}
+                                    key={item.listingId ? `listing-${item.listingId}` : `${item.contractAddress}-${item.tokenId}-${index}`}
                                     href={linkBuilder(item) as any}
                                     onClick={onCardClick ? () => onCardClick(item) : undefined}
                                 >
@@ -314,7 +329,7 @@ export function NFTGallery({
 
                         return (
                             <div
-                                key={item.listingId || `${item.contractAddress}-${item.tokenId}-${item.seller || 'unlisted'}`}
+                                key={item.listingId ? `listing-${item.listingId}` : `${item.contractAddress}-${item.tokenId}-${index}`}
                                 onClick={onCardClick ? () => onCardClick(item) : undefined}
                                 className={onCardClick ? 'cursor-pointer' : ''}
                             >
@@ -345,8 +360,8 @@ export function NFTGallery({
                             paddingBottom: '50px' // Space for hover shadows
                         }}
                     >
-                        {items.map((item) => (
-                            <React.Fragment key={item.listingId || `${item.contractAddress}-${item.tokenId}-${item.seller || 'unlisted'}`}>
+                        {items.map((item, index) => (
+                            <React.Fragment key={item.listingId ? `listing-${item.listingId}` : `${item.contractAddress}-${item.tokenId}-${index}`}>
                                 {renderCard(item)}
                             </React.Fragment>
                         ))}

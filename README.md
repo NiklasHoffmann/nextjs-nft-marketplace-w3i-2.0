@@ -182,6 +182,19 @@ A modern, full-stack NFT marketplace built with Next.js 15, TypeScript, and Web3
    
    Navigate to [http://localhost:3000](http://localhost:3000) to see the application.
 
+### ⚠️ MongoDB Connection Issues?
+
+If you see `API error: 500` or MongoDB connection errors:
+
+```bash
+# Quick diagnosis (shows your IP and tests connection)
+npm run diagnose:mongodb
+```
+
+**Common Issue:** IP not in MongoDB Atlas whitelist
+- See [MongoDB Quick Fix Guide](docs/MONGODB_QUICK_FIX.md) for 2-minute solution
+- Full troubleshooting: [MongoDB Troubleshooting](docs/MONGODB_TROUBLESHOOTING.md)
+
 ## 📁 Project Structure
 
 ```

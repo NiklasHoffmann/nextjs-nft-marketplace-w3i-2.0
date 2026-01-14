@@ -1,8 +1,8 @@
 "use client";
 
 import React from 'react';
-import Link from 'next/link';
 import type { Route } from 'next';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { SellStats } from './SellStats';
 
 type StepStatus = 'not-started' | 'checking' | 'done' | 'failed';
@@ -37,13 +37,6 @@ interface SellHeaderProps {
     selectedCount?: number;
 }
 
-const steps = [
-    { id: 'whitelist', label: 'Whitelist', icon: '🔍' },
-    { id: 'approval', label: 'Approval', icon: '✓' },
-    { id: 'signing', label: 'Signieren', icon: '✍️' },
-    { id: 'pending', label: 'Pending', icon: '⏳' },
-];
-
 export function SellHeader({
     listingType,
     setListingType,
@@ -63,34 +56,23 @@ export function SellHeader({
     selectedCount = 0
 }: SellHeaderProps) {
 
-    const getStepStatus = (stepId: string): StepStatus => {
-        return (stepStates as any)[stepId] || 'not-started';
-    };
-
-    const getStepLabel = (stepId: string, status: StepStatus) => {
-        if (status === 'checking') return 'Checking';
-        if (status === 'done') return 'Done';
-        if (status === 'failed') return 'Not Whitelisted';
-        return '';
-    };
-
     const getHeaderIcon = () => {
         switch (icon) {
             case 'check':
                 return (
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 );
             case 'progress':
                 return (
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                 );
             case 'success':
                 return (
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                 );
@@ -103,57 +85,46 @@ export function SellHeader({
         }
     };
 
-    const iconBgColor = icon === 'success' ? 'from-green-500 to-emerald-600' : 'from-purple-500 to-indigo-600';
+    const getGradientColors = () => {
+        switch (icon) {
+            case 'success':
+                return { from: 'from-green-500', to: 'to-emerald-600' };
+            case 'check':
+                return { from: 'from-blue-500', to: 'to-cyan-600' };
+            case 'progress':
+                return { from: 'from-orange-500', to: 'to-amber-600' };
+            default:
+                return { from: 'from-purple-500', to: 'to-indigo-600' };
+        }
+    };
+
+    const gradientColors = getGradientColors();
 
     return (
-        <div className="fixed top-[66px] left-0 right-0 z-10 bg-white border-b border-gray-200">
-            <div className="px-8 py-2.5">
-                <div className="flex items-center justify-between gap-8">
-                    {/* Page Info */}
-                    <div className="flex items-center gap-4 min-w-0">
-                        {/* Back Link */}
-                        <Link
-                            href={backUrl as Route}
-                            className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors flex-shrink-0"
-                            title={backLabel}
-                        >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                            </svg>
-                            <span className="text-xs font-medium">{backLabel}</span>
-                        </Link>
-                        
-                        <div className="w-px h-8 bg-gray-200" />
-                        
-                        <div className="flex items-center gap-2.5">
-                            <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${iconBgColor} flex items-center justify-center flex-shrink-0`}>
-                                {getHeaderIcon()}
-                            </div>
-                            <div className="min-w-0">
-                                <h1 className="text-lg font-bold text-gray-900 leading-tight truncate">
-                                    {title || (listingType === 'batch' ? 'Batch Listing' : 'Sell & Trade NFTs')}
-                                </h1>
-                                <p className="text-[11px] text-gray-600 truncate leading-tight">
-                                    {subtitle || (listingType === 'batch'
-                                        ? 'List multiple NFTs at once'
-                                        : 'List your NFTs for sale or trade with other collectors'
-                                    )}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* NFT Stats */}
-                    <div className="flex-1 max-w-2xl">
-                        <SellStats
-                            totalNFTs={totalNFTs}
-                            listedCount={listedCount}
-                            unlistedCount={unlistedCount}
-                            selectedCount={selectedCount}
-                        />
-                    </div>
-                </div>
-            </div>
-        </div>
+        <PageHeader
+            backLink={{
+                href: backUrl,
+                label: backLabel
+            }}
+            icon={{
+                type: "svg",
+                svgContent: getHeaderIcon(),
+                gradientFrom: gradientColors.from,
+                gradientTo: gradientColors.to
+            }}
+            title={title || (listingType === 'batch' ? 'Batch Listing' : 'Sell & Trade NFTs')}
+            subtitle={subtitle || (listingType === 'batch'
+                ? 'List multiple NFTs at once'
+                : 'List your NFTs for sale or trade with other collectors'
+            )}
+            rightContent={
+                <SellStats
+                    totalNFTs={totalNFTs}
+                    listedCount={listedCount}
+                    unlistedCount={unlistedCount}
+                    selectedCount={selectedCount}
+                />
+            }
+        />
     );
 }

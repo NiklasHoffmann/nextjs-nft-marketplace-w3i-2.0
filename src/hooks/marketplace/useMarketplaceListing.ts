@@ -295,7 +295,7 @@ export function useMarketplaceListing(marketplaceAddress: string) {
           if (!publicClient) {
             throw new Error('Public client not available');
           }
-          
+
           try {
             const whitelistStatus = await publicClient.readContract({
               address: marketplaceAddress as `0x${string}`,

@@ -184,7 +184,11 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
 
         const requestPromise = (async () => {
             try {
-                const res = await fetch(`/api/user/interactions?contractAddress=${contractAddress}&tokenId=${tokenId}&userId=${userAddress}`);
+                const res = await fetch(`/api/user/interactions?contractAddress=${contractAddress}&tokenId=${tokenId}&userId=${userAddress}`, {
+                    headers: {
+                        'x-wallet-address': userAddress // Add wallet address to header for auth
+                    }
+                });
                 if (res.ok) {
                     const result = await res.json();
                     const data = result.data || result;
@@ -281,37 +285,59 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
         try {
             const res = await fetch('/api/user/interactions', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-wallet-address': userAddress // Add wallet address to header for auth
+                },
                 body: JSON.stringify({ contractAddress, tokenId, userId: userAddress, isFavorite: true })
             });
 
-            if (res.ok) {
-                const result = await res.json();
-                console.log('[NFTStatsContext] toggleFavorite API response:', result);
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => null);
+                const errorMessage = errorData?.error || `Server error: ${res.status} ${res.statusText}`;
+                console.error('❌ toggleFavorite API error:', errorMessage);
 
-                // Stats aktualisieren (API gibt result.data.stats zurück)
-                if (result.data?.stats) {
-                    updateStatsCache({
-                        viewCount: result.data.stats.viewCount || 0,
-                        likeCount: result.data.stats.likeCount || 0,
-                        watchlistCount: result.data.stats.watchlistCount || 0,
-                        ratingCount: result.data.stats.ratingCount || 0,
-                        averageRating: result.data.stats.averageRating || 0
-                    });
+                // Show user-friendly error
+                if (res.status === 500) {
+                    console.error('💡 Mögliche Ursache: MongoDB Verbindungsproblem. Siehe Server-Logs.');
                 }
-
-                // User Interactions aktualisieren (result.data.data enthält die Interactions)
-                const interactions = result.data?.data || result.data;
-                if (interactions) {
-                    updateInteractionsCache({
-                        isFavorited: interactions.isFavorite || false,
-                        isWatchlisted: interactions.isWatchlisted || false,
-                        userRating: interactions.rating ?? null
-                    });
-                }
+                throw new Error(errorMessage);
             }
-        } catch (e) {
-            console.error('toggleFavorite error:', e);
+
+            const result = await res.json();
+            console.log('[NFTStatsContext] toggleFavorite API response:', result);
+
+            // Stats aktualisieren (API gibt result.data.stats zurück)
+            if (result.data?.stats) {
+                updateStatsCache({
+                    viewCount: result.data.stats.viewCount || 0,
+                    likeCount: result.data.stats.likeCount || 0,
+                    watchlistCount: result.data.stats.watchlistCount || 0,
+                    ratingCount: result.data.stats.ratingCount || 0,
+                    averageRating: result.data.stats.averageRating || 0
+                });
+            }
+
+            // User Interactions aktualisieren (result.data.data enthält die Interactions)
+            const interactions = result.data?.data || result.data;
+            if (interactions) {
+                updateInteractionsCache({
+                    isFavorited: interactions.isFavorite || false,
+                    isWatchlisted: interactions.isWatchlisted || false,
+                    userRating: interactions.rating ?? null
+                });
+            }
+        } catch (e: any) {
+            const errorMsg = e?.message || 'Unknown error';
+            console.error('❌ toggleFavorite error:', errorMsg);
+
+            // Network error (server not reachable)
+            if (e?.message === 'Failed to fetch' || !navigator.onLine) {
+                console.error('🌐 Netzwerkfehler: Server nicht erreichbar oder offline');
+            }
+
+            // Re-throw to allow UI to handle error
+            throw e;
         }
     }, [contractAddress, tokenId, userAddress, updateStatsCache, updateInteractionsCache]);
 
@@ -321,12 +347,28 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
         try {
             const res = await fetch('/api/user/interactions', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-wallet-address': userAddress // Add wallet address to header for auth
+                },
                 body: JSON.stringify({ contractAddress, tokenId, userId: userAddress, isWatchlisted: true })
             });
 
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => null);
+                const errorMessage = errorData?.error || `Server error: ${res.status} ${res.statusText}`;
+                console.error('❌ toggleWatchlist API error:', errorMessage);
+
+                // Show user-friendly error
+                if (res.status === 500) {
+                    console.error('💡 Mögliche Ursache: MongoDB Verbindungsproblem. Siehe Server-Logs.');
+                }
+                throw new Error(errorMessage);
+            }
+
+            const result = await res.json();
+
             if (res.ok) {
-                const result = await res.json();
 
                 // Stats aktualisieren (API gibt result.data.stats zurück)
                 if (result.data?.stats) {
@@ -349,8 +391,17 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
                     });
                 }
             }
-        } catch (e) {
-            console.error('toggleWatchlist error:', e);
+        } catch (e: any) {
+            const errorMsg = e?.message || 'Unknown error';
+            console.error('❌ toggleWatchlist error:', errorMsg);
+
+            // Network error (server not reachable)
+            if (e?.message === 'Failed to fetch' || !navigator.onLine) {
+                console.error('🌐 Netzwerkfehler: Server nicht erreichbar oder offline');
+            }
+
+            // Re-throw to allow UI to handle error
+            throw e;
         }
     }, [contractAddress, tokenId, userAddress, updateStatsCache, updateInteractionsCache]);
 
@@ -360,36 +411,55 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
         try {
             const res = await fetch('/api/user/interactions', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-wallet-address': userAddress // Add wallet address to header for auth
+                },
                 body: JSON.stringify({ contractAddress, tokenId, userId: userAddress, rating })
             });
 
-            if (res.ok) {
-                const result = await res.json();
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => null);
+                const errorMessage = errorData?.error || `Server error: ${res.status} ${res.statusText}`;
+                console.error('❌ setRating API error:', errorMessage);
 
-                // Stats aktualisieren (API gibt result.data.stats zurück)
-                if (result.data?.stats) {
-                    updateStatsCache({
-                        viewCount: result.data.stats.viewCount || 0,
-                        likeCount: result.data.stats.likeCount || 0,
-                        watchlistCount: result.data.stats.watchlistCount || 0,
-                        ratingCount: result.data.stats.ratingCount || 0,
-                        averageRating: result.data.stats.averageRating || 0
-                    });
+                if (res.status === 500) {
+                    console.error('💡 Mögliche Ursache: MongoDB Verbindungsproblem. Siehe Server-Logs.');
                 }
-
-                // User Interactions aktualisieren (result.data.data enthält die Interactions)
-                const interactions = result.data?.data || result.data;
-                if (interactions) {
-                    updateInteractionsCache({
-                        isFavorited: interactions.isFavorite || false,
-                        isWatchlisted: interactions.isWatchlisted || false,
-                        userRating: interactions.rating ?? null
-                    });
-                }
+                throw new Error(errorMessage);
             }
-        } catch (e) {
-            console.error('setRating error:', e);
+
+            const result = await res.json();
+
+            // Stats aktualisieren (API gibt result.data.stats zurück)
+            if (result.data?.stats) {
+                updateStatsCache({
+                    viewCount: result.data.stats.viewCount || 0,
+                    likeCount: result.data.stats.likeCount || 0,
+                    watchlistCount: result.data.stats.watchlistCount || 0,
+                    ratingCount: result.data.stats.ratingCount || 0,
+                    averageRating: result.data.stats.averageRating || 0
+                });
+            }
+
+            // User Interactions aktualisieren (result.data.data enthält die Interactions)
+            const interactions = result.data?.data || result.data;
+            if (interactions) {
+                updateInteractionsCache({
+                    isFavorited: interactions.isFavorite || false,
+                    isWatchlisted: interactions.isWatchlisted || false,
+                    userRating: interactions.rating ?? null
+                });
+            }
+        } catch (e: any) {
+            const errorMsg = e?.message || 'Unknown error';
+            console.error('❌ setRating error:', errorMsg);
+
+            if (e?.message === 'Failed to fetch' || !navigator.onLine) {
+                console.error('🌐 Netzwerkfehler: Server nicht erreichbar oder offline');
+            }
+
+            throw e;
         }
     }, [contractAddress, tokenId, userAddress, updateStatsCache, updateInteractionsCache]);
 
@@ -401,21 +471,37 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
                 body: JSON.stringify({ contractAddress, tokenId })
             });
 
-            if (res.ok) {
-                const result = await res.json();
-                if (result.data?.stats || result.stats) {
-                    const stats = result.data?.stats || result.stats;
-                    updateStatsCache({
-                        viewCount: stats.viewCount || 0,
-                        likeCount: stats.likeCount || 0,
-                        watchlistCount: stats.watchlistCount || 0,
-                        ratingCount: stats.ratingCount || 0,
-                        averageRating: stats.averageRating || 0
-                    });
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => null);
+                const errorMessage = errorData?.error || `Server error: ${res.status} ${res.statusText}`;
+                console.error('❌ incrementViews API error:', errorMessage);
+
+                if (res.status === 500) {
+                    console.error('💡 Mögliche Ursache: MongoDB Verbindungsproblem. Siehe Server-Logs.');
                 }
+                // Don't throw for view increments - not critical
+                return;
             }
-        } catch (e) {
-            console.error('incrementViews error:', e);
+
+            const result = await res.json();
+            if (result.data?.stats || result.stats) {
+                const stats = result.data?.stats || result.stats;
+                updateStatsCache({
+                    viewCount: stats.viewCount || 0,
+                    likeCount: stats.likeCount || 0,
+                    watchlistCount: stats.watchlistCount || 0,
+                    ratingCount: stats.ratingCount || 0,
+                    averageRating: stats.averageRating || 0
+                });
+            }
+        } catch (e: any) {
+            const errorMsg = e?.message || 'Unknown error';
+            console.error('❌ incrementViews error:', errorMsg);
+
+            if (e?.message === 'Failed to fetch' || !navigator.onLine) {
+                console.error('🌐 Netzwerkfehler: Server nicht erreichbar oder offline');
+            }
+            // Don't throw for view increments - not critical
         }
     }, [contractAddress, tokenId, updateStatsCache]);
 

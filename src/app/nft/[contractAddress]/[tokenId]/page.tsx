@@ -320,7 +320,7 @@ function NFTDetailPage() {
     // If we have data, show the page
     if (nftData && hasValidData) {
         return (
-            <div className="min-h-screen bg-gray-50 pt-32">
+            <div className="min-h-screen bg-gray-50 pt-[176px]">
                 <NFTDetailHeader {...headerProps} />
 
                 <MemoizedCategoryPills {...categoryPillsProps} />

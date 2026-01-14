@@ -17,6 +17,10 @@ export class GraphQLSyncV2 {
     private pollingInterval: NodeJS.Timeout | null = null;
     private itemsProcessed: number = 0;
     private lastUpdate: Date | null = null;
+    private consecutiveErrors: number = 0;
+    private currentInterval: number = 60000; // Start with 60 seconds
+    private readonly MIN_INTERVAL = 60000; // 60 seconds minimum
+    private readonly MAX_INTERVAL = 300000; // 5 minutes maximum
 
     /**
      * Start syncing from subgraph v2
@@ -36,7 +40,7 @@ export class GraphQLSyncV2 {
 
         console.log('\n🚀 [V2 Sync] Starting Subgraph v2 sync (Ideation Market)...');
         console.log('🔗 [V2 Sync] Endpoint:', subgraphUrl);
-        console.log('📊 [V2 Sync] Polling interval: 30 seconds');
+        console.log('📊 [V2 Sync] Polling interval: 60 seconds (adaptive with backoff)');
         console.log('📦 [V2 Sync] Target collection: marketplace_items');
 
         // Create Apollo Client
@@ -57,16 +61,30 @@ export class GraphQLSyncV2 {
      * Start polling for updates
      */
     private async startPolling() {
-        console.log('🔄 Starting polling mode for v2 subgraph (30s interval)');
+        console.log('🔄 Starting adaptive polling mode for v2 subgraph (60s base interval with backoff)');
         this.isActive = true;
 
         // Initial sync
         await this.pollListings();
 
-        // Poll every 30 seconds
-        this.pollingInterval = setInterval(async () => {
+        // Start adaptive polling
+        this.scheduleNextPoll();
+    }
+
+    /**
+     * Schedule next poll with current interval
+     */
+    private scheduleNextPoll() {
+        if (this.pollingInterval) {
+            clearTimeout(this.pollingInterval);
+        }
+
+        this.pollingInterval = setTimeout(async () => {
             await this.pollListings();
-        }, 30000);
+            if (this.isActive) {
+                this.scheduleNextPoll();
+            }
+        }, this.currentInterval);
     }
 
     /**
@@ -79,6 +97,7 @@ export class GraphQLSyncV2 {
             console.log('\n📡 [V2 Subgraph] Fetching active listings...');
             console.log('   Query: GET_ACTIVE_LISTINGS');
             console.log('   Variables: { first: 1000, skip: 0 }');
+            console.log(`   Current interval: ${this.currentInterval / 1000}s`);
 
             const result = await this.client.query({
                 query: GET_ACTIVE_LISTINGS,
@@ -88,6 +107,10 @@ export class GraphQLSyncV2 {
                 },
                 fetchPolicy: 'network-only' // Always fetch fresh data
             });
+
+            // Success - reset error tracking and interval
+            this.consecutiveErrors = 0;
+            this.currentInterval = this.MIN_INTERVAL;
 
             console.log('📥 [V2 Subgraph] Response received:');
             console.log(`   Total listings: ${result.data?.listings?.length || 0}`);
@@ -108,11 +131,38 @@ export class GraphQLSyncV2 {
             } else {
                 console.log('   ℹ️  No active listings found');
             }
-        } catch (error) {
-            console.error('❌ [V2 Subgraph] Polling error:', error);
-            if (error instanceof Error) {
-                console.error('   Error message:', error.message);
-                console.error('   Error stack:', error.stack);
+        } catch (error: any) {
+            // Check if it's a rate limit error (429)
+            const isRateLimit = error?.networkError?.statusCode === 429 ||
+                error?.message?.includes('429') ||
+                error?.message?.includes('Too many requests');
+
+            if (isRateLimit) {
+                this.consecutiveErrors++;
+                // Exponential backoff: double the interval, up to MAX_INTERVAL
+                this.currentInterval = Math.min(
+                    this.currentInterval * 2,
+                    this.MAX_INTERVAL
+                );
+
+                console.error(`\n⚠️ [V2 Subgraph] Rate limit hit (429)`);
+                console.error(`   Consecutive errors: ${this.consecutiveErrors}`);
+                console.error(`   Backing off to ${this.currentInterval / 1000}s interval`);
+                console.error(`   Next retry in ${this.currentInterval / 1000} seconds`);
+            } else {
+                // Other errors - moderate backoff
+                this.consecutiveErrors++;
+                this.currentInterval = Math.min(
+                    this.currentInterval * 1.5,
+                    this.MAX_INTERVAL
+                );
+
+                console.error('❌ [V2 Subgraph] Polling error:', error);
+                if (error instanceof Error) {
+                    console.error('   Error message:', error.message);
+                    console.error('   Error stack:', error.stack);
+                }
+                console.error(`   Next retry in ${this.currentInterval / 1000} seconds`);
             }
         }
     }
@@ -230,7 +280,7 @@ export class GraphQLSyncV2 {
         console.log('🛑 Stopping Subgraph v2 sync...');
 
         if (this.pollingInterval) {
-            clearInterval(this.pollingInterval);
+            clearTimeout(this.pollingInterval);
             this.pollingInterval = null;
         }
 
@@ -249,6 +299,8 @@ export class GraphQLSyncV2 {
             itemsProcessed: this.itemsProcessed,
             lastUpdate: this.lastUpdate,
             mode: 'polling',
+            currentInterval: this.currentInterval,
+            consecutiveErrors: this.consecutiveErrors,
             subgraphUrl: process.env.NEXT_PUBLIC_SUBGRAPH_V2_URL
         };
     }

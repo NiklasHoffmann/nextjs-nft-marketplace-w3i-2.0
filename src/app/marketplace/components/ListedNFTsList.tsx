@@ -42,6 +42,7 @@ interface ListedNFTsListPropsExtended extends ListedNFTsListProps {
 export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, onFiltersChange }: ListedNFTsListPropsExtended = {}) {
     const loadMoreRef = useRef<HTMLDivElement>(null);
     const isLoadingMore = useRef(false);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
 
     // Get search term from URL
     const searchParams = useSearchParams();
@@ -117,7 +118,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
         minWatchlistCount: filters.minWatchlistCount,
         sortBy: sortByMapping[sort.field] || 'price',
         sortOrder: sort.direction,
-        limit: 20,
+        limit: 50, // Increased from 20 to 50 for faster initial load (matches Collections)
         autoFetch: true,
     });
 
@@ -173,6 +174,13 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
     const imageUrls = useMemo(() => {
         return items.map(item => item.metadata?.image).filter((url): url is string => !!url);
     }, [items]);
+
+    // Track when first items arrive to hide initial loading state
+    useEffect(() => {
+        if (items.length > 0 || !loading) {
+            setIsInitialLoad(false);
+        }
+    }, [items.length, loading]);
 
     // Infinite Scroll
     useEffect(() => {
@@ -390,8 +398,8 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
                             loadingLabel="Refreshing..."
                         />
                     }
-                    loading={loading && items.length === 0}
-                    loadingCount={8}
+                    loading={isInitialLoad || (loading && items.length === 0)}
+                    loadingCount={12}
                     enableInsights={true}
                     showStats={true}
                     priority={true}

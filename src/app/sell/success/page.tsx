@@ -17,7 +17,7 @@ export default function SuccessPage() {
     const { formData, progressData, reset, setProgressStep, setFormData, setNftDataLoaded } = useListingFlow();
     const { invalidateCache } = useMarketplaceItems();
     const { refresh: refreshWalletNFTs } = useWalletNFTs();
-    
+
     const [listedNFT, setListedNFT] = useState<AggregatedNFT | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -36,7 +36,7 @@ export default function SuccessPage() {
             setIsLoading(true);
             setNftDataLoaded(false);
 
-            try{
+            try {
                 console.log('🔄 Invalidating marketplace cache to refresh listings...');
                 // Invalidate marketplace cache so it reloads on next visit
                 invalidateCache();
@@ -48,14 +48,14 @@ export default function SuccessPage() {
                         formData.selectedNFT.contractAddress,
                         formData.selectedNFT.tokenId
                     );
-                    
+
                     // Manually refresh WalletNFTs to update stats immediately
                     console.log('🔄 Triggering WalletNFTs refresh...');
                     await refreshWalletNFTs();
                 }
 
                 console.log('📡 Querying TheGraph for fresh listing data...');
-                
+
                 // Query TheGraph directly for this specific listing
                 const graphUrl = process.env.NEXT_PUBLIC_SUBGRAPH_URL || 'http://localhost:8000/subgraphs/name/nft-marketplace';
                 const graphQuery = {
@@ -217,7 +217,7 @@ export default function SuccessPage() {
     const displayNFT = listedNFT || formData.selectedNFT;
     const listing = displayNFT?.listing;
     const priceInEth = listing?.price ? formatEther(BigInt(listing.price)) : formData.price;
-    
+
     // Derive mode from listing data
     const listingMode = listing?.desiredContractAddress && listing.desiredContractAddress !== '0x0000000000000000000000000000000000000000'
         ? (listing.price && BigInt(listing.price) > BigInt(0) ? 'hybrid' : 'trade')
@@ -268,7 +268,7 @@ export default function SuccessPage() {
                 <div className="lg:col-span-2 space-y-6">
                     <div>
                         <h2 className="text-xl font-bold text-gray-900 mb-4">Listing Details</h2>
-                        
+
                         {/* Listing Info */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                             <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -285,7 +285,7 @@ export default function SuccessPage() {
                                                 <p className="font-semibold text-gray-900">Verkauf</p>
                                                 <p className="text-xs text-gray-600">Direktverkauf</p>
                                             </div>
-                                        </>  
+                                        </>
                                     )}
                                     {listingMode === 'trade' && (
                                         <>

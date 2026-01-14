@@ -178,6 +178,8 @@ export interface NFTScrollListProps {
     subtitle?: string | ReactNode;
     /** Action buttons (e.g., Refresh) shown in top-right corner */
     actions?: ReactNode;
+    /** Default view mode: true for grid, false for horizontal scroll (default: false) */
+    defaultGridView?: boolean;
 }
 
 // ===== FILTERABLE ITEMS =====
