@@ -219,8 +219,16 @@ export default function SuccessPage() {
     const priceInEth = listing?.price ? formatEther(BigInt(listing.price)) : formData.price;
 
     // Derive mode from listing data
-    const listingMode = listing?.desiredContractAddress && listing.desiredContractAddress !== '0x0000000000000000000000000000000000000000'
-        ? (listing.price && BigInt(listing.price) > BigInt(0) ? 'hybrid' : 'trade')
+    // Check if desiredContractAddress is set and not a zero address
+    const hasTradeTarget = listing?.desiredContractAddress && 
+        listing.desiredContractAddress !== '0x0000000000000000000000000000000000000000' &&
+        listing.desiredContractAddress !== '0x0' &&
+        listing.desiredContractAddress.toLowerCase() !== '0x0000000000000000000000000000000000000000';
+    
+    const hasPrice = listing?.price && BigInt(listing.price) > BigInt(0);
+    
+    const listingMode = hasTradeTarget
+        ? (hasPrice ? 'hybrid' : 'trade')
         : 'sale';
 
     return (
