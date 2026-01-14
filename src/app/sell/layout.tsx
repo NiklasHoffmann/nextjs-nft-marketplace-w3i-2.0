@@ -102,7 +102,7 @@ function SellLayoutContent({ children }: { children: React.ReactNode }) {
             />
 
             {/* Main Content with Sidebar Layout */}
-            <div className="flex pt-[173px]">
+            <div className="flex pt-[174px]">
                 {/* Flow Sidebar - sticky und direkt unter dem SellHeader */}
                 <div className="w-64 flex-shrink-0 sticky top-[173px] self-start h-[calc(100vh-173px)] overflow-y-auto bg-white border-r border-gray-200">
                     <div className="px-4 py-4">

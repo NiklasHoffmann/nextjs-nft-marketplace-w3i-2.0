@@ -83,7 +83,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
     cookieStore.set('admin-session', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax', // 'lax' statt 'strict' für bessere Kompatibilität mit Redirects
         maxAge: 60 * 60 * 24, // 24 Stunden
         path: '/'
     });
