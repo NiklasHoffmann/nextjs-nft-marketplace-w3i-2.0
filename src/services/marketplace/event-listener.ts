@@ -308,37 +308,99 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
 
     /**
      * Decode log into typed event
+     * 
+     * Note: When using watchContractEvent with specific event names,
+     * viem automatically decodes the events. The logs parameter contains
+     * the decoded args already. This method is for additional processing
+     * and type mapping.
      */
-    private async decodeLog(log: Log): Promise<ProcessedMarketplaceEvent | null> {
-        if (!log.topics[0]) return null;
+    private async decodeLog(log: any): Promise<ProcessedMarketplaceEvent | null> {
+        if (!log || !log.eventName) return null;
 
-        const eventSignature = log.topics[0];
+        try {
+            const processedAt = Date.now();
+            const baseEvent = {
+                transactionHash: log.transactionHash!,
+                blockNumber: log.blockNumber!,
+                logIndex: log.logIndex!,
+                processedAt
+            };
 
-        // Map event signatures to event names
-        // Note: These are keccak256 hashes of event signatures
-        const eventMap: Record<string, MarketplaceEventName> = {
-            // ListingCreated(uint128,address,uint256,uint256,uint256,uint32,address,bool,bool,address,uint256,uint256)
-            '0x': 'ItemListed', // TODO: Add actual signature hash
-            // ListingPurchased(uint128,address,uint256,uint256,bool,uint256,uint32,address,address,address,uint256,uint256)
-            // ListingCanceled(uint128,address,uint256,address,address)
-            // ListingUpdated(uint128,address,uint256,uint256,uint256,uint32,address,bool,bool,address,uint256,uint256)
-        };
+            // viem automatically decodes events when using watchContractEvent
+            // The log.args contains the decoded parameters
+            const args = log.args as any;
 
-        // For now, we'll use a simpler approach - check event name from ABI
-        // In production, you'd compute actual keccak256 hashes
+            switch (log.eventName) {
+                case 'ListingCreated':
+                    return {
+                        eventName: 'ItemListed',
+                        ...baseEvent,
+                        data: {
+                            listingId: args.listingId,
+                            tokenAddress: args.tokenAddress,
+                            tokenId: args.tokenId,
+                            seller: args.seller,
+                            price: args.price,
+                            erc1155Quantity: args.erc1155Quantity || 1n,
+                            buyerWhitelistEnabled: args.buyerWhitelistEnabled || false,
+                            partialBuyEnabled: args.partialBuyEnabled || false
+                        }
+                    } as ProcessedItemListedEvent;
 
-        const processedAt = Date.now();
-        const baseEvent = {
-            transactionHash: log.transactionHash!,
-            blockNumber: log.blockNumber!,
-            logIndex: log.logIndex!,
-            processedAt
-        };
+                case 'ListingPurchased':
+                    return {
+                        eventName: 'ItemBought',
+                        ...baseEvent,
+                        data: {
+                            listingId: args.listingId,
+                            tokenAddress: args.tokenAddress,
+                            tokenId: args.tokenId,
+                            buyer: args.buyer,
+                            seller: args.seller,
+                            price: args.price,
+                            erc1155Quantity: args.erc1155Quantity || 1n,
+                            partialBuy: args.partialBuy || false
+                        }
+                    } as ProcessedItemBoughtEvent;
 
-        // TODO: Proper event decoding using viem's decodeEventLog
-        // For now, return null - this will be completed in next iteration
-        
-        return null;
+                case 'ListingCanceled':
+                    return {
+                        eventName: 'ItemCanceled',
+                        ...baseEvent,
+                        data: {
+                            listingId: args.listingId,
+                            tokenAddress: args.tokenAddress,
+                            tokenId: args.tokenId,
+                            seller: args.seller,
+                            triggeredBy: args.triggeredBy
+                        }
+                    } as ProcessedItemCanceledEvent;
+
+                case 'ListingUpdated':
+                    return {
+                        eventName: 'ItemUpdated',
+                        ...baseEvent,
+                        data: {
+                            listingId: args.listingId,
+                            tokenAddress: args.tokenAddress,
+                            tokenId: args.tokenId,
+                            seller: args.seller,
+                            newPrice: args.price,
+                            newErc1155Quantity: args.erc1155Quantity || 1n,
+                            newBuyerWhitelistEnabled: args.buyerWhitelistEnabled || false,
+                            newPartialBuyEnabled: args.partialBuyEnabled || false
+                        }
+                    } as ProcessedItemUpdatedEvent;
+
+                default:
+                    console.warn('⚠️ [EventListener] Unknown event:', log.eventName);
+                    return null;
+            }
+
+        } catch (error) {
+            console.error('❌ [EventListener] Decode error:', error);
+            return null;
+        }
     }
 
     /**
