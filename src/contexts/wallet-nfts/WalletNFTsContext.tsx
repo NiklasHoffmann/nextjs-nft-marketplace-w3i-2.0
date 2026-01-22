@@ -31,6 +31,7 @@ interface WalletNFTsContextType {
     nfts: WalletNFT[];
     loading: boolean;
     error: string | null;
+    lastFetched: number | null;
 
     // Stats
     totalCount: number;
@@ -64,10 +65,14 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
 
         try {
             const nfts = await WalletNFTsService.fetchWalletNFTs(walletAddress);
-            const newState = WalletNFTsCache.createSuccessState(nfts);
 
+            // Force new array and object references to trigger React re-renders
+            const freshNfts = nfts.map(nft => ({ ...nft }));
+            const newState = WalletNFTsCache.createSuccessState(freshNfts);
+
+            devLog.info('wallet-nfts', `✅ Fetched ${freshNfts.length} NFTs, setting new state`);
             setState(newState);
-            cache.set(walletAddress, nfts);
+            cache.set(walletAddress, freshNfts);
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -82,6 +87,7 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
 
     /**
      * Auto-load NFTs when wallet connects
+     * Implements Stale-While-Revalidate pattern for better UX
      */
     useEffect(() => {
         if (!isConnected || !address) {
@@ -94,12 +100,23 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
         // Check cache first
         const cached = cache.get(lowerAddress);
         if (cached) {
+            // Show cached data immediately
             setState(cached);
+
+            // But indicate we're refreshing in background
+            const cacheAge = Date.now() - (cached.lastFetched || 0);
+            const shouldRefresh = cacheAge > 30000; // Refresh if older than 30s
+
+            if (shouldRefresh) {
+                devLog.info('wallet-nfts', `📊 Showing cached data (${Math.round(cacheAge / 1000)}s old), refreshing in background...`);
+                // Background refresh without showing loading state
+                fetchWalletNFTs(address);
+            }
             return;
         }
 
-        // Fetch fresh data
-        devLog.info('wallet-nfts', '🔄 [WalletNFTsContext] Cache miss or expired, fetching fresh data');
+        // Fetch fresh data (no cache)
+        devLog.info('wallet-nfts', '🔄 [WalletNFTsContext] Cache miss, fetching fresh data');
         fetchWalletNFTs(address);
     }, [address, isConnected, fetchWalletNFTs, cache]);
 
@@ -126,26 +143,81 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
      * (e.g., after listing, purchasing, or canceling NFTs)
      */
     useEffect(() => {
-        const unsubscribe = onDataInvalidation((detail: InvalidationEventDetail) => {
+        let debouncedRefreshTimeout: NodeJS.Timeout | null = null;
+        let pendingRefreshPromise: Promise<void> | null = null;
+
+        const unsubscribe = onDataInvalidation(async (detail: InvalidationEventDetail) => {
             devLog.info('wallet-nfts', `🔔 Received invalidation event:`, detail);
 
             // Refresh wallet NFTs if:
             // 1. Manual refresh or graph update (affects all)
             // 2. Listing/purchase/cancel involving current wallet's NFT
             // 3. Transfer involving current wallet
+            // 4. Listing created/canceled (affects all wallets that own NFTs)
             const shouldRefresh =
                 detail.type === 'manual-refresh' ||
                 detail.type === 'graph-update' ||
+                detail.type === 'listing-created' || // Always refresh after listing (NFT moved to marketplace)
+                detail.type === 'listing-canceled' || // Always refresh after cancel (NFT returned to wallet)
                 (detail.walletAddress && address && detail.walletAddress.toLowerCase() === address.toLowerCase());
 
             if (shouldRefresh && address) {
-                devLog.info('wallet-nfts', `🔄 Auto-refreshing wallet NFTs after ${detail.type}`);
+                devLog.info('wallet-nfts', `🔄 Auto-refreshing wallet NFTs after ${detail.type}`, {
+                    contractAddress: detail.contractAddress,
+                    tokenId: detail.tokenId,
+                    walletAddress: address
+                });
+
+                // Clear context cache
                 cache.invalidate(address);
-                fetchWalletNFTs(address);
+
+                // Debounced retry strategy - prevents race conditions from multiple parallel fetches
+                if (detail.type === 'listing-created') {
+                    devLog.info('wallet-nfts', '⏱️ Listing detected - using debounced retry strategy');
+
+                    // Cancel any pending retry
+                    if (debouncedRefreshTimeout) {
+                        clearTimeout(debouncedRefreshTimeout);
+                    }
+
+                    // Immediate fetch (if not already pending)
+                    if (!pendingRefreshPromise) {
+                        pendingRefreshPromise = fetchWalletNFTs(address)
+                            .finally(() => {
+                                pendingRefreshPromise = null;
+                            });
+                    }
+
+                    // Schedule debounced retry after 5s (DB sync typically complete)
+                    debouncedRefreshTimeout = setTimeout(() => {
+                        if (!pendingRefreshPromise) {
+                            devLog.info('wallet-nfts', '🔄 [Debounced Retry] After 5s');
+                            pendingRefreshPromise = fetchWalletNFTs(address)
+                                .finally(() => {
+                                    pendingRefreshPromise = null;
+                                });
+                        } else {
+                            devLog.info('wallet-nfts', '⏸️ Skipping retry - fetch already in progress');
+                        }
+                    }, 5000);
+                } else {
+                    // For other events, single fetch is enough (with deduplication)
+                    if (!pendingRefreshPromise) {
+                        pendingRefreshPromise = fetchWalletNFTs(address)
+                            .finally(() => {
+                                pendingRefreshPromise = null;
+                            });
+                    }
+                }
             }
         });
 
-        return unsubscribe;
+        return () => {
+            unsubscribe();
+            if (debouncedRefreshTimeout) {
+                clearTimeout(debouncedRefreshTimeout);
+            }
+        };
     }, [address, cache, fetchWalletNFTs]);
 
     /**
@@ -215,6 +287,7 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
         nfts: state.nfts,
         loading: state.loading,
         error: state.error,
+        lastFetched: state.lastFetched,
         totalCount: stats.totalCount,
         listedCount: stats.listedCount,
         unlistedCount: stats.unlistedCount,

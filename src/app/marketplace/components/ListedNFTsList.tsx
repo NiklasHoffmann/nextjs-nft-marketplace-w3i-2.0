@@ -43,6 +43,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
     const loadMoreRef = useRef<HTMLDivElement>(null);
     const isLoadingMore = useRef(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
+    const [showReloadNotification, setShowReloadNotification] = useState(false);
 
     // Get search term from URL
     const searchParams = useSearchParams();
@@ -182,6 +183,34 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
         }
     }, [items.length, loading]);
 
+    // Listen for new listings and show notification
+    useEffect(() => {
+        const handleDataInvalidation = (event: Event) => {
+            const customEvent = event as CustomEvent<{ type: string }>;
+            const eventType = customEvent.detail?.type;
+
+            if (eventType === 'listing-created') {
+                console.log('🆕 [ListedNFTsList] New listing detected, showing notification...');
+                setShowReloadNotification(true);
+
+                // Hide notification after auto-reload completes (3s delay + 2s display)
+                setTimeout(() => {
+                    setShowReloadNotification(false);
+                }, 5000);
+            }
+        };
+
+        if (typeof window !== 'undefined') {
+            window.addEventListener('dataInvalidation', handleDataInvalidation);
+        }
+
+        return () => {
+            if (typeof window !== 'undefined') {
+                window.removeEventListener('dataInvalidation', handleDataInvalidation);
+            }
+        };
+    }, []);
+
     // Infinite Scroll
     useEffect(() => {
         if (!loadMoreRef.current || !pagination?.hasMore || loading || isLoadingMore.current) return;
@@ -240,6 +269,14 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
     return (
         <div className="w-full">
             <ImagePreloader imageUrls={imageUrls} priority={true} />
+
+            {/* New Listing Notification */}
+            {showReloadNotification && (
+                <div className="fixed top-20 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in">
+                    <SpinnerIcon className="w-5 h-5 animate-spin" />
+                    <span className="font-medium">Neues Listing wird geladen...</span>
+                </div>
+            )}
 
             {/* Header with Categories and Active Filters */}
             <div className="sticky top-[66px] z-10 bg-white border-b border-gray-200 mb-8 md:pl-16 pl-10">

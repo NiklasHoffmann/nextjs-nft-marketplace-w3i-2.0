@@ -385,9 +385,34 @@ export const GET = apiHandler(async (request: NextRequest) => {
         ];
     }
 
-    if (category && category.length > 0) metadataFilters['insights.category'] = { $in: category };
-    if (rarity && rarity.length > 0) metadataFilters['insights.rarity'] = { $in: rarity };
-    if (tags && tags.length > 0) metadataFilters['insights.tags'] = { $in: tags };
+    // Category filter - include items WITHOUT category (newly listed, not yet indexed by TheGraph)
+    if (category && category.length > 0) {
+        metadataFilters.$and = metadataFilters.$and || [];
+        metadataFilters.$and.push({
+            $or: [
+                { 'insights.category': { $in: category } },
+                { 'insights.category': { $exists: false } },
+                { 'insights.category': null }
+            ]
+        });
+    }
+
+    // Rarity filter - include items WITHOUT rarity (newly listed, not yet indexed by TheGraph)
+    if (rarity && rarity.length > 0) {
+        metadataFilters.$and = metadataFilters.$and || [];
+        metadataFilters.$and.push({
+            $or: [
+                { 'insights.rarity': { $in: rarity } },
+                { 'insights.rarity': { $exists: false } },
+                { 'insights.rarity': null }
+            ]
+        });
+    }
+
+    // Tags filter - strict match (no fallback for missing tags)
+    if (tags && tags.length > 0) {
+        metadataFilters['insights.tags'] = { $in: tags };
+    }
 
     if (Object.keys(metadataFilters).length > 0) {
         pipeline.push({ $match: metadataFilters });

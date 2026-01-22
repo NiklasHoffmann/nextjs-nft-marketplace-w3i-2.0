@@ -71,6 +71,12 @@ export function MarketplaceEventsProvider({
     marketplaceAddress,
     wsUrl
 }: MarketplaceEventsProviderProps) {
+    console.log('🏪 [MarketplaceEventsProvider] Initializing...');
+    console.log('   autoStart:', autoStart);
+    console.log('   debug:', debug);
+    console.log('   marketplaceAddress:', marketplaceAddress || 'default');
+    console.log('   wsUrl:', wsUrl || 'from env');
+
     const [latestEvent, setLatestEvent] = useState<ProcessedMarketplaceEvent | null>(null);
 
     // Setup event listener with auto-invalidation
@@ -90,6 +96,7 @@ export function MarketplaceEventsProvider({
             routeMarketplaceEvent(event);
         },
         onConnectionChange: (connected) => {
+            console.log(`🔌 [MarketplaceEvents] Connection status changed: ${connected ? '✅ CONNECTED' : '❌ DISCONNECTED'}`);
             if (debug) {
                 console.log(`🔌 [MarketplaceEvents] Connection ${connected ? 'established' : 'lost'}`);
             }
@@ -97,6 +104,13 @@ export function MarketplaceEventsProvider({
         onError: (error) => {
             console.error('❌ [MarketplaceEvents] Error:', error);
         }
+    });
+
+    console.log('📊 [MarketplaceEventsProvider] Current state:', {
+        isConnected,
+        eventsReceived,
+        lastEventAt,
+        stateActive: state.isActive
     });
 
     // Log connection status changes
@@ -133,11 +147,11 @@ export function MarketplaceEventsProvider({
  */
 export function useMarketplaceEventsContext(): MarketplaceEventsContextValue {
     const context = useContext(MarketplaceEventsContext);
-    
+
     if (!context) {
         throw new Error('useMarketplaceEventsContext must be used within MarketplaceEventsProvider');
     }
-    
+
     return context;
 }
 
@@ -151,14 +165,13 @@ export function EventConnectionStatus() {
     const { isConnected, eventsReceived } = useMarketplaceEventsContext();
 
     return (
-        <div 
+        <div
             className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-3 py-2 bg-gray-900/90 text-white text-sm rounded-lg shadow-lg backdrop-blur-sm"
             title={isConnected ? `Connected • ${eventsReceived} events` : 'Disconnected'}
         >
-            <div 
-                className={`w-2 h-2 rounded-full ${
-                    isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
-                }`}
+            <div
+                className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+                    }`}
             />
             <span className="font-medium">
                 {isConnected ? 'Live' : 'Offline'}
@@ -187,7 +200,7 @@ export function EventDebugPanel() {
     return (
         <div className="fixed top-20 right-4 z-50 w-80 bg-gray-900/95 text-white p-4 rounded-lg shadow-xl backdrop-blur-sm font-mono text-xs">
             <h3 className="text-sm font-bold mb-3 text-green-400">🔴 Event Listener</h3>
-            
+
             <div className="space-y-2">
                 <div className="flex justify-between">
                     <span className="text-gray-400">Status:</span>

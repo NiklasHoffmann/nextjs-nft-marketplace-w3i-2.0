@@ -9,17 +9,37 @@
 
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { ListingFlowProvider, useListingFlow } from './contexts/ListingFlowContext';
 import { SellHeader, FlowSidebar } from './components';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
 import type { ListingType } from './types';
+import { devLog } from '@/utils/devLog';
 
 function SellLayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const { formData, progressData } = useListingFlow();
     const walletNFTsContext = useWalletNFTs();
+
+    // Listen for listing-created events and force refresh
+    useEffect(() => {
+        const handleInvalidation = (event: CustomEvent) => {
+            const detail = event.detail;
+            devLog.info('sell-layout', '🔔 Received invalidation event:', detail);
+
+            // Force refresh when listing is created/canceled to update stats immediately
+            if (detail.type === 'listing-created' || detail.type === 'listing-canceled') {
+                devLog.info('sell-layout', '🔄 Stats will update automatically via WalletNFTsContext refresh');
+            }
+        };
+
+        window.addEventListener('data-invalidation', handleInvalidation as EventListener);
+
+        return () => {
+            window.removeEventListener('data-invalidation', handleInvalidation as EventListener);
+        };
+    }, []);
 
     // Calculate NFT selection and type first
     const selectedCount = pathname === '/sell/success'
@@ -76,15 +96,24 @@ function SellLayoutContent({ children }: { children: React.ReactNode }) {
     const headerConfig = getHeaderConfig();
 
     // Calculate NFT counts from WalletNFTsContext directly
-    const totalNFTs = useMemo(() => walletNFTsContext.nfts.length, [walletNFTsContext.nfts]);
-    const listedCount = useMemo(
-        () => walletNFTsContext.nfts.filter(nft => nft.isListed || nft.listingId).length,
-        [walletNFTsContext.nfts]
-    );
-    const unlistedCount = useMemo(
-        () => walletNFTsContext.nfts.filter(nft => !nft.isListed && !nft.listingId).length,
-        [walletNFTsContext.nfts]
-    );
+    // Re-calculate when nfts array OR lastFetched changes (ensures update after refresh)
+    const totalNFTs = useMemo(() => {
+        const count = walletNFTsContext.nfts.length;
+        devLog.info('sell-layout', `📊 Total NFTs: ${count} (lastFetched: ${walletNFTsContext.lastFetched})`);
+        return count;
+    }, [walletNFTsContext.nfts, walletNFTsContext.lastFetched]);
+
+    const listedCount = useMemo(() => {
+        const count = walletNFTsContext.nfts.filter(nft => nft.isListed || nft.listingId).length;
+        devLog.info('sell-layout', `📊 Listed NFTs: ${count}`);
+        return count;
+    }, [walletNFTsContext.nfts, walletNFTsContext.lastFetched]);
+
+    const unlistedCount = useMemo(() => {
+        const count = walletNFTsContext.nfts.filter(nft => !nft.isListed && !nft.listingId).length;
+        devLog.info('sell-layout', `📊 Unlisted NFTs: ${count}`);
+        return count;
+    }, [walletNFTsContext.nfts, walletNFTsContext.lastFetched]);
 
     return (
         <div className="min-h-screen bg-gray-50">

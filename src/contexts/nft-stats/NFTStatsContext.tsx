@@ -34,10 +34,10 @@ const statsCache = new Map<string, NFTStats>();
 const interactionsCache = new Map<string, UserInteractionState>();
 const listeners = new Map<string, Set<() => void>>();
 
-// Cache-Timestamps: Daten sind 30 Sekunden gültig
+// Cache-Timestamps: Daten sind 60 Sekunden gültig (aligned with TheGraph polling)
 const statsCacheTimestamps = new Map<string, number>();
 const interactionsCacheTimestamps = new Map<string, number>();
-const CACHE_TTL = 30000; // 30 Sekunden
+const CACHE_TTL = 60000; // 60 seconds
 
 // Request Queue für Batch Loading (verhindert Rate Limits)
 const pendingStatsRequests = new Map<string, Promise<void>>();

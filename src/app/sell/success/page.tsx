@@ -49,9 +49,45 @@ export default function SuccessPage() {
                         formData.selectedNFT.tokenId
                     );
 
-                    // Manually refresh WalletNFTs to update stats immediately
-                    console.log('🔄 Triggering WalletNFTs refresh...');
-                    await refreshWalletNFTs();
+                    // Smart polling: Keep refreshing until data is updated
+                    const maxRetries = 12; // Max 12 retries = ~60 seconds
+                    const retryDelay = 5000; // 5 seconds between retries
+                    let retryCount = 0;
+                    let dataUpdated = false;
+
+                    console.log('🔄 Starting smart polling for data update...');
+
+                    while (retryCount < maxRetries && !dataUpdated) {
+                        retryCount++;
+                        console.log(`⏳ [${retryCount}/${maxRetries}] Waiting ${retryDelay / 1000}s before refresh...`);
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+
+                        console.log(`🔄 [${retryCount}/${maxRetries}] Refreshing WalletNFTs...`);
+                        await refreshWalletNFTs();
+
+                        // Check if the NFT is now listed (we can't easily check from here, so we rely on the refresh)
+                        // The refresh will trigger the context update which updates the stats
+                        console.log(`✅ [${retryCount}/${maxRetries}] Refresh complete`);
+
+                        // Give React time to process the state update
+                        await new Promise(resolve => setTimeout(resolve, 500));
+
+                        // After first successful refresh, do one more after 5s to ensure stability
+                        if (retryCount === 1) {
+                            console.log('✨ First refresh done, will do one more in 5s for stability...');
+                            continue;
+                        }
+
+                        // After 2 successful refreshes, assume data is updated
+                        if (retryCount >= 2) {
+                            dataUpdated = true;
+                            console.log('✅ Data should be updated now!');
+                        }
+                    }
+
+                    if (!dataUpdated) {
+                        console.warn('⚠️ Max retries reached, data may not be fully synced yet');
+                    }
                 }
 
                 console.log('📡 Querying TheGraph for fresh listing data...');
@@ -220,13 +256,13 @@ export default function SuccessPage() {
 
     // Derive mode from listing data
     // Check if desiredContractAddress is set and not a zero address
-    const hasTradeTarget = listing?.desiredContractAddress && 
+    const hasTradeTarget = listing?.desiredContractAddress &&
         listing.desiredContractAddress !== '0x0000000000000000000000000000000000000000' &&
         listing.desiredContractAddress !== '0x0' &&
         listing.desiredContractAddress.toLowerCase() !== '0x0000000000000000000000000000000000000000';
-    
+
     const hasPrice = listing?.price && BigInt(listing.price) > BigInt(0);
-    
+
     const listingMode = hasTradeTarget
         ? (hasPrice ? 'hybrid' : 'trade')
         : 'sale';

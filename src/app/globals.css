@@ -42,6 +42,28 @@
     /* thumb blue, track transparent */
 }
 
+/* Prevent content from scrolling behind fixed header */
+html {
+    scroll-padding-top: 66px;
+}
+
+/* Additional scroll padding for pages with PageHeader */
+.has-page-header {
+    scroll-padding-top: 160px;
+}
+
+@media (min-width: 640px) {
+    .has-page-header {
+        scroll-padding-top: 140px;
+    }
+}
+
+@media (min-width: 768px) {
+    .has-page-header {
+        scroll-padding-top: 126px;
+    }
+}
+
 
 :root {
     --font-poppins: 'Poppins', system-ui, sans-serif;

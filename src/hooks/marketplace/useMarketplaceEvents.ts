@@ -71,11 +71,18 @@ export interface UseMarketplaceEventsReturn {
 }
 
 // Default marketplace address (Sepolia)
-const DEFAULT_MARKETPLACE_ADDRESS: Address = '0xF422A7779D2feB884CcC1773b88d98494A946604';
+const DEFAULT_MARKETPLACE_ADDRESS: Address = '0x1107Eb26D47A5bF88E9a9F97cbC7EA38c3E1D7EC';
 
 // ===== HOOK IMPLEMENTATION =====
 
 export function useMarketplaceEvents(config: UseMarketplaceEventsConfig = {}): UseMarketplaceEventsReturn {
+    console.log('🎣 [useMarketplaceEvents] Hook initialized with config:', {
+        autoStart: config.autoStart ?? true,
+        requireConnection: config.requireConnection ?? false,
+        marketplaceAddress: config.marketplaceAddress || 'default',
+        hasWsUrl: !!config.wsUrl
+    });
+
     const {
         autoStart = true,
         requireConnection = false,
@@ -87,68 +94,128 @@ export function useMarketplaceEvents(config: UseMarketplaceEventsConfig = {}): U
     // Wallet connection state
     const { isConnected: walletConnected } = useAccount();
 
-    // Hook state
-    const [state, setState] = useState<EventListenerState>({
-        isActive: false,
-        isConnected: false,
-        eventsProcessed: 0,
-        lastEventAt: null,
-        reconnectAttempts: 0,
-        activeSubscriptions: []
-    });
-
     // Service instance (stable reference)
     const listenerRef = useRef(getMarketplaceEventListener(marketplaceAddress, wsUrl));
     const configRef = useRef(listenerConfig);
-    const isStartedRef = useRef(false);
+
+    // Initialize state from service (important for remounts when service is still active)
+    const [state, setState] = useState<EventListenerState>(() => {
+        const serviceState = listenerRef.current.getState();
+        return serviceState;
+    });
+
+    const isStartedRef = useRef(listenerRef.current.getState().isActive);
+
+    console.log('🔗 [useMarketplaceEvents] Service instance created/retrieved');
+    console.log('   listenerRef.current:', !!listenerRef.current);
+    console.log('   marketplaceAddress:', marketplaceAddress);
+    console.log('   wsUrl:', wsUrl || 'from env');
 
     // Update config ref when it changes
     useEffect(() => {
         configRef.current = listenerConfig;
     }, [listenerConfig]);
 
-    // State update function (called by service)
+    // State update function (called by service callbacks ONLY)
     const updateState = useCallback(() => {
-        const newState = listenerRef.current.getState();
-        setState(newState);
+        try {
+            const newState = listenerRef.current.getState();
+            console.log('🔄 [updateState] Callback triggered, syncing state:', newState);
+            setState(newState);
+        } catch (error) {
+            console.error('❌ [updateState] Error:', error);
+        }
     }, []);
 
-    // Wrapped callbacks that update state
-    const wrappedConfig: EventListenerConfig = {
-        ...listenerConfig,
+    // Wrapped callbacks that update state (using refs to avoid recreating on every render)
+    const wrappedConfigRef = useRef<EventListenerConfig>({
         onEvent: async (event) => {
             updateState();
-            await listenerConfig.onEvent?.(event);
+            await configRef.current.onEvent?.(event);
         },
         onItemListed: async (event) => {
             updateState();
-            await listenerConfig.onItemListed?.(event);
+            await configRef.current.onItemListed?.(event);
         },
         onItemBought: async (event) => {
             updateState();
-            await listenerConfig.onItemBought?.(event);
+            await configRef.current.onItemBought?.(event);
         },
         onItemCanceled: async (event) => {
             updateState();
-            await listenerConfig.onItemCanceled?.(event);
+            await configRef.current.onItemCanceled?.(event);
         },
         onItemUpdated: async (event) => {
             updateState();
-            await listenerConfig.onItemUpdated?.(event);
+            await configRef.current.onItemUpdated?.(event);
         },
         onConnectionChange: (connected) => {
             updateState();
-            listenerConfig.onConnectionChange?.(connected);
+            configRef.current.onConnectionChange?.(connected);
         },
         onError: (error, eventName) => {
             updateState();
-            listenerConfig.onError?.(error, eventName);
+            configRef.current.onError?.(error, eventName);
         }
-    };
+    });
+
+    // Auto-start effect (runs ONCE on mount)
+    useEffect(() => {
+        console.log('🚀 [Auto-Start Effect] Mounted, autoStart:', autoStart);
+
+        if (autoStart && !isStartedRef.current) {
+            const currentState = listenerRef.current.getState();
+            console.log('📊 [Auto-Start] Current service state:', currentState);
+
+            if (!currentState.isActive) {
+                console.log('🚀 [Auto-Start] Starting listener with callbacks...');
+                isStartedRef.current = true;
+                listenerRef.current.start(wrappedConfigRef.current);
+            } else {
+                console.log('✅ [Auto-Start] Service already active');
+                isStartedRef.current = true;
+            }
+        }
+
+        // No cleanup - we want the service to keep running
+    }, [autoStart]);
+
+    // Periodic state sync (fallback in case callbacks miss updates)
+    useEffect(() => {
+        console.log('⏰ [State Sync] Setting up periodic sync (5s interval)');
+
+        const syncInterval = setInterval(() => {
+            const currentState = listenerRef.current.getState();
+            setState(prev => {
+                // Only update if state actually changed (avoid unnecessary re-renders)
+                if (prev.isActive !== currentState.isActive ||
+                    prev.isConnected !== currentState.isConnected ||
+                    prev.eventsProcessed !== currentState.eventsProcessed) {
+                    console.log('🔄 [Periodic Sync] State changed, updating:', {
+                        isConnected: currentState.isConnected,
+                        isActive: currentState.isActive
+                    });
+                    return currentState;
+                }
+                return prev;
+            });
+        }, 5000); // Every 5 seconds
+
+        return () => {
+            console.log('🧹 [State Sync] Cleanup periodic sync');
+            clearInterval(syncInterval);
+        };
+    }, []); // Empty deps - runs once
 
     // Start listening
     const start = useCallback(async () => {
+        console.log('🚀 [useMarketplaceEvents] start() called');
+        console.log('   isStartedRef.current:', isStartedRef.current);
+        console.log('   requireConnection:', requireConnection);
+        console.log('   walletConnected:', walletConnected);
+
         if (isStartedRef.current) {
+            console.log('⏭️ [useMarketplaceEvents] Already started, skipping');
             return;
         }
 
@@ -158,14 +225,17 @@ export function useMarketplaceEvents(config: UseMarketplaceEventsConfig = {}): U
             return;
         }
 
+        console.log('✓ [useMarketplaceEvents] Starting event listener...');
         try {
-            await listenerRef.current.start(wrappedConfig);
+            await listenerRef.current.start(wrappedConfigRef.current);
             isStartedRef.current = true;
             updateState();
+            console.log('✅ [useMarketplaceEvents] Event listener started successfully!');
         } catch (error) {
             console.error('❌ [useMarketplaceEvents] Start failed:', error);
+            console.error('   Error details:', error instanceof Error ? error.message : String(error));
         }
-    }, [requireConnection, walletConnected, wrappedConfig, updateState]);
+    }, [requireConnection, walletConnected, updateState]);
 
     // Stop listening
     const stop = useCallback(async () => {
@@ -187,19 +257,29 @@ export function useMarketplaceEvents(config: UseMarketplaceEventsConfig = {}): U
         return listenerRef.current.subscribe(eventName as any, callback);
     }, []);
 
+    console.log('📋 [useMarketplaceEvents] Before effects - state:', {
+        autoStart,
+        isStartedRef: isStartedRef.current,
+        requireConnection,
+        walletConnected
+    });
+
     // Auto-start effect
     useEffect(() => {
+        console.log('🔄 [useMarketplaceEvents] Auto-start effect triggered');
+        console.log('   autoStart:', autoStart);
+        console.log('   isStartedRef.current:', isStartedRef.current);
+
         if (autoStart && !isStartedRef.current) {
+            console.log('➡️ [useMarketplaceEvents] Calling start()...');
             start();
+        } else if (!autoStart) {
+            console.log('⏸️ [useMarketplaceEvents] autoStart is false, not starting');
         }
 
-        // Cleanup on unmount
-        return () => {
-            if (isStartedRef.current) {
-                stop();
-            }
-        };
-    }, [autoStart, start, stop]);
+        // NO cleanup - service is a singleton and should persist across component lifecycles
+        // Stopping here would disconnect WebSocket on page navigation
+    }, [autoStart, start]);
 
     // Wallet connection effect (if required)
     useEffect(() => {
@@ -211,6 +291,8 @@ export function useMarketplaceEvents(config: UseMarketplaceEventsConfig = {}): U
             }
         }
     }, [requireConnection, walletConnected, start, stop]);
+
+    console.log('✅ [useMarketplaceEvents] Hook render complete, returning state');
 
     return {
         isConnected: state.isConnected,

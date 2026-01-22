@@ -1,50 +1,59 @@
-# 🗂️ API Structure Overview
+# app/api/ - API Routes
 
-## 📋 Quick Reference
+Next.js API routes using standardized patterns with apiHandler, middleware, and validation.
 
+## Quick Reference
+
+### Standard Route Pattern
+```typescript
+import { apiHandler, withAuth, withAdmin } from '@/lib/api';
+import { z } from 'zod';
+
+// GET - Public endpoint
+export const GET = apiHandler(async (request) => {
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get('id');
+  
+  const data = await fetchData(id);
+  return { data };
+});
+
+// POST - Protected endpoint
+export const POST = apiHandler(async (request) => {
+  await withAuth(request);
+  const userAddress = request.userAddress; // auto-injected
+  
+  const body = await request.json();
+  const result = await processData(body, userAddress);
+  return { data: result };
+});
+
+// DELETE - Admin only
+export const DELETE = apiHandler(async (request) => {
+  await withAdmin(request);
+  
+  await deleteResource();
+  return { data: { message: 'Deleted' } };
+});
 ```
-/api/
-├── 🎯 nft/                              # All NFT-related operations
-│   ├── admin/
-│   │   └── insights/
-│   │       ├── route.ts                 # NFT Admin Insights (CUD)
-│   │       └── collections/
-│   │           └── route.ts             # Collection Admin Insights (CUD)
-│   ├── insights/
-│   │   ├── route.ts                     # Public NFT Insights (Read)
-│   │   └── collections/
-│   │       └── route.ts                 # Public Collection Insights (Read)
-│   ├── metadata/
-│   │   └── route.ts                     # NFT Metadata & Caching
-│   ├── stats/
-│   │   └── route.ts                     # NFT Statistics & Analytics
-│   └── tokenURI/
-│       └── route.ts                     # Blockchain TokenURI Access
-└── 👤 user/                             # All user-related operations
-    └── interactions/
-        └── route.ts                     # Combined User Interactions
+
+### With Validation
+```typescript
+import { withValidation } from '@/lib/middleware/validation';
+
+const schema = z.object({
+  name: z.string().min(1),
+  price: z.string().regex(/^\d+(\.\d+)?$/)
+});
+
+export const POST = apiHandler(async (request) => {
+  await withValidation(request, schema);
+  const body = await request.json();
+  
+  // body is now validated
+  return { data: body };
+});
 ```
-
----
-
-## 🚀 Endpoints Summary
-
-### 🎯 NFT Routes (`/api/nft/`)
-
-| Endpoint | Methods | Purpose | Auth Required |
-|----------|---------|---------|---------------|
-| **Admin Management** |
-| `/nft/admin/insights` | POST, PUT, DELETE | Manage NFT insights | ✅ Admin |
-| `/nft/admin/insights/collections` | POST, PUT, DELETE | Manage collection insights | ✅ Admin |
-| **Public Access** |
-| `/nft/insights` | GET | Read NFT insights | ❌ Public |
-| `/nft/insights/collections` | GET | Read collection insights | ❌ Public |
-| **Data Services** |
-| `/nft/metadata` | GET | Fetch NFT metadata | ❌ Public |
-| `/nft/stats` | GET, POST | NFT stats & view tracking | ❌ Public |
-| `/nft/tokenURI` | GET | Blockchain tokenURI | ❌ Public |
-
-### 👤 User Routes (`/api/user/`)
 
 | Endpoint | Methods | Purpose | Auth Required |
 |----------|---------|---------|---------------|

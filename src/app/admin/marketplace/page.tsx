@@ -9,6 +9,8 @@ import networkMapping from '@/constants/network.mapping.json';
 import { isAddress } from 'viem';
 import { hasAdminAccess } from '@/utils';
 import Link from 'next/link';
+import { AdminModeIndicator } from '@/components/admin/AdminModeIndicator';
+import { MigrationBanner } from '@/components/admin/MigrationBanner';
 
 export default function MarketplaceAdminPage() {
   const { address, isConnected } = useAccount();
@@ -321,6 +323,17 @@ export default function MarketplaceAdminPage() {
             </Link>
           </div>
 
+          {/* Admin Mode Indicator */}
+          <div className="mb-6">
+            <AdminModeIndicator diamondAddress={MARKETPLACE_ADDRESS} />
+          </div>
+
+          {/* Migration Banner (Optional - uncomment when migration is planned) */}
+          {/* <MigrationBanner 
+            migrationDate={new Date('2024-06-01')} 
+            showDismiss={true}
+          /> */}
+
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Marketplace Administration</h1>
@@ -354,6 +367,23 @@ export default function MarketplaceAdminPage() {
               </div>
             </div>
           )}
+
+          {/* Governance Mode Hint */}
+          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm text-blue-800 font-medium mb-1">💡 Governance Mode Available</p>
+                <p className="text-xs text-blue-600">
+                  For critical changes requiring <strong>multi-admin approval</strong> (e.g., fee changes, major whitelisting),
+                  use <Link href="/admin/multisig" className="underline font-semibold hover:text-blue-800">MultiSig Proposals</Link>.
+                  This page executes changes <strong>immediately</strong> as contract owner.
+                </p>
+              </div>
+            </div>
+          </div>
 
           {/* Status Messages */}
           {error && (

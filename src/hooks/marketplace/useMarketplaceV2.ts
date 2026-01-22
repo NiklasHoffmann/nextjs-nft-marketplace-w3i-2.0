@@ -93,6 +93,9 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
   // Ref to store latest fetchItems function
   const fetchItemsRef = useRef<((pageNum: number, append?: boolean) => Promise<void>) | null>(null);
 
+  // Track if component is mounted
+  const isMountedRef = useRef(true);
+
   // Create cache key from filters
   const createFilterKey = useCallback(() => {
     return JSON.stringify({
@@ -386,6 +389,62 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
     filters.sortBy,
     filters.sortOrder,
   ]);
+
+  // Listen for data invalidation events and auto-reload
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    // Listen for marketplace data invalidation (listing-created, purchased, canceled, etc.)
+    const handleInvalidation = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        type: string;
+        contractAddress?: string;
+        tokenId?: string;
+        timestamp: number;
+      }>;
+
+      const eventType = customEvent.detail?.type;
+
+      // Auto-reload on marketplace events that affect listings
+      const shouldReload =
+        eventType === 'listing-created' ||
+        eventType === 'listing-canceled' ||
+        eventType === 'nft-purchased' ||
+        eventType === 'graph-update' ||
+        eventType === 'manual-refresh';
+
+      if (shouldReload) {
+        console.log(`🔄 [useMarketplaceV2] ${eventType} event detected, auto-reloading...`);
+
+        // Only reload if component is still mounted and not during initial load
+        if (isMountedRef.current && !initialLoading) {
+          // SHORT delay for MongoDB sync (event-bridge now syncs immediately)
+          // Just give MongoDB a moment to complete the write operation
+          const delay = 500; // 500ms is enough for immediate MongoDB sync
+
+          console.log(`⏱️  [useMarketplaceV2] Waiting ${delay}ms for MongoDB sync...`);
+
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              console.log(`✅ [useMarketplaceV2] Reloading after ${eventType}`);
+              fetchItems(1, false);
+            }
+          }, delay);
+        }
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('dataInvalidation', handleInvalidation);
+    }
+
+    return () => {
+      isMountedRef.current = false;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('dataInvalidation', handleInvalidation);
+      }
+    };
+  }, [initialLoading, fetchItems]);
 
   return {
     items,

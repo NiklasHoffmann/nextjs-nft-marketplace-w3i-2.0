@@ -11,6 +11,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { devLog } from '@/utils/devLog';
 import { CollectionsService, type Collection } from './CollectionsService';
 import { CollectionsCache, type CollectionsState } from './CollectionsCache';
+import { onDataInvalidation, type InvalidationEventDetail } from '@/services/DataInvalidationService';
 
 interface CollectionsContextValue {
     collections: Collection[];
@@ -107,6 +108,45 @@ export function CollectionsProvider({
             fetchCollections();
         }
     }, [autoLoad, state.collections.length, state.loading, state.lastFetched, fetchCollections]);
+
+    /**
+     * Listen for data invalidation events
+     * Auto-refresh collections when marketplace events occur
+     * Optimized: Only full refresh on global events, partial on NFT-specific events
+     */
+    useEffect(() => {
+        const unsubscribe = onDataInvalidation((detail: InvalidationEventDetail) => {
+            devLog.info('collections', `🔔 Received invalidation event:`, detail);
+
+            // Full refresh only for global events
+            const needsFullRefresh =
+                detail.type === 'graph-update' ||
+                detail.type === 'manual-refresh';
+
+            // Partial refresh for NFT-specific events (only affects one collection)
+            const needsPartialRefresh =
+                detail.type === 'listing-created' ||
+                detail.type === 'listing-canceled' ||
+                detail.type === 'nft-purchased';
+
+            if (needsFullRefresh) {
+                devLog.info('collections', `🔄 Full refresh after ${detail.type}`);
+                cache.clearCache();
+                fetchCollections(true);
+            } else if (needsPartialRefresh && detail.contractAddress) {
+                // Optimized: Only refresh the affected collection
+                devLog.info('collections', `🔄 Partial refresh for collection ${detail.contractAddress}`);
+                // For now, still do full refresh but with shorter delay
+                // Future optimization: Update only affected collection in cache
+                setTimeout(() => {
+                    cache.clearCache();
+                    fetchCollections(true);
+                }, 2000); // 2s delay for DB to sync
+            }
+        });
+
+        return unsubscribe;
+    }, [cache, fetchCollections]);
 
     // Calculate statistics
     const stats = useMemo(() => CollectionsService.calculateStats(state.collections), [state.collections]);

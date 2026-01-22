@@ -18,7 +18,7 @@ export interface CollectionsState {
 }
 
 export class CollectionsCache {
-    private static readonly DEFAULT_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+    private static readonly DEFAULT_CACHE_DURATION = 60 * 1000; // 60 seconds (aligned with TheGraph polling)
 
     private cache: CollectionsState | null = null;
     private cacheDuration: number;

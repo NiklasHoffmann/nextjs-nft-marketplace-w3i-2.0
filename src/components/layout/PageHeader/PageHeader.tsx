@@ -85,13 +85,13 @@ function BackButton({ href, label }: BackLink) {
     return (
         <Link
             href={href as Route}
-            className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors flex-shrink-0"
+            className="inline-flex items-center gap-1 sm:gap-1.5 text-gray-500 hover:text-gray-900 transition-colors flex-shrink-0"
             title={label}
         >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            <span className="text-xs font-medium">{label}</span>
+            <span className="text-[11px] sm:text-xs font-medium truncate max-w-[80px] sm:max-w-none">{label}</span>
         </Link>
     );
 }
@@ -100,7 +100,7 @@ function BackButton({ href, label }: BackLink) {
  * Separator - Visual divider
  */
 function Separator() {
-    return <div className="w-px h-8 bg-gray-200 flex-shrink-0" />;
+    return <div className="hidden md:block w-px h-8 bg-gray-200 flex-shrink-0" />;
 }
 
 /**
@@ -164,17 +164,17 @@ function TitleSection({
             : address;
 
         return (
-            <div className="min-w-0">
-                <h1 className="text-lg font-bold text-gray-900 leading-tight truncate">
+            <div className="min-w-0 flex-1">
+                <h1 className="text-base sm:text-lg font-bold text-gray-900 leading-tight truncate">
                     {title}
                 </h1>
                 <div className="flex items-center gap-1.5">
-                    <p className="font-mono text-[11px] text-gray-600 truncate leading-tight">
+                    <p className="font-mono text-[10px] sm:text-[11px] text-gray-600 truncate leading-tight">
                         {displayText}
                     </p>
                     <button
                         onClick={() => handleCopy(address)}
-                        className="text-gray-500 hover:text-gray-900 transition-colors p-0.5 hover:bg-gray-100 rounded"
+                        className="text-gray-500 hover:text-gray-900 transition-colors p-0.5 hover:bg-gray-100 rounded flex-shrink-0"
                         title="Copy Address"
                         aria-label="Copy address"
                     >
@@ -188,12 +188,12 @@ function TitleSection({
     }
 
     return (
-        <div className="min-w-0">
-            <h1 className="text-lg font-bold text-gray-900 leading-tight truncate">
+        <div className="min-w-0 flex-1">
+            <h1 className="text-base sm:text-lg font-bold text-gray-900 leading-tight truncate">
                 {title}
             </h1>
             {subtitle && (
-                <p className="text-[11px] text-gray-500 truncate leading-tight">
+                <p className="text-[10px] sm:text-[11px] text-gray-500 truncate leading-tight">
                     {subtitle}
                 </p>
             )}
@@ -266,13 +266,13 @@ export function PageHeader({
 }: PageHeaderProps) {
     return (
         <div className={`fixed top-[66px] left-0 right-0 ${hasSidebar ? 'md:left-16' : ''} z-10 bg-white border-b border-gray-200 ${className}`}>
-            <div className="px-8 py-2.5">
-                <div className="flex items-center justify-between gap-8">
+            <div className="px-4 sm:px-6 md:px-8 py-3 md:py-2.5">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-8">
                     {/* Left Side - Navigation, Icon, Title */}
-                    <div className="flex items-center gap-4 min-w-0">
+                    <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1 md:flex-initial">
                         <BackButton {...backLink} />
                         <Separator />
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-2 md:gap-2.5 min-w-0 flex-1">
                             <IconBadge {...icon} />
                             <TitleSection title={title} subtitle={subtitle} />
                         </div>
@@ -280,7 +280,7 @@ export function PageHeader({
 
                     {/* Right Side - Stats or custom content */}
                     {rightContent && (
-                        <div className="flex-1 max-w-2xl">
+                        <div className="w-full md:flex-1 md:max-w-2xl">
                             {rightContent}
                         </div>
                     )}

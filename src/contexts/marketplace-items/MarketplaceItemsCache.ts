@@ -24,7 +24,7 @@ export interface MarketplaceItemsCacheState {
 }
 
 export class MarketplaceItemsCache {
-    private static readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+    private static readonly CACHE_TTL = 60 * 1000; // 60 seconds (aligned with TheGraph polling)
     private static readonly INITIAL_STATE: MarketplaceItemsCacheState = {
         entries: new Map(),
         loading: false,

@@ -40,6 +40,18 @@ if (process.env.NODE_ENV === 'development') {
 // separate module, the client can be shared across functions.
 export default clientPromise;
 
+// Helper function to get database (alias for backward compatibility)
+export async function connectToDatabase(): Promise<{ db: Db; client: MongoClient }> {
+    try {
+        const client = await clientPromise;
+        const db = client.db();
+        return { db, client };
+    } catch (error: any) {
+        console.error('❌ [MongoDB] Connection failed:', error);
+        throw new MongoConnectionError(error);
+    }
+}
+
 // Helper function to get database
 export async function getDatabase(): Promise<Db> {
     try {

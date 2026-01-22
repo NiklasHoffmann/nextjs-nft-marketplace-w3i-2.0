@@ -206,7 +206,7 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
                 filteredCount={filteredCount}
             />
 
-            <main className="pt-[126px] md:pl-16">
+            <main className="pt-[160px] sm:pt-[140px] md:pt-[126px] md:pl-16">
                 {/* Collection Header */}
                 <PageHeader
                     backLink={{

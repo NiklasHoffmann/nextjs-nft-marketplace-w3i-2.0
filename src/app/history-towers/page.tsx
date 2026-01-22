@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 
 export default function HistoryTowersPage() {
     return (
-        <div className="fixed inset-0 bg-gray-50 pt-16 overflow-hidden">
+        <div className="fixed inset-0 bg-gray-50 pt-[66px] overflow-hidden">
             <GamePageLayout />
         </div>
     );

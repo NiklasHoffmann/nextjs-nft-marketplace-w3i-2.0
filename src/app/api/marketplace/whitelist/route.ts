@@ -5,7 +5,7 @@ import marketplaceAbi from '@/constants/marketplace.abi.json';
 import { apiHandler } from '@/lib/api/handler';
 import { apiSuccess } from '@/lib/api/responses';
 
-const MARKETPLACE_ADDRESS = '0xF422A7779D2feB884CcC1773b88d98494A946604';
+const MARKETPLACE_ADDRESS = '0x1107Eb26D47A5bF88E9a9F97cbC7EA38c3E1D7EC';
 
 export const GET = apiHandler(async (request: NextRequest) => {
   const client = createPublicClient({
