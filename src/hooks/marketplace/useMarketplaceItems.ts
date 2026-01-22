@@ -461,7 +461,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
 /**
  * Hook for fetching collections from the V2 API
  */
-interface UseCollectionsV2Options {
+interface UseMarketplaceCollectionsOptions {
   page?: number;
   limit?: number;
   minFloorPrice?: string;
