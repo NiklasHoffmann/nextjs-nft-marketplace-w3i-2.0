@@ -1,115 +1,207 @@
 # Scripts Directory
 
-This directory contains scripts for data synchronization, database maintenance, and development tools.
+Professional script organization for the NFT Marketplace.
+
+## 📁 Directory Structure
+
+```
+scripts/
+├── production/          # Production-ready scripts
+├── dev/                # Development & testing tools
+├── utils/              # Utility scripts
+├── maintenance/        # Maintenance & cleanup
+├── lib/                # Shared libraries
+└── archive/            # Historical scripts (reference only)
+```
 
 ## 🚀 Production Scripts
 
-### Main Sync Script
-```bash
-node scripts/sync-marketplace-data.js
-```
-**Purpose**: Synchronizes NFT data from TheGraph → Blockchain → IPFS → MongoDB
-- Fetches marketplace events from TheGraph subgraph
-- Retrieves contract data (owner, tokenURI, approval) via viem
-- Parses metadata from IPFS
-- Loads insights from admin_nft_insights collection
-- Updates marketplace_items collection
-- Auto-start on server boot (production)
+Located in [`production/`](./production/)
 
-**Status**: ✅ Active - 61 NFTs synced
+### Main Synchronization
+- **`sync-marketplace-data.js`** ⭐ **MAIN PRODUCTION SCRIPT**
+  ```bash
+  node scripts/production/sync-marketplace-data.js
+  ```
+  - Syncs NFT data: TheGraph → Blockchain → IPFS → MongoDB
+  - Auto-start on server boot (production)
+  - Status: ✅ Active (61 NFTs synced)
 
-### Database Setup
-```bash
-node scripts/create-indexes.js
-```
-**Purpose**: Creates MongoDB indexes for optimal query performance
-- Run after schema changes
-- Improves marketplace queries
+- **`start-sync.mjs`** / **`start-sync.ts`**
+  - Entry points for starting the sync service
+  - Used by server instrumentation
 
-```bash
-node scripts/migrate-nft-stats.js
-```
-**Purpose**: Initializes/migrates nft_stats collection
-- Run once when setting up stats system
-- Creates initial stats documents from user interactions
+- **`sync-collections.ts`**
+  - Syncs collection-level data and statistics
+  - Aggregates marketplace insights
+
+### Database Management
+- **`create-indexes.js`**
+  ```bash
+  node scripts/production/create-indexes.js
+  ```
+  - Creates MongoDB indexes for optimal query performance
+  - Run after schema changes
+
+- **`create-cart-indexes.js`**
+  - Creates cart-specific indexes
+  - Run once for cart feature setup
+
+- **`migrate-nft-stats.js`**
+  ```bash
+  node scripts/production/migrate-nft-stats.js
+  ```
+  - Initializes/migrates nft_stats collection
+  - Run once when setting up stats system
 
 ## 🧪 Development Scripts
 
-Located in `scripts/dev/`:
+Located in [`dev/`](./dev/)
 
 ### Testing
-```bash
-node scripts/dev/test-sort.js          # Test MongoDB numerical sorting
-node scripts/dev/test-api-direct.js    # Test API endpoints
-node scripts/dev/test-subgraph.js      # Test TheGraph queries
-```
+- **`test-api-direct.js`** - Direct API endpoint testing
+- **`test-subgraph.js`** - TheGraph query testing
+- **`test-sort.js`** - MongoDB sorting verification
 
 ### Verification
+- **`check-data-structure.js`** - Inspect MongoDB documents
+- **`check-nft-stats.js`** - Verify nft_stats collection
+- **`check-full-schema.js`** - Full schema validation
+- **`verify-stats-separation.js`** - Data separation audit
+
+### Seeding
+- **`add-test-stats.js`** - Add test statistics data
+- **`seed-test-data.ts`** - Seed test marketplace data
+- **`setup-indexes.ts`** - Setup development indexes
+
+## 🛠️ Utility Scripts
+
+Located in [`utils/`](./utils/)
+
+- **`calc-selector.js`** - Calculate function selectors
+- **`compare-abi.js`** - Compare ABI files
+- **`find-signature.js`** - Find function signatures
+
+## 🔧 Maintenance Scripts
+
+Located in [`maintenance/`](./maintenance/)
+
 ```bash
-node scripts/dev/check-data-structure.js     # Inspect MongoDB documents
-node scripts/dev/check-nft-stats.js          # Verify stats collection
-node scripts/dev/verify-stats-separation.js  # Verify data separation
+node scripts/maintenance/<script-name>
 ```
 
-### Development Utilities
-```bash
-node scripts/dev/add-test-stats.js     # Add test stats data
-```
+- **`cleanup-duplicate-interactions.ts`** - Remove duplicate user interactions
+- **`cleanup-orphaned.js`** - Remove orphaned data
+- **`fix-negative-stats.js`** - Fix negative stat values
 
-## 🛠️ Maintenance Scripts
+## 📦 Shared Libraries
 
-Located in `scripts/maintenance/`:
+Located in [`lib/`](./lib/)
 
-```bash
-node scripts/maintenance/cleanup-duplicate-interactions.ts  # Remove duplicate user interactions
-node scripts/maintenance/cleanup-orphaned.js                # Remove orphaned data
-node scripts/maintenance/fix-negative-stats.js              # Fix negative stat values
-```
+- **`sync-helpers.js`** - Shared synchronization utilities
 
-## 📦 Archive
+## 📚 Archive
 
-All obsolete scripts have been moved to `scripts/archive/`:
-- `archive/old-sync/` - Old synchronization scripts (replaced by sync-marketplace-data.js)
-- `archive/old-migrations/` - Applied migration scripts (already executed)
-- `archive/debug-check/` - Old debug/check scripts (superseded)
-- `archive/old-tests/` - Old test scripts (no longer needed)
-- `archive/refactor/` - PowerShell refactoring scripts (already applied)
-- `archive/fixes/` - One-time fix scripts (already applied)
+Located in [`archive/`](./archive/)
 
-## 📋 Script Organization
+Historical scripts kept for reference only:
+- `archive/check-scripts/` - Debug/check scripts (one-time use)
+- `archive/migrations/` - Applied migration scripts
+- `archive/fixes/` - Applied fix scripts
+- `archive/tests/` - Old test scripts
 
-### Essential (Keep)
-- ✅ `sync-marketplace-data.js` - Main production sync
-- ✅ `create-indexes.js` - Database indexes
-- ✅ `migrate-nft-stats.js` - Stats migration
-
-### Development (Keep)
-- ✅ `dev/` folder - Testing and verification tools
-
-### Maintenance (Keep if needed)
-- ⚠️ `maintenance/` folder - Cleanup and fix scripts
-
-### Archive (Reference only)
-- 📦 `archive/` folder - Obsolete scripts for reference
+**⚠️ These scripts are NOT maintained and may not work with current codebase.**
 
 ## 🎯 Quick Reference
 
 | Task | Command |
 |------|---------|
-| Sync marketplace data | `node scripts/sync-marketplace-data.js` |
-| Create DB indexes | `node scripts/create-indexes.js` |
-| Migrate stats | `node scripts/migrate-nft-stats.js` |
-| Test price sorting | `node scripts/dev/test-sort.js` |
-| Check data structure | `node scripts/dev/check-data-structure.js` |
-| Verify stats | `node scripts/dev/check-nft-stats.js` |
+| **Start sync service** | `node scripts/production/sync-marketplace-data.js` |
+| **Create DB indexes** | `node scripts/production/create-indexes.js` |
+| **Migrate stats** | `node scripts/production/migrate-nft-stats.js` |
+| **Test API** | `node scripts/dev/test-api-direct.js` |
+| **Check data** | `node scripts/dev/check-data-structure.js` |
+| **Cleanup duplicates** | `node scripts/maintenance/cleanup-duplicate-interactions.ts` |
 
-## 🔄 Auto-Sync (Production)
+## 📋 Best Practices
 
-The main sync script runs automatically on server boot via:
-- Node.js: Server startup hook
-- Polling interval: 30 seconds
-- Status: ✅ Active
+### For Production Scripts
+- ✅ Always test in development first
+- ✅ Check MongoDB connection before running
+- ✅ Monitor logs for errors
+- ✅ Use environment variables from `.env.local`
 
-## 📚 Documentation
+### For Development Scripts
+- Run in non-production environment
+- Safe to experiment and modify
+- Create backups before testing cleanup scripts
 
-See `SCRIPTS_OVERVIEW.md` for detailed script descriptions and categorization.
+### For Maintenance Scripts
+- ⚠️ Run with caution in production
+- Always create database backups first
+- Test on staging environment when possible
+
+## 🔍 Finding Scripts
+
+Use these commands to quickly find scripts:
+
+```bash
+# List all production scripts
+ls scripts/production/
+
+# List all dev scripts
+ls scripts/dev/
+
+# Search for specific functionality
+grep -r "function name" scripts/
+```
+
+## 📝 Adding New Scripts
+
+When adding new scripts:
+
+1. **Determine the correct location:**
+   - Production-critical → `production/`
+   - Testing/debugging → `dev/`
+   - One-time maintenance → `maintenance/`
+   - Utilities → `utils/`
+
+2. **Follow naming conventions:**
+   - Verbs first: `sync-`, `create-`, `migrate-`, `check-`, `test-`
+   - Clear purpose: `sync-marketplace-data.js` not `sync.js`
+
+3. **Add documentation:**
+   - Comment header with purpose
+   - Update this README
+   - Add usage examples
+
+4. **Include error handling:**
+   - MongoDB connection errors
+   - Environment variable checks
+   - Graceful failures
+
+## 🆘 Troubleshooting
+
+### MongoDB Connection Issues
+Check MongoDB connection in development environment first.
+
+### Sync Issues
+Monitor logs in production/sync-marketplace-data.js output.
+
+### Missing Environment Variables
+Ensure `.env.local` contains:
+- `MONGODB_URI`
+- `THEGRAPH_URL`
+- `ALCHEMY_API_KEY`
+- `RPC_URL`
+
+## 📖 Related Documentation
+
+- [ORGANIZATION_SUMMARY.md](./ORGANIZATION_SUMMARY.md) - Reorganization notes
+- [docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md) - Development guide
+- [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) - System architecture
+
+---
+
+**Last Updated:** January 19, 2026  
+**Status:** Reorganization Complete ✅

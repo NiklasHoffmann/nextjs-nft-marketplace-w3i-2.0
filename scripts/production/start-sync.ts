@@ -12,7 +12,7 @@ import { join } from 'path';
 config({ path: join(process.cwd(), '.env.local') });
 
 async function startSync() {
-    console.log('\n🚀 Starting NFT Sync Service manually...\n');
+    console.log('\n🚀 Starting NFT Sync Service (HYBRID MODE)...\n');
 
     try {
         const { getNFTSyncService } = await import('../src/services/nft-sync/index.js');
@@ -20,9 +20,10 @@ async function startSync() {
         const syncService = getNFTSyncService();
         await syncService.start();
 
-        console.log('\n✅ Sync Service is now running!');
-        console.log('📊 Fetching listings every 30 seconds from The Graph v2');
-        console.log('💾 Syncing to MongoDB: marketplace_items');
+        console.log('\n✅ Hybrid Sync Service is now running!');
+        console.log('🎧 WebSocket: Real-time events from Infura (< 1 second)');
+        console.log('📊 TheGraph v2: Polling every 30 seconds (fallback)');
+        console.log('💾 MongoDB: marketplace_items, nft_metadata, nft_stats');
         console.log('\n💡 Press Ctrl+C to stop\n');
 
         // Keep process alive and show status
@@ -31,7 +32,8 @@ async function startSync() {
             const now = new Date().toLocaleTimeString();
 
             if (status.isRunning) {
-                console.log(`[${now}] ✓ Sync service alive -`, status.graphSyncV2);
+                const wsStatus = status.eventListener?.isConnected ? '🟢 Connected' : '🔴 Disconnected';
+                console.log(`[${now}] Service alive - WebSocket: ${wsStatus} | Graph: ${status.graphSyncV2?.status || 'running'}`);
             } else {
                 console.log(`[${now}] ⚠️ Sync service stopped!`);
             }

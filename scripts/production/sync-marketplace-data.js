@@ -9,7 +9,7 @@ const {
     upsertNFTMetadata,
     upsertMarketplaceListing,
     hasListingChanged
-} = require('./lib/sync-helpers');
+} = require('../lib/sync-helpers');
 
 require('dotenv').config({ path: '.env.local' });
 
