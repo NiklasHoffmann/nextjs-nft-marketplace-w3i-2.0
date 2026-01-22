@@ -15,11 +15,13 @@ import type { Address, Hash, Log } from 'viem';
 /**
  * All marketplace contract event names
  */
-export type MarketplaceEventName = 
+export type MarketplaceEventName =
     | 'ItemListed'
-    | 'ItemBought' 
+    | 'ItemBought'
     | 'ItemCanceled'
-    | 'ItemUpdated';
+    | 'ItemUpdated'
+    | 'ListingCanceledDueToInvalidListing'
+    | 'CollectionWhitelistRevokedCancelTriggered';
 
 // ===== RAW EVENT DATA (from contract logs) =====
 
@@ -135,7 +137,7 @@ export interface ProcessedItemUpdatedEvent extends BaseMarketplaceEvent {
 /**
  * Union type of all processed marketplace events
  */
-export type ProcessedMarketplaceEvent = 
+export type ProcessedMarketplaceEvent =
     | ProcessedItemListedEvent
     | ProcessedItemBoughtEvent
     | ProcessedItemCanceledEvent
