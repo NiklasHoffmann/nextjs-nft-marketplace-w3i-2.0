@@ -22,28 +22,28 @@ export const GET_ACTIVE_LISTINGS = gql`
             orderBy: createdAt
             orderDirection: desc
         ) {
-            id
+            active
+            buyerWhitelistEnabled
             chainId
+            createdAt
+            currency
+            desiredErc1155Quantity
+            desiredTokenAddress
+            desiredTokenId
+            erc1155QuantityListed
+            feeRate
+            id
             listingId
+            listingType
+            partialBuyEnabled
+            priceTotal
+            remainingQuantity
+            seller
+            status
             tokenAddress
             tokenId
             tokenStandard
-            erc1155QuantityListed
-            remainingQuantity
-            priceTotal
             unitPrice
-            buyerWhitelistEnabled
-            partialBuyEnabled
-            listingType
-            feeRate
-            desiredTokenAddress
-            desiredTokenId
-            desiredErc1155Quantity
-            currency
-            seller
-            status
-            active
-            createdAt
         }
     }
 `;

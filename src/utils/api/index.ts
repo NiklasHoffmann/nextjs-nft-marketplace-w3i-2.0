@@ -13,7 +13,6 @@ export {
     fetchNFTInsights,
     fetchCollectionInsights,
     fetchNFTStats,
-    fetchMarketplaceListing,
     fetchMultipleNFTs,
     checkAPIHealth
 } from './nft';

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createPublicClient, http } from 'viem';
 import { sepolia } from 'viem/chains';
-import marketplaceAbi from '@/constants/marketplace.abi.json';
+import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
 import { apiHandler } from '@/lib/api/handler';
 import { apiSuccess } from '@/lib/api/responses';
 
@@ -15,7 +15,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
   const whitelistedCollections = await client.readContract({
     address: MARKETPLACE_ADDRESS as `0x${string}`,
-    abi: marketplaceAbi,
+    abi: MARKETPLACE_ABI,
     functionName: 'getWhitelistedCollections',
   }) as string[];
 

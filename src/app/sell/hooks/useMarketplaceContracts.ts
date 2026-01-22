@@ -8,20 +8,13 @@
 
 import { useMarketplaceListing } from '@/hooks/marketplace/useMarketplaceListing';
 import { useChainId } from 'wagmi';
-import networkMapping from '@/constants/network.mapping.json';
-
-type NetworkMapping = {
-    [key: string]: {
-        NftMarketplace: string[];
-    };
-};
+import { NETWORK_CONFIG } from '@/config/networks';
 
 export function useMarketplaceContracts() {
     const chainId = useChainId();
     
     // Get marketplace address from network mapping
-    const mapping = networkMapping as NetworkMapping;
-    const marketplaceAddress = (mapping[chainId.toString()]?.NftMarketplace?.[0] || '') as `0x${string}`;
+    const marketplaceAddress = (NETWORK_CONFIG[chainId.toString()]?.NftMarketplace?.[0] || '') as `0x${string}`;
     
     const { createListing, isLoading, error, isSuccess, isError, txHash } = useMarketplaceListing(marketplaceAddress);
 

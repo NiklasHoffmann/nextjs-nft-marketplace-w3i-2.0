@@ -8,7 +8,7 @@
 import { NextRequest } from 'next/server';
 import { createPublicClient, http, getAddress } from 'viem';
 import { sepolia } from 'viem/chains';
-import marketplaceAbi from '@/constants/marketplace.abi.json';
+import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
 import { apiHandler } from '@/lib/api/handler';
 import { apiSuccess, apiBadRequest } from '@/lib/api/responses';
 
@@ -41,7 +41,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
         // Call isCollectionWhitelisted on marketplace contract
         const isWhitelisted = await publicClient.readContract({
             address: checksummedMarketplace,
-            abi: marketplaceAbi,
+            abi: MARKETPLACE_ABI,
             functionName: 'isCollectionWhitelisted',
             args: [checksummedCollection]
         });

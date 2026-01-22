@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useAccount, useChainId } from 'wagmi';
 import { useMarketplaceAdmin } from '@/hooks/marketplace/useMarketplaceAdmin';
 import { useReadContract } from 'wagmi';
-import marketplaceAbi from '@/constants/marketplace.abi.json';
-import networkMapping from '@/constants/network.mapping.json';
+import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
+import { NETWORK_CONFIG } from '@/config/networks';
 import { isAddress } from 'viem';
 import { hasAdminAccess } from '@/utils';
 import Link from 'next/link';
@@ -20,7 +20,7 @@ export default function MarketplaceAdminPage() {
   // Get marketplace address for current chain
   const getMarketplaceAddress = (): string => {
     const chainIdStr = chainId?.toString() || '11155111'; // Default to Sepolia
-    const mapping = networkMapping as Record<string, { NftMarketplace: string[] }>;
+    const mapping = NETWORK_CONFIG as Record<string, { NftMarketplace: string[] }>;
     return mapping[chainIdStr]?.NftMarketplace?.[0] || '';
   };
 
@@ -53,19 +53,19 @@ export default function MarketplaceAdminPage() {
   // Read current values
   const { data: currentFee } = useReadContract({
     address: MARKETPLACE_ADDRESS as `0x${string}`,
-    abi: marketplaceAbi,
+    abi: MARKETPLACE_ABI,
     functionName: 'getInnovationFee',
   });
 
   const { data: whitelistedCollections, refetch: refetchCollections } = useReadContract({
     address: MARKETPLACE_ADDRESS as `0x${string}`,
-    abi: marketplaceAbi,
+    abi: MARKETPLACE_ABI,
     functionName: 'getWhitelistedCollections',
   });
 
   const { data: contractOwner } = useReadContract({
     address: MARKETPLACE_ADDRESS as `0x${string}`,
-    abi: marketplaceAbi,
+    abi: MARKETPLACE_ABI,
     functionName: 'getContractOwner',
   }) as { data: string | undefined };
 

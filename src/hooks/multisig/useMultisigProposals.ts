@@ -14,7 +14,8 @@ import {
     ProposalType,
     ProposalStatus
 } from '@/types/multisig';
-import marketplaceAbi from '@/constants/marketplace.abi.json';
+import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
+import { MULTISIG_WALLET_ABI } from '@/config/abis/multisig-wallet';
 import { encodeFunctionData } from 'viem';
 
 export function useMultisigProposals(marketplaceAddress?: string) {
@@ -203,14 +204,22 @@ export function useMultisigProposals(marketplaceAddress?: string) {
             const functionName = proposal.functionName;
             const args = proposal.functionArgs;
 
+            // Determine which ABI to use based on target contract
+            // If targeting the marketplace, use marketplace ABI
+            // Otherwise (e.g., multisig operations), use multisig ABI
+            const isMarketplaceOperation = proposal.targetContract.toLowerCase() === marketplaceAddress?.toLowerCase();
+            const contractABI = isMarketplaceOperation ? MARKETPLACE_ABI : MULTISIG_WALLET_ABI;
+
             notifications.info('Executing Proposal', 'Please confirm the transaction in your wallet...');
 
             // Execute the contract call
+            // Note: We use 'any' here because the proposal can target different contracts
+            // with different function signatures. The actual validation happens on-chain.
             writeContract({
                 address: proposal.targetContract as `0x${string}`,
-                abi: marketplaceAbi,
+                abi: contractABI as any,
                 functionName: functionName as any,
-                args: args as any[],
+                args: args as any,
             });
 
             return true;

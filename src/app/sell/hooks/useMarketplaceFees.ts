@@ -7,7 +7,7 @@
 'use client';
 
 import { useReadContract } from 'wagmi';
-import marketplaceAbi from '@/constants/marketplace.abi.json';
+import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
 
 interface UseMarketplaceFeesProps {
     marketplaceAddress: `0x${string}`;
@@ -23,7 +23,7 @@ export function useMarketplaceFees({
     // Get innovation fee (marketplace fee) from contract
     const { data: innovationFeeData } = useReadContract({
         address: marketplaceAddress,
-        abi: marketplaceAbi,
+        abi: MARKETPLACE_ABI,
         functionName: 'getInnovationFee',
     });
 

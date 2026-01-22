@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Marketplace Data Reading Hook
  * Handles: All view/read functions for marketplace data
  * All functions here are read-only and do not modify state
@@ -11,7 +11,7 @@
 "use client";
 
 import { useReadContract, useReadContracts } from 'wagmi';
-import marketplaceAbi from '@/constants/marketplace.abi.json';
+import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
 
 export function useMarketplaceData(marketplaceAddress: string) {
 
@@ -19,7 +19,7 @@ export function useMarketplaceData(marketplaceAddress: string) {
   const useListingById = (listingId: string) => {
     return useReadContract({
       address: marketplaceAddress as `0x${string}`,
-      abi: marketplaceAbi,
+      abi: MARKETPLACE_ABI,
       functionName: 'getListingByListingId',
       args: [BigInt(listingId)],
       query: {
@@ -32,7 +32,7 @@ export function useMarketplaceData(marketplaceAddress: string) {
   const useListingsByNFT = (tokenAddress: string, tokenId: string) => {
     return useReadContract({
       address: marketplaceAddress as `0x${string}`,
-      abi: marketplaceAbi,
+      abi: MARKETPLACE_ABI,
       functionName: 'getListingsByNFT',
       args: [tokenAddress as `0x${string}`, BigInt(tokenId)],
       query: {
@@ -45,7 +45,7 @@ export function useMarketplaceData(marketplaceAddress: string) {
   const useBuyerWhitelist = (listingId: string, buyerAddress: string) => {
     return useReadContract({
       address: marketplaceAddress as `0x${string}`,
-      abi: marketplaceAbi,
+      abi: MARKETPLACE_ABI,
       functionName: 'isBuyerWhitelisted',
       args: [BigInt(listingId), buyerAddress as `0x${string}`],
       query: {
@@ -58,7 +58,7 @@ export function useMarketplaceData(marketplaceAddress: string) {
   const useCollectionWhitelist = (collectionAddress: string) => {
     return useReadContract({
       address: marketplaceAddress as `0x${string}`,
-      abi: marketplaceAbi,
+      abi: MARKETPLACE_ABI,
       functionName: 'isCollectionWhitelisted',
       args: [collectionAddress as `0x${string}`],
       query: {
@@ -73,22 +73,22 @@ export function useMarketplaceData(marketplaceAddress: string) {
       contracts: [
         {
           address: marketplaceAddress as `0x${string}`,
-          abi: marketplaceAbi,
+          abi: MARKETPLACE_ABI,
           functionName: 'getInnovationFee'
         },
         {
           address: marketplaceAddress as `0x${string}`,
-          abi: marketplaceAbi,
+          abi: MARKETPLACE_ABI,
           functionName: 'getNextListingId'
         },
         {
           address: marketplaceAddress as `0x${string}`,
-          abi: marketplaceAbi,
+          abi: MARKETPLACE_ABI,
           functionName: 'getContractOwner'
         },
         {
           address: marketplaceAddress as `0x${string}`,
-          abi: marketplaceAbi,
+          abi: MARKETPLACE_ABI,
           functionName: 'getWhitelistedCollections'
         }
       ]

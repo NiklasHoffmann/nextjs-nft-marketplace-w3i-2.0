@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Marketplace Listing Operations Hook
  * Handles: createListing, updateListing, cancelListing
  */
@@ -7,7 +7,7 @@
 import { useState } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, usePublicClient, useAccount } from 'wagmi';
 import { parseEther, getAddress } from 'viem';
-import marketplaceAbi from '@/constants/marketplace.abi.json';
+import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
 
 const ERC721_ABI = [
   {
@@ -76,7 +76,7 @@ export function useMarketplaceListing(marketplaceAddress: string) {
   });
 
   // Debug: Log when submittedHash changes
-  console.log('🔍 [useMarketplaceListing] Current state:', {
+  console.log('?? [useMarketplaceListing] Current state:', {
     submittedHash,
     isConfirming,
     isSuccess,
@@ -97,8 +97,8 @@ export function useMarketplaceListing(marketplaceAddress: string) {
     allowedBuyers = []
   }: CreateListingParams) => {
     try {
-      console.log('🔵 [useMarketplaceListing] createListing called');
-      console.log('📋 Parameters:', {
+      console.log('?? [useMarketplaceListing] createListing called');
+      console.log('?? Parameters:', {
         tokenAddress,
         tokenId,
         price,
@@ -118,7 +118,7 @@ export function useMarketplaceListing(marketplaceAddress: string) {
         ? getAddress(desiredTokenAddress)
         : "0x0000000000000000000000000000000000000000";
 
-      console.log('🔐 Checksummed addresses:', {
+      console.log('?? Checksummed addresses:', {
         original: tokenAddress,
         checksummed: checksummedTokenAddress,
         desiredOriginal: desiredTokenAddress,
@@ -126,21 +126,21 @@ export function useMarketplaceListing(marketplaceAddress: string) {
       });
 
       const args = [
-        checksummedTokenAddress, // tokenAddress (CHECKSUMMED!)
+        checksummedTokenAddress as `0x${string}`, // tokenAddress (CHECKSUMMED!)
         BigInt(tokenId), // tokenId
-        "0x0000000000000000000000000000000000000000", // erc1155Holder (not needed for ERC721)
+        "0x0000000000000000000000000000000000000000" as `0x${string}`, // erc1155Holder (not needed for ERC721)
         parseEther(price), // price
-        "0x0000000000000000000000000000000000000000", // currency (0x0 = ETH/native token)
-        checksummedDesiredTokenAddress, // desiredTokenAddress (CHECKSUMMED!)
+        "0x0000000000000000000000000000000000000000" as `0x${string}`, // currency (0x0 = ETH/native token)
+        checksummedDesiredTokenAddress as `0x${string}`, // desiredTokenAddress (CHECKSUMMED!)
         BigInt(desiredTokenId), // desiredTokenId
         BigInt("0"), // desiredErc1155Quantity (not needed for ERC721)
         BigInt("0"), // erc1155Quantity (0 for ERC721, >0 for ERC1155)
         buyerWhitelistEnabled, // buyerWhitelistEnabled
         false, // partialBuyEnabled (not needed for ERC721)
-        allowedBuyers // allowedBuyers
-      ];
+        allowedBuyers as readonly `0x${string}`[] // allowedBuyers
+      ] as const;
 
-      console.log('📝 Contract args (detailed):');
+      console.log('?? Contract args (detailed):');
       console.log('  [0] tokenAddress:', args[0]);
       console.log('  [1] tokenId:', args[1]?.toString());
       console.log('  [2] erc1155Holder:', args[2]);
@@ -156,7 +156,7 @@ export function useMarketplaceListing(marketplaceAddress: string) {
 
       // CRITICAL: Check and ensure approval before proceeding
       if (publicClient && userAddress) {
-        console.log('🔍 Checking ACTUAL approval status on-chain...');
+        console.log('?? Checking ACTUAL approval status on-chain...');
         try {
           // Check if marketplace is approved for all
           const isApprovedForAll = await publicClient.readContract({
@@ -177,7 +177,7 @@ export function useMarketplaceListing(marketplaceAddress: string) {
           const isSingleApproved = approvedAddress?.toLowerCase() === marketplaceAddress.toLowerCase();
           const actuallyApproved = isApprovedForAll || isSingleApproved;
 
-          console.log('✅ ACTUAL Approval Check:', {
+          console.log('? ACTUAL Approval Check:', {
             isApprovedForAll,
             approvedAddress,
             isSingleApproved,
@@ -187,14 +187,14 @@ export function useMarketplaceListing(marketplaceAddress: string) {
           });
 
           if (!actuallyApproved) {
-            console.log('⚠️ NFT NOT APPROVED - Requesting approval from user...');
+            console.log('?? NFT NOT APPROVED - Requesting approval from user...');
 
             // Ask user to approve
             if (!window.confirm('This NFT needs to be approved for the marketplace.\n\nClick OK to approve all your NFTs from this collection for trading.\n\n(This is a one-time approval per collection)')) {
               throw new Error('User cancelled approval. Please approve the NFT collection to list items.');
             }
 
-            console.log('📝 Sending setApprovalForAll transaction...');
+            console.log('?? Sending setApprovalForAll transaction...');
 
             // Send approval transaction
             const approvalTx = await writeContractAsync({
@@ -204,8 +204,8 @@ export function useMarketplaceListing(marketplaceAddress: string) {
               args: [marketplaceAddress as `0x${string}`, true]
             });
 
-            console.log('⏳ Waiting for approval transaction confirmation...');
-            console.log('🔗 Approval TX:', approvalTx);
+            console.log('? Waiting for approval transaction confirmation...');
+            console.log('?? Approval TX:', approvalTx);
 
             // Wait for approval confirmation (we need to create a separate waiter)
             let approvalConfirmed = false;
@@ -221,10 +221,10 @@ export function useMarketplaceListing(marketplaceAddress: string) {
                 });
                 if (newApprovalStatus) {
                   approvalConfirmed = true;
-                  console.log('✅ Approval confirmed on-chain!');
+                  console.log('? Approval confirmed on-chain!');
                 }
               } catch (e) {
-                console.log('⏳ Still waiting for approval confirmation...');
+                console.log('? Still waiting for approval confirmation...');
               }
               attempts++;
             }
@@ -233,26 +233,26 @@ export function useMarketplaceListing(marketplaceAddress: string) {
               throw new Error('Approval transaction timed out. Please try again.');
             }
           } else {
-            console.log('✅ Already approved - proceeding...');
+            console.log('? Already approved - proceeding...');
           }
         } catch (approvalCheckError: any) {
-          console.error('❌ Approval check/request failed:', approvalCheckError);
+          console.error('? Approval check/request failed:', approvalCheckError);
           throw approvalCheckError;
         }
       }
 
       // Simulate the transaction first to get detailed revert reason
-      console.log('🔍 Simulating transaction to check for errors...');
+      console.log('?? Simulating transaction to check for errors...');
       try {
         if (publicClient && userAddress) {
           await publicClient.simulateContract({
             address: marketplaceAddress as `0x${string}`,
-            abi: marketplaceAbi,
+            abi: MARKETPLACE_ABI,
             functionName: 'createListing',
             args,
             account: userAddress, // Use actual user address for simulation
           });
-          console.log('✅ Simulation successful - transaction should work');
+          console.log('? Simulation successful - transaction should work');
         }
       } catch (simError: any) {
         // Check error type first to reduce unnecessary logging
@@ -263,14 +263,14 @@ export function useMarketplaceListing(marketplaceAddress: string) {
           errorMessage.includes('AlreadyListed');
 
         if (isAlreadyListedError) {
-          console.warn('⚠️ NFT is already listed - will redirect to detail page');
+          console.warn('?? NFT is already listed - will redirect to detail page');
           const alreadyListedError = new Error('ALREADY_LISTED');
           (alreadyListedError as any).code = 'ALREADY_LISTED';
           throw alreadyListedError;
         }
 
         // For other errors, log details
-        console.error('❌ Simulation failed:', errorMessage);
+        console.error('? Simulation failed:', errorMessage);
 
         // Check for approval errors - block transaction
         const isApprovalError = errorMessage.includes('NotAuthorizedOperator') ||
@@ -278,7 +278,7 @@ export function useMarketplaceListing(marketplaceAddress: string) {
           errorMessage.includes('ERC721: transfer caller is not owner nor approved');
 
         if (isApprovalError) {
-          console.error('🚫 APPROVAL ERROR - Blocking transaction');
+          console.error('?? APPROVAL ERROR - Blocking transaction');
           throw new Error('NFT is not approved for the marketplace. Please approve it first.');
         }
 
@@ -288,8 +288,8 @@ export function useMarketplaceListing(marketplaceAddress: string) {
           errorMessage.includes('CollectionWhitelist');
 
         if (isWhitelistError) {
-          console.warn('⚠️ Whitelist simulation error detected');
-          console.warn('⚠️ Verifying whitelist status with contract...');
+          console.warn('?? Whitelist simulation error detected');
+          console.warn('?? Verifying whitelist status with contract...');
 
           // Double-check whitelist status directly from contract
           if (!publicClient) {
@@ -299,41 +299,41 @@ export function useMarketplaceListing(marketplaceAddress: string) {
           try {
             const whitelistStatus = await publicClient.readContract({
               address: marketplaceAddress as `0x${string}`,
-              abi: marketplaceAbi,
+              abi: MARKETPLACE_ABI,
               functionName: 'isCollectionWhitelisted',
               args: [checksummedTokenAddress as `0x${string}`]
             });
 
-            console.log('📡 Direct contract check - isWhitelisted:', whitelistStatus);
+            console.log('?? Direct contract check - isWhitelisted:', whitelistStatus);
 
             if (!whitelistStatus) {
-              console.error('🚫 WHITELIST ERROR - Collection is NOT whitelisted!');
+              console.error('?? WHITELIST ERROR - Collection is NOT whitelisted!');
               throw new Error(`Collection ${checksummedTokenAddress} is not whitelisted on this marketplace`);
             }
 
-            console.log('✅ Collection IS whitelisted - simulation error was false positive');
-            console.log('⚠️ Proceeding with transaction...');
+            console.log('? Collection IS whitelisted - simulation error was false positive');
+            console.log('?? Proceeding with transaction...');
           } catch (whitelistCheckError) {
-            console.error('❌ Failed to verify whitelist status:', whitelistCheckError);
+            console.error('? Failed to verify whitelist status:', whitelistCheckError);
             throw new Error('Failed to verify collection whitelist status');
           }
         } else {
           // For other errors, just warn but continue
-          console.warn('⚠️ Proceeding with transaction despite simulation failure...');
+          console.warn('?? Proceeding with transaction despite simulation failure...');
         }
       }
 
-      console.log('⛽ Setting gas limit to 800,000 to avoid estimation issues');
+      console.log('? Setting gas limit to 800,000 to avoid estimation issues');
 
       const contractConfig = {
         address: marketplaceAddress as `0x${string}`,
-        abi: marketplaceAbi,
+        abi: MARKETPLACE_ABI,
         functionName: 'createListing' as const,
         args,
         gas: BigInt(800000) // Increased from 500k
       };
 
-      console.log('📤 Sending transaction with config:', {
+      console.log('?? Sending transaction with config:', {
         address: contractConfig.address,
         functionName: contractConfig.functionName,
         gasLimit: contractConfig.gas.toString(),
@@ -342,14 +342,14 @@ export function useMarketplaceListing(marketplaceAddress: string) {
 
       const hash = await writeContractAsync(contractConfig);
 
-      console.log('✅ [useMarketplaceListing] Transaction sent successfully');
-      console.log('📋 Transaction hash:', hash);
+      console.log('? [useMarketplaceListing] Transaction sent successfully');
+      console.log('?? Transaction hash:', hash);
       setSubmittedHash(hash);
 
       return hash;
     } catch (err: any) {
-      console.error('❌ [useMarketplaceListing] TRANSACTION FAILED');
-      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('? [useMarketplaceListing] TRANSACTION FAILED');
+      console.error('????????????????????????????????????????');
       console.error('Error Type:', err.name || 'Unknown');
       console.error('Error Message:', err.message);
 
@@ -376,22 +376,22 @@ export function useMarketplaceListing(marketplaceAddress: string) {
       // Check for specific error types
       if (err.message?.toLowerCase().includes('user rejected') ||
         err.message?.toLowerCase().includes('user denied')) {
-        console.error('🚫 USER REJECTED TRANSACTION IN WALLET');
+        console.error('?? USER REJECTED TRANSACTION IN WALLET');
       } else if (err.message?.toLowerCase().includes('gas')) {
-        console.error('⛽ GAS-RELATED ERROR DETECTED');
+        console.error('? GAS-RELATED ERROR DETECTED');
         console.error('This could be: insufficient gas, gas limit too low, or network congestion');
       } else if (err.message?.toLowerCase().includes('insufficient funds')) {
-        console.error('💰 INSUFFICIENT FUNDS - User does not have enough ETH');
+        console.error('?? INSUFFICIENT FUNDS - User does not have enough ETH');
       } else if (err.message?.toLowerCase().includes('nonce')) {
-        console.error('🔢 NONCE ERROR - Transaction ordering issue');
+        console.error('?? NONCE ERROR - Transaction ordering issue');
       } else if (err.message?.toLowerCase().includes('revert')) {
-        console.error('🔄 CONTRACT REVERTED - Smart contract rejected the transaction');
+        console.error('?? CONTRACT REVERTED - Smart contract rejected the transaction');
         if (err.reason) {
           console.error('Revert Reason:', err.reason);
         }
       }
 
-      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('????????????????????????????????????????');
       console.error('Full Error Object:', err);
 
       throw err;
@@ -413,23 +413,23 @@ export function useMarketplaceListing(marketplaceAddress: string) {
 
       await writeContractAsync({
         address: marketplaceAddress as `0x${string}`,
-        abi: marketplaceAbi,
+        abi: MARKETPLACE_ABI,
         functionName: 'updateListing',
         args: [
           BigInt(listingId),
-          newPrice ? parseEther(newPrice) : undefined,
-          newDesiredTokenAddress || "0x0000000000000000000000000000000000000000",
+          newPrice ? parseEther(newPrice) : BigInt(0),
+          (newDesiredTokenAddress || "0x0000000000000000000000000000000000000000") as `0x${string}`,
           BigInt(newDesiredTokenId || "0"),
           BigInt("0"), // newDesiredErc1155Quantity (0 for ERC721)
           BigInt("0"), // newErc1155Quantity (0 for ERC721)
           newBuyerWhitelistEnabled || false,
           false, // newPartialBuyEnabled
-          newAllowedBuyers
-        ],
+          (newAllowedBuyers as `0x${string}`[]) || []
+        ] as const,
         gas: BigInt(300000)
       });
     } catch (err: any) {
-      console.error('❌ [useMarketplaceListing] Update failed:', err);
+      console.error('? [useMarketplaceListing] Update failed:', err);
       throw err;
     } finally {
       setIsLoading(false);
@@ -442,13 +442,13 @@ export function useMarketplaceListing(marketplaceAddress: string) {
 
       await writeContractAsync({
         address: marketplaceAddress as `0x${string}`,
-        abi: marketplaceAbi,
+        abi: MARKETPLACE_ABI,
         functionName: 'cancelListing',
         args: [BigInt(listingId)],
         gas: BigInt(150000)
       });
     } catch (err: any) {
-      console.error('❌ [useMarketplaceListing] Cancel failed:', err);
+      console.error('? [useMarketplaceListing] Cancel failed:', err);
       throw err;
     } finally {
       setIsLoading(false);

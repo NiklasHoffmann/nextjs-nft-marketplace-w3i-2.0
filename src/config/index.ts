@@ -1,14 +1,17 @@
 /**
  * CENTRAL CONFIG EXPORTS
  * 
- * Alle Konfigurationen importieren von hier:
- * import { wagmiConfig, HOME_CONFIG, isAdminAddress } from '@/config'
+ * All configuration imports go through this barrel export:
+ * import { wagmiConfig, HOME_CONFIG, isAdminAddress, MARKETPLACE_ABI } from '@/config'
  * 
- * Struktur:
+ * Structure:
  * - app.config.ts: Feature Flags, Home Redirect
- * - admin.ts: Admin-Adressen, Routen-Schutz
- * - wagmi.ts: Web3/Blockchain Konfiguration
+ * - admin.ts: Admin Addresses, Route Protection
+ * - wagmi.ts: Web3/Blockchain Configuration
  * - apolloClient.ts: GraphQL Client
+ * - networks.ts: Network Config, Contract Addresses
+ * - abis/: Smart Contract ABIs (TypeScript)
+ * - subgraph/: GraphQL Queries for TheGraph
  */
 
 // App Configuration (Feature Flags, Redirects)
@@ -28,3 +31,22 @@ export { wagmiConfig, publicClient, appName } from './wagmi';
 
 // Apollo Client (GraphQL)
 export { default as apolloClient } from './apolloClient';
+
+// Network Configuration (Contract Addresses, Chain Helpers)
+export {
+    NETWORK_CONFIG,
+    getMarketplaceAddress,
+    isSupportedChain,
+    type NetworkMapping,
+    type NetworkContracts
+} from './networks';
+
+// Smart Contract ABIs
+export {
+    MARKETPLACE_ABI,
+    MULTISIG_WALLET_ABI,
+    DIAMOND_ABI
+} from './abis';
+
+// Subgraph Queries
+export * from './subgraph';

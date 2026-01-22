@@ -6,7 +6,7 @@
  */
 
 import { ApolloClient, InMemoryCache, HttpLink } from '@apollo/client';
-import { GET_ACTIVE_LISTINGS, LISTINGS_UPDATED_SUBSCRIPTION } from '@/constants/subgraph.queries.v2';
+import { GET_ACTIVE_LISTINGS, LISTINGS_UPDATED_SUBSCRIPTION } from '@/config/subgraph';
 import { getDatabase } from '@/lib/mongodb';
 import type { ListingV2 } from '@/types/marketplace/listing-v2';
 import { blockchainStateSync } from './blockchain-state-sync';

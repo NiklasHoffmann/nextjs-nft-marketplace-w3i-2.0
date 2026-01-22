@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Marketplace User Operations Hook
  * Handles: User functions like proceeds withdrawal and reading user proceeds
  */
@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { formatEther } from 'viem';
-import marketplaceAbi from '@/constants/marketplace.abi.json';
+import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
 
 export function useMarketplaceUser(marketplaceAddress: string) {
   const { address } = useAccount();
@@ -22,7 +22,7 @@ export function useMarketplaceUser(marketplaceAddress: string) {
     refetch: refetchProceeds
   } = useReadContract({
     address: marketplaceAddress as `0x${string}`,
-    abi: marketplaceAbi,
+    abi: MARKETPLACE_ABI,
     functionName: 'getProceeds',
     args: address ? [address] : undefined,
     query: {
@@ -64,7 +64,7 @@ export function useMarketplaceUser(marketplaceAddress: string) {
     try {
       writeContract({
         address: marketplaceAddress as `0x${string}`,
-        abi: marketplaceAbi,
+        abi: MARKETPLACE_ABI,
         functionName: 'withdrawProceeds',
       });
     } catch (err: any) {

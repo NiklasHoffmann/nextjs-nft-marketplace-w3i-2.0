@@ -12,7 +12,7 @@ import { ProposalCard } from '@/components/admin/multisig/ProposalCard';
 import { CreateProposalModal } from '@/components/admin/multisig/CreateProposalModal';
 import { LoadingState } from '@/components/core/Loading';
 import { ProposalStatus, ProposalType } from '@/types/multisig';
-import networkMapping from '@/constants/network.mapping.json';
+import { NETWORK_CONFIG } from '@/config/networks';
 
 export default function AdminMultisigPage() {
     const { address, isConnected } = useAccount();
@@ -25,7 +25,7 @@ export default function AdminMultisigPage() {
     // Get marketplace address
     const getMarketplaceAddress = (): string => {
         const chainIdStr = chainId?.toString() || '11155111';
-        const mapping = networkMapping as Record<string, { NftMarketplace: string[] }>;
+        const mapping = NETWORK_CONFIG as Record<string, { NftMarketplace: string[] }>;
         return mapping[chainIdStr]?.NftMarketplace?.[0] || '';
     };
 

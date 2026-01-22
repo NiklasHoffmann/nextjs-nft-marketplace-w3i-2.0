@@ -7,7 +7,7 @@
 import { useState } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { parseEther } from 'viem';
-import marketplaceAbi from '@/constants/marketplace.abi.json';
+import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
 
 interface PurchaseListingParams {
   listingId: string;
@@ -80,19 +80,19 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
       // Use writeContractAsync which returns the transaction hash directly
       const hash = await writeContractAsync({
         address: marketplaceAddress as `0x${string}`,
-        abi: marketplaceAbi,
+        abi: MARKETPLACE_ABI,
         functionName: 'purchaseListing',
         args: [
           BigInt(listingId), // listingId
           parseEther(expectedPrice), // expectedPrice
-          "0x0000000000000000000000000000000000000000", // expectedCurrency (0x0 for ETH)
+          "0x0000000000000000000000000000000000000000" as `0x${string}`, // expectedCurrency (0x0 for ETH)
           BigInt("0"), // expectedErc1155Quantity (0 for ERC721, quantity for ERC1155)
-          expectedDesiredTokenAddress, // expectedDesiredTokenAddress
+          expectedDesiredTokenAddress as `0x${string}`, // expectedDesiredTokenAddress
           BigInt(expectedDesiredTokenId), // expectedDesiredTokenId
           BigInt("0"), // expectedDesiredErc1155Quantity (not needed for pure ETH sales)
           BigInt("0"), // erc1155PurchaseQuantity (0 for ERC721, quantity for ERC1155)
-          desiredErc1155Holder // desiredErc1155Holder (for swaps)
-        ],
+          desiredErc1155Holder as `0x${string}` // desiredErc1155Holder (for swaps)
+        ] as const,
         value: ethValue,
         gas: BigInt(500000) // Safe limit: high enough for NFT purchases, well below 16.7M cap
       });

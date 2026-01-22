@@ -174,40 +174,6 @@ export const fetchNFTStats = async (contractAddress: string, tokenId: string): P
     return result.data || null;
 };
 
-// ===== MARKETPLACE/LISTING API =====
-
-/**
- * Fetches marketplace listing data from server-side API
- * The API route queries TheGraph to bypass CSP restrictions
- * 
- * @param contractAddress - The NFT contract address
- * @param tokenId - The NFT token ID
- * @returns Promise resolving to ActiveItem or null if not listed
- */
-export const fetchMarketplaceListing = async (contractAddress: string, tokenId: string): Promise<ActiveItem | null> => {
-    try {
-        const response = await fetch(`/api/marketplace/listing/${contractAddress}/${tokenId}`);
-
-        if (!response.ok) {
-            devLog.warn('nft-api', `Failed to fetch marketplace listing for ${contractAddress}/${tokenId}:`, response.status);
-            return null;
-        }
-
-        const data = await response.json();
-
-        if (!data.listing) {
-
-            return null;
-        }
-
-        return data.listing;
-
-    } catch (error) {
-        devLog.warn('nft-api', `❌ Failed to fetch marketplace listing for ${contractAddress}/${tokenId}:`, error);
-        return null;
-    }
-};
-
 // ===== BATCH API OPERATIONS =====
 
 /**
@@ -217,11 +183,10 @@ export const fetchMarketplaceListing = async (contractAddress: string, tokenId: 
  */
 export const fetchMultipleNFTs = async (nfts: Array<{ contractAddress: string; tokenId: string }>) => {
     const promises = nfts.map(async (nft) => {
-        const [metadataResult, insightsResult, statsResult, listingResult] = await Promise.allSettled([
+        const [metadataResult, insightsResult, statsResult] = await Promise.allSettled([
             fetchNFTMetadata(nft.contractAddress, nft.tokenId),
             fetchNFTInsights(nft.contractAddress, nft.tokenId),
             fetchNFTStats(nft.contractAddress, nft.tokenId),
-            fetchMarketplaceListing(nft.contractAddress, nft.tokenId),
         ]);
 
         return {
@@ -229,12 +194,10 @@ export const fetchMultipleNFTs = async (nfts: Array<{ contractAddress: string; t
             metadata: metadataResult.status === 'fulfilled' ? metadataResult.value : null,
             insights: insightsResult.status === 'fulfilled' ? insightsResult.value : null,
             stats: statsResult.status === 'fulfilled' ? statsResult.value : null,
-            listing: listingResult.status === 'fulfilled' ? listingResult.value : null,
             errors: {
                 metadata: metadataResult.status === 'rejected' ? metadataResult.reason : null,
                 insights: insightsResult.status === 'rejected' ? insightsResult.reason : null,
                 stats: statsResult.status === 'rejected' ? statsResult.reason : null,
-                listing: listingResult.status === 'rejected' ? listingResult.reason : null,
             }
         };
     });

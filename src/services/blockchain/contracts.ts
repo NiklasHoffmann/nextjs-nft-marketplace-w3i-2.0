@@ -3,7 +3,7 @@
  */
 
 import { isValidAddress } from '@/utils/validation';
-import networkMapping from '@/constants/network.mapping.json';
+import { NETWORK_CONFIG } from '@/config/networks';
 
 /**
  * Standard ERC-721 function selectors
@@ -141,7 +141,7 @@ export const supportsInterface = async (
 export const getMarketplaceAddress = (chainId?: number): `0x${string}` | undefined => {
     if (!chainId) return undefined;
 
-    const chainConfig = networkMapping[chainId.toString() as keyof typeof networkMapping];
+    const chainConfig = NETWORK_CONFIG[chainId.toString() as keyof typeof NETWORK_CONFIG];
     if (!chainConfig?.NftMarketplace?.[0]) return undefined;
 
     return chainConfig.NftMarketplace[0] as `0x${string}`;

@@ -22,7 +22,7 @@
 
 import { createPublicClient, webSocket, decodeEventLog, type Address, type Hash, type Log, type WatchContractEventReturnType } from 'viem';
 import { sepolia } from 'viem/chains';
-import marketplaceAbi from '@/constants/marketplace.abi.json';
+import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
 import type {
     MarketplaceEventName,
     ProcessedMarketplaceEvent,
@@ -231,7 +231,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             console.log('👀 [EventListener] Starting event watcher...');
             this.unwatch = this.client.watchContractEvent({
                 address: this.marketplaceAddress,
-                abi: marketplaceAbi,
+                abi: MARKETPLACE_ABI,
                 onLogs: (logs) => this.handleLogs(logs),
                 onError: (error) => this.handleError(error),
                 strict: false // Don't throw on decode errors
@@ -358,7 +358,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             console.log('🔍 [decodeLog] No eventName, attempting manual decode...');
             try {
                 const decoded = decodeEventLog({
-                    abi: marketplaceAbi,
+                    abi: MARKETPLACE_ABI,
                     data: log.data,
                     topics: log.topics,
                     strict: false // Don't throw on unknown events
