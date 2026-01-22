@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useForm } from '@/hooks/useForm';
+import { useForm } from '@/hooks';
 
 interface BatchPricingFormProps {
     selectedCount: number;

@@ -6,7 +6,7 @@
  * Performance-optimized marketplace using MongoDB REST API.
  * 
  * Architecture:
- * - MongoDB via useMarketplaceV2 hook
+ * - MongoDB via useMarketplaceItems hook
  * - MarketplaceCacheContext for intelligent caching
  * - Complete enriched NFT data (metadata + insights + contract + marketplace)
  * 

@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
-import { useForm } from '@/hooks/useForm';
+import { useForm } from '@/hooks';
 
 interface BatchListingFormProps {
     userNFTs: AggregatedNFT[];

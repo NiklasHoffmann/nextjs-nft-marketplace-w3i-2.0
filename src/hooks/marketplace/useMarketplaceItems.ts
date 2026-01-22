@@ -1,18 +1,18 @@
 /**
- * Marketplace V2 Hooks
+ * Marketplace Items Hooks
  * 
- * Modern fetch-based hooks for the new MongoDB-backed marketplace API
+ * Modern fetch-based hooks for the MongoDB-backed marketplace API
  * With caching support to prevent unnecessary reloads
  */
 
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useMarketplaceItems } from '@/contexts/marketplace-items';
+import { useMarketplaceItems as useMarketplaceItemsContext } from '@/contexts/marketplace-items';
 import { useCollections } from '@/contexts/collections';
 import type { EnrichedNFTDocument, MarketplaceItemsResponse } from '@/types/marketplace/enriched-nft';
 
-interface UseMarketplaceV2Options {
+interface UseMarketplaceItemsOptions {
   // Pagination
   page?: number;
   limit?: number;
@@ -42,7 +42,7 @@ interface UseMarketplaceV2Options {
   autoFetch?: boolean;
 }
 
-interface UseMarketplaceV2Return {
+interface UseMarketplaceItemsReturn {
   items: EnrichedNFTDocument[];
   loading: boolean;
   error: string | null;
@@ -64,10 +64,10 @@ interface UseMarketplaceV2Return {
 }
 
 /**
- * Hook for fetching marketplace items from the new V2 API
+ * Hook for fetching marketplace items from MongoDB API
  * With intelligent caching to prevent unnecessary reloads
  */
-export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMarketplaceV2Return {
+export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): UseMarketplaceItemsReturn {
   const {
     page: initialPage = 1,
     limit = 20,
@@ -80,11 +80,11 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(initialPage);
-  const [pagination, setPagination] = useState<UseMarketplaceV2Return['pagination']>(null);
-  const [availableFilters, setAvailableFilters] = useState<UseMarketplaceV2Return['filters']>(null);
+  const [pagination, setPagination] = useState<UseMarketplaceItemsReturn['pagination']>(null);
+  const [availableFilters, setAvailableFilters] = useState<UseMarketplaceItemsReturn['filters']>(null);
 
   // Get cache context
-  const cache = useMarketplaceItems();
+  const cacheContext = useMarketplaceItemsContext();
 
   // Prevent concurrent loadMore calls
   const loadingRef = useRef(false);
@@ -153,13 +153,13 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
     // Check cache first (only for page 1, not for pagination)
     // IMPORTANT: Check cache BEFORE clearing items to avoid flicker
     const filterKey = createFilterKey();
-    console.log('🔍 [useMarketplaceV2] Checking cache for key:', filterKey);
+    console.log('🔍 [useMarketplaceItems] Checking cache for key:', filterKey);
 
     if (!append && pageNum === 1) {
-      const cached = cache.getCached(filterKey);
+      const cached = cacheContext.getCached(filterKey);
 
       if (cached) {
-        console.log('✅ [useMarketplaceV2] Cache HIT - using cached data:', cached.data.items.length);
+        console.log('✅ [useMarketplaceItems] Cache HIT - using cached data:', cached.data.items.length);
         // Cache hit - set items immediately without clearing first
         setItems(cached.data.items);
         setPagination(cached.data.pagination);
@@ -169,13 +169,13 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
         abortControllerRef.current = null;
         return;
       }
-      console.log('❌ [useMarketplaceV2] Cache MISS - fetching from API');
+      console.log('❌ [useMarketplaceItems] Cache MISS - fetching from API');
     }
 
     // Clear items AFTER cache check (only if cache miss and not appending)
     // This prevents flickering when cache is available
     if (!append) {
-      console.log('🗑️ [useMarketplaceV2] Clearing items before fetch');
+      console.log('🗑️ [useMarketplaceItems] Clearing items before fetch');
       setItems([]);
     }
 
@@ -183,7 +183,7 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
     setLoading(true);
     setError(null);
 
-    console.log('🌐 [useMarketplaceV2] Starting API request...');
+    console.log('🌐 [useMarketplaceItems] Starting API request...');
 
     try {
       // Build query string
@@ -211,7 +211,7 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
         signal: abortController.signal
       });
 
-      console.log('📡 [useMarketplaceV2] Response received:', response.status, response.ok);
+      console.log('📡 [useMarketplaceItems] Response received:', response.status, response.ok);
 
       if (!response.ok) {
         // Try to get error details from response
@@ -227,7 +227,7 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
 
       const data: MarketplaceItemsResponse = await response.json();
 
-      console.log('📊 [useMarketplaceV2] API Response:', {
+      console.log('📊 [useMarketplaceItems] API Response:', {
         success: data.success,
         itemsCount: data.data?.items?.length || 0,
         pagination: data.data?.pagination,
@@ -245,8 +245,8 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
           setItems(prev => {
             // Deduplication: Filter out items that already exist (by listingId)
             const existingIds = new Set(prev.map(item => item.listingId).filter(Boolean));
-            const newItems = data.data.items.filter(item => {
-              console.log('📦 [useMarketplaceV2] Setting items:', data.data.items.length);
+            const newItems = data.data.items.filter((item: EnrichedNFTDocument) => {
+              console.log('📦 [useMarketplaceItems] Setting items:', data.data.items.length);
               if (!item.listingId) return true; // Keep items without listingId
               return !existingIds.has(item.listingId); // Skip duplicates
             });
@@ -259,7 +259,7 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
           // Cache the result (only for page 1)
           if (pageNum === 1) {
             const filterKey = createFilterKey();
-            cache.setCache(filterKey, data.data);
+            cacheContext.setCache(filterKey, data.data);
           }
         }
 
@@ -270,12 +270,12 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
     } catch (err) {
       // Ignore abort errors (normal flow when filters change)
       if (err instanceof Error && err.name === 'AbortError') {
-        console.log('⚠️ [useMarketplaceV2] Request aborted (normal)');
+        console.log('⚠️ [useMarketplaceItems] Request aborted (normal)');
         loadingRef.current = false; // Reset loading ref on abort
         return;
       }
 
-      console.error('❌ [useMarketplaceV2] Fetch error:', err);
+      console.error('❌ [useMarketplaceItems] Fetch error:', err);
 
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch items';
       setError(errorMessage);
@@ -304,7 +304,7 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
     filters.minWatchlistCount,
     filters.sortBy,
     filters.sortOrder,
-    cache,
+    cacheContext,
     createFilterKey,
   ]);
 
@@ -343,7 +343,7 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
       return;
     }
 
-    console.log('[useMarketplaceV2] useEffect triggered - clearing items and fetching...');
+    console.log('[useMarketplaceItems] useEffect triggered - clearing items and fetching...');
 
     // CRITICAL: Clear items immediately when filters change to prevent showing stale data
     // This happens BEFORE the fetchItems call to ensure instant UI update
@@ -360,7 +360,7 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
     setPage(1);
 
     // Call fetchItems directly (not via ref to avoid race condition)
-    console.log('[useMarketplaceV2] Calling fetchItems...');
+    console.log('[useMarketplaceItems] Calling fetchItems...');
     fetchItems(1, false);
 
     // NO cleanup - let requests complete even if component unmounts or re-renders
@@ -414,7 +414,7 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
         eventType === 'manual-refresh';
 
       if (shouldReload) {
-        console.log(`🔄 [useMarketplaceV2] ${eventType} event detected, auto-reloading...`);
+        console.log(`🔄 [useMarketplaceItems] ${eventType} event detected, auto-reloading...`);
 
         // Only reload if component is still mounted and not during initial load
         if (isMountedRef.current && !initialLoading) {
@@ -422,11 +422,11 @@ export function useMarketplaceV2(options: UseMarketplaceV2Options = {}): UseMark
           // Just give MongoDB a moment to complete the write operation
           const delay = 500; // 500ms is enough for immediate MongoDB sync
 
-          console.log(`⏱️  [useMarketplaceV2] Waiting ${delay}ms for MongoDB sync...`);
+          console.log(`⏱️  [useMarketplaceItems] Waiting ${delay}ms for MongoDB sync...`);
 
           setTimeout(() => {
             if (isMountedRef.current) {
-              console.log(`✅ [useMarketplaceV2] Reloading after ${eventType}`);
+              console.log(`✅ [useMarketplaceItems] Reloading after ${eventType}`);
               fetchItems(1, false);
             }
           }, delay);
@@ -473,13 +473,13 @@ interface UseCollectionsV2Options {
 }
 
 /**
- * useCollectionsV2 - Wrapper around CollectionsContext
+ * useMarketplaceCollections - Wrapper around CollectionsContext
  * 
  * Provides backward-compatible API for CollectionsTableV2 component.
  * Now uses CollectionsContext instead of direct API calls for better
  * performance and caching.
  */
-export function useCollectionsV2(options: UseCollectionsV2Options = {}) {
+export function useMarketplaceCollections(options: UseMarketplaceCollectionsOptions = {}) {
   const {
     page: initialPage = 1,
     limit = 20,

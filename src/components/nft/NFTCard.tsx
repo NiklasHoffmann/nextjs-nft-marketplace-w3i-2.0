@@ -26,7 +26,7 @@ import { devLog } from '@/utils/devLog';
 import type { AggregatedNFT } from '@/types/core/core-nft-modern';
 import OptimizedNFTImage from './OptimizedNFTImage';
 import { BaseCard } from '@/components/core/Card/BaseCard';
-import { useCardTilt } from '@/hooks/useCardTilt';
+import { useCardTilt } from '@/hooks';
 import { NFTCardHeader } from './NFTCard/NFTCardHeader';
 import { NFTCardImage } from './NFTCard/NFTCardImage';
 import { NFTCardFooter } from './NFTCard/NFTCardFooter';

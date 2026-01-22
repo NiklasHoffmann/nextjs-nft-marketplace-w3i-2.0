@@ -3,7 +3,7 @@
 import React, { useEffect, memo, useMemo, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAccount } from 'wagmi';
-import { useNFTPriceData, useNFTDetail } from '@/hooks';
+import { useNFTPriceData, useMarketplaceItemDetail } from '@/hooks';
 import { useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
 import { isValidContractAddress, isValidNFTTokenId, createShareableNFTUrl } from '@/utils';
 import { TabType } from '@/types';
@@ -41,7 +41,7 @@ function NFTDetailPage() {
     }, [contractAddress, tokenId]);
 
     // Use cache-aware hook instead of direct API call
-    const { nft: nftData, loading: dataLoading, error: dataError } = useNFTDetail({
+    const { nft: nftData, loading: dataLoading, error: dataError } = useMarketplaceItemDetail({
         contractAddress,
         tokenId,
         autoFetch: isValidParams

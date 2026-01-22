@@ -7,14 +7,14 @@
  * Displays all active NFT listings from the marketplace.
  * Uses MongoDB backend for 60x faster performance than TheGraph.
  * 
- * Data Source: MongoDB (via useMarketplaceV2 hook)
+ * Data Source: MongoDB (via useMarketplaceItems hook)
  * Features: Server-side filtering, pagination (20 items/page), sorting
  * Performance: ~65ms vs V1's 3-5s load time
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useMarketplaceV2 } from '@/hooks/marketplace/useMarketplaceV2';
+import { useMarketplaceItems } from '@/hooks';
 import { ImagePreloader } from '@/components/nft';
 import { NFTGallery } from '@/components/shared';
 import { RefreshButton } from '@/components/ui';
@@ -107,7 +107,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
         pagination,
         refetch,
         loadMore,
-    } = useMarketplaceV2({
+    } = useMarketplaceItems({
         search: filters.searchTerm,
         minPrice: filters.priceMin?.toString(),
         maxPrice: filters.priceMax?.toString(),

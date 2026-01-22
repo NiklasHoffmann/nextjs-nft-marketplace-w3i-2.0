@@ -1,28 +1,38 @@
 ﻿/**
  * CENTRAL HOOKS EXPORT
  * 
- * Alle Hooks importieren von hier: import { ... } from '@/hooks'
+ * All hooks can be imported from: import { ... } from '@/hooks'
  * 
- * Organisation:
- * • marketplace/ - Marketplace Smart Contract Funktionen
- * • nfts/ - NFT Display, Admin, Utilities, Collections  
- * • interactions/ - User Action Tracking
+ * Structure:
+ * • marketplace/ - Marketplace smart contract operations
+ * • multisig/ - MultiSig wallet & governance
+ * • nfts/ - NFT data, insights, filters
+ * • wallet/ - User wallet NFTs
+ * • user/ - User interactions (likes, watchlist, ratings)
+ * • ui/ - Reusable UI patterns (modal, form, tilt, scroll)
+ * • admin/ - Admin-only functionality
  */
 
-// Re-export all NFT hooks
-export * from './nfts';
-
-// Re-export all Marketplace hooks  
+// === MARKETPLACE CONTRACT HOOKS ===
 export * from './marketplace';
 
-// Re-export all Interaction hooks
-export * from './interactions';
+// === MULTISIG WALLET HOOKS ===
+export * from './multisig';
 
-// Performance hooks deprecated - folder kept for future real implementation
+// === NFT HOOKS ===
+export * from './nfts';
 
-// Re-export context hooks
+// === WALLET HOOKS ===
+export * from './wallet';
+
+// === USER HOOKS ===
+export * from './user';
+
+// === UI UTILITY HOOKS ===
+export * from './ui';
+
+// === ADMIN HOOKS ===
+export * from './admin';
+
+// === CONTEXT RE-EXPORTS ===
 export { useNFTStats, useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
-
-// Utility hooks
-export { useAdminStatus } from './useAdminStatus';
-export { useHorizontalScroll } from './useHorizontalScroll';

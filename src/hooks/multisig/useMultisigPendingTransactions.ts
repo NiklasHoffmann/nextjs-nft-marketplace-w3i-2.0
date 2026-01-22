@@ -1,5 +1,5 @@
 /**
- * usePendingTransactions Hook
+ * useMultisigPendingTransactions Hook
  * 
  * Fetches and manages pending MultiSig transactions with enhanced metadata.
  */
@@ -12,7 +12,7 @@ import { MULTISIG_WALLET_ABI } from '@/config/abis/multisig-wallet';
 import { MULTISIG_ADDRESSES, type PendingMultiSigTx, type MultiSigTransaction } from '@/types/multisig-wallet';
 import { enhancePendingTransaction } from '@/services/multisig/MultisigService';
 
-export function usePendingTransactions(diamondAddress: string) {
+export function useMultisigPendingTransactions(diamondAddress: string) {
     const { address } = useAccount();
     const chainId = useChainId();
     const publicClient = usePublicClient();

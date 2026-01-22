@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { useMarketplaceV2 } from '@/hooks/marketplace/useMarketplaceV2'
+import { useMarketplaceItems } from '@/hooks'
 import { useCollections } from '@/contexts/collections/CollectionsContext'
 import { useNFTFilters } from '@/hooks/nfts/useNFTFilters'
 import { NFTFilterSidebar, NFTGallery } from '@/components'
@@ -27,7 +27,7 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
         items: marketplaceItems,
         loading: itemsLoading,
         error: itemsError
-    } = useMarketplaceV2({
+    } = useMarketplaceItems({
         contractAddress: contractAddress,
         isListed: true,
         autoFetch: true,

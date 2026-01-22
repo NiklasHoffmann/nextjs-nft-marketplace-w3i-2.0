@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import { useMarketplaceContracts, useMarketplaceFees } from '../../hooks';
-import { useForm } from '@/hooks/useForm';
+import { useForm } from '@/hooks';
 
 export type ListingMode = 'sale' | 'trade' | 'hybrid';
 

@@ -1,5 +1,5 @@
 /**
- * Hook for fetching single NFT detail from OPTIMIZED API
+ * Hook for fetching single marketplace item detail from OPTIMIZED API
  * 
  * Uses /api/nft/detail which:
  * - Fetches from nft_metadata (cached IPFS data)
@@ -20,13 +20,13 @@ import { useMarketplaceItems } from '@/contexts/marketplace-items';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
 import type { EnrichedNFTDocument } from '@/types/marketplace/enriched-nft';
 
-interface UseNFTDetailOptions {
+interface UseMarketplaceItemDetailOptions {
     contractAddress: string;
     tokenId: string;
     autoFetch?: boolean;
 }
 
-interface UseNFTDetailReturn {
+interface UseMarketplaceItemDetailReturn {
     nft: EnrichedNFTDocument | null;
     loading: boolean;
     error: string | null;
@@ -34,9 +34,9 @@ interface UseNFTDetailReturn {
 }
 
 /**
- * Hook for fetching single NFT detail with cache support
+ * Hook for fetching single marketplace item detail with cache support
  */
-export function useNFTDetail(options: UseNFTDetailOptions): UseNFTDetailReturn {
+export function useMarketplaceItemDetail(options: UseMarketplaceItemDetailOptions): UseMarketplaceItemDetailReturn {
     const { contractAddress, tokenId, autoFetch = true } = options;
 
     const [nft, setNFT] = useState<EnrichedNFTDocument | null>(null);

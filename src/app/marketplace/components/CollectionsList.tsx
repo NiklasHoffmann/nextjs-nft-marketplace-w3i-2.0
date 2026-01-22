@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useCollectionsV2 } from '@/hooks/marketplace/useMarketplaceV2';
+import { useMarketplaceCollections } from '@/hooks';
 import { useAdminStatus, useHorizontalScroll } from '@/hooks';
 import { ScrollButtons, RefreshButton, AdminDebugPanel } from '@/components/ui';
 import { LoadingState } from '@/components/core/Loading';
@@ -59,7 +59,7 @@ export function CollectionsList({ currentSort, onSortChange, filters }: Collecti
         error,
         summary,
         refetch,
-    } = useCollectionsV2({
+    } = useMarketplaceCollections({
         sortBy: sortByMapping[currentSort.field] || 'floorPrice',
         sortOrder: currentSort.direction,
         limit: 50,
@@ -70,7 +70,7 @@ export function CollectionsList({ currentSort, onSortChange, filters }: Collecti
     const filteredCollections = useMemo(() => {
         if (!filters) return collections;
 
-        return collections.filter((collection) => {
+        return collections.filter((collection: any) => {
             if (filters.minSupply !== undefined && collection.insights?.totalSupply && collection.insights.totalSupply < filters.minSupply) {
                 return false;
             }

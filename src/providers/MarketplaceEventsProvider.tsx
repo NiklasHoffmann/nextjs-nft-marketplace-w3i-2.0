@@ -24,7 +24,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useMarketplaceEvents } from '@/hooks/marketplace/useMarketplaceEvents';
+import { useMarketplaceEvents } from '@/hooks';
 import { routeMarketplaceEvent } from '@/services/marketplace/event-invalidation-bridge';
 import type {
     ProcessedMarketplaceEvent,

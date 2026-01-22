@@ -14,7 +14,7 @@ import { memo, useState, useCallback } from 'react';
 import { BaseModal } from '@/components/core/Modal';
 import { useTransactionService } from '@/services/blockchain';
 import { useMarketplaceItems } from '@/contexts/marketplace-items';
-import { useForm } from '@/hooks/useForm';
+import { useForm } from '@/hooks';
 
 interface UpdateListingModalProps {
     isOpen: boolean;

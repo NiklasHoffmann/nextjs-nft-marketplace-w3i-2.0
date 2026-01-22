@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useAdminMode } from '@/hooks/useAdminMode';
+import { useAdminMode } from '@/hooks';
 import { AdminMode } from '@/types/multisig-wallet';
 
 interface AdminModeIndicatorProps {

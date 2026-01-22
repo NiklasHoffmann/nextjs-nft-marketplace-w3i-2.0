@@ -10,13 +10,13 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { AdminModeIndicator } from '@/components/admin/AdminModeIndicator';
 import { MultiSigTransactionCard } from '@/components/admin/multisig/MultiSigTransactionCard';
-import { usePendingTransactions } from '@/hooks/multisig/usePendingTransactions';
+import { useMultisigPendingTransactions } from '@/hooks';
 import { LoadingState } from '@/components/core/Loading/LoadingState';
 
 const DIAMOND_ADDRESS = process.env.NEXT_PUBLIC_DIAMOND_ADDRESS!;
 
 export default function MultiSigWalletPage() {
-    const { pendingTransactions, isLoading, error, refetch } = usePendingTransactions(DIAMOND_ADDRESS);
+    const { pendingTransactions, isLoading, error, refetch } = useMultisigPendingTransactions(DIAMOND_ADDRESS);
     const [filter, setFilter] = useState<'all' | 'ready' | 'pending'>('all');
 
     const filteredTransactions = pendingTransactions.filter((tx) => {
