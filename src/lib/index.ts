@@ -19,7 +19,29 @@
 export * from './api';
 
 // === MIDDLEWARE ===
-export * from './middleware';
+// Re-export middleware without RATE_LIMIT_CONFIG to avoid conflict with api/
+export {
+    // Auth middleware
+    withAuth,
+    withAdmin,
+    withOptionalAuth,
+    isAdmin,
+    getAuthenticatedAddress,
+    // Validation middleware
+    withValidation,
+    withQueryValidation,
+    getValidatedData,
+    getValidatedQuery,
+    ethereumAddressSchema,
+    tokenIdSchema,
+    nftIdentifierSchema,
+    paginationSchema,
+    // Rate limiting (without RATE_LIMIT_CONFIG - use from api/)
+    rateLimit,
+    isRateLimited,
+    getRemainingRequests,
+    resetRateLimit,
+} from './middleware';
 
 // === DATABASE UTILITIES ===
 export * from './db';
@@ -29,15 +51,19 @@ export * from './blockchain';
 
 // === CACHE UTILITIES ===
 export {
+    // Stats cache
     getStatsCacheKey,
     getCachedStats,
     setCachedStats,
     invalidateStatsCache,
-    clearStatsCache,
-    getCollectionsCacheKey,
-    getCachedCollections,
-    setCachedCollections,
-    invalidateCollectionsCache,
+    // Interactions cache
+    getInteractionsCacheKey,
+    getCachedInteractions,
+    setCachedInteractions,
+    invalidateInteractionsCache,
+    // General cache utilities
+    invalidateAllCachesForNFT,
+    getCacheStats,
     clearAllCaches,
 } from './cache';
 
@@ -45,13 +71,13 @@ export {
 export { cn } from './utils';
 
 // === MONGODB CONNECTION ===
+export { default as clientPromise } from './mongodb';
 export {
-    clientPromise,
+    connectToDatabase,
+    getDatabase,
     getCollection,
-    getDb,
     getEnrichedNFTsCollection,
-    getMarketplaceItemsCollection,
-    getNFTStatsCollection,
+    getCollectionStatsCollection,
 } from './mongodb';
 
 // Note: globals.ts is imported in app root layout - no exports needed

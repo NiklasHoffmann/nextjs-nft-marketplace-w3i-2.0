@@ -35,7 +35,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         operation: currentOperation,
         txHash,
       });
-      
+
       notifications.clearAll();
       notifications.success(
         'Transaction Successful!',
@@ -45,7 +45,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
           duration: 8000
         }
       );
-      
+
       setCurrentOperation(null);
       setLoadingNotifId(null);
     }
@@ -59,7 +59,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
       newFee: newFeeInBasisPoints,
       percentage: newFeeInBasisPoints / 100
     });
-    
+
     const notifId = notifications.loading(
       'Setting Innovation Fee',
       `Updating fee to ${newFeeInBasisPoints / 100}%...`
@@ -78,7 +78,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         args: [newFeeInBasisPoints],
         gas: BigInt(100000)
       });
-      
+
       console.log('?? [Admin] Innovation fee transaction sent to wallet');
     } catch (err: any) {
       console.error('? [Admin] Failed to set innovation fee:', err);
@@ -99,7 +99,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
       marketplace: marketplaceAddress,
       collection: collectionAddress
     });
-    
+
     const notifId = notifications.loading(
       'Adding Collection',
       'Adding collection to whitelist...'
@@ -118,7 +118,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         args: [collectionAddress as `0x${string}`],
         gas: BigInt(150000), // Increased from 100k
       });
-      
+
       console.log('?? [Admin] Add collection transaction sent to wallet');
     } catch (err: any) {
       console.error('? [Admin] Failed to add collection:', err);
@@ -139,7 +139,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
       marketplace: marketplaceAddress,
       collection: collectionAddress
     });
-    
+
     const notifId = notifications.loading(
       'Removing Collection',
       'Removing collection from whitelist...'
@@ -158,7 +158,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         args: [collectionAddress as `0x${string}`],
         gas: BigInt(150000), // Increased from 100k
       });
-      
+
       console.log('?? [Admin] Remove collection transaction sent to wallet');
     } catch (err: any) {
       console.error('? [Admin] Failed to remove collection:', err);
@@ -180,7 +180,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
       count: collectionAddresses.length,
       collections: collectionAddresses
     });
-    
+
     const notifId = notifications.loading(
       'Batch Adding Collections',
       `Adding ${collectionAddresses.length} collection(s) to whitelist...`
@@ -199,7 +199,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         args: [collectionAddresses as `0x${string}`[]],
         gas: BigInt(200000)
       });
-      
+
       console.log('?? [Admin] Batch add transaction sent to wallet');
     } catch (err: any) {
       console.error('? [Admin] Failed to batch add collections:', err);
@@ -221,7 +221,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
       count: collectionAddresses.length,
       collections: collectionAddresses
     });
-    
+
     const notifId = notifications.loading(
       'Batch Removing Collections',
       `Removing ${collectionAddresses.length} collection(s) from whitelist...`
@@ -240,7 +240,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         args: [collectionAddresses as `0x${string}`[]],
         gas: BigInt(200000)
       });
-      
+
       console.log('?? [Admin] Batch remove transaction sent to wallet');
     } catch (err: any) {
       console.error('? [Admin] Failed to batch remove collections:', err);
@@ -261,7 +261,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
       marketplace: marketplaceAddress,
       listingId
     });
-    
+
     const notifId = notifications.loading(
       'Cleaning Listing',
       `Removing invalid listing #${listingId}...`
@@ -280,7 +280,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         args: [BigInt(listingId)],
         gas: BigInt(150000)
       });
-      
+
       console.log('?? [Admin] Clean listing transaction sent to wallet');
     } catch (err: any) {
       console.error('? [Admin] Failed to clean listing:', err);
@@ -303,7 +303,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
       count: buyerAddresses.length,
       buyers: buyerAddresses
     });
-    
+
     const notifId = notifications.loading(
       'Adding Buyer Whitelist',
       `Adding ${buyerAddresses.length} buyer(s) to listing #${listingId}...`
@@ -322,7 +322,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         args: [BigInt(listingId), buyerAddresses as `0x${string}`[]],
         gas: BigInt(200000)
       });
-      
+
       console.log('?? [Admin] Add buyer whitelist transaction sent to wallet');
     } catch (err: any) {
       console.error('? [Admin] Failed to add buyer whitelist:', err);
@@ -344,7 +344,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
       count: buyerAddresses.length,
       buyers: buyerAddresses
     });
-    
+
     const notifId = notifications.loading(
       'Removing Buyer Whitelist',
       `Removing ${buyerAddresses.length} buyer(s) from listing #${listingId}...`
@@ -363,7 +363,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         args: [BigInt(listingId), buyerAddresses as `0x${string}`[]],
         gas: BigInt(200000)
       });
-      
+
       console.log('?? [Admin] Remove buyer whitelist transaction sent to wallet');
     } catch (err: any) {
       console.error('? [Admin] Failed to remove buyer whitelist:', err);

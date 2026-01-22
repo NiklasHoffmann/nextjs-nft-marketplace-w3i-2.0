@@ -22,13 +22,13 @@ interface BatchListingFormProps {
     marketplaceAddress: string;
 }
 
-export function BatchListingForm({ 
-    userNFTs, 
+export function BatchListingForm({
+    userNFTs,
     selectedNFTs: externalSelectedNFTs,
     onSelectedNFTsChange,
-    onSubmit, 
-    onBack, 
-    marketplaceAddress 
+    onSubmit,
+    onBack,
+    marketplaceAddress
 }: BatchListingFormProps) {
     const [contractFilter, setContractFilter] = useState('');
     const [internalSelectedNFTs, setInternalSelectedNFTs] = useState<Set<string>>(new Set());
@@ -438,95 +438,66 @@ export function BatchListingForm({
 
                 {/* Pricing Configuration - Only show when NFTs are selected */}
                 {selectedNFTs.size > 0 && (
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Preis-Konfiguration</h3>
+                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Preis-Konfiguration</h3>
 
-                    {/* Pricing Type Selection */}
-                    <div className="mb-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-3">
-                            Preis-Strategie
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setPricingType('fixed')}
-                                className={`p-4 rounded-xl border-2 transition-all duration-300 ${pricingType === 'fixed'
-                                    ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 shadow-md'
-                                    : 'border-gray-200 hover:border-blue-300 bg-white'
-                                    }`}
-                            >
-                                <div className="text-center">
-                                    <svg className={`w-6 h-6 mx-auto mb-2 ${pricingType === 'fixed' ? 'text-blue-600' : 'text-gray-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h10M7 12h10m-10 5h10" />
-                                    </svg>
-                                    <span className={`text-sm font-medium ${pricingType === 'fixed' ? 'text-blue-900' : 'text-gray-700'}`}>
-                                        Fester Preis
-                                    </span>
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setPricingType('variable')}
-                                className={`p-4 rounded-xl border-2 transition-all duration-300 ${pricingType === 'variable'
-                                    ? 'border-green-500 bg-gradient-to-br from-green-50 to-green-100 shadow-md'
-                                    : 'border-gray-200 hover:border-green-300 bg-white'
-                                    }`}
-                            >
-                                <div className="text-center">
-                                    <svg className={`w-6 h-6 mx-auto mb-2 ${pricingType === 'variable' ? 'text-green-600' : 'text-gray-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                                    </svg>
-                                    <span className={`text-sm font-medium ${pricingType === 'variable' ? 'text-green-900' : 'text-gray-700'}`}>
-                                        Variable Preise
-                                    </span>
-                                </div>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Fixed Price */}
-                    {pricingType === 'fixed' && (
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Preis für alle NFTs *
+                        {/* Pricing Type Selection */}
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-3">
+                                Preis-Strategie
                             </label>
-                            <div className="flex">
-                                <input
-                                    type="number"
-                                    step="0.0001"
-                                    {...form.getFieldProps('fixedPrice')}
-                                    className={`flex-1 rounded-l-lg border ${form.hasError('fixedPrice') ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
-                                    placeholder="0.00"
-                                />
-                                <select
-                                    {...form.getFieldProps('currency')}
-                                    className="rounded-r-lg border border-l-0 border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm"
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setPricingType('fixed')}
+                                    className={`p-4 rounded-xl border-2 transition-all duration-300 ${pricingType === 'fixed'
+                                        ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 shadow-md'
+                                        : 'border-gray-200 hover:border-blue-300 bg-white'
+                                        }`}
                                 >
-                                    <option value="ETH">ETH</option>
-                                    <option value="USDC">USDC</option>
-                                </select>
-                            </div>
-                            {form.hasError('fixedPrice') && (
-                                <p className="mt-1 text-sm text-red-600">{form.getFieldError('fixedPrice')}</p>
-                            )}
-                        </div>
-                    )}
+                                    <div className="text-center">
+                                        <svg className={`w-6 h-6 mx-auto mb-2 ${pricingType === 'fixed' ? 'text-blue-600' : 'text-gray-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h10M7 12h10m-10 5h10" />
+                                        </svg>
+                                        <span className={`text-sm font-medium ${pricingType === 'fixed' ? 'text-blue-900' : 'text-gray-700'}`}>
+                                            Fester Preis
+                                        </span>
+                                    </div>
+                                </button>
 
-                    {/* Variable Price */}
-                    {pricingType === 'variable' && (
-                        <div className="space-y-4 mb-4">
-                            <div>
+                                <button
+                                    type="button"
+                                    onClick={() => setPricingType('variable')}
+                                    className={`p-4 rounded-xl border-2 transition-all duration-300 ${pricingType === 'variable'
+                                        ? 'border-green-500 bg-gradient-to-br from-green-50 to-green-100 shadow-md'
+                                        : 'border-gray-200 hover:border-green-300 bg-white'
+                                        }`}
+                                >
+                                    <div className="text-center">
+                                        <svg className={`w-6 h-6 mx-auto mb-2 ${pricingType === 'variable' ? 'text-green-600' : 'text-gray-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                                        </svg>
+                                        <span className={`text-sm font-medium ${pricingType === 'variable' ? 'text-green-900' : 'text-gray-700'}`}>
+                                            Variable Preise
+                                        </span>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Fixed Price */}
+                        {pricingType === 'fixed' && (
+                            <div className="mb-4">
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Start-Preis (Erster NFT) *
+                                    Preis für alle NFTs *
                                 </label>
                                 <div className="flex">
                                     <input
                                         type="number"
                                         step="0.0001"
-                                        {...form.getFieldProps('startPrice')}
-                                        className={`flex-1 rounded-l-lg border ${form.hasError('startPrice') ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
-                                        placeholder="1.00"
+                                        {...form.getFieldProps('fixedPrice')}
+                                        className={`flex-1 rounded-l-lg border ${form.hasError('fixedPrice') ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
+                                        placeholder="0.00"
                                     />
                                     <select
                                         {...form.getFieldProps('currency')}
@@ -536,92 +507,121 @@ export function BatchListingForm({
                                         <option value="USDC">USDC</option>
                                     </select>
                                 </div>
-                                {form.hasError('startPrice') && (
-                                    <p className="mt-1 text-sm text-red-600">{form.getFieldError('startPrice')}</p>
+                                {form.hasError('fixedPrice') && (
+                                    <p className="mt-1 text-sm text-red-600">{form.getFieldError('fixedPrice')}</p>
                                 )}
                             </div>
+                        )}
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    End-Preis (Letzter NFT) *
-                                </label>
-                                <div className="flex">
-                                    <input
-                                        type="number"
-                                        step="0.0001"
-                                        {...form.getFieldProps('endPrice')}
-                                        className={`flex-1 rounded-l-lg border ${form.hasError('endPrice') ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
-                                        placeholder="10.00"
-                                    />
-                                    <div className="rounded-r-lg border border-l-0 border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-600">
-                                        {form.values.currency}
+                        {/* Variable Price */}
+                        {pricingType === 'variable' && (
+                            <div className="space-y-4 mb-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Start-Preis (Erster NFT) *
+                                    </label>
+                                    <div className="flex">
+                                        <input
+                                            type="number"
+                                            step="0.0001"
+                                            {...form.getFieldProps('startPrice')}
+                                            className={`flex-1 rounded-l-lg border ${form.hasError('startPrice') ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
+                                            placeholder="1.00"
+                                        />
+                                        <select
+                                            {...form.getFieldProps('currency')}
+                                            className="rounded-r-lg border border-l-0 border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm"
+                                        >
+                                            <option value="ETH">ETH</option>
+                                            <option value="USDC">USDC</option>
+                                        </select>
                                     </div>
+                                    {form.hasError('startPrice') && (
+                                        <p className="mt-1 text-sm text-red-600">{form.getFieldError('startPrice')}</p>
+                                    )}
                                 </div>
-                                {form.hasError('endPrice') && (
-                                    <p className="mt-1 text-sm text-red-600">{form.getFieldError('endPrice')}</p>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        End-Preis (Letzter NFT) *
+                                    </label>
+                                    <div className="flex">
+                                        <input
+                                            type="number"
+                                            step="0.0001"
+                                            {...form.getFieldProps('endPrice')}
+                                            className={`flex-1 rounded-l-lg border ${form.hasError('endPrice') ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
+                                            placeholder="10.00"
+                                        />
+                                        <div className="rounded-r-lg border border-l-0 border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-600">
+                                            {form.values.currency}
+                                        </div>
+                                    </div>
+                                    {form.hasError('endPrice') && (
+                                        <p className="mt-1 text-sm text-red-600">{form.getFieldError('endPrice')}</p>
+                                    )}
+                                </div>
+
+                                {/* Price Preview */}
+                                {form.values.startPrice && form.values.endPrice && selectedNFTs.size > 0 && (
+                                    <div className="bg-gradient-to-r from-green-50 to-green-100 border-green-200 rounded-lg p-3 border">
+                                        <p className="text-xs font-medium text-green-900 mb-2">Preis-Vorschau:</p>
+                                        <div className="space-y-1 text-xs text-green-800">
+                                            {/* NFT List with individual prices */}
+                                            <div className="max-h-40 overflow-y-auto space-y-1 mb-2">
+                                                {selectedNFTsList.map((nft, idx) => (
+                                                    <div key={nft.key} className="flex justify-between items-center py-0.5">
+                                                        <span className="truncate flex-1">
+                                                            {nft.meta?.name || `NFT #${nft.tokenId}`}
+                                                        </span>
+                                                        <span className="font-semibold ml-2">
+                                                            {calculatePrice(idx, selectedNFTsList.length)} {form.values.currency}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="pt-2 border-t border-green-300 flex justify-between font-semibold">
+                                                <span>Gesamt ({selectedNFTs.size} NFTs):</span>
+                                                <span>
+                                                    {selectedNFTsList.reduce((sum, _, idx) => {
+                                                        return sum + parseFloat(calculatePrice(idx, selectedNFTsList.length));
+                                                    }, 0).toFixed(4)} {form.values.currency}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 )}
                             </div>
+                        )}
 
-                            {/* Price Preview */}
-                            {form.values.startPrice && form.values.endPrice && selectedNFTs.size > 0 && (
-                                <div className="bg-gradient-to-r from-green-50 to-green-100 border-green-200 rounded-lg p-3 border">
-                                    <p className="text-xs font-medium text-green-900 mb-2">Preis-Vorschau:</p>
-                                    <div className="space-y-1 text-xs text-green-800">
-                                        {/* NFT List with individual prices */}
-                                        <div className="max-h-40 overflow-y-auto space-y-1 mb-2">
-                                            {selectedNFTsList.map((nft, idx) => (
-                                                <div key={nft.key} className="flex justify-between items-center py-0.5">
-                                                    <span className="truncate flex-1">
-                                                        {nft.meta?.name || `NFT #${nft.tokenId}`}
-                                                    </span>
-                                                    <span className="font-semibold ml-2">
-                                                        {calculatePrice(idx, selectedNFTsList.length)} {form.values.currency}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="pt-2 border-t border-green-300 flex justify-between font-semibold">
-                                            <span>Gesamt ({selectedNFTs.size} NFTs):</span>
-                                            <span>
-                                                {selectedNFTsList.reduce((sum, _, idx) => {
-                                                    return sum + parseFloat(calculatePrice(idx, selectedNFTsList.length));
-                                                }, 0).toFixed(4)} {form.values.currency}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
+                        {/* Description */}
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Beschreibung *
+                            </label>
+                            <textarea
+                                {...form.getFieldProps('description')}
+                                rows={3}
+                                className={`w-full rounded-xl border ${form.hasError('description') ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
+                                placeholder="Beschreiben Sie Ihre Batch-Listings..."
+                            />
+                            {form.hasError('description') && (
+                                <p className="mt-1 text-sm text-red-600">{form.getFieldError('description')}</p>
                             )}
                         </div>
-                    )}
 
-                    {/* Description */}
-                    <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Beschreibung *
-                        </label>
-                        <textarea
-                            {...form.getFieldProps('description')}
-                            rows={3}
-                            className={`w-full rounded-xl border ${form.hasError('description') ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-sm`}
-                            placeholder="Beschreiben Sie Ihre Batch-Listings..."
-                        />
-                        {form.hasError('description') && (
-                            <p className="mt-1 text-sm text-red-600">{form.getFieldError('description')}</p>
-                        )}
+                        {/* Submit Button */}
+                        <button
+                            type="submit"
+                            disabled={selectedNFTs.size === 0}
+                            className="w-full px-6 py-4 rounded-xl text-white font-semibold text-lg shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-105 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed disabled:transform-none"
+                        >
+                            {selectedNFTs.size > 0
+                                ? `${selectedNFTs.size} NFT${selectedNFTs.size > 1 ? 's' : ''} listen`
+                                : 'NFTs auswählen'
+                            }
+                        </button>
                     </div>
-
-                    {/* Submit Button */}
-                    <button
-                        type="submit"
-                        disabled={selectedNFTs.size === 0}
-                        className="w-full px-6 py-4 rounded-xl text-white font-semibold text-lg shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-105 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed disabled:transform-none"
-                    >
-                        {selectedNFTs.size > 0
-                            ? `${selectedNFTs.size} NFT${selectedNFTs.size > 1 ? 's' : ''} listen`
-                            : 'NFTs auswählen'
-                        }
-                    </button>
-                </div>
                 )}
             </div>
         </form>

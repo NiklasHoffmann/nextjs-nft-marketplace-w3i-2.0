@@ -78,11 +78,10 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
                     <button
                         type="button"
                         onClick={() => setPricingType('fixed')}
-                        className={`p-4 rounded-xl border-2 transition-all duration-300 ${
-                            pricingType === 'fixed'
+                        className={`p-4 rounded-xl border-2 transition-all duration-300 ${pricingType === 'fixed'
                                 ? 'border-purple-500 bg-gradient-to-br from-purple-50 to-purple-100 shadow-md'
                                 : 'border-gray-200 hover:border-purple-300 bg-white'
-                        }`}
+                            }`}
                     >
                         <div className="text-center">
                             <svg className={`w-6 h-6 mx-auto mb-2 ${pricingType === 'fixed' ? 'text-purple-600' : 'text-gray-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -97,11 +96,10 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
                     <button
                         type="button"
                         onClick={() => setPricingType('variable')}
-                        className={`p-4 rounded-xl border-2 transition-all duration-300 ${
-                            pricingType === 'variable'
+                        className={`p-4 rounded-xl border-2 transition-all duration-300 ${pricingType === 'variable'
                                 ? 'border-green-500 bg-gradient-to-br from-green-50 to-green-100 shadow-md'
                                 : 'border-gray-200 hover:border-green-300 bg-white'
-                        }`}
+                            }`}
                     >
                         <div className="text-center">
                             <svg className={`w-6 h-6 mx-auto mb-2 ${pricingType === 'variable' ? 'text-green-600' : 'text-gray-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -212,11 +210,10 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
             <button
                 type="submit"
                 disabled={whitelistStatus !== 'done' || approvalStatus === 'checking'}
-                className={`w-full px-6 py-3 rounded-xl text-white font-semibold shadow-lg hover:shadow-2xl transition-all duration-300 transform flex items-center justify-center gap-2 ${
-                    whitelistStatus !== 'done' || approvalStatus === 'checking'
+                className={`w-full px-6 py-3 rounded-xl text-white font-semibold shadow-lg hover:shadow-2xl transition-all duration-300 transform flex items-center justify-center gap-2 ${whitelistStatus !== 'done' || approvalStatus === 'checking'
                         ? 'bg-gray-400 cursor-not-allowed'
                         : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 hover:scale-105'
-                }`}
+                    }`}
             >
                 {whitelistStatus === 'failed' ? (
                     <>

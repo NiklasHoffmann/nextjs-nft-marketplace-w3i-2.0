@@ -570,15 +570,15 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
     private handleError(error: Error | unknown): void {
         // Safely extract error information
         const safeError = error as any;
-        
+
         // Check if error is actually an empty object (common with WebSocket close events)
-        const isEmptyError = error && typeof error === 'object' && 
-                            Object.keys(error).length === 0 && 
-                            !error.constructor?.name;
-        
+        const isEmptyError = error && typeof error === 'object' &&
+            Object.keys(error).length === 0 &&
+            !error.constructor?.name;
+
         // Extract meaningful error info (viem sometimes sends empty objects or close events)
-        const errorMessage = safeError?.message || safeError?.reason || 
-                            (isEmptyError ? 'WebSocket closed' : 'Unknown error');
+        const errorMessage = safeError?.message || safeError?.reason ||
+            (isEmptyError ? 'WebSocket closed' : 'Unknown error');
         const errorCode = safeError?.code;
         const errorType = safeError?.type || safeError?.constructor?.name || 'Unknown';
         const errorName = safeError?.name || 'Error';

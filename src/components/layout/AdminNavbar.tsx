@@ -287,8 +287,8 @@ export default function AdminNavbar() {
                                                         href={item.href as any}
                                                         onClick={() => setIsDropdownOpen(false)}
                                                         className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${isCurrentPage
-                                                                ? `${activeBgClass} ${activeTextClass} font-medium`
-                                                                : 'text-gray-700 hover:bg-gray-50'
+                                                            ? `${activeBgClass} ${activeTextClass} font-medium`
+                                                            : 'text-gray-700 hover:bg-gray-50'
                                                             }`}
                                                     >
                                                         {item.icon}

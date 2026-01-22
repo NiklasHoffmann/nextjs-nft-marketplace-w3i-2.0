@@ -59,8 +59,8 @@ export default function MultiSigWalletPage() {
                             <button
                                 onClick={() => setFilter('all')}
                                 className={`rounded-lg px-4 py-2 text-sm font-medium ${filter === 'all'
-                                        ? 'bg-green-600 text-white'
-                                        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                                    ? 'bg-green-600 text-white'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
                                     }`}
                             >
                                 Alle ({pendingTransactions.length})
@@ -68,8 +68,8 @@ export default function MultiSigWalletPage() {
                             <button
                                 onClick={() => setFilter('ready')}
                                 className={`rounded-lg px-4 py-2 text-sm font-medium ${filter === 'ready'
-                                        ? 'bg-green-600 text-white'
-                                        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                                    ? 'bg-green-600 text-white'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
                                     }`}
                             >
                                 Bereit ({pendingTransactions.filter((tx) => tx.canExecute).length})
@@ -77,8 +77,8 @@ export default function MultiSigWalletPage() {
                             <button
                                 onClick={() => setFilter('pending')}
                                 className={`rounded-lg px-4 py-2 text-sm font-medium ${filter === 'pending'
-                                        ? 'bg-green-600 text-white'
-                                        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                                    ? 'bg-green-600 text-white'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
                                     }`}
                             >
                                 Ausstehend ({pendingTransactions.filter((tx) => !tx.canExecute).length})

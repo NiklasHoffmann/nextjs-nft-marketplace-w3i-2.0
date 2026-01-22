@@ -10,212 +10,212 @@ const path = require('path');
 
 // ANSI color codes
 const colors = {
-  reset: '\x1b[0m',
-  red: '\x1b[31m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  blue: '\x1b[34m',
-  cyan: '\x1b[36m',
-  gray: '\x1b[90m'
+    reset: '\x1b[0m',
+    red: '\x1b[31m',
+    green: '\x1b[32m',
+    yellow: '\x1b[33m',
+    blue: '\x1b[34m',
+    cyan: '\x1b[36m',
+    gray: '\x1b[90m'
 };
 
 const log = {
-  info: (msg) => console.log(`${colors.blue}ℹ${colors.reset} ${msg}`),
-  success: (msg) => console.log(`${colors.green}✓${colors.reset} ${msg}`),
-  warn: (msg) => console.log(`${colors.yellow}⚠${colors.reset} ${msg}`),
-  error: (msg) => console.log(`${colors.red}✗${colors.reset} ${msg}`),
-  section: (msg) => console.log(`\n${colors.cyan}${msg}${colors.reset}`)
+    info: (msg) => console.log(`${colors.blue}ℹ${colors.reset} ${msg}`),
+    success: (msg) => console.log(`${colors.green}✓${colors.reset} ${msg}`),
+    warn: (msg) => console.log(`${colors.yellow}⚠${colors.reset} ${msg}`),
+    error: (msg) => console.log(`${colors.red}✗${colors.reset} ${msg}`),
+    section: (msg) => console.log(`\n${colors.cyan}${msg}${colors.reset}`)
 };
 
 // Required files
 const requiredFiles = {
-  development: '.env.local',
-  production: '.env.production.local'
+    development: '.env.local',
+    production: '.env.production.local'
 };
 
 // Template files
 const templateFiles = {
-  development: '.env.local.template',
-  production: '.env.production.template'
+    development: '.env.local.template',
+    production: '.env.production.template'
 };
 
 // Critical variables that MUST be set
 const criticalVars = {
-  common: [
-    'MONGODB_URI',
-    'JWT_SECRET'
-  ],
-  development: [
-    'NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID',
-    'NEXT_PUBLIC_MARKETPLACE_ADDRESS'
-  ],
-  production: [
-    'NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID',
-    'NEXT_PUBLIC_MARKETPLACE_ADDRESS',
-    'NEXT_PUBLIC_SUBGRAPH_V2_URL'
-  ]
+    common: [
+        'MONGODB_URI',
+        'JWT_SECRET'
+    ],
+    development: [
+        'NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID',
+        'NEXT_PUBLIC_MARKETPLACE_ADDRESS'
+    ],
+    production: [
+        'NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID',
+        'NEXT_PUBLIC_MARKETPLACE_ADDRESS',
+        'NEXT_PUBLIC_SUBGRAPH_V2_URL'
+    ]
 };
 
 function checkFileExists(filePath) {
-  return fs.existsSync(path.join(process.cwd(), filePath));
+    return fs.existsSync(path.join(process.cwd(), filePath));
 }
 
 function loadEnvFile(filePath) {
-  try {
-    const content = fs.readFileSync(path.join(process.cwd(), filePath), 'utf8');
-    const vars = {};
-    
-    content.split('\n').forEach(line => {
-      const match = line.match(/^([^#=\s]+)\s*=\s*(.*)$/);
-      if (match) {
-        vars[match[1]] = match[2].trim();
-      }
-    });
-    
-    return vars;
-  } catch (error) {
-    return null;
-  }
+    try {
+        const content = fs.readFileSync(path.join(process.cwd(), filePath), 'utf8');
+        const vars = {};
+
+        content.split('\n').forEach(line => {
+            const match = line.match(/^([^#=\s]+)\s*=\s*(.*)$/);
+            if (match) {
+                vars[match[1]] = match[2].trim();
+            }
+        });
+
+        return vars;
+    } catch (error) {
+        return null;
+    }
 }
 
 function validateJWTSecret(secret) {
-  if (!secret || secret === '__GENERATE_A_LONG_RANDOM_SECRET_HERE__' || secret === '__LONG_RANDOM_SECRET__') {
-    return false;
-  }
-  if (secret.length < 32) {
-    return false;
-  }
-  return true;
+    if (!secret || secret === '__GENERATE_A_LONG_RANDOM_SECRET_HERE__' || secret === '__LONG_RANDOM_SECRET__') {
+        return false;
+    }
+    if (secret.length < 32) {
+        return false;
+    }
+    return true;
 }
 
 function validateMongoURI(uri) {
-  if (!uri || uri.includes('YOUR_') || uri.includes('username:password')) {
-    return false;
-  }
-  return uri.startsWith('mongodb://') || uri.startsWith('mongodb+srv://');
+    if (!uri || uri.includes('YOUR_') || uri.includes('username:password')) {
+        return false;
+    }
+    return uri.startsWith('mongodb://') || uri.startsWith('mongodb+srv://');
 }
 
 function validateAddress(address) {
-  return /^0x[a-fA-F0-9]{40}$/.test(address);
+    return /^0x[a-fA-F0-9]{40}$/.test(address);
 }
 
 function checkEnvironment(env) {
-  log.section(`🔍 Checking ${env.toUpperCase()} Environment`);
-  
-  const envFile = requiredFiles[env];
-  const templateFile = templateFiles[env];
-  
-  // Check if env file exists
-  if (!checkFileExists(envFile)) {
-    log.error(`${envFile} not found!`);
-    
-    if (checkFileExists(templateFile)) {
-      log.info(`Copy template: cp ${templateFile} ${envFile}`);
+    log.section(`🔍 Checking ${env.toUpperCase()} Environment`);
+
+    const envFile = requiredFiles[env];
+    const templateFile = templateFiles[env];
+
+    // Check if env file exists
+    if (!checkFileExists(envFile)) {
+        log.error(`${envFile} not found!`);
+
+        if (checkFileExists(templateFile)) {
+            log.info(`Copy template: cp ${templateFile} ${envFile}`);
+        }
+        return false;
     }
-    return false;
-  }
-  
-  log.success(`${envFile} exists`);
-  
-  // Load and validate variables
-  const vars = loadEnvFile(envFile);
-  
-  if (!vars) {
-    log.error(`Failed to load ${envFile}`);
-    return false;
-  }
-  
-  let hasErrors = false;
-  
-  // Check critical variables
-  const requiredVars = [...criticalVars.common, ...criticalVars[env]];
-  
-  log.info('Validating critical variables...');
-  
-  requiredVars.forEach(varName => {
-    const value = vars[varName];
-    
-    if (!value) {
-      log.error(`${varName} is not set`);
-      hasErrors = true;
-      return;
+
+    log.success(`${envFile} exists`);
+
+    // Load and validate variables
+    const vars = loadEnvFile(envFile);
+
+    if (!vars) {
+        log.error(`Failed to load ${envFile}`);
+        return false;
     }
-    
-    // Specific validations
-    if (varName === 'JWT_SECRET') {
-      if (!validateJWTSecret(value)) {
-        log.error(`${varName} is too short or using placeholder (min 32 chars)`);
-        hasErrors = true;
-      } else {
-        log.success(`${varName} is valid`);
-      }
-    } else if (varName === 'MONGODB_URI') {
-      if (!validateMongoURI(value)) {
-        log.error(`${varName} is invalid or using placeholder`);
-        hasErrors = true;
-      } else {
-        log.success(`${varName} is valid`);
-      }
-    } else if (varName.includes('ADDRESS')) {
-      if (!validateAddress(value)) {
-        log.error(`${varName} is not a valid Ethereum address`);
-        hasErrors = true;
-      } else {
-        log.success(`${varName} is valid`);
-      }
-    } else {
-      if (value.includes('YOUR_') || value.includes('your_')) {
-        log.warn(`${varName} appears to be using a placeholder`);
-        hasErrors = true;
-      } else {
-        log.success(`${varName} is set`);
-      }
-    }
-  });
-  
-  // Security warnings for NEXT_PUBLIC_ variables
-  const publicVars = Object.keys(vars).filter(k => k.startsWith('NEXT_PUBLIC_'));
-  
-  if (publicVars.length > 0) {
-    log.info(`\n${publicVars.length} client-side variables (NEXT_PUBLIC_*) found`);
-    
-    // Check for potential secrets in public vars
-    const suspiciousPatterns = ['SECRET', 'PASSWORD', 'PRIVATE', 'KEY'];
-    publicVars.forEach(varName => {
-      if (suspiciousPatterns.some(pattern => varName.includes(pattern))) {
-        log.warn(`${varName} contains sensitive keyword but is public!`);
-        hasErrors = true;
-      }
+
+    let hasErrors = false;
+
+    // Check critical variables
+    const requiredVars = [...criticalVars.common, ...criticalVars[env]];
+
+    log.info('Validating critical variables...');
+
+    requiredVars.forEach(varName => {
+        const value = vars[varName];
+
+        if (!value) {
+            log.error(`${varName} is not set`);
+            hasErrors = true;
+            return;
+        }
+
+        // Specific validations
+        if (varName === 'JWT_SECRET') {
+            if (!validateJWTSecret(value)) {
+                log.error(`${varName} is too short or using placeholder (min 32 chars)`);
+                hasErrors = true;
+            } else {
+                log.success(`${varName} is valid`);
+            }
+        } else if (varName === 'MONGODB_URI') {
+            if (!validateMongoURI(value)) {
+                log.error(`${varName} is invalid or using placeholder`);
+                hasErrors = true;
+            } else {
+                log.success(`${varName} is valid`);
+            }
+        } else if (varName.includes('ADDRESS')) {
+            if (!validateAddress(value)) {
+                log.error(`${varName} is not a valid Ethereum address`);
+                hasErrors = true;
+            } else {
+                log.success(`${varName} is valid`);
+            }
+        } else {
+            if (value.includes('YOUR_') || value.includes('your_')) {
+                log.warn(`${varName} appears to be using a placeholder`);
+                hasErrors = true;
+            } else {
+                log.success(`${varName} is set`);
+            }
+        }
     });
-  }
-  
-  return !hasErrors;
+
+    // Security warnings for NEXT_PUBLIC_ variables
+    const publicVars = Object.keys(vars).filter(k => k.startsWith('NEXT_PUBLIC_'));
+
+    if (publicVars.length > 0) {
+        log.info(`\n${publicVars.length} client-side variables (NEXT_PUBLIC_*) found`);
+
+        // Check for potential secrets in public vars
+        const suspiciousPatterns = ['SECRET', 'PASSWORD', 'PRIVATE', 'KEY'];
+        publicVars.forEach(varName => {
+            if (suspiciousPatterns.some(pattern => varName.includes(pattern))) {
+                log.warn(`${varName} contains sensitive keyword but is public!`);
+                hasErrors = true;
+            }
+        });
+    }
+
+    return !hasErrors;
 }
 
 function generateSecret() {
-  log.section('🔐 Generate New JWT Secret');
-  log.info('Run this command and add to .env.local:');
-  console.log(colors.gray + '\nnode -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"\n' + colors.reset);
+    log.section('🔐 Generate New JWT Secret');
+    log.info('Run this command and add to .env.local:');
+    console.log(colors.gray + '\nnode -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"\n' + colors.reset);
 }
 
 function main() {
-  console.log(`
+    console.log(`
 ${colors.cyan}╔═══════════════════════════════════════════════╗
 ║   Environment Configuration Validator        ║
 ║   NFT Marketplace - Production Ready         ║
 ╚═══════════════════════════════════════════════╝${colors.reset}
 `);
-  
-  const args = process.argv.slice(2);
-  const env = args[0] || process.env.NODE_ENV || 'development';
-  
-  if (args.includes('--generate-secret')) {
-    generateSecret();
-    return;
-  }
-  
-  if (args.includes('--help')) {
-    console.log(`
+
+    const args = process.argv.slice(2);
+    const env = args[0] || process.env.NODE_ENV || 'development';
+
+    if (args.includes('--generate-secret')) {
+        generateSecret();
+        return;
+    }
+
+    if (args.includes('--help')) {
+        console.log(`
 Usage: node scripts/check-env.js [environment] [options]
 
 Environments:
@@ -231,19 +231,19 @@ Examples:
   node scripts/check-env.js production
   node scripts/check-env.js --generate-secret
 `);
-    return;
-  }
-  
-  const isValid = checkEnvironment(env);
-  
-  if (isValid) {
-    log.section('✅ Environment is valid!');
-    process.exit(0);
-  } else {
-    log.section('❌ Environment has errors!');
-    log.info('See docs/environment/README.md for setup instructions');
-    process.exit(1);
-  }
+        return;
+    }
+
+    const isValid = checkEnvironment(env);
+
+    if (isValid) {
+        log.section('✅ Environment is valid!');
+        process.exit(0);
+    } else {
+        log.section('❌ Environment has errors!');
+        log.info('See docs/environment/README.md for setup instructions');
+        process.exit(1);
+    }
 }
 
 main();
