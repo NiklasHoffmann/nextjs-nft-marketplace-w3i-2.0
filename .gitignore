@@ -57,6 +57,12 @@ next-env.d.ts
 *.log
 sync-service-debug.log
 
+# Build outputs & debug files
+build-*.txt
+build-*.log
+api_response*.json
+api_routes*.json
+
 # Temp files
 temp-*
 *.tmp
