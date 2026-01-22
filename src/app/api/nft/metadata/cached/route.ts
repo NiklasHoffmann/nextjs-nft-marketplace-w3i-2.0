@@ -15,7 +15,7 @@ import {
     upsertNFTMetadata,
     getEnrichedNFTMetadata,
     updateNFTOwnership
-} from '@/lib/db/nft-metadata';
+} from '@/lib/db';
 import type { NFTMetadata } from '@/types/nft-metadata';
 
 /**

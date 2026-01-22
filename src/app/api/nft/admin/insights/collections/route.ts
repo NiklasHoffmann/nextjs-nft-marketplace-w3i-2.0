@@ -18,7 +18,7 @@ import { z } from 'zod';
 import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { apiHandler } from '@/lib/api/handler';
-import { withAdmin } from '@/lib/middleware/auth';
+import { withAdmin } from '@/lib/middleware';
 import { apiBadRequest, apiNotFound, apiSuccess } from '@/lib/api/responses';
 import { ConflictError } from '@/lib/api/errors';
 import type { NFTProjectDescriptions } from '@/types/features/nft-insights';

@@ -17,7 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
 import { apiHandler } from '@/lib/api/handler';
-import { withAuth } from '@/lib/middleware/auth';
+import { withAuth } from '@/lib/middleware';
 import { apiBadRequest } from '@/lib/api/responses';
 
 interface CartItem {

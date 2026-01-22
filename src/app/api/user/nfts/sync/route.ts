@@ -13,12 +13,12 @@ import {
     apiSuccess,
     BadRequestError
 } from '@/lib/api';
-import { withAuth } from '@/lib/middleware/auth';
+import { withAuth } from '@/lib/middleware';
 import {
     getNFTsByOwner,
     updateNFTOwnership,
     upsertNFTMetadata
-} from '@/lib/db/nft-metadata';
+} from '@/lib/db';
 import type { NFTMetadataSyncResult } from '@/types/nft-metadata';
 import { fetchComprehensiveNFTDataNew } from '@/services/blockchain/nft-fetcher';
 

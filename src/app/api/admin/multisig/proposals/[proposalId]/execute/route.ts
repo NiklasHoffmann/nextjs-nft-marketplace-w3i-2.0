@@ -9,7 +9,7 @@
 
 import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, parseJsonBody, NotFoundError, BadRequestError } from '@/lib/api';
-import { withAdmin } from '@/lib/middleware/auth';
+import { withAdmin } from '@/lib/middleware';
 import clientPromise from '@/lib/mongodb';
 import { MultisigProposal } from '@/types/multisig';
 

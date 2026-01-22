@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiBadRequest, apiSuccess, apiError, apiInternalError } from '@/lib/api/responses';
 import { apiHandler } from '@/lib/api/handler';
-import { getWalletNFTsFromBlockchain, getKnownContractAddresses } from '@/lib/blockchain/wallet-nfts';
+import { getWalletNFTsFromBlockchain, getKnownContractAddresses } from '@/lib/blockchain';
 import type { Address } from 'viem';
 
 // Interface for NFT response from external APIs

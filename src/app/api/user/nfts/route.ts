@@ -7,7 +7,7 @@
 
 import { NextRequest } from 'next/server';
 import { apiHandler } from '@/lib/api/handler';
-import { withAuth } from '@/lib/middleware/auth';
+import { withAuth } from '@/lib/middleware';
 import {
     apiSuccess,
     apiBadRequest,

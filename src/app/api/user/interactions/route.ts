@@ -1,7 +1,7 @@
 ﻿import { NextRequest } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
 import { apiHandler } from '@/lib/api/handler';
-import { withAuth } from '@/lib/middleware/auth';
+import { withAuth } from '@/lib/middleware';
 import {
     getCachedInteractions,
     setCachedInteractions,
