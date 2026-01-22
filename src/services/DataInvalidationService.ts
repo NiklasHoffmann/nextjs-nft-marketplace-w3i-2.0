@@ -43,12 +43,6 @@ export function emitDataInvalidation(detail: InvalidationEventDetail): void {
 
     const event = new CustomEvent('dataInvalidation', { detail });
     window.dispatchEvent(event);
-
-    // Also emit specific marketplace invalidation
-    const marketplaceEvent = new CustomEvent('marketplaceItemsInvalidated', {
-        detail: { filterKey: undefined, timestamp: Date.now() }
-    });
-    window.dispatchEvent(marketplaceEvent);
 }
 
 /**

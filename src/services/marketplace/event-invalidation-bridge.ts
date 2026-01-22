@@ -30,12 +30,6 @@ import type {
     ProcessedItemUpdatedEvent
 } from '@/types/marketplace/contract-events';
 
-// ===== INVALIDATION HANDLERS =====
-
-/**
- * Handle ListingCreated event
- * Invalidates wallet NFTs and marketplace items
- */
 export function handleListingCreated(event: ProcessedItemListedEvent): void {
     const { nftAddress, tokenId, listingId, seller } = event.data;
 
@@ -138,6 +132,75 @@ export function handleListingCanceled(event: ProcessedItemCanceledEvent): void {
 }
 
 /**
+ * Handle ListingCanceledDueToInvalidListing event
+ * Same as ListingCanceled - NFT returns to owner
+ */
+export function handleListingCanceledDueToInvalid(event: ProcessedItemCanceledEvent): void {
+    const { nftAddress, tokenId, listingId, seller } = event.data;
+
+    console.log('🔄 [EventBridge] ListingCanceledDueToInvalidListing:', {
+        listingId: listingId.toString(),
+        nft: `${nftAddress}:${tokenId}`,
+        seller,
+        reason: 'Invalid listing (NFT transferred or approval revoked)'
+    });
+
+    // Same invalidation as regular cancel
+    invalidateAfterCancelListing(
+        nftAddress,
+        tokenId.toString(),
+        listingId.toString()
+    );
+
+    // Emit custom event
+    emitOptimisticUpdate({
+        type: 'listing-canceled',
+        contractAddress: nftAddress,
+        tokenId: tokenId.toString(),
+        listingId: listingId.toString(),
+        timestamp: event.processedAt,
+        metadata: {
+            seller,
+            reason: 'invalid-listing'
+        }
+    });
+}
+
+/**
+ * Handle CollectionWhitelistRevokedCancelTriggered event
+ * Collection removed from whitelist - all listings canceled
+ */
+export function handleCollectionWhitelistRevoked(event: any): void {
+    const { listingId, tokenAddress } = event.data;
+
+    console.log('🔄 [EventBridge] CollectionWhitelistRevokedCancelTriggered:', {
+        listingId: listingId.toString(),
+        collection: tokenAddress,
+        reason: 'Collection removed from whitelist'
+    });
+
+    // Invalidate entire collection
+    // Note: We don't have tokenId in this event, so invalidate broadly
+    invalidateAfterCancelListing(
+        tokenAddress,
+        '0', // Placeholder - will trigger collection-wide refresh
+        listingId.toString()
+    );
+
+    // Emit custom event
+    emitOptimisticUpdate({
+        type: 'listing-canceled',
+        contractAddress: tokenAddress,
+        tokenId: '0',
+        listingId: listingId.toString(),
+        timestamp: event.processedAt,
+        metadata: {
+            reason: 'collection-whitelist-revoked'
+        }
+    });
+}
+
+/**
  * Handle ListingUpdated event
  * Invalidates marketplace cache for updated listing
  */
@@ -205,7 +268,7 @@ export function onOptimisticUpdate(
     callback: (detail: OptimisticUpdateDetail) => void
 ): () => void {
     if (typeof window === 'undefined') {
-        return () => {};
+        return () => { };
     }
 
     const handler = (event: Event) => {
@@ -225,25 +288,33 @@ export function onOptimisticUpdate(
 /**
  * Route marketplace event to appropriate handler
  */
-export function routeMarketplaceEvent(event: ProcessedMarketplaceEvent): void {
+export function routeMarketplaceEvent(event: ProcessedMarketplaceEvent | any): void {
     try {
         switch (event.eventName) {
             case 'ItemListed':
                 handleListingCreated(event as ProcessedItemListedEvent);
                 break;
-            
+
             case 'ItemBought':
                 handleListingPurchased(event as ProcessedItemBoughtEvent);
                 break;
-            
+
             case 'ItemCanceled':
                 handleListingCanceled(event as ProcessedItemCanceledEvent);
                 break;
-            
+
             case 'ItemUpdated':
                 handleListingUpdated(event as ProcessedItemUpdatedEvent);
                 break;
-            
+
+            case 'ListingCanceledDueToInvalidListing':
+                handleListingCanceledDueToInvalid(event as ProcessedItemCanceledEvent);
+                break;
+
+            case 'CollectionWhitelistRevokedCancelTriggered':
+                handleCollectionWhitelistRevoked(event);
+                break;
+
             default:
                 console.warn('⚠️ [EventBridge] Unknown event type:', (event as any).eventName);
         }

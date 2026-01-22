@@ -1,14 +1,17 @@
 /**
  * NFT Sync Service - Main Entry Point
  * 
- * OPTIMIZED ARCHITECTURE (per DATA_SYNC_ARCHITECTURE.md)
+ * HYBRID ARCHITECTURE (Optimized Real-Time System)
  * 
- * Background services:
- * - The Graph v2: Polls every 30s (LISTING DATA ONLY)
+ * Real-time services:
+ * - WebSocket Event Listener: Instant events from blockchain (< 1s)
+ * - The Graph v2: Polls every 30s as fallback (LISTING DATA)
+ * 
+ * Periodic services:
  * - Stats Sync: Aggregates stats periodically
  * - Insights Sync: Syncs admin insights
  * 
- * On-demand services (NOT scheduled):
+ * On-demand services:
  * - Blockchain State Sync: Called when needed (owner + approved)
  * - IPFS Metadata Sync: Called when missing (one-time fetch)
  */
@@ -16,6 +19,10 @@
 import { GraphQLSyncV2 } from './graph-subscription-v2';
 import { StatsSync } from './stats-sync';
 import { InsightsSync } from './insights-sync';
+import { MarketplaceEventListenerService } from '../marketplace/event-listener';
+import { routeMarketplaceEvent } from '../marketplace/event-invalidation-bridge';
+import { syncListingToMongoDB, removeListingFromMongoDB } from '../marketplace/event-mongodb-sync';
+import type { ProcessedItemListedEvent, ProcessedItemBoughtEvent, ProcessedItemCanceledEvent } from '@/types/marketplace/contract-events';
 
 // ❌ DEPRECATED: graph-subscription.ts (v1 - REMOVED)
 // ❌ DEPRECATED: metadata-sync.ts (replaced by on-demand services)
@@ -24,6 +31,7 @@ export class NFTSyncService {
     private graphSyncV2: GraphQLSyncV2;
     private statsSync: StatsSync;
     private insightsSync: InsightsSync;
+    private eventListener: MarketplaceEventListenerService;
 
     private isRunning: boolean = false;
 
@@ -31,7 +39,16 @@ export class NFTSyncService {
         this.graphSyncV2 = new GraphQLSyncV2();
         this.statsSync = new StatsSync();
         this.insightsSync = new InsightsSync();
+
+        // Initialize event listener with marketplace address
+        const marketplaceAddress = process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS as `0x${string}`;
+        if (!marketplaceAddress) {
+            throw new Error('NEXT_PUBLIC_MARKETPLACE_ADDRESS not configured');
+        }
+        this.eventListener = new MarketplaceEventListenerService(marketplaceAddress);
+
         console.log('🆕 Subgraph v2 sync initialized (OPTIMIZED: listing data only)');
+        console.log('🎧 WebSocket event listener initialized (REAL-TIME)');
     }
 
     /**
@@ -43,26 +60,66 @@ export class NFTSyncService {
             return;
         }
 
-        console.log('🚀 Starting NFT Sync Service...');
+        console.log('🚀 Starting NFT Sync Service (HYBRID MODE)...');
 
         try {
-            // Start GraphQL v2 sync (real-time marketplace updates)
-            console.log('📡 Using Subgraph v2 (Ideation Market) - OPTIMIZED');
+            // Start WebSocket Event Listener (REAL-TIME - Priority #1)
+            console.log('🎧 Starting WebSocket Event Listener...');
+
+            // Subscribe to all marketplace events and route them
+            const eventTypes: Array<'ItemListed' | 'ItemBought' | 'ItemCanceled' | 'ItemUpdated'> = [
+                'ItemListed',
+                'ItemBought',
+                'ItemCanceled',
+                'ItemUpdated'
+            ];
+
+            eventTypes.forEach(eventName => {
+                this.eventListener.subscribe(eventName, (event) => {
+                    console.log(`📡 [Backend] Received ${event.eventName}:`, {
+                        listingId: (event.data as any).listingId?.toString(),
+                        nft: `${(event.data as any).nftAddress}:${(event.data as any).tokenId}`
+                    });
+
+                    // SERVER-SIDE: Immediately sync to MongoDB
+                    if (event.eventName === 'ItemListed') {
+                        syncListingToMongoDB(event as ProcessedItemListedEvent).catch(error => {
+                            console.error('❌ [Backend] MongoDB sync failed:', error);
+                        });
+                    } else if (event.eventName === 'ItemBought' || event.eventName === 'ItemCanceled') {
+                        const { nftAddress, tokenId, listingId } = (event as ProcessedItemBoughtEvent | ProcessedItemCanceledEvent).data;
+                        removeListingFromMongoDB(
+                            nftAddress,
+                            tokenId.toString(),
+                            listingId.toString()
+                        ).catch(error => {
+                            console.error('❌ [Backend] MongoDB removal failed:', error);
+                        });
+                    }
+
+                    // Route event through invalidation bridge (triggers client-side cache invalidation)
+                    routeMarketplaceEvent(event);
+                });
+            });
+
+            await this.eventListener.start();
+            console.log('✅ WebSocket connected - Real-time events active');
+
+            // Start GraphQL v2 sync (FALLBACK - runs every 30s)
+            console.log('📡 Starting Subgraph v2 sync (FALLBACK)...');
             await this.graphSyncV2.start();
 
             // Start periodic sync jobs
             this.statsSync.start();
             this.insightsSync.start();
 
-            // ❌ REMOVED: metadata-sync (replaced by on-demand services)
-            // Blockchain state and IPFS metadata are now fetched on-demand
-            // See: blockchain-state-sync.ts and ipfs-metadata-lazy-sync.ts
-
             this.isRunning = true;
-            console.log('✅ NFT Sync Service started successfully (OPTIMIZED ARCHITECTURE)');
-            console.log('   ✅ Subgraph v2: Every 30s (listing data only)');
-            console.log('   ✅ Blockchain State: On-demand (when needed)');
-            console.log('   ✅ IPFS Metadata: Lazy-loaded (one-time fetch)');
+            console.log('\n✅ NFT Sync Service started successfully (HYBRID ARCHITECTURE)');
+            console.log('   🎧 WebSocket Events: REAL-TIME (< 1 second)');
+            console.log('   📡 Subgraph v2: Every 30s (fallback + historical data)');
+            console.log('   📊 Stats/Insights: Periodic sync');
+            console.log('   ⚡ Blockchain State: On-demand');
+            console.log('   💾 IPFS Metadata: Lazy-loaded\n');
         } catch (error) {
             console.error('❌ Error starting NFT Sync Service:', error);
             throw error;
@@ -81,6 +138,10 @@ export class NFTSyncService {
         console.log('🛑 Stopping NFT Sync Service...');
 
         try {
+            // Stop WebSocket listener
+            await this.eventListener.stop();
+            console.log('✅ WebSocket disconnected');
+
             // Stop v2 sync
             await this.graphSyncV2.stop();
 
@@ -101,7 +162,8 @@ export class NFTSyncService {
     getStatus() {
         return {
             isRunning: this.isRunning,
-            architecture: 'OPTIMIZED (v2 only)',
+            architecture: 'HYBRID (WebSocket + TheGraph)',
+            eventListener: this.eventListener.getState(),
             graphSyncV2: this.graphSyncV2.getStatus(),
             statsSync: this.statsSync.getStatus(),
             insightsSync: this.insightsSync.getStatus()
