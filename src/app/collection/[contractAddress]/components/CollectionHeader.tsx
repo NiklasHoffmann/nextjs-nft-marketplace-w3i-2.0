@@ -51,7 +51,7 @@ function CollectionStats({
                     </svg>
                 }
                 label="Floor"
-                value={floorPrice ? formatEther(BigInt(Math.floor(floorPrice * 1e18))) : '—'}
+                value={floorPrice ? formatEther(floorPrice.toString()) : '—'}
                 variant="green"
             />
             <StatCard

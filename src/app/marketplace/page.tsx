@@ -14,71 +14,33 @@
  * Database: MongoDB marketplace_items collection with real-time sync
  */
 
-import React, { useState, useCallback, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import React from "react";
 import { ListedNFTsList, CollectionsList } from "@/components/marketplace";
-import { NFTFilterSidebar } from "@/components";
-import type { NFTFilters, NFTSortOptions } from "@/types/marketplace";
+import { useMarketplaceLayout } from "./layout";
 
 export default function MarketplacePage() {
-    const searchParams = useSearchParams();
-    const urlSearchTerm = searchParams?.get('search') || '';
-
-    const [filters, setFilters] = useState<NFTFilters>({
-        categories: [],
-        rarities: [],
-        searchTerm: urlSearchTerm,
-    });
-    const [sort, setSort] = useState<NFTSortOptions>({
-        field: 'price',
-        direction: 'desc'
-    });
-
-    // Sync URL search param with filters
-    useEffect(() => {
-        setFilters(prev => ({ ...prev, searchTerm: urlSearchTerm }));
-    }, [urlSearchTerm]);
-
-    // Stable callback references to prevent infinite loops
-    const handleFiltersChange = useCallback((newFilters: NFTFilters) => {
-        setFilters(newFilters);
-    }, []);
-
-    const handleSortChange = useCallback((newSort: NFTSortOptions) => {
-        setSort(newSort);
-    }, []);
+    const { filters, sort, onFiltersChange, onSortChange } = useMarketplaceLayout();
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* NFTFilterSidebar */}
-            <NFTFilterSidebar
-                onFiltersChange={handleFiltersChange}
-                onSortChange={handleSortChange}
-                currentSort={sort}
-                totalItems={0}
-                filteredCount={0}
+        <>
+            {/* ListedNFTsList - MongoDB-powered */}
+            <ListedNFTsList
+                externalFilters={filters}
+                externalSort={sort}
+                onFiltersChange={onFiltersChange}
             />
 
-            <main className="pt-[66px]">
-                {/* ListedNFTsList - MongoDB-powered */}
-                <ListedNFTsList
-                    externalFilters={filters}
-                    externalSort={sort}
-                    onFiltersChange={handleFiltersChange}
-                />
+            {/* Divider */}
+            <div className="px-8 my-8">
+                <hr className="border-t border-gray-200" />
+            </div>
 
-                {/* Divider */}
-                <div className="px-8 my-8">
-                    <hr className="border-t border-gray-200" />
-                </div>
-
-                {/* CollectionsList - MongoDB-powered */}
-                <CollectionsList
-                    currentSort={sort}
-                    onSortChange={setSort}
-                    filters={filters}
-                />
-            </main>
-        </div>
+            {/* CollectionsList - MongoDB-powered */}
+            <CollectionsList
+                currentSort={sort}
+                onSortChange={onSortChange}
+                filters={filters}
+            />
+        </>
     );
 }

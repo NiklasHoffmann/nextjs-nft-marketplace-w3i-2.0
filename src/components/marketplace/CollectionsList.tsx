@@ -26,7 +26,6 @@ interface CollectionsListProps {
  * - Shared UI components (RefreshButton, AdminDebugPanel)
  */
 export function CollectionsList({ currentSort, onSortChange, filters }: CollectionsListProps) {
-    const [isClient, setIsClient] = useState(false);
     const router = useRouter();
     const { isAdmin } = useAdminStatus();
 
@@ -97,17 +96,13 @@ export function CollectionsList({ currentSort, onSortChange, filters }: Collecti
         router.push(`/collection/${contractAddress}`);
     }, [router]);
 
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
-
     // Re-check scroll position when collections change
     useEffect(() => {
         checkScrollPosition();
-    }, [filteredCollections, checkScrollPosition]);
+    }, [filteredCollections.length, checkScrollPosition]);
 
     // Loading state
-    if (!isClient || (loading && collections.length === 0)) {
+    if (loading && collections.length === 0) {
         return (
             <div className="w-full md:pl-16 pl-10">
                 <div className="px-8 mb-6">

@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMarketplaceItems } from '@/hooks';
+import { useMarketplaceLayout } from '@/app/marketplace/layout';
 import { ImagePreloader } from '@/components/nft';
 import { NFTGallery } from '@/components/shared';
 import { RefreshButton } from '@/components/ui';
@@ -44,6 +45,10 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
     const isLoadingMore = useRef(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
     const [showReloadNotification, setShowReloadNotification] = useState(false);
+    const [cachedItems, setCachedItems] = useState<NFTScrollItem[]>([]);
+
+    // Get layout context for total items tracking
+    const layoutContext = useMarketplaceLayout();
 
     // Get search term from URL
     const searchParams = useSearchParams();
@@ -176,12 +181,30 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
         return items.map(item => item.metadata?.image).filter((url): url is string => !!url);
     }, [items]);
 
+    // Cache items to prevent empty state flash during refetch
+    useEffect(() => {
+        if (scrollItems.length > 0) {
+            setCachedItems(scrollItems);
+        }
+    }, [scrollItems]);
+
+    // Display cached items while loading if available, otherwise show current items
+    const displayItems = loading && cachedItems.length > 0 && scrollItems.length === 0 ? cachedItems : scrollItems;
+
     // Track when first items arrive to hide initial loading state
     useEffect(() => {
-        if (items.length > 0 || !loading) {
+        // Only set to false when we actually have items loaded successfully
+        if (items.length > 0 && !loading) {
             setIsInitialLoad(false);
         }
     }, [items.length, loading]);
+
+    // Update layout context with total/filtered counts
+    useEffect(() => {
+        if (layoutContext && pagination) {
+            layoutContext.setFilteredCount(items.length);
+        }
+    }, [items.length, pagination, layoutContext]);
 
     // Listen for new listings and show notification
     useEffect(() => {
@@ -190,7 +213,6 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
             const eventType = customEvent.detail?.type;
 
             if (eventType === 'listing-created') {
-                console.log('🆕 [ListedNFTsList] New listing detected, showing notification...');
                 setShowReloadNotification(true);
 
                 // Hide notification after auto-reload completes (3s delay + 2s display)
@@ -414,7 +436,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
             {/* NFT Gallery */}
             <div className="min-h-[288px] md:pl-16 pl-10">
                 <NFTGallery
-                    items={scrollItems}
+                    items={displayItems}
                     title="Utilities"
                     largeTitle={true}
                     subtitle={
@@ -435,7 +457,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
                             loadingLabel="Refreshing..."
                         />
                     }
-                    loading={isInitialLoad || (loading && items.length === 0)}
+                    loading={isInitialLoad}
                     loadingCount={12}
                     enableInsights={true}
                     showStats={true}
