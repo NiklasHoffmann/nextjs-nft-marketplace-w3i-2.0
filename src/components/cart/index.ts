@@ -10,3 +10,4 @@
  */
 
 export { CartHeader } from './CartHeader';
+export { CartStats } from './CartStats';

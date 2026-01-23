@@ -15,7 +15,6 @@ import { formatEther } from '@/utils';
 import Link from 'next/link';
 import { ButtonSpinner } from '@/components/core/Loading';
 import { EmptyState } from '@/components/core/Empty';
-import { CartHeader } from '@/components/cart';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 
 interface EnrichedCartItem {
@@ -130,18 +129,12 @@ export function CartPage() {
     // Not connected state
     if (!isConnected) {
         return (
-            <div className="min-h-screen bg-gray-50">
-                <CartHeader itemCount={0} totalValue="0.0000" />
-
-                <main className="pt-[66px]">
-                    <div className="max-w-4xl mx-auto px-8 py-16">
-                        <EmptyState
-                            icon="🔒"
-                            title="Wallet Connection Required"
-                            description="Please connect your wallet to view your shopping cart."
-                        />
-                    </div>
-                </main>
+            <div className="max-w-4xl mx-auto px-8 py-16">
+                <EmptyState
+                    icon="🔒"
+                    title="Wallet Connection Required"
+                    description="Please connect your wallet to view your shopping cart."
+                />
             </div>
         );
     }
@@ -149,52 +142,42 @@ export function CartPage() {
     // Empty cart state
     if (itemCount === 0) {
         return (
-            <div className="min-h-screen bg-gray-50">
-                <CartHeader itemCount={0} totalValue="0.0000" />
-
-                <main className="pt-[66px]">
-                    <div className="max-w-4xl mx-auto px-8 py-16">
-                        <EmptyState
-                            icon="🛒"
-                            title="Your cart is empty"
-                            description="Add some NFTs to your cart to get started with batch purchasing!"
-                            action={{
-                                label: 'Browse Marketplace',
-                                onClick: () => router.push('/marketplace')
-                            }}
-                        />
-                    </div>
-                </main>
+            <div className="max-w-4xl mx-auto px-8 py-16">
+                <EmptyState
+                    icon="🛒"
+                    title="Your cart is empty"
+                    description="Add some NFTs to your cart to get started with batch purchasing!"
+                    action={{
+                        label: 'Browse Marketplace',
+                        onClick: () => router.push('/marketplace')
+                    }}
+                />
             </div>
         );
     }
 
     // Cart with items
     return (
-        <div className="min-h-screen bg-gray-50">
-            <CartHeader itemCount={itemCount} totalValue={totalPriceFormatted} />
+        <div className="max-w-6xl mx-auto px-8 py-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Cart Items */}
+                <div className="lg:col-span-2 space-y-4">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+                        <div className="p-6 border-b border-gray-200">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-lg font-semibold text-gray-900">Cart Items</h2>
+                                {itemCount > 0 && (
+                                    <button
+                                        onClick={clearCart}
+                                        className="text-sm text-red-600 hover:text-red-700 font-medium"
+                                    >
+                                        Clear All
+                                    </button>
+                                )}
+                            </div>
+                        </div>
 
-            <main className="pt-[66px]">
-                <div className="max-w-6xl mx-auto px-8 py-8">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {/* Cart Items */}
-                        <div className="lg:col-span-2 space-y-4">
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-                                <div className="p-6 border-b border-gray-200">
-                                    <div className="flex items-center justify-between">
-                                        <h2 className="text-lg font-semibold text-gray-900">Cart Items</h2>
-                                        {itemCount > 0 && (
-                                            <button
-                                                onClick={clearCart}
-                                                className="text-sm text-red-600 hover:text-red-700 font-medium"
-                                            >
-                                                Clear All
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="divide-y divide-gray-200">
+                        <div className="divide-y divide-gray-200">
                                     {enrichedItems.map((item) => (
                                         <div key={item.listingId} className="p-6 hover:bg-gray-50 transition-colors">
                                             <div className="flex gap-4">
@@ -266,93 +249,91 @@ export function CartPage() {
                                             </div>
                                         </div>
                                     ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Order Summary */}
-                        <div className="lg:col-span-1">
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 sticky top-24">
-                                <div className="p-6">
-                                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h2>
-
-                                    <div className="space-y-3 mb-6">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-600">Items ({itemCount})</span>
-                                            <span className="font-medium text-gray-900">{totalPriceFormatted} ETH</span>
-                                        </div>
-
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-600">Estimated Gas</span>
-                                            <span className="font-medium text-gray-900">~0.005 ETH</span>
-                                        </div>
-
-                                        {itemCount > 1 && (
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-green-600">Gas Savings</span>
-                                                <span className="font-medium text-green-600">-{estimatedGasSavings} ETH</span>
-                                            </div>
-                                        )}
-
-                                        <hr className="border-gray-200" />
-
-                                        <div className="flex justify-between">
-                                            <span className="text-base font-semibold text-gray-900">Total</span>
-                                            <span className="text-lg font-bold text-gray-900">
-                                                {(parseFloat(totalPriceFormatted) + 0.005).toFixed(4)} ETH
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Benefits */}
-                                    {itemCount > 1 && (
-                                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                                            <div className="flex items-start gap-2">
-                                                <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                                </svg>
-                                                <div className="text-sm">
-                                                    <p className="font-medium text-green-800">Batch Purchase Benefits</p>
-                                                    <ul className="mt-2 text-green-700 space-y-1">
-                                                        <li>• Save ~{estimatedGasSavings} ETH in gas fees</li>
-                                                        <li>• Single transaction approval</li>
-                                                        <li>• Faster checkout process</li>
-                                                    </ul>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Purchase Button */}
-                                    <button
-                                        onClick={handleBatchPurchase}
-                                        disabled={isProcessing || itemCount === 0}
-                                        className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center"
-                                    >
-                                        {isProcessing ? (
-                                            <>
-                                                <ButtonSpinner className="-ml-1 mr-3" />
-                                                Processing...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                                                </svg>
-                                                Complete Batch Purchase
-                                            </>
-                                        )}
-                                    </button>
-
-                                    <p className="text-xs text-gray-500 text-center mt-4">
-                                        Your wallet will prompt you to confirm the transaction
-                                    </p>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
-            </main>
+
+                {/* Order Summary */}
+                <div className="lg:col-span-1">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 sticky top-24">
+                        <div className="p-6">
+                            <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h2>
+
+                            <div className="space-y-3 mb-6">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-600">Items ({itemCount})</span>
+                                    <span className="font-medium text-gray-900">{totalPriceFormatted} ETH</span>
+                                </div>
+
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-600">Estimated Gas</span>
+                                    <span className="font-medium text-gray-900">~0.005 ETH</span>
+                                </div>
+
+                                {itemCount > 1 && (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-green-600">Gas Savings</span>
+                                        <span className="font-medium text-green-600">-{estimatedGasSavings} ETH</span>
+                                    </div>
+                                )}
+
+                                <hr className="border-gray-200" />
+
+                                <div className="flex justify-between">
+                                    <span className="text-base font-semibold text-gray-900">Total</span>
+                                    <span className="text-lg font-bold text-gray-900">
+                                        {(parseFloat(totalPriceFormatted) + 0.005).toFixed(4)} ETH
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Benefits */}
+                            {itemCount > 1 && (
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                                    <div className="flex items-start gap-2">
+                                        <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                        </svg>
+                                        <div className="text-sm">
+                                            <p className="font-medium text-green-800">Batch Purchase Benefits</p>
+                                            <ul className="mt-2 text-green-700 space-y-1">
+                                                <li>• Save ~{estimatedGasSavings} ETH in gas fees</li>
+                                                <li>• Single transaction approval</li>
+                                                <li>• Faster checkout process</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Purchase Button */}
+                            <button
+                                onClick={handleBatchPurchase}
+                                disabled={isProcessing || itemCount === 0}
+                                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center"
+                            >
+                                {isProcessing ? (
+                                    <>
+                                        <ButtonSpinner className="-ml-1 mr-3" />
+                                        Processing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                                        </svg>
+                                        Complete Batch Purchase
+                                    </>
+                                )}
+                            </button>
+
+                            <p className="text-xs text-gray-500 text-center mt-4">
+                                Your wallet will prompt you to confirm the transaction
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
