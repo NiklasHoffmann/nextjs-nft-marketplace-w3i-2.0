@@ -270,10 +270,17 @@ export function PageHeader({
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-8">
                     {/* Left Side - Navigation, Icon, Title */}
                     <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1 md:flex-initial">
-                        <BackButton {...backLink} />
+                        <BackButton href={backLink.href} label={backLink.label} />
                         <Separator />
                         <div className="flex items-center gap-2 md:gap-2.5 min-w-0 flex-1">
-                            <IconBadge {...icon} />
+                            <IconBadge
+                                type={icon.type}
+                                svgContent={icon.svgContent}
+                                text={icon.text}
+                                gradientFrom={icon.gradientFrom}
+                                gradientTo={icon.gradientTo}
+                                customContent={icon.customContent}
+                            />
                             <TitleSection title={title} subtitle={subtitle} />
                         </div>
                     </div>

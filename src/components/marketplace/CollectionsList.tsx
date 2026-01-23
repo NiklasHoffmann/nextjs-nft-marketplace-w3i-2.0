@@ -94,7 +94,7 @@ export function CollectionsList({ currentSort, onSortChange, filters }: Collecti
         if (!contractAddress) {
             return;
         }
-        router.push(`/nft/${contractAddress}`);
+        router.push(`/collection/${contractAddress}`);
     }, [router]);
 
     useEffect(() => {
