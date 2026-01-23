@@ -320,10 +320,11 @@ function NFTDetailPage() {
     // If we have data, show the page
     if (nftData && hasValidData) {
         return (
-            <div className="min-h-screen bg-gray-50 pt-[176px]">
+            <>
                 <NFTDetailHeader {...headerProps} />
 
-                <MemoizedCategoryPills {...categoryPillsProps} />
+                <div className="pt-[120px]">
+                    <MemoizedCategoryPills {...categoryPillsProps} />
 
                 {/* Mobile Only - NFT Image directly under CategoryPills */}
                 <div className="lg:hidden max-w-7xl mx-auto px-4 sm:px-6 py-4">
@@ -369,7 +370,8 @@ function NFTDetailPage() {
                         </div>
                     </div>
                 </div>
-            </div>
+                </div>
+            </>
         );
     }
 
