@@ -21,7 +21,7 @@ import {
     invalidateAfterPurchase,
     invalidateAfterCancelListing,
     type InvalidationEventDetail
-} from '@/services/DataInvalidationService';
+} from '@/services/validation';
 import type {
     ProcessedMarketplaceEvent,
     ProcessedItemListedEvent,

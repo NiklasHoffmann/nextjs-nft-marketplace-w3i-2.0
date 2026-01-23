@@ -14,7 +14,7 @@ import {
     type ContractProperties,
     type OwnershipData,
     type TokenMetadata
-} from './smart-cache';
+} from '@/services/cache/smart-cache';
 
 // Comprehensive NFT data interface
 interface BlockchainNFTData {

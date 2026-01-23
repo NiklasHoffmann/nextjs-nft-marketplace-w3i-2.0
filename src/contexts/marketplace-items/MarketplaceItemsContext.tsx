@@ -20,7 +20,7 @@ import type { NFTStatsUpdateDetail } from '@/types/events';
 import { MarketplaceItemsService, type CacheEntry } from './MarketplaceItemsService';
 import { MarketplaceItemsCache } from './MarketplaceItemsCache';
 import { emitStatsUpdate } from './MarketplaceItemsEvents';
-import { onDataInvalidation, type InvalidationEventDetail } from '@/services/DataInvalidationService';
+import { onDataInvalidation, type InvalidationEventDetail } from '@/services/validation';
 
 interface MarketplaceItemsContextType {
     // Cache operations

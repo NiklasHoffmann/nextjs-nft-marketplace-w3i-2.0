@@ -49,7 +49,7 @@ import {
     invalidateAfterPurchase,
     invalidateAfterCancelListing,
     invalidateAfterListing
-} from '@/services/DataInvalidationService';
+} from '@/services/validation';
 
 // ===== TYPES =====
 

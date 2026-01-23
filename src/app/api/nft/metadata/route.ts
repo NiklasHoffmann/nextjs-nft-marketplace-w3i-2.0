@@ -57,7 +57,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
         // Use the optimized blockchain data fetcher
         // 🔥 NEW: Clear approval cache if refreshApproval is requested
         if (forceRefreshApproval) {
-            const { clearApprovalCache } = await import('@/services/blockchain/smart-cache');
+            const { clearApprovalCache } = await import('@/services/cache');
             clearApprovalCache(contractAddress, tokenId);
         }
 

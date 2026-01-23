@@ -1,11 +1,11 @@
 /**
- * NFT Sync Service - Main Entry Point
+ * NFT SYNC SERVICE - Main Entry Point
  * 
  * HYBRID ARCHITECTURE (Optimized Real-Time System)
  * 
  * Real-time services:
  * - WebSocket Event Listener: Instant events from blockchain (< 1s)
- * - The Graph v2: Polls every 30s as fallback (LISTING DATA)
+ * - The Graph: Polls every 30s as fallback (LISTING DATA)
  * 
  * Periodic services:
  * - Stats Sync: Aggregates stats periodically
@@ -14,9 +14,13 @@
  * On-demand services:
  * - Blockchain State Sync: Called when needed (owner + approved)
  * - IPFS Metadata Sync: Called when missing (one-time fetch)
+ * 
+ * ❌ DEPRECATED (moved to archive/deprecated/):
+ * - graph-subscription.ts (v1 - replaced by current version)
+ * - metadata-sync.ts (replaced by on-demand services)
  */
 
-import { GraphQLSyncV2 } from './graph-subscription-v2';
+import { GraphQLSync } from './graph-subscription';
 import { StatsSync } from './stats-sync';
 import { InsightsSync } from './insights-sync';
 import { MarketplaceEventListenerService } from '../marketplace/event-listener';
@@ -24,11 +28,11 @@ import { routeMarketplaceEvent } from '../marketplace/event-invalidation-bridge'
 import { syncListingToMongoDB, removeListingFromMongoDB } from '../marketplace/event-mongodb-sync';
 import type { ProcessedItemListedEvent, ProcessedItemBoughtEvent, ProcessedItemCanceledEvent } from '@/types/marketplace/contract-events';
 
-// ❌ DEPRECATED: graph-subscription.ts (v1 - REMOVED)
-// ❌ DEPRECATED: metadata-sync.ts (replaced by on-demand services)
+export { blockchainStateSync } from './blockchain-state-sync';
+export { ipfsMetadataLazySync } from './ipfs-metadata-lazy-sync';
 
 export class NFTSyncService {
-    private graphSyncV2: GraphQLSyncV2;
+    private graphSync: GraphQLSync;
     private statsSync: StatsSync;
     private insightsSync: InsightsSync;
     private eventListener: MarketplaceEventListenerService;
@@ -36,7 +40,7 @@ export class NFTSyncService {
     private isRunning: boolean = false;
 
     constructor() {
-        this.graphSyncV2 = new GraphQLSyncV2();
+        this.graphSync = new GraphQLSync();
         this.statsSync = new StatsSync();
         this.insightsSync = new InsightsSync();
 
@@ -105,9 +109,9 @@ export class NFTSyncService {
             await this.eventListener.start();
             console.log('✅ WebSocket connected - Real-time events active');
 
-            // Start GraphQL v2 sync (FALLBACK - runs every 30s)
-            console.log('📡 Starting Subgraph v2 sync (FALLBACK)...');
-            await this.graphSyncV2.start();
+            // Start GraphQL sync (FALLBACK - runs every 30s)
+            console.log('📡 Starting Subgraph sync (FALLBACK)...');
+            await this.graphSync.start();
 
             // Start periodic sync jobs
             this.statsSync.start();
@@ -116,7 +120,7 @@ export class NFTSyncService {
             this.isRunning = true;
             console.log('\n✅ NFT Sync Service started successfully (HYBRID ARCHITECTURE)');
             console.log('   🎧 WebSocket Events: REAL-TIME (< 1 second)');
-            console.log('   📡 Subgraph v2: Every 30s (fallback + historical data)');
+            console.log('   📡 Subgraph: Every 30s (fallback + historical data)');
             console.log('   📊 Stats/Insights: Periodic sync');
             console.log('   ⚡ Blockchain State: On-demand');
             console.log('   💾 IPFS Metadata: Lazy-loaded\n');
@@ -142,8 +146,8 @@ export class NFTSyncService {
             await this.eventListener.stop();
             console.log('✅ WebSocket disconnected');
 
-            // Stop v2 sync
-            await this.graphSyncV2.stop();
+            // Stop GraphQL sync
+            await this.graphSync.stop();
 
             this.statsSync.stop();
             this.insightsSync.stop();
@@ -164,7 +168,7 @@ export class NFTSyncService {
             isRunning: this.isRunning,
             architecture: 'HYBRID (WebSocket + TheGraph)',
             eventListener: this.eventListener.getState(),
-            graphSyncV2: this.graphSyncV2.getStatus(),
+            graphSync: this.graphSync.getStatus(),
             statsSync: this.statsSync.getStatus(),
             insightsSync: this.insightsSync.getStatus()
         };
@@ -176,7 +180,7 @@ export class NFTSyncService {
      */
     async syncOnce(): Promise<void> {
         console.log('🔄 [Force Sync] Running immediate sync...');
-        await this.graphSyncV2.syncOnce();
+        await this.graphSync.syncOnce();
         console.log('✅ [Force Sync] Immediate sync complete');
     }
 }

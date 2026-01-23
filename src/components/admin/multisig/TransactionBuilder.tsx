@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import { DiamondOperation, DIAMOND_OPERATION_TEMPLATES } from '@/types/multisig-wallet';
 import { useMultisigWallet } from '@/hooks/multisig/useMultisigWallet';
-import { createDiamondTransactionRequest, validateOperationArgs } from '@/services/multisig/MultisigService';
+import { createDiamondTransactionRequest, validateOperationArgs } from '@/services/multisig';
 import { LoadingState } from '@/components/core/Loading/LoadingState';
 import { useRouter } from 'next/navigation';
 

@@ -11,7 +11,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { devLog } from '@/utils/devLog';
 import { CollectionsService, type Collection } from './CollectionsService';
 import { CollectionsCache, type CollectionsState } from './CollectionsCache';
-import { onDataInvalidation, type InvalidationEventDetail } from '@/services/DataInvalidationService';
+import { onDataInvalidation, type InvalidationEventDetail } from '@/services/validation';
 
 interface CollectionsContextValue {
     collections: Collection[];

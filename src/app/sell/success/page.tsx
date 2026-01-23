@@ -9,7 +9,7 @@ import { useMarketplaceItems } from '@/contexts/marketplace-items';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
 import { formatEther } from 'viem';
 import type { AggregatedNFT } from '@/types/core/core-nft-modern';
-import { invalidateAfterListing } from '@/services/DataInvalidationService';
+import { invalidateAfterListing } from '@/services/validation';
 
 export default function SuccessPage() {
     const router = useRouter();

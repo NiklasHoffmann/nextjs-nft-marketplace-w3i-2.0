@@ -23,7 +23,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useAccount } from 'wagmi';
 import { devLog } from '@/utils/devLog';
 import { WalletNFTsService, type WalletNFT } from './WalletNFTsService';
-import { onDataInvalidation, type InvalidationEventDetail } from '@/services/DataInvalidationService';
+import { onDataInvalidation, type InvalidationEventDetail } from '@/services/validation';
 import { WalletNFTsCache, type WalletNFTsState } from './WalletNFTsCache';
 
 interface WalletNFTsContextType {

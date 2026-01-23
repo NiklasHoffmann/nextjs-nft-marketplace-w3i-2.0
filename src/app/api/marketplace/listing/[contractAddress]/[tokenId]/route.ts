@@ -8,7 +8,7 @@
 import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, BadRequestError } from '@/lib/api';
 import { ApolloClient, InMemoryCache } from '@apollo/client';
-import { GET_ACTIVE_ITEMS } from '@/config/subgraph/queries';
+import { GET_LISTINGS_BY_NFT } from '@/config/subgraph/queries';
 
 interface RouteParams {
   params: Promise<{
@@ -49,9 +49,13 @@ export async function GET(
       },
     });
 
-    // Fetch all active items (only query that works)
+    // Fetch listings for this specific NFT
     const { data, error } = await client.query({
-      query: GET_ACTIVE_ITEMS,
+      query: GET_LISTINGS_BY_NFT,
+      variables: {
+        tokenAddress: normalizedAddress,
+        tokenId: tokenId,
+      },
     });
 
     if (error) {
@@ -59,31 +63,33 @@ export async function GET(
       throw new Error(`Failed to fetch marketplace data: ${error.message}`);
     }
 
-    // Filter for the specific NFT (field is 'items', not 'activeItems')
-    const items = data?.items || [];
+    // Get the listings array
+    const listings = data?.listings || [];
 
-    const listing = items.find(
-      (item: any) =>
-        item.contractAddress?.toLowerCase() === normalizedAddress &&
-        item.tokenId === tokenId // tokenId is a string in GraphQL, not lowercase
-    );
-
-    if (!listing) {
+    if (listings.length === 0) {
       // NFT not listed - return null, not an error
       return apiSuccess({ listing: null });
     }
 
-    // Return the listing data
+    // Return the first active listing (most recent)
+    const listing = listings[0];
     return apiSuccess({
       listing: {
+        id: listing.id,
         listingId: listing.listingId,
-        contractAddress: listing.contractAddress,
+        tokenAddress: listing.tokenAddress,
         tokenId: listing.tokenId,
-        price: listing.price,
+        tokenStandard: listing.tokenStandard,
+        priceTotal: listing.priceTotal,
+        remainingQuantity: listing.remainingQuantity,
+        unitPrice: listing.unitPrice,
+        listingType: listing.listingType,
+        feeRate: listing.feeRate,
         seller: listing.seller,
-        buyer: listing.buyer,
-        isListed: listing.isListed,
-        desiredContractAddress: listing.desiredContractAddress,
+        status: listing.status,
+        active: listing.active,
+        createdAt: listing.createdAt,
+        desiredTokenAddress: listing.desiredTokenAddress,
         desiredTokenId: listing.desiredTokenId,
       },
     });
