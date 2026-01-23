@@ -7,7 +7,7 @@ import { useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
 import { useETHPrice } from "@/contexts/CurrencyContext";
 import { formatEther } from "@/utils";
 import { devLog } from '@/utils/devLog';
-import type { NFTStatsUpdateEvent } from '@/types/events';
+import type { NFTStatsUpdateEvent } from '@/types';
 import OptimizedNFTImage from './OptimizedNFTImage';
 import { BaseCard } from '@/components/core/Card/BaseCard';
 import type { AggregatedNFT } from '@/types/core/core-nft-modern';

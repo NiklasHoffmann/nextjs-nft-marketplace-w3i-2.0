@@ -8,7 +8,7 @@ import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, NotFoundError } from '@/lib/api';
 import { withAdmin } from '@/lib/middleware';
 import clientPromise from '@/lib/mongodb';
-import { MultisigProposal } from '@/types/multisig';
+import { MultisigProposal } from '@/types';
 
 /**
  * GET /api/admin/multisig/proposals/[proposalId]

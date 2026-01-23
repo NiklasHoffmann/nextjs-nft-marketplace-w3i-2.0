@@ -4,7 +4,7 @@
  */
 "use client";
 
-import { MultisigProposal, ProposalType } from '@/types/multisig';
+import { MultisigProposal, ProposalType } from '@/types';
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
 

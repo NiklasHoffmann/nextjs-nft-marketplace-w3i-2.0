@@ -11,7 +11,7 @@ import { useMultisigProposals } from '@/hooks/multisig/useMultisigProposals';
 import { ProposalCard } from '@/components/admin/multisig/ProposalCard';
 import { CreateProposalModal } from '@/components/admin/multisig/CreateProposalModal';
 import { LoadingState } from '@/components/core/Loading';
-import { ProposalStatus, ProposalType } from '@/types/multisig';
+import { ProposalStatus, ProposalType } from '@/types';
 import { NETWORK_CONFIG } from '@/config/networks';
 
 export default function AdminMultisigPage() {

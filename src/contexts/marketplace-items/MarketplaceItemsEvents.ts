@@ -7,7 +7,7 @@
  * Separated from context for better organization and testability.
  */
 
-import type { NFTStatsUpdateDetail } from '@/types/events';
+import type { NFTStatsUpdateDetail } from '@/types';
 
 /**
  * Emit stats update event for cross-context communication

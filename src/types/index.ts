@@ -2,12 +2,13 @@
  * CENTRAL TYPE DEFINITIONS EXPORT
  * 
  * Systematische Type Organisation für NFT Marketplace:
- * • Core: Grundlegende NFT, Currency, Blockchain Types
+ * • Core: Grundlegende NFT, Currency, Events, Metadata Types
  * • UI: Component Props, Interface States, Layout Types
  * • API: Request/Response, Pagination, Error Handling
  * • Insights: NFT Analytics, Metadata, Admin/Public Views
- * • Features: User Interactions, Detail Pages, Personalization
+ * • Features: User Interactions, Detail Pages, Game
  * • Marketplace: Smart Contract Parameters, Events, Configuration
+ * • Multisig: Multi-signature wallet operations
  * 
  * Import from: import { ... } from '@/types'
  */
@@ -30,5 +31,5 @@ export * from './features';
 // === MARKETPLACE TYPES ===
 export * from './marketplace';
 
-// === EVENT TYPES ===
-export * from './events';
+// === MULTISIG TYPES ===
+export * from './multisig';

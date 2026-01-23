@@ -19,7 +19,7 @@ import {
     BadRequestError
 } from '@/lib/api';
 import { getCollection } from '@/lib/mongodb';
-import type { EnrichedNFTMetadata } from '@/types/nft-metadata';
+import type { EnrichedNFTMetadata } from '@/types';
 
 /**
  * GET /api/user/nfts

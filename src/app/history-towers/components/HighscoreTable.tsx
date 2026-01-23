@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useState, useEffect } from 'react';
-import type { GameScore, TopScoresResponse } from '@/types/game';
+import type { GameScore, TopScoresResponse } from '@/types';
 
 interface HighscoreTableProps {
     walletAddress?: string;

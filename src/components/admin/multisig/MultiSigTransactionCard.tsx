@@ -6,7 +6,7 @@
 
 'use client';
 
-import { type PendingMultiSigTx, TRANSACTION_TYPE_LABELS, TRANSACTION_TYPE_COLORS } from '@/types/multisig-wallet';
+import { type PendingMultiSigTx, TRANSACTION_TYPE_LABELS, TRANSACTION_TYPE_COLORS } from '@/types';
 import { getTransactionStatusLabel, getTransactionStatusColor, formatTransactionValue } from '@/services/multisig';
 import { useMultisigWallet } from '@/hooks/multisig/useMultisigWallet';
 import { useState } from 'react';

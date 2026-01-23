@@ -1,7 +1,7 @@
 ﻿import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, parseJsonBody, getQueryParam, BadRequestError } from '@/lib/api';
 import { getCollection } from '@/lib/mongodb';
-import type { GameScore, GameScoreSubmission, ScoreSubmitResponse, TopScoresResponse } from '@/types/game';
+import type { GameScore, GameScoreSubmission, ScoreSubmitResponse, TopScoresResponse } from '@/types';
 
 // Rate limiting map (in production, use Redis or similar)
 const rateLimitMap = new Map<string, number[]>();

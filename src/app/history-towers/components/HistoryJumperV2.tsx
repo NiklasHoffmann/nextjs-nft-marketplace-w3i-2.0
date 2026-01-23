@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useAccount } from 'wagmi'
 import HighscoreDialog from './HighscoreDialog'
-import type { ScoreSubmitResponse } from '@/types/game'
+import type { ScoreSubmitResponse } from '@/types'
 import type { Platform } from '../types/historyTower.types'
 import {
     CANVAS_WIDTH,

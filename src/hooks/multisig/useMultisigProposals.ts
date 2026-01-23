@@ -13,7 +13,7 @@ import {
     ProposalListResponse,
     ProposalType,
     ProposalStatus
-} from '@/types/multisig';
+} from '@/types';
 import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
 import { MULTISIG_WALLET_ABI } from '@/config/abis/multisig-wallet';
 import { encodeFunctionData } from 'viem';

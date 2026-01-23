@@ -9,7 +9,7 @@ import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, parseJsonBody, BadRequestError } from '@/lib/api';
 import { withAdmin } from '@/lib/middleware';
 import clientPromise from '@/lib/mongodb';
-import { MultisigProposal, CreateProposalRequest, ProposalStatus } from '@/types/multisig';
+import { MultisigProposal, CreateProposalRequest, ProposalStatus } from '@/types';
 import { randomUUID } from 'crypto';
 
 /**

@@ -16,7 +16,7 @@ import {
     getEnrichedNFTMetadata,
     updateNFTOwnership
 } from '@/lib/db';
-import type { NFTMetadata } from '@/types/nft-metadata';
+import type { NFTMetadata } from '@/types';
 
 /**
  * GET /api/nft/metadata/cached

@@ -10,7 +10,7 @@
 import { useState, useCallback } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
 import { MULTISIG_WALLET_ABI } from '@/config/abis/multisig-wallet';
-import { MULTISIG_ADDRESSES, type SubmitTransactionRequest, type TransactionSubmissionResult, type ConfirmationResult } from '@/types/multisig-wallet';
+import { MULTISIG_ADDRESSES, type SubmitTransactionRequest, type TransactionSubmissionResult, type ConfirmationResult } from '@/types';
 
 export function useMultisigWallet() {
     const { address } = useAccount();

@@ -19,7 +19,7 @@ import {
     updateNFTOwnership,
     upsertNFTMetadata
 } from '@/lib/db';
-import type { NFTMetadataSyncResult } from '@/types/nft-metadata';
+import type { NFTMetadataSyncResult } from '@/types';
 import { fetchComprehensiveNFTDataNew } from '@/services/blockchain/nft-fetcher';
 
 // Lightweight NFT discovery from Alchemy

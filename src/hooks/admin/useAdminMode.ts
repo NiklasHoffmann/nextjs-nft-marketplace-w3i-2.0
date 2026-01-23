@@ -8,7 +8,7 @@
 
 import { useAccount, useReadContract, useChainId } from 'wagmi';
 import { DIAMOND_ABI } from '@/config/abis/diamond';
-import { MULTISIG_ADDRESSES, AdminMode, type AdminModeInfo } from '@/types/multisig-wallet';
+import { MULTISIG_ADDRESSES, AdminMode, type AdminModeInfo } from '@/types';
 
 export function useAdminMode(diamondAddress: string): AdminModeInfo {
     const { address } = useAccount();

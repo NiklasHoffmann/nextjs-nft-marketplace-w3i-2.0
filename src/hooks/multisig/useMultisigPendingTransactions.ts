@@ -9,7 +9,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAccount, useReadContract, useChainId, usePublicClient } from 'wagmi';
 import { MULTISIG_WALLET_ABI } from '@/config/abis/multisig-wallet';
-import { MULTISIG_ADDRESSES, type PendingMultiSigTx, type MultiSigTransaction } from '@/types/multisig-wallet';
+import { MULTISIG_ADDRESSES, type PendingMultiSigTx, type MultiSigTransaction } from '@/types';
 import { enhancePendingTransaction } from '@/services/multisig';
 
 export function useMultisigPendingTransactions(diamondAddress: string) {

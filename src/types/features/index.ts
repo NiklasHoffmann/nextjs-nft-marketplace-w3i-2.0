@@ -5,6 +5,7 @@
  * • NFT Detail: Detail Page, Enhanced Metadata, User Data
  * • User Interactions: Like, Watchlist, View History
  * • Insights: Enhanced Descriptions, Project Info, Partnerships
+ * • Game: History Towers game mechanics
  * • Personalization: User Preferences, Customizations
  */
 
@@ -30,3 +31,6 @@ export type {
     createEmptyNFTProjectDescriptions,
     createEmptyNFTFunctionalitiesDescriptions
 } from './nft-insights';
+
+// === GAME MECHANICS ===
+export * from './game';

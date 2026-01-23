@@ -8,7 +8,7 @@ import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, NotFoundError, BadRequestError, ForbiddenError } from '@/lib/api';
 import { withAdmin } from '@/lib/middleware';
 import clientPromise from '@/lib/mongodb';
-import { MultisigProposal, ProposalConfirmation } from '@/types/multisig';
+import { MultisigProposal, ProposalConfirmation } from '@/types';
 
 /**
  * POST /api/admin/multisig/proposals/[proposalId]/confirm

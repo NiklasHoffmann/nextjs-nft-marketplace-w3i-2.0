@@ -7,7 +7,7 @@
  * Separated from context for better testability and reusability.
  */
 
-import type { NFTStatsWithMeta } from '@/types/events';
+import type { NFTStatsWithMeta } from '@/types';
 import { devLog } from '@/utils/devLog';
 
 // Re-export the stats type with metadata

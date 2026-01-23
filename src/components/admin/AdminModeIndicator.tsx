@@ -7,7 +7,7 @@
 'use client';
 
 import { useAdminMode } from '@/hooks';
-import { AdminMode } from '@/types/multisig-wallet';
+import { AdminMode } from '@/types';
 
 interface AdminModeIndicatorProps {
     diamondAddress: string;

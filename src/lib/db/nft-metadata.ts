@@ -6,7 +6,7 @@
  */
 
 import { getCollection } from '@/lib/mongodb';
-import type { NFTMetadata, EnrichedNFTMetadata } from '@/types/nft-metadata';
+import type { NFTMetadata, EnrichedNFTMetadata } from '@/types';
 import type { Document } from 'mongodb';
 
 /**

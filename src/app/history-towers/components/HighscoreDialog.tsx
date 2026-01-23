@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useState, useEffect } from 'react';
-import type { GameScoreSubmission, ScoreSubmitResponse } from '@/types/game';
+import type { GameScoreSubmission, ScoreSubmitResponse } from '@/types';
 
 interface HighscoreDialogProps {
     score: number;

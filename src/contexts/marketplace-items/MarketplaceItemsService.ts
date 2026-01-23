@@ -9,7 +9,7 @@
 
 import { devLog } from '@/utils/devLog';
 import type { EnrichedNFTDocument, MarketplaceItemsResponse } from '@/types/marketplace/enriched-nft';
-import type { NFTStatsUpdateDetail } from '@/types/events';
+import type { NFTStatsUpdateDetail } from '@/types';
 import { MarketplaceItemsCache } from './MarketplaceItemsCache';
 import { emitStatsUpdate } from './MarketplaceItemsEvents';
 

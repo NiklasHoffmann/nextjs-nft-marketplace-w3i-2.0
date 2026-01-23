@@ -5,7 +5,7 @@
 "use client";
 
 import { useState } from 'react';
-import { ProposalType } from '@/types/multisig';
+import { ProposalType } from '@/types';
 import { BaseModal } from '@/components/core/Modal/BaseModal';
 
 interface CreateProposalModalProps {

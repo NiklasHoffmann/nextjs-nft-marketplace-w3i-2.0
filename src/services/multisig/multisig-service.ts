@@ -14,7 +14,7 @@ import {
     type MultiSigTransaction,
     type DecodedContractCall,
     type SubmitTransactionRequest,
-} from '@/types/multisig-wallet';
+} from '@/types';
 import { DIAMOND_ABI } from '@/config/abis/diamond';
 
 // ============================================================================
