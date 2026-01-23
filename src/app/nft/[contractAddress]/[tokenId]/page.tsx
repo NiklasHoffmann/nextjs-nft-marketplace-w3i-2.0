@@ -8,7 +8,6 @@ import { useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
 import { isValidContractAddress, isValidNFTTokenId, createShareableNFTUrl } from '@/utils';
 import { TabType } from '@/types';
 import {
-    NFTDetailHeader,
     CategoryPills,
     NFTMediaSection,
     NFTPriceCard,
@@ -166,22 +165,6 @@ function NFTDetailPage() {
     //     incrementViews();
     // }, [isValidParams, contractAddress, tokenId]);
 
-    const headerProps = useMemo(() => ({
-        name: finalName,
-        tokenId,
-        contractName: contractInfo?.name || null,
-        collection: contractInfo?.name || null,
-        contractSymbol: contractInfo?.symbol || null,
-        contractAddress,
-        isFavorited: statsUserInteractions?.isFavorited || false,
-        onToggleFavorite: statsToggleFavorite,
-        onShare: handleShare
-    }), [
-        finalName, tokenId, contractInfo?.name,
-        contractInfo?.symbol, contractAddress, statsUserInteractions,
-        statsToggleFavorite, handleShare
-    ]);
-
     const categoryPillsProps = useMemo(() => ({
         categories: [],
         tags: [],
@@ -321,10 +304,7 @@ function NFTDetailPage() {
     if (nftData && hasValidData) {
         return (
             <>
-                <NFTDetailHeader {...headerProps} />
-
-                <div className="pt-[120px]">
-                    <MemoizedCategoryPills {...categoryPillsProps} />
+                <MemoizedCategoryPills {...categoryPillsProps} />
 
                 {/* Mobile Only - NFT Image directly under CategoryPills */}
                 <div className="lg:hidden max-w-7xl mx-auto px-4 sm:px-6 py-4">
@@ -369,7 +349,6 @@ function NFTDetailPage() {
                             </div>
                         </div>
                     </div>
-                </div>
                 </div>
             </>
         );

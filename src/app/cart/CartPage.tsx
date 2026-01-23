@@ -178,77 +178,77 @@ export function CartPage() {
                         </div>
 
                         <div className="divide-y divide-gray-200">
-                                    {enrichedItems.map((item) => (
-                                        <div key={item.listingId} className="p-6 hover:bg-gray-50 transition-colors">
-                                            <div className="flex gap-4">
-                                                {/* NFT Image */}
-                                                <div className="flex-shrink-0">
-                                                    {item.contractAddress && item.imageUrl ? (
-                                                        <Link href={`/nft/${item.contractAddress}/${item.tokenId}`}>
-                                                            <div className="w-20 h-20 rounded-lg overflow-hidden relative">
-                                                                <OptimizedNFTImage
-                                                                    imageUrl={item.imageUrl}
-                                                                    tokenId={item.tokenId}
-                                                                    alt={item.name || `NFT #${item.tokenId}`}
-                                                                    className="object-cover rounded-lg"
-                                                                    width={80}
-                                                                    height={80}
-                                                                />
-                                                            </div>
-                                                        </Link>
-                                                    ) : (
-                                                        <div className="w-20 h-20 rounded-lg bg-gray-200 overflow-hidden">
-                                                            <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                                                                {item.contractAddress ? 'Loading...' : 'Invalid NFT'}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* NFT Details */}
-                                                <div className="flex-1 min-w-0">
-                                                    {item.contractAddress ? (
-                                                        <Link href={`/nft/${item.contractAddress}/${item.tokenId}`}>
-                                                            <h3 className="text-sm font-medium text-gray-900 hover:text-blue-600 truncate">
-                                                                {item.name || `NFT #${item.tokenId}`}
-                                                            </h3>
-                                                        </Link>
-                                                    ) : (
-                                                        <h3 className="text-sm font-medium text-gray-500 truncate">
-                                                            {item.name || `NFT #${item.tokenId}`} (Invalid)
-                                                        </h3>
-                                                    )}
-                                                    <p className="text-xs text-gray-500 mt-1">
-                                                        Token ID: {item.tokenId}
-                                                    </p>
-                                                    <p className="text-xs text-gray-500 font-mono">
-                                                        {item.contractAddress ? `${item.contractAddress.slice(0, 6)}...${item.contractAddress.slice(-4)}` : 'Invalid Address'}
-                                                    </p>
-                                                    <p className="text-xs text-gray-500 mt-2">
-                                                        Seller: {item.seller.slice(0, 6)}...{item.seller.slice(-4)}
-                                                    </p>
-                                                </div>
-
-                                                {/* Price & Actions */}
-                                                <div className="flex flex-col items-end justify-between">
-                                                    <div className="text-right">
-                                                        <p className="text-lg font-bold text-gray-900">
-                                                            {formatEther(item.price)} ETH
-                                                        </p>
+                            {enrichedItems.map((item) => (
+                                <div key={item.listingId} className="p-6 hover:bg-gray-50 transition-colors">
+                                    <div className="flex gap-4">
+                                        {/* NFT Image */}
+                                        <div className="flex-shrink-0">
+                                            {item.contractAddress && item.imageUrl ? (
+                                                <Link href={`/nft/${item.contractAddress}/${item.tokenId}`}>
+                                                    <div className="w-20 h-20 rounded-lg overflow-hidden relative">
+                                                        <OptimizedNFTImage
+                                                            imageUrl={item.imageUrl}
+                                                            tokenId={item.tokenId}
+                                                            alt={item.name || `NFT #${item.tokenId}`}
+                                                            className="object-cover rounded-lg"
+                                                            width={80}
+                                                            height={80}
+                                                        />
                                                     </div>
-                                                    <button
-                                                        onClick={() => removeFromCart(item.listingId)}
-                                                        className="inline-flex items-center text-sm text-red-600 hover:text-red-700 font-medium"
-                                                    >
-                                                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                        </svg>
-                                                        Remove
-                                                    </button>
+                                                </Link>
+                                            ) : (
+                                                <div className="w-20 h-20 rounded-lg bg-gray-200 overflow-hidden">
+                                                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                                                        {item.contractAddress ? 'Loading...' : 'Invalid NFT'}
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
-                                    ))}
+
+                                        {/* NFT Details */}
+                                        <div className="flex-1 min-w-0">
+                                            {item.contractAddress ? (
+                                                <Link href={`/nft/${item.contractAddress}/${item.tokenId}`}>
+                                                    <h3 className="text-sm font-medium text-gray-900 hover:text-blue-600 truncate">
+                                                        {item.name || `NFT #${item.tokenId}`}
+                                                    </h3>
+                                                </Link>
+                                            ) : (
+                                                <h3 className="text-sm font-medium text-gray-500 truncate">
+                                                    {item.name || `NFT #${item.tokenId}`} (Invalid)
+                                                </h3>
+                                            )}
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Token ID: {item.tokenId}
+                                            </p>
+                                            <p className="text-xs text-gray-500 font-mono">
+                                                {item.contractAddress ? `${item.contractAddress.slice(0, 6)}...${item.contractAddress.slice(-4)}` : 'Invalid Address'}
+                                            </p>
+                                            <p className="text-xs text-gray-500 mt-2">
+                                                Seller: {item.seller.slice(0, 6)}...{item.seller.slice(-4)}
+                                            </p>
+                                        </div>
+
+                                        {/* Price & Actions */}
+                                        <div className="flex flex-col items-end justify-between">
+                                            <div className="text-right">
+                                                <p className="text-lg font-bold text-gray-900">
+                                                    {formatEther(item.price)} ETH
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => removeFromCart(item.listingId)}
+                                                className="inline-flex items-center text-sm text-red-600 hover:text-red-700 font-medium"
+                                            >
+                                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
