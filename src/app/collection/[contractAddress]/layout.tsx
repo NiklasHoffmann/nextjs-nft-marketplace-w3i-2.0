@@ -1,6 +1,9 @@
+'use client';
+
 import React, { use } from 'react';
-import { useCollections } from '@/contexts/CollectionsContext';
-import CollectionHeader from '@/app/nft/components/CollectionHeader';
+import { useCollections } from '@/contexts/collections/CollectionsContext';
+import type { Collection } from '@/contexts/collections/CollectionsService';
+import { CollectionHeader } from './components';
 
 export default function CollectionLayout({
     children,
@@ -14,16 +17,16 @@ export default function CollectionLayout({
     const { collections } = useCollections();
 
     const collection = collections.find(
-        (col) => col.contractAddress.toLowerCase() === contractAddress.toLowerCase()
+        (col: Collection) => col.contractAddress.toLowerCase() === contractAddress.toLowerCase()
     );
 
     // Calculate stats from collection
-    const totalListings = collection?.stats.totalListings || 0;
-    const totalVolume = collection?.stats.totalVolume || 0;
-    const avgPrice = totalListings > 0 ? totalVolume / totalListings : 0;
-    const floorPrice = collection?.stats.floorPrice || 0;
-    const totalViews = collection?.insights?.totalViews || 0;
-    const totalLikes = collection?.insights?.totalLikes || 0;
+    const totalListings = collection?.itemCount || 0;
+    const totalVolume = collection?.totalValue || 0;
+    const avgPrice = collection?.averagePrice || 0;
+    const floorPrice = collection?.floorPrice || 0;
+    const totalViews = collection?.totalViews || 0;
+    const totalLikes = collection?.totalLikes || 0;
 
     return (
         <div className="min-h-screen bg-gray-50">

@@ -120,3 +120,5 @@ export function CollectionHeader({
         />
     );
 }
+
+export default CollectionHeader;

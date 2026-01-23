@@ -3,7 +3,7 @@
 // NFT Collection Übersichtsseite - zeigt alle NFTs einer Collection
 
 import React from "react";
-import CollectionPageClient from "@/app/nft/components/CollectionPageClient";
+import { CollectionPageClient } from "./components";
 
 interface CollectionPageProps {
     params: Promise<{

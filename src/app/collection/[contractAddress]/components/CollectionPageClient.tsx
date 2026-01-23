@@ -2,11 +2,10 @@
 
 // NFT Collection Page Client Component
 // Zeigt alle NFTs einer spezifischen Collection an
-// Verwendet von: app/nft/[contractAddress]/page.tsx
+// Verwendet von: app/collection/[contractAddress]/page.tsx
 
 import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { CollectionHeader } from './CollectionHeader'
 import { useMarketplaceItems } from '@/hooks'
 import { useCollections } from '@/contexts/collections/CollectionsContext'
 import { useNFTFilters } from '@/hooks/nfts/useNFTFilters'
@@ -206,60 +205,45 @@ export default function CollectionPageClient({ contractAddress }: CollectionPage
                 filteredCount={filteredCount}
             />
 
-            {/* Collection Header */}
-            <CollectionHeader
-                contractAddress={contractAddress}
-                contractName={collectionMetadata?.contractName}
-                contractSymbol={collectionMetadata?.contractSymbol}
-                totalListings={collectionStats?.totalListings || 0}
-                totalVolume={collectionStats?.totalVolume}
-                avgPrice={collectionStats?.avgPrice}
-                floorPrice={collectionStats?.minPrice}
-                totalViews={collectionStats?.totalViews}
-                totalLikes={collectionStats?.totalLikes}
-            />
+            {/* NFT List Area */}
+            <div className="md:pl-16 py-8">
+                {/* Error Message */}
+                {itemsError && (
+                    <div className="bg-orange-100 border border-orange-300 text-orange-800 px-4 py-3 rounded-lg text-sm mb-6">
+                        Error loading items: {itemsError}
+                    </div>
+                )}
 
-            <div className="pt-[120px] md:pl-16">
-                {/* NFT List Area */}
-                <div className="pt-20 pb-8">
-                    {/* Error Message */}
-                    {itemsError && (
-                        <div className="bg-orange-100 border border-orange-300 text-orange-800 px-4 py-3 rounded-lg text-sm mb-6">
-                            Error loading items: {itemsError}
-                        </div>
-                    )}
-
-                    {filteredNFTs.length > 0 ? (
-                        <NFTGallery
-                            items={convertToScrollItems(filteredNFTs)}
-                            enableInsights={true}
-                            showStats={true}
-                            priority={false}
-                            enableViewAll={true}
-                            defaultGridView={true}
-                            emptyMessage="No NFTs found"
-                        />
-                    ) : (
-                        <EmptyState
-                            icon="🖼️"
-                            title="No NFTs Found"
-                            description={
-                                filters.searchTerm || filters.categories.length > 0 || filters.rarities.length > 0
-                                    ? 'Try adjusting your filters'
-                                    : 'No items listed in this collection'
-                            }
-                            action={
-                                (filters.searchTerm || filters.categories.length > 0 || filters.rarities.length > 0) ? {
-                                    label: 'Clear Filters',
-                                    onClick: () => {
-                                        setFilters({ categories: [], rarities: [], searchTerm: '' })
-                                        setSort({ field: 'price', direction: 'desc' })
-                                    }
-                                } : undefined
-                            }
-                        />
-                    )}
-                </div>
+                {filteredNFTs.length > 0 ? (
+                    <NFTGallery
+                        items={convertToScrollItems(filteredNFTs)}
+                        enableInsights={true}
+                        showStats={true}
+                        priority={false}
+                        enableViewAll={true}
+                        defaultGridView={true}
+                        emptyMessage="No NFTs found"
+                    />
+                ) : (
+                    <EmptyState
+                        icon="🖼️"
+                        title="No NFTs Found"
+                        description={
+                            filters.searchTerm || filters.categories.length > 0 || filters.rarities.length > 0
+                                ? 'Try adjusting your filters'
+                                : 'No items listed in this collection'
+                        }
+                        action={
+                            (filters.searchTerm || filters.categories.length > 0 || filters.rarities.length > 0) ? {
+                                label: 'Clear Filters',
+                                onClick: () => {
+                                    setFilters({ categories: [], rarities: [], searchTerm: '' })
+                                    setSort({ field: 'price', direction: 'desc' })
+                                }
+                            } : undefined
+                        }
+                    />
+                )}
             </div>
         </>
     )
