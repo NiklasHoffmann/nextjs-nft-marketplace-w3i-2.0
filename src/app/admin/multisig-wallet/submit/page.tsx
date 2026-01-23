@@ -7,8 +7,8 @@
 'use client';
 
 import Link from 'next/link';
-import { TransactionBuilder } from '@/components/admin/multisig/TransactionBuilder';
-import { AdminModeIndicator } from '@/components/admin/AdminModeIndicator';
+import { TransactionBuilder } from '@/app/admin/components/multisig/TransactionBuilder';
+import { AdminModeIndicator } from '@/app/admin/components/ui/AdminModeIndicator';
 
 const DIAMOND_ADDRESS = process.env.NEXT_PUBLIC_DIAMOND_ADDRESS!;
 

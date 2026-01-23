@@ -8,8 +8,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { AdminModeIndicator } from '@/components/admin/AdminModeIndicator';
-import { MultiSigTransactionCard } from '@/components/admin/multisig/MultiSigTransactionCard';
+import { AdminModeIndicator } from '@/app/admin/components/ui/AdminModeIndicator';
+import { MultiSigTransactionCard } from '@/app/admin/components/multisig/MultiSigTransactionCard';
 import { useMultisigPendingTransactions } from '@/hooks';
 import { LoadingState } from '@/components/core/Loading/LoadingState';
 
