@@ -23,3 +23,6 @@ export * from './cart';
 
 // Marketplace Components - Marketplace-specific UI
 export * from './marketplace';
+
+// Wallet Components - Wallet Dashboard UI
+export * from './wallet';
