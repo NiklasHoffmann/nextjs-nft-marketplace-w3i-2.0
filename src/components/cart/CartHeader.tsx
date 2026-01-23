@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { StatCard } from '@/app/wallet/components/StatCard';
+import { StatCard } from '@/components/ui';
 
 interface CartHeaderProps {
     itemCount: number;

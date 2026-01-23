@@ -10,7 +10,7 @@
 "use client";
 
 import { useState } from 'react';
-import { StatCard } from '@/app/wallet/components/StatCard';
+import { StatCard } from '@/components/ui';
 
 interface NFTInteractionCardsProps {
     // Stats data
