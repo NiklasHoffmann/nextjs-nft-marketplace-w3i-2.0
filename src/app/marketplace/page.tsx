@@ -16,7 +16,7 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { ListedNFTsList, CollectionsList } from "./components";
+import { ListedNFTsList, CollectionsList } from "@/components/marketplace";
 import { NFTFilterSidebar } from "@/components";
 import type { NFTFilters, NFTSortOptions } from "@/types/marketplace";
 

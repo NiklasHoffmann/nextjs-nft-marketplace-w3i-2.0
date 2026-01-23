@@ -12,3 +12,4 @@ export { AddToCartButton } from './AddToCartButton';
 export { RefreshButton } from './RefreshButton';
 export { AdminDebugPanel } from './AdminDebugPanel';
 export { SocialMetrics } from './SocialMetrics';
+export { StatCard } from './StatCard';

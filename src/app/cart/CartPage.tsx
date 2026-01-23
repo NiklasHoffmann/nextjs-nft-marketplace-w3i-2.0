@@ -15,7 +15,7 @@ import { formatEther } from '@/utils';
 import Link from 'next/link';
 import { ButtonSpinner } from '@/components/core/Loading';
 import { EmptyState } from '@/components/core/Empty';
-import { CartHeader } from './components';
+import { CartHeader } from '@/components/cart';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 
 interface EnrichedCartItem {

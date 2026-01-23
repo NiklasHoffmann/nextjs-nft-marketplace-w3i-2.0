@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { StatCard } from './StatCard';
+import { StatCard } from '@/components/ui/StatCard';
 
 interface WalletStatsProps {
     listedCount: number;
