@@ -1,7 +1,7 @@
 ﻿// utils/01-core/01-core-bigint.ts
 // Add BigInt serialization support for JSON.stringify
 
-import { devLog } from '@/utils/devLog';
+import { devLog } from './dev-log';
 
 // Extend BigInt prototype to add toJSON method
 declare global {

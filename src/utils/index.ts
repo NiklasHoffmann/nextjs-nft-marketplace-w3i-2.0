@@ -2,7 +2,7 @@
  * UTILS - Zentrale Utility-Funktionen Export
  * 
  * Organisierte Utility-Kategorien:
- * • core: Grundlegende Datenverarbeitung (BigInt, Media)
+ * • core: Grundlegende Datenverarbeitung (BigInt, Media, DevLog)
  * • formatters: Display-Formatierung (Currency, Dates, Text)
  * • validation: Input-Validierung & Sanitization
  * • performance: Monitoring & Cache-Management
@@ -10,10 +10,14 @@
  * • api: Data-Fetching & Service Integration
  * 
  * NOTE: Blockchain utilities moved to @/services/blockchain
+ * NOTE: devLog is exported from core, but can be imported as '@/utils/devLog' for backwards compatibility
  */
 
 // Core: Fundamental utilities for data types and media handling
 export * from './core';
+
+// Backwards compatibility: Export devLog directly for existing imports
+export { devLog } from './core/dev-log';
 
 // Formatters: Data formatting and display utilities
 export * from './formatters';
