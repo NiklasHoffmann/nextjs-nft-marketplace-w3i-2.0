@@ -17,7 +17,7 @@ import { useMarketplaceItems } from '@/hooks';
 import { useCollections } from '@/contexts/collections/CollectionsContext';
 import { useNFTFilters } from '@/hooks/nfts/useNFTFilters';
 import { NFTGallery } from '@/components';
-import { useCollectionLayout } from './layout';
+import { useCollectionLayout } from './context';
 import { LoadingState } from '@/components/core/Loading';
 import { EmptyState } from '@/components/core/Empty';
 import { convertToScrollItems, convertToFilterableItems } from '@/utils/marketplace';

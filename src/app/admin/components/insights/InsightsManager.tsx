@@ -85,7 +85,13 @@ const initialFormData: NFTInsightFormData = {
     partnershipDetails: ''
 };
 
-export default function AdminNFTInsightsManager() {
+/**
+ * InsightsManager Component
+ * 
+ * Main component for managing NFT insights data.
+ * Legacy export as AdminNFTInsightsManager for backwards compatibility.
+ */
+export default function InsightsManager() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const [formData, setFormData] = useState<NFTInsightFormData>(initialFormData);

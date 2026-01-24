@@ -42,6 +42,7 @@ function CollectionStats({
                 }
                 label="Listed"
                 value={totalListings.toString()}
+                hideSecondaryPlaceholder
                 variant="purple"
             />
             <StatCard
@@ -52,6 +53,7 @@ function CollectionStats({
                 }
                 label="Floor"
                 value={floorPrice ? formatEther(floorPrice.toString()) : '—'}
+                hideSecondaryPlaceholder
                 variant="green"
             />
             <StatCard
@@ -63,6 +65,7 @@ function CollectionStats({
                 }
                 label="Views"
                 value={totalViews?.toString() || '0'}
+                hideSecondaryPlaceholder
                 variant="blue"
             />
             <StatCard
@@ -73,6 +76,7 @@ function CollectionStats({
                 }
                 label="Likes"
                 value={totalLikes?.toString() || '0'}
+                hideSecondaryPlaceholder
                 variant="red"
             />
         </div>

@@ -5,7 +5,7 @@
  * 
  * @example
  * ```tsx
- * import { CartHeader } from '@/components/cart';
+ * import { CartHeader } from './components';
  * ```
  */
 

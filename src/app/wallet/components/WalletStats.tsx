@@ -29,6 +29,7 @@ export function WalletStats({
                 }
                 label="Listed"
                 value={listedCount || 0}
+                hideSecondaryPlaceholder
                 variant="green"
             />
 
@@ -41,6 +42,7 @@ export function WalletStats({
                 }
                 label="Not Listed"
                 value={unlistedCount || 0}
+                hideSecondaryPlaceholder
                 variant="gray"
             />
 
@@ -53,6 +55,7 @@ export function WalletStats({
                 }
                 label="Total"
                 value={(listedCount || 0) + (unlistedCount || 0)}
+                hideSecondaryPlaceholder
                 variant="purple"
             />
 
@@ -65,7 +68,7 @@ export function WalletStats({
                 }
                 label="Total Value"
                 value={`${totalListedValue > 0 ? totalListedValue.toFixed(4) : '0.0000'} ETH`}
-                secondaryValue={!ethPriceLoading && totalValueUSD && totalListedValue > 0 ? totalValueUSD : undefined}
+                hideSecondaryPlaceholder
                 variant="blue"
             />
         </div>

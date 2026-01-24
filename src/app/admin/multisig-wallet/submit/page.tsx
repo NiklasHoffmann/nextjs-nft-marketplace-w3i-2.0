@@ -8,7 +8,7 @@
 
 import Link from 'next/link';
 import { TransactionBuilder } from '@/app/admin/components/multisig/TransactionBuilder';
-import { AdminModeIndicator } from '@/app/admin/components/ui/AdminModeIndicator';
+import { AdminModeIndicator } from '@/app/admin/components/shared/AdminModeIndicator';
 
 const DIAMOND_ADDRESS = process.env.NEXT_PUBLIC_DIAMOND_ADDRESS!;
 

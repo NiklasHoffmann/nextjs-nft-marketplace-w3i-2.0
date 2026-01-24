@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { AdminNFTInsightsManager } from "../components";
+import InsightsManager from "../components/insights/InsightsManager";
 import { LoadingState } from '@/components/core/Loading';
 
 function AdminContent() {
@@ -28,7 +28,7 @@ function AdminContent() {
                     <p className="text-gray-600">Manage NFT insights, descriptions, and metadata</p>
                 </div>
 
-                <AdminNFTInsightsManager />
+                <InsightsManager />
             </div>
         </div>
     );

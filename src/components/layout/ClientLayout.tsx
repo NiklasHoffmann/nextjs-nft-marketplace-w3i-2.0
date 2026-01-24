@@ -14,7 +14,7 @@ import { NotificationProvider, NotificationContainer } from "@/contexts/notifica
 import { AdminGuard } from "@/components/auth";
 import { MarketplaceEventsProvider, EventConnectionStatus } from "@/providers/MarketplaceEventsProvider";
 import Navbar from './Navbar';
-import AdminNavbar from './AdminNavbar';
+import AdminNavbar from '@/app/admin/components/AdminNavbar';
 import Web3Provider from './Web3Provider';
 import { usePathname } from 'next/navigation';
 

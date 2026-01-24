@@ -9,8 +9,8 @@ import { NETWORK_CONFIG } from '@/config/networks';
 import { isAddress } from 'viem';
 import { hasAdminAccess } from '@/utils';
 import Link from 'next/link';
-import { AdminModeIndicator } from '@/app/admin/components/ui/AdminModeIndicator';
-import { MigrationBanner } from '@/app/admin/components/ui/MigrationBanner';
+import { AdminModeIndicator } from '@/app/admin/components/shared/AdminModeIndicator';
+import { MigrationBanner } from '@/app/admin/components/shared/MigrationBanner';
 
 export default function MarketplaceAdminPage() {
   const { address, isConnected } = useAccount();

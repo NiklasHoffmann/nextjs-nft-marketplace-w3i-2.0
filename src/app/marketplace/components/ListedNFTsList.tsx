@@ -15,7 +15,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMarketplaceItems } from '@/hooks';
-import { useMarketplaceLayout } from '@/app/marketplace/layout';
+import { useMarketplaceLayout } from '@/app/marketplace/context';
 import { ImagePreloader } from '@/components/nft';
 import { NFTGallery } from '@/components/shared';
 import { RefreshButton } from '@/components/ui';
@@ -188,8 +188,20 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
         }
     }, [scrollItems]);
 
-    // Display cached items while loading if available, otherwise show current items
-    const displayItems = loading && cachedItems.length > 0 && scrollItems.length === 0 ? cachedItems : scrollItems;
+    // Display cached items ONLY during initial filter/sort changes when items become empty
+    // Once new items load, always show scrollItems to prevent duplicates
+    const displayItems = useMemo(() => {
+        // If we have new items, always use them (clears cache effectively)
+        if (scrollItems.length > 0) {
+            return scrollItems;
+        }
+        // Only show cache if loading and no new items yet (prevents empty flash)
+        if (loading && cachedItems.length > 0) {
+            return cachedItems;
+        }
+        // Default: show current items (even if empty)
+        return scrollItems;
+    }, [scrollItems, loading, cachedItems]);
 
     // Track when first items arrive to hide initial loading state
     useEffect(() => {

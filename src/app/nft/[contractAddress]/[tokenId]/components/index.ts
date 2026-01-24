@@ -20,5 +20,5 @@ export { default as PersonalTab } from './tabs/PersonalTab';
 export { default as FunctionalitiesTab } from './tabs/FunctionalitiesTab';
 export { default as TokenomicsTab } from './tabs/TokenomicsTab';
 
-// Modals moved to @/components/nft/modals
-// import { BuyNowModal, CancelListingModal, UpdateListingModal } from '@/components/nft/modals';
+// NFT Modals - local components
+export { BuyNowModal, CancelListingModal, UpdateListingModal } from './modals';

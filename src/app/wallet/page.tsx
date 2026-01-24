@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import React, { useState, useEffect } from 'react';
-import { WalletDashboard } from '@/components/wallet';
+import { WalletDashboard } from './components';
 import { LoadingState } from '@/components/core/Loading';
 
 // Force dynamic rendering for this page to prevent SSG issues

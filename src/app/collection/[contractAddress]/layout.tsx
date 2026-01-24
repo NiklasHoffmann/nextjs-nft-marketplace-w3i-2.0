@@ -1,31 +1,12 @@
 'use client';
 
-import React, { use, useState, useCallback, createContext, useContext, useMemo } from 'react';
+import React, { use, useState, useCallback, useMemo } from 'react';
 import { useCollections } from '@/contexts/collections/CollectionsContext';
 import type { Collection } from '@/contexts/collections/CollectionsService';
 import { CollectionHeader } from './components';
 import { NFTFilterSidebar } from '@/components';
 import type { NFTFilters, NFTSortOptions } from '@/types/marketplace';
-
-interface CollectionLayoutContext {
-    filters: NFTFilters;
-    sort: NFTSortOptions;
-    onFiltersChange: (filters: NFTFilters) => void;
-    onSortChange: (sort: NFTSortOptions) => void;
-    totalItems: number;
-    filteredCount: number;
-    setFilteredCount: (count: number) => void;
-}
-
-const CollectionLayoutContext = createContext<CollectionLayoutContext | null>(null);
-
-export function useCollectionLayout() {
-    const context = useContext(CollectionLayoutContext);
-    if (!context) {
-        throw new Error('useCollectionLayout must be used within CollectionLayout');
-    }
-    return context;
-}
+import { CollectionLayoutContext } from './context';
 
 export default function CollectionLayout({
     children,

@@ -17,12 +17,3 @@ export * from './ui';
 
 // Auth Components - AdminGuard, Access Control
 export * from './auth';
-
-// Cart Components - Shopping Cart UI
-export * from './cart';
-
-// Marketplace Components - Marketplace-specific UI
-export * from './marketplace';
-
-// Wallet Components - Wallet Dashboard UI
-export * from './wallet';

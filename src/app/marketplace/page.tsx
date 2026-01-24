@@ -15,8 +15,8 @@
  */
 
 import React from "react";
-import { ListedNFTsList, CollectionsList } from "@/components/marketplace";
-import { useMarketplaceLayout } from "./layout";
+import { ListedNFTsList, CollectionsList } from "./components";
+import { useMarketplaceLayout } from "./context";
 
 export default function MarketplacePage() {
     const { filters, sort, onFiltersChange, onSortChange } = useMarketplaceLayout();

@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAccount, useBalance } from 'wagmi';
-import { Web3ConnectButton } from './Web3ConnectButton';
+import { Web3ConnectButton } from '@/components/layout/Web3ConnectButton';
 import { hasAdminAccess } from '@/utils';
 
 export default function AdminNavbar() {

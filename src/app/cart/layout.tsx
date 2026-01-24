@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { CartHeader } from '@/components/cart';
+import { CartHeader } from './components';
 import { useCart } from '@/contexts';
 
 export default function CartLayout({ children }: { children: ReactNode }) {

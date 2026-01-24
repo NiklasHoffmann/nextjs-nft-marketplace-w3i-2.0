@@ -14,14 +14,14 @@ async function handler(req: NextRequest) {
 
     // 2. Active Listings - gelistete NFTs aus marketplace_items
     const activeListings = await db.collection('marketplace_items').countDocuments({
-        status: 'listed'
+        status: 'LISTED'
     });
 
-    // 3. Total Volume - Summe aller verkauften NFTs
-    const volumeResult = await db.collection('marketplace_items').aggregate([
+    // 3. Listed Volume - Summe aller Preise von gelisteten NFTs
+    const listedVolumeResult = await db.collection('marketplace_items').aggregate([
         {
             $match: {
-                status: 'sold'
+                status: 'LISTED'
             }
         },
         {
@@ -32,7 +32,24 @@ async function handler(req: NextRequest) {
         }
     ]).toArray();
 
-    const totalVolume = volumeResult.length > 0 ? (volumeResult[0]?.totalVolume ?? 0) : 0;
+    const listedVolume = listedVolumeResult.length > 0 ? (listedVolumeResult[0]?.totalVolume ?? 0) : 0;
+
+    // 4. Sales Volume - Summe aller verkauften NFTs
+    const salesVolumeResult = await db.collection('marketplace_items').aggregate([
+        {
+            $match: {
+                status: 'SOLD'
+            }
+        },
+        {
+            $group: {
+                _id: null,
+                totalVolume: { $sum: { $toDouble: "$price" } }
+            }
+        }
+    ]).toArray();
+
+    const salesVolume = salesVolumeResult.length > 0 ? (salesVolumeResult[0]?.totalVolume ?? 0) : 0;
 
     // 4. Total Users - Unique Wallets die interagiert haben
     // Zähle unique addresses aus ALLEN Quellen:
@@ -48,7 +65,7 @@ async function handler(req: NextRequest) {
                         { $group: { _id: null, addresses: { $addToSet: '$_id' } } }
                     ],
                     buyers: [
-                        { $match: { status: 'sold', buyer: { $exists: true, $ne: null } } },
+                        { $match: { status: 'SOLD', buyer: { $exists: true, $ne: null } } },
                         { $group: { _id: '$buyer' } },
                         { $group: { _id: null, addresses: { $addToSet: '$_id' } } }
                     ]
@@ -90,22 +107,22 @@ async function handler(req: NextRequest) {
 
     const totalUsers = allUserAddresses.size;
 
-    // 5. Additional Stats
+    // 6. Additional Stats
     const pendingListings = await db.collection('marketplace_items').countDocuments({
-        status: 'pending'
+        status: 'PENDING'
     });
 
     const cancelledListings = await db.collection('marketplace_items').countDocuments({
-        status: 'cancelled'
+        status: 'CANCELLED'
     });
 
     const totalSales = await db.collection('marketplace_items').countDocuments({
-        status: 'sold'
+        status: 'SOLD'
     });
 
-    // 6. Recent Sales (last 5)
+    // 7. Recent Sales (last 5)
     const recentSales = await db.collection('marketplace_items')
-        .find({ status: 'sold' })
+        .find({ status: 'SOLD' })
         .sort({ updatedAt: -1 })
         .limit(5)
         .toArray();
@@ -115,7 +132,9 @@ async function handler(req: NextRequest) {
         data: {
             totalNFTs,
             activeListings,
-            totalVolume,
+            listedVolume,      // Summe der Preise von aktuell gelisteten Items
+            salesVolume,       // Summe der Preise von verkauften Items
+            totalVolume: salesVolume, // Backwards compatibility
             totalUsers,
             totalSales,
             pendingListings,

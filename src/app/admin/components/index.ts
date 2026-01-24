@@ -1,31 +1,35 @@
 ﻿/**
  * Admin Components - Barrel Export
  * 
- * Central export point for all admin-specific components.
+ * Feature-based structure for better organization.
  * Import from '@/app/admin/components' instead of individual files.
  * 
  * @example
  * ```tsx
- * import { AdminModeIndicator, ProposalCard } from '@/app/admin/components';
+ * import { AdminModeIndicator, ProposalCard, InsightsManager } from '@/app/admin/components';
  * ```
  * 
  * @module admin/components
  */
 
-// UI Components
-export { AdminModeIndicator } from './ui/AdminModeIndicator';
-export { MigrationBanner } from './ui/MigrationBanner';
+// Global Admin Components
+export { default as AdminNavbar } from './AdminNavbar';
 
-// MultiSig Components
+// Shared Components (used across features)
+export { AdminModeIndicator } from './shared/AdminModeIndicator';
+export { MigrationBanner } from './shared/MigrationBanner';
+
+// MultiSig Feature Components
 export { ProposalCard } from './multisig/ProposalCard';
 export { CreateProposalModal } from './multisig/CreateProposalModal';
 export { MultiSigTransactionCard } from './multisig/MultiSigTransactionCard';
 export { TransactionBuilder } from './multisig/TransactionBuilder';
 
-// Insights Management Components (original admin components)
-export { default as AdminNFTInsightsManager } from './AdminNFTInsightsManager';
+// Insights Feature Components
+export { default as InsightsManager } from './insights/InsightsManager';
+export { default as AdminNFTInsightsManager } from './insights/InsightsManager'; // Backwards compatibility
 
-// Section Components
+// Insights - Section Components
 export {
     NFTSelector,
     BasicInfoManager,
@@ -34,11 +38,11 @@ export {
     ProjectLinkManager,
     PartnershipManager,
     RaritySelector,
-} from './sections';
+} from './insights/sections';
 
-// Form Components
+// Insights - Form Components
 export {
     TitleDescriptionManager,
     DynamicDescriptionManager,
     NFTCardDescriptionsManager,
-} from './forms';
+} from './insights/forms';

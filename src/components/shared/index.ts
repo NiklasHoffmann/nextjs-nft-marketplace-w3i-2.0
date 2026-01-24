@@ -9,7 +9,6 @@
  */
 
 // Shared Components (used across multiple routes)
-export { default as NFTFilterBar } from './NFTFilterBar';
 export { NFTFilterSidebar } from './NFTFilterSidebar';
 export { NFTGallery } from './NFTGallery';
 

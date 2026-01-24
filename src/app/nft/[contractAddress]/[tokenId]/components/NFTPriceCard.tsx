@@ -7,7 +7,7 @@ import {
     BuyNowModal,
     CancelListingModal,
     UpdateListingModal
-} from '@/components/nft/modals';
+} from './modals';
 
 function NFTPriceCard({
     price,

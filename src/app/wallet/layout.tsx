@@ -3,7 +3,7 @@
 import { ReactNode } from 'react';
 import { useAccount } from 'wagmi';
 import { formatEther } from 'viem';
-import { WalletHeader } from '@/components/wallet';
+import { WalletHeader } from './components';
 import { useWalletNFTsV2 } from '@/hooks/wallet/useWalletNFTsV2';
 import { useETHPrice } from '@/contexts/CurrencyContext';
 

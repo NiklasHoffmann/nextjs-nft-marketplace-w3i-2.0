@@ -1,30 +1,10 @@
 'use client';
 
-import { ReactNode, useState, useCallback, useEffect, useMemo, createContext, useContext } from 'react';
+import { ReactNode, useState, useCallback, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { NFTFilterSidebar } from '@/components';
 import type { NFTFilters, NFTSortOptions } from '@/types/marketplace';
-
-interface MarketplaceLayoutContext {
-    filters: NFTFilters;
-    sort: NFTSortOptions;
-    onFiltersChange: (filters: NFTFilters) => void;
-    onSortChange: (sort: NFTSortOptions) => void;
-    totalItems: number;
-    filteredCount: number;
-    setFilteredCount: (count: number) => void;
-}
-
-// Create context to share filter state between layout and page
-const MarketplaceLayoutContext = createContext<MarketplaceLayoutContext | null>(null);
-
-export function useMarketplaceLayout() {
-    const context = useContext(MarketplaceLayoutContext);
-    if (!context) {
-        throw new Error('useMarketplaceLayout must be used within MarketplaceLayout');
-    }
-    return context;
-}
+import { MarketplaceLayoutContext } from './context';
 
 export default function MarketplaceLayout({ children }: { children: ReactNode }) {
     const searchParams = useSearchParams();

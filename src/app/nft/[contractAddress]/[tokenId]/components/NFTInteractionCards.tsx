@@ -132,7 +132,7 @@ export function NFTInteractionCards({
                     }
                     label="Saved"
                     value={watchlistCount}
-                    variant="blue"
+                    variant={isWatchlisted ? 'blue' : 'gray'}
                     hideSecondaryPlaceholder
                 />
             </button>
