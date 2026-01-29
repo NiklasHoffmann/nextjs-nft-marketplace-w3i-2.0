@@ -266,6 +266,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
         setPagination(data.data.pagination);
         setAvailableFilters(data.data.filters || null);
         setInitialLoading(false);
+        setLoading(false); // Set loading false immediately after setting data
       }
     } catch (err) {
       // Ignore abort errors (normal flow when filters change)
@@ -280,9 +281,9 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch items';
       setError(errorMessage);
       setInitialLoading(false);
+      setLoading(false); // Set loading false on error too
     } finally {
       loadingRef.current = false;
-      setLoading(false);
       if (abortControllerRef.current === abortController) {
         abortControllerRef.current = null;
       }

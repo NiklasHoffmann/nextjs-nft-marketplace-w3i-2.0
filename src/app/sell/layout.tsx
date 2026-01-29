@@ -11,6 +11,7 @@
 
 import React, { useMemo, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import { useScrollPosition } from '@/hooks/useScrollPosition';
 import { ListingFlowProvider, useListingFlow } from './contexts/ListingFlowContext';
 import { SellHeader, FlowSidebar } from './components';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
@@ -21,6 +22,16 @@ function SellLayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const { formData, progressData, reset } = useListingFlow();
     const walletNFTsContext = useWalletNFTs();
+    const isScrolled = useScrollPosition(80);
+
+    // Layout metrics
+    const NAVBAR_HEIGHT = 64; // Navbar height
+    const HEADER_NORMAL_HEIGHT = 90; // Normal header height
+    const HEADER_COMPACT_HEIGHT = 56; // Compact header height
+    
+    const headerHeight = isScrolled ? HEADER_COMPACT_HEIGHT : HEADER_NORMAL_HEIGHT;
+    const topOffset = NAVBAR_HEIGHT + headerHeight;
+    const contentPadding = topOffset + 10; // +10px for spacing
 
     // Reset state when leaving /sell route
     useEffect(() => {
@@ -145,9 +156,15 @@ function SellLayoutContent({ children }: { children: React.ReactNode }) {
             />
 
             {/* Main Content with Sidebar Layout */}
-            <div className="flex pt-[154px]">
+            <div className="flex transition-all duration-300" style={{ paddingTop: `${contentPadding}px` }}>
                 {/* Flow Sidebar - sticky und direkt unter dem SellHeader */}
-                <div className="w-64 flex-shrink-0 sticky top-[173px] self-start h-[calc(100vh-173px)] overflow-y-auto bg-white border-r border-gray-200">
+                <div 
+                    className="w-64 flex-shrink-0 sticky self-start overflow-y-auto bg-white border-r border-gray-200 transition-all duration-300"
+                    style={{ 
+                        top: `${topOffset}px`,
+                        height: `calc(100vh - ${topOffset}px)`
+                    }}
+                >
                     <div className="px-4 py-4">
                         <FlowSidebar
                             whitelistStatus={progressData.whitelistStatus || 'not-started'}

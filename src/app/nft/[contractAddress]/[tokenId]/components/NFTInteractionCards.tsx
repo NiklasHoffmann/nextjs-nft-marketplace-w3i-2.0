@@ -33,7 +33,7 @@ interface NFTInteractionCardsProps {
 
     // Wallet state
     isConnected: boolean;
-    
+
     // Compact mode (from PageHeader scroll state)
     isCompact?: boolean;
 }
@@ -75,7 +75,7 @@ export function NFTInteractionCards({
 
     return (
         <div className={
-            isCompact 
+            isCompact
                 ? "hidden lg:flex flex-wrap gap-2 justify-end items-stretch transition-all"
                 : "hidden lg:grid grid-cols-5 gap-3 items-stretch transition-all"
         }>

@@ -15,7 +15,7 @@ export interface ExtendedTokenConfig {
     isMock?: boolean;
 }
 
-export type TokenCategory = 
+export type TokenCategory =
     | 'ETH_WRAPPERS'
     | 'BTC_WRAPPERS'
     | 'USD_STABLECOINS'
@@ -26,6 +26,7 @@ export type TokenCategory =
     | 'NFT_METAVERSE'
     | 'L2_ECOSYSTEM'
     | 'LIQUID_STAKING'
+    | 'TESTNET_TOKENS'
     | 'MOCK_TOKENS';
 
 /**
@@ -651,5 +652,6 @@ export const CATEGORY_NAMES: Record<TokenCategory, string> = {
     NFT_METAVERSE: "NFT & Metaverse",
     L2_ECOSYSTEM: "L2 & Ecosystem",
     LIQUID_STAKING: "Liquid Staking & RWA",
+    TESTNET_TOKENS: "Testnet Tokens",
     MOCK_TOKENS: "Mock Tokens (Testing)"
 };

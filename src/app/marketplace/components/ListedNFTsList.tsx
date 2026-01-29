@@ -151,7 +151,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
                 });
             }
         }
-        
+
         return items
             .filter(item => item.contractAddress && item.contractAddress !== 'undefined' && item.contractAddress.trim() !== '')
             .map((item) => {
@@ -165,49 +165,49 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
                     // Fallback: convert any non-string to string
                     price = String(price);
                 }
-                
+
                 return {
                     contractAddress: item.contractAddress.toLowerCase(),
                     tokenId: item.tokenId,
                     price: price || undefined,
                     isListed: (item as any).isListed ?? item.marketplace?.isListed ?? false,
-                listingId: (item as any).listingId || item.marketplace?.listingId || undefined,
-                seller: (item as any).seller || item.marketplace?.seller || undefined,
-                buyer: (item as any).buyer || item.marketplace?.buyer || undefined,
-                desiredContractAddress: (item as any).desiredContractAddress || item.marketplace?.desiredContractAddress || undefined,
-                desiredTokenId: (item as any).desiredTokenId || item.marketplace?.desiredTokenId || undefined,
-                metadata: item.metadata ? {
-                    name: item.metadata.name,
-                    description: item.metadata.description,
-                    image: item.metadata.image,
-                    animationUrl: item.metadata.animationUrl,
-                    externalUrl: item.metadata.externalUrl,
-                    attributes: item.metadata.attributes
-                } : undefined,
-                insights: item.insights ? {
-                    customTitle: item.insights.customTitle || undefined,
-                    category: item.insights.category || undefined,
-                    tags: item.insights.tags || undefined,
-                    rarity: item.insights.rarity || undefined,
-                    cardDescriptions: item.insights.cardDescriptions || undefined,
-                    projectDescriptions: item.insights.projectDescriptions || undefined,
-                    functionalitiesDescriptions: item.insights.functionalitiesDescriptions || undefined,
-                    projectWebsite: item.insights.projectWebsite || undefined,
-                    projectTwitter: item.insights.projectTwitter || undefined,
-                    projectDiscord: item.insights.projectDiscord || undefined,
-                    partnerships: item.insights.partnerships || undefined
-                } : undefined,
-                contract: item.contract ? {
-                    name: item.contract.name,
-                    symbol: item.contract.symbol,
-                    totalSupply: item.contract.totalSupply,
-                    owner: item.contract.owner,
-                    tokenURI: item.contract.tokenURI,
-                    approved: item.contract.approvedAddress || null,
-                    ownerBalance: item.contract.ownerBalance
-                } : undefined
-            };
-        });
+                    listingId: (item as any).listingId || item.marketplace?.listingId || undefined,
+                    seller: (item as any).seller || item.marketplace?.seller || undefined,
+                    buyer: (item as any).buyer || item.marketplace?.buyer || undefined,
+                    desiredContractAddress: (item as any).desiredContractAddress || item.marketplace?.desiredContractAddress || undefined,
+                    desiredTokenId: (item as any).desiredTokenId || item.marketplace?.desiredTokenId || undefined,
+                    metadata: item.metadata ? {
+                        name: item.metadata.name,
+                        description: item.metadata.description,
+                        image: item.metadata.image,
+                        animationUrl: item.metadata.animationUrl,
+                        externalUrl: item.metadata.externalUrl,
+                        attributes: item.metadata.attributes
+                    } : undefined,
+                    insights: item.insights ? {
+                        customTitle: item.insights.customTitle || undefined,
+                        category: item.insights.category || undefined,
+                        tags: item.insights.tags || undefined,
+                        rarity: item.insights.rarity || undefined,
+                        cardDescriptions: item.insights.cardDescriptions || undefined,
+                        projectDescriptions: item.insights.projectDescriptions || undefined,
+                        functionalitiesDescriptions: item.insights.functionalitiesDescriptions || undefined,
+                        projectWebsite: item.insights.projectWebsite || undefined,
+                        projectTwitter: item.insights.projectTwitter || undefined,
+                        projectDiscord: item.insights.projectDiscord || undefined,
+                        partnerships: item.insights.partnerships || undefined
+                    } : undefined,
+                    contract: item.contract ? {
+                        name: item.contract.name,
+                        symbol: item.contract.symbol,
+                        totalSupply: item.contract.totalSupply,
+                        owner: item.contract.owner,
+                        tokenURI: item.contract.tokenURI,
+                        approved: item.contract.approvedAddress || null,
+                        ownerBalance: item.contract.ownerBalance
+                    } : undefined
+                };
+            });
     }, [items]);
 
     // Preload images

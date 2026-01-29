@@ -47,14 +47,14 @@ function isReactNodeValue(value: number | string | React.ReactNode): value is Re
 }
 
 // Helper component for rendering value
-function StatValue({ 
-    value, 
-    textColor, 
-    fontSize, 
-    className = '' 
-}: { 
-    value: number | string | React.ReactNode; 
-    textColor: string; 
+function StatValue({
+    value,
+    textColor,
+    fontSize,
+    className = ''
+}: {
+    value: number | string | React.ReactNode;
+    textColor: string;
     fontSize: string;
     className?: string;
 }) {
@@ -65,10 +65,10 @@ function StatValue({
             </div>
         );
     }
-    
+
     return (
-        <div 
-            className={`${fontSize} font-bold ${textColor} truncate ${className}`} 
+        <div
+            className={`${fontSize} font-bold ${textColor} truncate ${className}`}
             title={String(value)}
         >
             {value}
@@ -132,9 +132,9 @@ export function StatCard({ icon, label, value, secondaryValue, variant, hideSeco
                         </div>
                         <span className="text-[10px] font-medium text-gray-600">{label}</span>
                     </div>
-                    
+
                     <div className="flex-1 flex flex-col justify-center items-start">
-                        <StatValue 
+                        <StatValue
                             value={value}
                             textColor={styles.textColor}
                             fontSize="text-base"

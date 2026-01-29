@@ -6,7 +6,7 @@ import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
 import { useERC20 } from '@/hooks/tokens';
 import { useForm } from '@/hooks';
-import { CurrencySelector } from '@/components/marketplace/CurrencySelector';
+import { ExtendedCurrencySelector } from '@/components/marketplace';
 import { ZERO_ADDRESS, getTokenConfig, isNativeETH } from '@/config/tokens';
 
 export type ListingMode = 'sale' | 'trade' | 'hybrid';
@@ -103,7 +103,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
             }
 
             // Im Netto-Modus: Brutto-Preis für Contract verwenden
-            const submissionPrice = (mode === 'sale' || mode === 'hybrid') 
+            const submissionPrice = (mode === 'sale' || mode === 'hybrid')
                 ? (values.priceMode === 'net' ? fees.grossPrice.toString() : values.price)
                 : undefined;
 
@@ -122,7 +122,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
     // Get token config for selected currency
     const selectedTokenConfig = useMemo(() => {
         if (isNativeETH(form.values.currency)) return null;
-        
+
         // Try to find token config (including mock tokens for development)
         const tokens = ['WETH', 'USDC', 'DAI', 'MOCK_ERC20', 'MOCK_WBTC', 'MOCK_EURS', 'MOCK_USDT'] as const;
         for (const tokenSymbol of tokens) {
@@ -135,12 +135,12 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
     }, [form.values.currency, chainId]);
 
     // Generic ERC20 Hook for approval check (works with any token)
-    const { 
-        hasEnoughAllowance, 
-        approve, 
+    const {
+        hasEnoughAllowance,
+        approve,
         balance: tokenBalance,
-        isApproving 
-    } = useERC20({ 
+        isApproving
+    } = useERC20({
         tokenAddress: selectedTokenConfig?.address as `0x${string}` | undefined,
         spenderAddress: marketplaceAddress,
         decimals: selectedTokenConfig?.decimals || 18
@@ -196,7 +196,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
         ? (() => {
             const inputPrice = parseFloat(form.values.price);
             const totalFeeRate = innovationFeePercentage + royaltyFeePercentage;
-            
+
             if (form.values.priceMode === 'net') {
                 // Netto-Modus: Eingegebener Preis = Was Seller erhält
                 // Brutto-Preis = Netto / (1 - feeRate)
@@ -204,7 +204,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                 const grossPrice = netPrice / (1 - totalFeeRate);
                 const marketplaceFee = grossPrice * innovationFeePercentage;
                 const royaltyFee = grossPrice * royaltyFeePercentage;
-                
+
                 return {
                     grossPrice,
                     marketplaceFee,
@@ -340,13 +340,13 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                                 </svg>
                                 Preis {mode === 'hybrid' && '(zusätzlich zum NFT)'}
                             </h3>
-                            
+
                             {/* Currency Selection */}
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Zahlungsmethode *
                                 </label>
-                                <CurrencySelector 
+                                <ExtendedCurrencySelector
                                     value={form.values.currency}
                                     onChange={(currency) => form.setFieldValue('currency', currency)}
                                 />
@@ -369,11 +369,10 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                                     <button
                                         type="button"
                                         onClick={() => form.setFieldValue('priceMode', 'gross')}
-                                        className={`flex-1 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
-                                            form.values.priceMode === 'gross'
+                                        className={`flex-1 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${form.values.priceMode === 'gross'
                                                 ? 'border-blue-500 bg-blue-50 text-blue-900'
                                                 : 'border-gray-300 bg-white text-gray-700 hover:border-blue-300'
-                                        }`}
+                                            }`}
                                     >
                                         <div className="flex items-center justify-center gap-2">
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -386,11 +385,10 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                                     <button
                                         type="button"
                                         onClick={() => form.setFieldValue('priceMode', 'net')}
-                                        className={`flex-1 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
-                                            form.values.priceMode === 'net'
+                                        className={`flex-1 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${form.values.priceMode === 'net'
                                                 ? 'border-green-500 bg-green-50 text-green-900'
                                                 : 'border-gray-300 bg-white text-gray-700 hover:border-green-300'
-                                        }`}
+                                            }`}
                                     >
                                         <div className="flex items-center justify-center gap-2">
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -402,7 +400,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                                     </button>
                                 </div>
                                 <p className="text-xs text-gray-500 mt-2">
-                                    {form.values.priceMode === 'gross' 
+                                    {form.values.priceMode === 'gross'
                                         ? 'Geben Sie den Endpreis ein, den der Käufer zahlt. Gebühren werden automatisch abgezogen.'
                                         : 'Geben Sie den Betrag ein, den Sie nach Abzug aller Gebühren erhalten möchten.'
                                     }

@@ -8,9 +8,9 @@
 
 import { useState, useMemo } from 'react';
 import { useChainId } from 'wagmi';
-import { 
-    ZERO_ADDRESS, 
-    getAvailableTokens, 
+import {
+    ZERO_ADDRESS,
+    getAvailableTokens,
     getCurrencySymbolByAddress,
     getAllExtendedTokens,
     getTokensByCategory,
@@ -28,10 +28,10 @@ interface ExtendedCurrencySelectorProps {
     allowedCategories?: TokenCategory[]; // Limit to specific categories
 }
 
-export function ExtendedCurrencySelector({ 
-    value, 
-    onChange, 
-    disabled = false, 
+export function ExtendedCurrencySelector({
+    value,
+    onChange,
+    disabled = false,
     className = '',
     showCategories = true,
     allowedCategories
@@ -40,31 +40,64 @@ export function ExtendedCurrencySelector({
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Get tokens based on network
+    // Get tokens - show ALL extended tokens on all networks for preview
     const isMainnet = chainId === 1;
-    const extendedTokens = isMainnet ? getAllExtendedTokens() : [];
+    const extendedTokens = getAllExtendedTokens(); // Always show all 76 tokens
     const basicTokens = getAvailableTokens(chainId); // Includes mock tokens on Sepolia/Hardhat
-    
-    // Combine tokens: Extended on Mainnet, Basic+Mock on other networks
+
+    // Combine tokens: Extended + Mock tokens (mark mainnet tokens as preview on testnets)
     const allTokens = useMemo(() => {
-        const tokens = isMainnet ? extendedTokens : basicTokens;
-        
+        if (isMainnet) {
+            // Mainnet: only extended tokens
+            return extendedTokens;
+        }
+
+        // Testnets: Extended tokens (marked as preview) + native testnet tokens
+        // basicTokens with isMock get "MOCK_TOKENS" category, others get "TESTNET_TOKENS"
+        const testnetTokens = basicTokens.map(t => ({
+            ...t,
+            category: t.isMock ? 'MOCK_TOKENS' : 'TESTNET_TOKENS'
+        }));
+
+        const tokens = [
+            ...extendedTokens.map(t => ({ ...t, isMock: true })), // Mainnet preview tokens (keep original categories)
+            ...testnetTokens // Native testnet tokens (TESTNET_TOKENS or MOCK_TOKENS)
+        ];
+
         // Filter by allowed categories if specified
+        let filteredTokens = tokens;
         if (allowedCategories && allowedCategories.length > 0) {
-            return tokens.filter(token => 
+            filteredTokens = tokens.filter(token =>
                 token.category && allowedCategories.includes(token.category as TokenCategory)
             );
         }
-        
-        return tokens;
+
+        // Sort: Mock tokens first, then mainnet preview (isMock=true), then testnet tokens
+        return filteredTokens.sort((a, b) => {
+            const aIsMockToken = a.category === 'MOCK_TOKENS';
+            const bIsMockToken = b.category === 'MOCK_TOKENS';
+            const aIsTestnet = a.category === 'TESTNET_TOKENS';
+            const bIsTestnet = b.category === 'TESTNET_TOKENS';
+
+            // 1. MOCK_TOKENS first
+            if (aIsMockToken && !bIsMockToken) return -1;
+            if (!aIsMockToken && bIsMockToken) return 1;
+
+            // 2. TESTNET_TOKENS second
+            if (aIsTestnet && !bIsTestnet) return -1;
+            if (!aIsTestnet && bIsTestnet) return 1;
+
+            // 3. Rest (mainnet preview tokens) last
+            return 0;
+        });
     }, [isMainnet, extendedTokens, basicTokens, allowedCategories]);
 
     // Group tokens by category (works on all networks if tokens have category field)
     const tokensByCategory = useMemo(() => {
         if (!showCategories) return null;
-        
+
         const grouped: Record<string, ExtendedTokenConfig[]> = {};
-        
+
         allTokens.forEach(token => {
             const category = token.category || 'MOCK_TOKENS';
             if (!grouped[category]) {
@@ -72,16 +105,16 @@ export function ExtendedCurrencySelector({
             }
             grouped[category].push(token as ExtendedTokenConfig);
         });
-        
+
         return grouped;
     }, [showCategories, allTokens]);
 
     // Filter tokens by search
     const filteredTokens = useMemo(() => {
         if (!searchTerm) return allTokens;
-        
+
         const term = searchTerm.toLowerCase();
-        return allTokens.filter(token => 
+        return allTokens.filter(token =>
             token.symbol.toLowerCase().includes(term) ||
             token.name.toLowerCase().includes(term) ||
             token.address.toLowerCase().includes(term)
@@ -97,12 +130,12 @@ export function ExtendedCurrencySelector({
             icon: string;
             category: string;
         }> = [
-            { address: ZERO_ADDRESS, symbol: 'ETH', name: 'Ether', icon: 'Ξ', category: 'ETH_WRAPPERS' }
-        ];
-        
+                { address: ZERO_ADDRESS, symbol: 'ETH', name: 'Ether', icon: 'Ξ', category: 'ETH_WRAPPERS' }
+            ];
+
         filteredTokens.forEach(token => {
             let icon = token.icon || 'T';
-            
+
             opts.push({
                 address: token.address,
                 symbol: token.symbol,
@@ -111,11 +144,11 @@ export function ExtendedCurrencySelector({
                 category: token.category || 'OTHER'
             });
         });
-        
+
         return opts;
     }, [filteredTokens]);
 
-    const selectedOption = options.find(opt => 
+    const selectedOption = options.find(opt =>
         opt.address.toLowerCase() === (value || ZERO_ADDRESS).toLowerCase()
     ) ?? options[0]!;
 
@@ -134,10 +167,10 @@ export function ExtendedCurrencySelector({
                         <span className="font-medium">{selectedOption.symbol}</span>
                         <span className="text-sm text-gray-500">({selectedOption.name})</span>
                     </div>
-                    <svg 
+                    <svg
                         className={`w-5 h-5 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                        fill="none" 
-                        stroke="currentColor" 
+                        fill="none"
+                        stroke="currentColor"
                         viewBox="0 0 24 24"
                     >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -149,11 +182,11 @@ export function ExtendedCurrencySelector({
             {isOpen && !disabled && (
                 <>
                     {/* Backdrop */}
-                    <div 
+                    <div
                         className="fixed inset-0 z-10"
                         onClick={() => setIsOpen(false)}
                     />
-                    
+
                     {/* Options Panel */}
                     <div className="absolute z-20 w-full mt-2 bg-white border-2 border-gray-200 rounded-lg shadow-xl overflow-hidden max-h-[500px] flex flex-col">
                         {/* Search Bar */}
@@ -169,47 +202,58 @@ export function ExtendedCurrencySelector({
                                 />
                             </div>
                         )}
-                        
+
                         {/* Token List */}
                         <div className="overflow-y-auto flex-1">
                             {showCategories && tokensByCategory ? (
                                 // Grouped by category with grid layout
-                                Object.entries(tokensByCategory).map(([category, tokens]) => {
-                                    const filteredCategoryTokens = tokens.filter(token => 
-                                        !searchTerm || 
-                                        token.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        token.name.toLowerCase().includes(searchTerm.toLowerCase())
-                                    );
-                                    
-                                    if (filteredCategoryTokens.length === 0) return null;
-                                    
-                                    return (
-                                        <div key={category}>
-                                            <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 sticky top-0">
-                                                <span className="text-xs font-semibold text-gray-600 uppercase">
-                                                    {CATEGORY_NAMES[category as TokenCategory] || category}
-                                                </span>
+                                Object.entries(tokensByCategory)
+                                    .sort(([catA], [catB]) => {
+                                        // 1. MOCK_TOKENS first
+                                        if (catA === 'MOCK_TOKENS') return -1;
+                                        if (catB === 'MOCK_TOKENS') return 1;
+                                        // 2. TESTNET_TOKENS second
+                                        if (catA === 'TESTNET_TOKENS') return -1;
+                                        if (catB === 'TESTNET_TOKENS') return 1;
+                                        // 3. Rest (mainnet preview) after
+                                        return 0;
+                                    })
+                                    .map(([category, tokens]) => {
+                                        const filteredCategoryTokens = tokens.filter(token =>
+                                            !searchTerm ||
+                                            token.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            token.name.toLowerCase().includes(searchTerm.toLowerCase())
+                                        );
+
+                                        if (filteredCategoryTokens.length === 0) return null;
+
+                                        return (
+                                            <div key={category}>
+                                                <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                                                    <span className="text-xs font-semibold text-gray-600 uppercase">
+                                                        {CATEGORY_NAMES[category as TokenCategory] || category}
+                                                    </span>
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-2 p-3">
+                                                    {filteredCategoryTokens.map((token) => {
+                                                        const isSelected = token.address.toLowerCase() === (value || ZERO_ADDRESS).toLowerCase();
+                                                        return (
+                                                            <TokenGridOption
+                                                                key={token.address}
+                                                                token={token}
+                                                                isSelected={isSelected}
+                                                                onClick={() => {
+                                                                    onChange(token.address);
+                                                                    setIsOpen(false);
+                                                                    setSearchTerm('');
+                                                                }}
+                                                            />
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
-                                            <div className="grid grid-cols-3 gap-2 p-3">
-                                                {filteredCategoryTokens.map((token) => {
-                                                    const isSelected = token.address.toLowerCase() === (value || ZERO_ADDRESS).toLowerCase();
-                                                    return (
-                                                        <TokenGridOption
-                                                            key={token.address}
-                                                            token={token}
-                                                            isSelected={isSelected}
-                                                            onClick={() => {
-                                                                onChange(token.address);
-                                                                setIsOpen(false);
-                                                                setSearchTerm('');
-                                                            }}
-                                                        />
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    );
-                                })
+                                        );
+                                    })
                             ) : (
                                 // Flat grid
                                 <div className="grid grid-cols-3 gap-2 p-3">
@@ -224,11 +268,10 @@ export function ExtendedCurrencySelector({
                                                     setIsOpen(false);
                                                     setSearchTerm('');
                                                 }}
-                                                className={`px-3 py-3 flex flex-col items-center gap-1 rounded-lg border-2 transition-all ${
-                                                    isSelected 
-                                                        ? 'bg-blue-50 border-blue-500 text-blue-700' 
+                                                className={`px-3 py-3 flex flex-col items-center gap-1 rounded-lg border-2 transition-all ${isSelected
+                                                        ? 'bg-blue-50 border-blue-500 text-blue-700'
                                                         : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700'
-                                                }`}
+                                                    }`}
                                             >
                                                 <span className="text-2xl font-semibold">{option.icon}</span>
                                                 <div className="text-center">
@@ -245,7 +288,7 @@ export function ExtendedCurrencySelector({
                                     })}
                                 </div>
                             )}
-                            
+
                             {options.length === 0 && (
                                 <div className="px-4 py-8 text-center text-gray-500">
                                     <p className="text-sm">No tokens found</p>
@@ -267,16 +310,15 @@ interface TokenOptionProps {
 
 function TokenGridOption({ token, isSelected, onClick }: TokenOptionProps) {
     const icon = token.icon || 'T';
-    
+
     return (
         <button
             type="button"
             onClick={onClick}
-            className={`relative px-3 py-3 flex flex-col items-center gap-1 rounded-lg border-2 transition-all ${
-                isSelected 
-                    ? 'bg-blue-50 border-blue-500 text-blue-700' 
+            className={`relative px-3 py-3 flex flex-col items-center gap-1 rounded-lg border-2 transition-all ${isSelected
+                    ? 'bg-blue-50 border-blue-500 text-blue-700'
                     : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700'
-            }`}
+                }`}
         >
             <span className="text-2xl font-semibold">{icon}</span>
             <div className="text-center w-full">

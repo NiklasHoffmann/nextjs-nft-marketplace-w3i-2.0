@@ -5,15 +5,25 @@ import { useAccount } from 'wagmi';
 import Link from 'next/link';
 import { WalletNFTsList } from './WalletNFTsList';
 import { useWalletNFTsV2 } from '@/hooks/wallet/useWalletNFTsV2';
+import { LoadingState } from '@/components/core/Loading';
 
 export function WalletDashboard() {
-    const { address, isConnected } = useAccount();
+    const { address, isConnected, isConnecting, isReconnecting } = useAccount();
 
     // Simple data fetching without filters
     const { nfts, loading, error } = useWalletNFTsV2({
         walletAddress: address,
         autoFetch: true
     });
+
+    // Show loading while wallet is connecting/reconnecting
+    if (isConnecting || isReconnecting) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center pt-20">
+                <LoadingState size="lg" variant="centered" message="Connecting wallet..." />
+            </div>
+        );
+    }
 
     if (!isConnected || !address) {
         return (
@@ -36,7 +46,7 @@ export function WalletDashboard() {
         <div className="py-8">
             <WalletNFTsList
                 nfts={nfts}
-                loading={loading}
+                loading={loading || isConnecting || isReconnecting}
                 error={error}
                 title="Your NFT Collection"
                 separateSections={true}

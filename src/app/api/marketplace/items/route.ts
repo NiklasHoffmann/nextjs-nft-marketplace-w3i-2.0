@@ -409,9 +409,9 @@ export const GET = apiHandler(async (request: NextRequest) => {
             return new RegExp(`^${escapedCat}$`, 'i');
         });
         metadataFilters['insights.category'] = { $in: categoryRegexes };
-        console.log('🏷️ [API] Category filter applied:', { 
-            input: category, 
-            regexes: categoryRegexes.map(r => r.source) 
+        console.log('🏷️ [API] Category filter applied:', {
+            input: category,
+            regexes: categoryRegexes.map(r => r.source)
         });
     }
 

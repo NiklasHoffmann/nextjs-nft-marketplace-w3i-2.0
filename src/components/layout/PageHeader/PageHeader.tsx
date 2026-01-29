@@ -89,17 +89,16 @@ function BackButton({ href, label, isCompact }: BackLink & { isCompact: boolean 
             className="inline-flex items-center gap-1 sm:gap-1.5 text-gray-500 hover:text-gray-900 transition-all duration-300 flex-shrink-0"
             title={label}
         >
-            <svg 
-                className={`transition-all duration-300 ${isCompact ? 'w-4 h-4' : 'w-3.5 h-3.5 sm:w-4 sm:h-4'}`} 
-                fill="none" 
-                stroke="currentColor" 
+            <svg
+                className={`transition-all duration-300 ${isCompact ? 'w-4 h-4' : 'w-3.5 h-3.5 sm:w-4 sm:h-4'}`}
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
             >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            <span className={`text-[11px] sm:text-xs font-medium truncate max-w-[80px] sm:max-w-none transition-all duration-300 ${
-                isCompact ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
-            }`}>
+            <span className={`text-[11px] sm:text-xs font-medium truncate max-w-[80px] sm:max-w-none transition-all duration-300 ${isCompact ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
+                }`}>
                 {label}
             </span>
         </Link>
@@ -117,9 +116,8 @@ function Separator() {
  * IconBadge - Displays icon based on configuration with size transition
  */
 function IconBadge({ type, svgContent, text, gradientFrom, gradientTo, customContent, isCompact }: IconConfig & { isCompact: boolean }) {
-    const baseClasses = `rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
-        isCompact ? 'w-7 h-7' : 'w-9 h-9'
-    }`;
+    const baseClasses = `rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${isCompact ? 'w-7 h-7' : 'w-9 h-9'
+        }`;
 
     switch (type) {
         case 'svg':
@@ -183,14 +181,12 @@ function TitleSection({
 
         return (
             <div className="min-w-0 flex-1">
-                <h1 className={`font-bold text-gray-900 leading-tight truncate transition-all duration-300 ${
-                    isCompact ? 'text-sm' : 'text-base sm:text-lg'
-                }`}>
+                <h1 className={`font-bold text-gray-900 leading-tight truncate transition-all duration-300 ${isCompact ? 'text-sm' : 'text-base sm:text-lg'
+                    }`}>
                     {title}
                 </h1>
-                <div className={`flex items-center gap-1.5 transition-all duration-300 ${
-                    isCompact ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100 h-auto'
-                }`}>
+                <div className={`flex items-center gap-1.5 transition-all duration-300 ${isCompact ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100 h-auto'
+                    }`}>
                     <p className="font-mono text-[10px] sm:text-[11px] text-gray-600 truncate leading-tight">
                         {displayText}
                     </p>
@@ -211,15 +207,13 @@ function TitleSection({
 
     return (
         <div className="min-w-0 flex-1">
-            <h1 className={`font-bold text-gray-900 leading-tight truncate transition-all ${
-                isCompact ? 'text-sm' : 'text-base sm:text-lg'
-            }`}>
+            <h1 className={`font-bold text-gray-900 leading-tight truncate transition-all ${isCompact ? 'text-sm' : 'text-base sm:text-lg'
+                }`}>
                 {title}
             </h1>
             {subtitle && (
-                <p className={`text-[10px] sm:text-[11px] text-gray-500 truncate leading-tight transition-all ${
-                    isCompact ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100 h-auto'
-                }`}>
+                <p className={`text-[10px] sm:text-[11px] text-gray-500 truncate leading-tight transition-all ${isCompact ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100 h-auto'
+                    }`}>
                     {subtitle}
                 </p>
             )}
@@ -294,12 +288,10 @@ export function PageHeader({
     const isScrolled = useScrollPosition(80);
 
     return (
-        <div className={`fixed top-[66px] left-0 right-0 ${hasSidebar ? 'md:left-16' : ''} z-10 bg-white border-b border-gray-200 transition-all duration-300 ${
-            isScrolled ? 'shadow-sm' : ''
-        } ${className}`}>
-            <div className={`px-4 sm:px-6 md:px-8 transition-all duration-300 ${
-                isScrolled ? 'py-1.5 md:py-1.5' : 'py-3 md:py-2.5'
-            }`}>
+        <div className={`fixed top-[66px] left-0 right-0 ${hasSidebar ? 'md:left-16' : ''} z-10 bg-white border-b border-gray-200 transition-all duration-300 ${isScrolled ? 'shadow-sm' : ''
+            } ${className}`}>
+            <div className={`px-4 sm:px-6 md:px-8 transition-all duration-300 ${isScrolled ? 'py-1.5 md:py-1.5' : 'py-3 md:py-2.5'
+                }`}>
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-8">
                     {/* Left Side - Navigation, Icon, Title */}
                     <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1 md:flex-initial">
@@ -321,9 +313,8 @@ export function PageHeader({
 
                     {/* Right Side - Stats with compact mode */}
                     {rightContent && (
-                        <div className={`w-full md:flex-1 md:max-w-2xl transition-all duration-300 ${
-                            isScrolled ? 'transform scale-90 origin-right' : ''
-                        }`}>
+                        <div className={`w-full md:flex-1 md:max-w-2xl transition-all duration-300 ${isScrolled ? 'transform scale-90 origin-right' : ''
+                            }`}>
                             {React.cloneElement(rightContent as React.ReactElement, { isCompact: isScrolled })}
                         </div>
                     )}

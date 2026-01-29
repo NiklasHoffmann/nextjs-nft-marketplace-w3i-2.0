@@ -29,14 +29,15 @@ export function useWalletNFTsV2({
     autoFetch = true
 }: UseWalletNFTsV2Options): UseWalletNFTsV2Return {
     const [nfts, setNfts] = useState<WalletNFT[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(autoFetch); // Start with true if autoFetch enabled
     const [error, setError] = useState<string | null>(null);
     const [stats, setStats] = useState({ total: 0, listed: 0, unlisted: 0 });
     const abortControllerRef = useRef<AbortController | null>(null);
 
     const fetchNFTs = useCallback(async () => {
         if (!walletAddress) {
-            setNfts([]);
+            // Don't clear NFTs or change loading state if no wallet address
+            // This prevents flashing when wallet is reconnecting
             return;
         }
 
@@ -107,18 +108,18 @@ export function useWalletNFTsV2({
                 listed: data.data.listed || 0,
                 unlisted: data.data.unlisted || 0
             });
+            setLoading(false); // Set loading false immediately after setting data
 
         } catch (err: any) {
             if (err.name !== 'AbortError') {
                 console.error('Failed to fetch wallet NFTs:', err);
                 setError(err.message || 'Failed to fetch NFTs');
+                setLoading(false); // Set loading false on error too
             }
-        } finally {
-            setLoading(false);
         }
     }, [walletAddress]);
 
-    // Auto-fetch on mount and when dependencies change
+    // Auto-fetch when wallet address becomes available
     useEffect(() => {
         if (autoFetch && walletAddress) {
             fetchNFTs();
