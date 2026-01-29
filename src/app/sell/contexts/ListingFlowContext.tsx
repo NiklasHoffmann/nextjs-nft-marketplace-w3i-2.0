@@ -71,7 +71,7 @@ const STORAGE_KEY = 'listing-flow-data';
 const initialFormData: ListingFormData = {
     mode: 'sale',
     selectedNFT: null,
-    currency: 'ETH',
+    currency: '0x0000000000000000000000000000000000000000', // Native ETH
 };
 
 const initialProgressData: ListingProgressData = {

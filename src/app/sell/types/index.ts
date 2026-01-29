@@ -51,9 +51,13 @@ export type ProgressStep = 'whitelist' | 'approval' | 'signing' | 'pending' | 's
 export type PricingType = 'fixed' | 'variable';
 
 /**
- * Accepted currencies
+ * Accepted currencies (ERC20 token addresses)
+ * - "0x0000000000000000000000000000000000000000" = Native ETH
+ * - WETH/USDC/DAI address = Respective ERC20 token
+ * 
+ * Note: Store as address, display as symbol
  */
-export type Currency = 'ETH' | 'USDC';
+export type Currency = string; // Token address (0x0 for ETH)
 
 // ==================== Trade Types ====================
 

@@ -2,16 +2,18 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount } from 'wagmi';
+import { useAccount, useChainId } from 'wagmi';
 import { useListingFlow } from '../contexts/ListingFlowContext';
 import { useTransactionService } from '@/services/blockchain';
 import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
 import NFTCard from '@/components/nft/NFTCard';
 import Link from 'next/link';
+import { getCurrencySymbolByAddress } from '@/config/tokens';
 
 export default function ListingPage() {
     const router = useRouter();
     const { address } = useAccount();
+    const chainId = useChainId();
     const { formData, setProgressStep, setCompletedSteps, setTxHash, setError, progressData } = useListingFlow();
     const { marketplaceAddress } = useMarketplaceContracts();
     const txService = useTransactionService();
@@ -20,6 +22,9 @@ export default function ListingPage() {
         contractAddress: formData.selectedNFT?.contractAddress,
         tokenId: formData.selectedNFT?.tokenId
     });
+
+    // Get currency symbol for display (address → symbol)
+    const currencySymbol = getCurrencySymbolByAddress(chainId, formData.currency);
 
     const [progressTxHash, setProgressTxHash] = useState<string | undefined>();
     const [progressError, setProgressError] = useState<string | undefined>();
@@ -174,10 +179,10 @@ export default function ListingPage() {
         listing: {
             listingId: 'preview',
             price: priceInWei,
-            currency: formData.currency || 'ETH',
+            currency: formData.currency || '0x0000000000000000000000000000000000000000', // Native ETH
             seller: formData.selectedNFT.core.owner,
             mode: formData.mode || 'sale',
-            status: 'active',
+            status: 'LISTED',
             createdAt: Date.now(),
             updatedAt: Date.now()
         }
@@ -265,26 +270,26 @@ export default function ListingPage() {
                                 <div className="flex justify-between items-center mb-3">
                                     <span className="text-sm text-gray-700">Verkaufspreis</span>
                                     <span className="text-2xl font-bold text-blue-600">
-                                        {formData.price} {formData.currency}
+                                        {formData.price} {currencySymbol}
                                     </span>
                                 </div>
                                 <div className="bg-white rounded-lg border border-blue-200 p-4 text-xs space-y-2">
                                     <div className="flex justify-between text-gray-600">
                                         <span>Listing-Preis:</span>
-                                        <span>{formData.price} {formData.currency}</span>
+                                        <span>{formData.price} {currencySymbol}</span>
                                     </div>
                                     <div className="flex justify-between text-red-600">
                                         <span>Marketplace-Gebühr ({(innovationFeePercentage * 100).toFixed(2)}%):</span>
-                                        <span>-{fees.marketplaceFee.toFixed(4)} {formData.currency}</span>
+                                        <span>-{fees.marketplaceFee.toFixed(4)} {currencySymbol}</span>
                                     </div>
                                     <div className="flex justify-between text-red-600">
                                         <span>Creator Royalty ({(royaltyFeePercentage * 100).toFixed(2)}%):</span>
-                                        <span>-{fees.royaltyFee.toFixed(4)} {formData.currency}</span>
+                                        <span>-{fees.royaltyFee.toFixed(4)} {currencySymbol}</span>
                                     </div>
                                     <hr className="border-blue-200" />
                                     <div className="flex justify-between font-semibold text-green-600 text-sm">
                                         <span>Sie erhalten:</span>
-                                        <span>{fees.youReceive.toFixed(4)} {formData.currency}</span>
+                                        <span>{fees.youReceive.toFixed(4)} {currencySymbol}</span>
                                     </div>
                                 </div>
                             </div>

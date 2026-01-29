@@ -2,7 +2,7 @@
  * Global Initialization for Background Services
  * 
  * This file is imported early in the Next.js startup process via instrumentation.ts
- * It starts background services like NFT sync that should run continuously.
+ * It starts background services like NFT sync and real-time event listener.
  */
 
 import { getNFTSyncService } from '@/services/nft-sync';
@@ -26,7 +26,7 @@ export async function initializeBackgroundServices() {
     isInitialized = true;
 
     try {
-        // Start NFT Sync Service
+        // Start NFT Sync Service (includes WebSocket Event Listener + GraphQL Fallback)
         const syncService = getNFTSyncService();
         await syncService.start();
 

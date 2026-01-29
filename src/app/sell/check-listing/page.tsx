@@ -1,20 +1,29 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useChainId } from 'wagmi';
 import { useListingFlow } from '../contexts/ListingFlowContext';
 import NFTCard from '@/components/nft/NFTCard';
 import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
+import { getCurrencySymbolByAddress } from '@/config/tokens';
 
 export default function CheckListingPage() {
     const router = useRouter();
     const { formData, setProgressStep } = useListingFlow();
+    const chainId = useChainId();
     const { marketplaceAddress } = useMarketplaceContracts();
     const { calculateFees, innovationFeePercentage, royaltyFeePercentage } = useMarketplaceFees({
         marketplaceAddress,
         contractAddress: formData.selectedNFT?.contractAddress,
         tokenId: formData.selectedNFT?.tokenId
     });
+
+    // Convert currency address to symbol
+    const currencySymbol = useMemo(() => 
+        getCurrencySymbolByAddress(chainId, formData.currency),
+        [chainId, formData.currency]
+    );
 
     // Guard: Redirect if no NFT selected
     useEffect(() => {
@@ -63,10 +72,10 @@ export default function CheckListingPage() {
             contractAddress: formData.selectedNFT.contractAddress,
             tokenId: formData.selectedNFT.tokenId,
             price: priceInWei,
-            currency: formData.currency || 'ETH',
+            currency: formData.currency || '0x0000000000000000000000000000000000000000',
             seller: formData.selectedNFT.core.owner || '0x0000000000000000000000000000000000000000',
             mode: formData.mode || 'sale',
-            status: 'active',
+            status: 'LISTED',
             isListed: true,
             buyer: null,
             createdAt: Date.now(),
@@ -158,26 +167,26 @@ export default function CheckListingPage() {
                                 <div className="flex justify-between items-center mb-3">
                                     <span className="text-sm text-gray-700">Verkaufspreis</span>
                                     <span className="text-2xl font-bold text-blue-600">
-                                        {formData.price} {formData.currency}
+                                        {formData.price} {currencySymbol}
                                     </span>
                                 </div>
                                 <div className="bg-white rounded-lg border border-blue-200 p-4 text-xs space-y-2">
                                     <div className="flex justify-between text-gray-600">
                                         <span>Listing-Preis:</span>
-                                        <span>{formData.price} {formData.currency}</span>
+                                        <span>{formData.price} {currencySymbol}</span>
                                     </div>
                                     <div className="flex justify-between text-red-600">
                                         <span>Marketplace-Gebühr ({(innovationFeePercentage * 100).toFixed(2)}%):</span>
-                                        <span>-{fees.marketplaceFee.toFixed(4)} {formData.currency}</span>
+                                        <span>-{fees.marketplaceFee.toFixed(4)} {currencySymbol}</span>
                                     </div>
                                     <div className="flex justify-between text-red-600">
                                         <span>Creator Royalty ({(royaltyFeePercentage * 100).toFixed(2)}%):</span>
-                                        <span>-{fees.royaltyFee.toFixed(4)} {formData.currency}</span>
+                                        <span>-{fees.royaltyFee.toFixed(4)} {currencySymbol}</span>
                                     </div>
                                     <hr className="border-blue-200" />
                                     <div className="flex justify-between font-semibold text-green-600 text-sm">
                                         <span>Sie erhalten:</span>
-                                        <span>{fees.youReceive.toFixed(4)} {formData.currency}</span>
+                                        <span>{fees.youReceive.toFixed(4)} {currencySymbol}</span>
                                     </div>
                                 </div>
                             </div>

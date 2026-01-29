@@ -55,6 +55,7 @@ interface LegacyNFTCardProps {
   isListed?: boolean;
   desiredContractAddress?: string;
   desiredTokenId?: string;
+  listingType?: 'PURE_ETH' | 'SWAP_AND_ETH' | 'PURE_SWAP'; // v2 field
   metadata?: {
     name?: string | null;
     description?: string | null;
@@ -164,8 +165,9 @@ export function NFTCard(props: NFTCardAllProps) {
         price: props.price || '0',
         seller: props.seller as `0x${string}`,
         buyer: props.buyer as `0x${string}` | null,
-        desiredContractAddress: (props.desiredContractAddress as `0x${string}`) || (contractAddress as `0x${string}`),
-        desiredTokenId: props.desiredTokenId || null
+        desiredContractAddress: (props.desiredContractAddress as `0x${string}`) || null,
+        desiredTokenId: props.desiredTokenId || null,
+        listingType: props.listingType || null
       } : undefined,
       core: {
         contractAddress: contractAddress as `0x${string}`,
@@ -255,6 +257,7 @@ export function NFTCard(props: NFTCardAllProps) {
   const price = nft.listing?.price || null;
   const desiredContractAddress = nft.listing?.desiredContractAddress || null;
   const currency = nft.listing?.currency || null;
+  const listingType = nft.listing?.listingType || (isLegacyProps(props) ? props.listingType : undefined) || null;
 
   // Social stats
   const likeCount = stats?.likeCount || 0;
@@ -353,6 +356,7 @@ export function NFTCard(props: NFTCardAllProps) {
                 isListed={isListed}
                 desiredContractAddress={desiredContractAddress}
                 currency={currency}
+                listingType={listingType}
               />
             </div>
 

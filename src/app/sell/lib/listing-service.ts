@@ -100,12 +100,14 @@ export class ListingService {
                 tokenAddress: data.selectedNFT.contractAddress,
                 tokenId: data.selectedNFT.tokenId,
                 price: data.price,
+                currency: data.currency,
                 marketplaceAddress: this.marketplaceAddress
             });
             await this.createListingFn({
                 tokenAddress: data.selectedNFT.contractAddress,
                 tokenId: data.selectedNFT.tokenId,
                 price: data.price,
+                currency: data.currency, // Pass currency to contract
                 desiredTokenAddress: '0x0000000000000000000000000000000000000000',
                 desiredTokenId: '0',
                 buyerWhitelistEnabled: false,

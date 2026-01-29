@@ -2,7 +2,9 @@
  * Subgraph Sync Service
  * 
  * Syncs marketplace listings from The Graph subgraph to MongoDB
- * Uses polling (30s interval) as fallback for WebSocket events
+ * Uses polling (5min interval) as fallback for WebSocket events
+ * 
+ * NOTE: This is a FALLBACK service - primary real-time updates via WebSocket
  */
 
 import { ApolloClient, InMemoryCache, HttpLink } from '@apollo/client';
@@ -19,9 +21,9 @@ export class GraphQLSync {
     private itemsProcessed: number = 0;
     private lastUpdate: Date | null = null;
     private consecutiveErrors: number = 0;
-    private currentInterval: number = 60000; // Start with 60 seconds
-    private readonly MIN_INTERVAL = 60000; // 60 seconds minimum
-    private readonly MAX_INTERVAL = 300000; // 5 minutes maximum
+    private currentInterval: number = 300000; // Start with 300 seconds (5 minutes)
+    private readonly MIN_INTERVAL = 300000; // 5 minutes minimum (WebSocket is primary)
+    private readonly MAX_INTERVAL = 900000; // 15 minutes maximum
 
     /**
      * Start syncing from subgraph v2
@@ -41,7 +43,7 @@ export class GraphQLSync {
 
         console.log('\n🚀 [V2 Sync] Starting Subgraph v2 sync (Ideation Market)...');
         console.log('🔗 [V2 Sync] Endpoint:', subgraphUrl);
-        console.log('📊 [V2 Sync] Polling interval: 60 seconds (adaptive with backoff)');
+        console.log('📊 [V2 Sync] Polling interval: 5 minutes (FALLBACK - WebSocket is primary)');
         console.log('📦 [V2 Sync] Target collection: marketplace_items');
 
         // Create Apollo Client
@@ -62,7 +64,7 @@ export class GraphQLSync {
      * Start polling for updates
      */
     private async startPolling() {
-        console.log('🔄 Starting adaptive polling mode for v2 subgraph (60s base interval with backoff)');
+        console.log('🔄 Starting adaptive polling mode for v2 subgraph (120s base interval with exponential backoff)');
         this.isActive = true;
 
         // Initial sync
@@ -97,13 +99,13 @@ export class GraphQLSync {
         try {
             console.log('\n📡 [V2 Subgraph] Fetching active listings...');
             console.log('   Query: GET_ACTIVE_LISTINGS');
-            console.log('   Variables: { first: 1000, skip: 0 }');
+            console.log('   Variables: { first: 100, skip: 0 }');
             console.log(`   Current interval: ${this.currentInterval / 1000}s`);
 
             const result = await this.client.query({
                 query: GET_ACTIVE_LISTINGS,
                 variables: {
-                    first: 1000,
+                    first: 100, // Reduced from 1000 to 100 to avoid rate limits
                     skip: 0
                 },
                 fetchPolicy: 'network-only' // Always fetch fresh data

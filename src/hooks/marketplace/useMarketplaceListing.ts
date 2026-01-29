@@ -12,8 +12,8 @@ import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
 interface CreateListingParams {
   tokenAddress: string;
   tokenId: string;
-  price: string; // in ETH
-  currency?: string; // currency address (0x0 for ETH, WETH address for WETH)
+  price: string; // in token units (ETH, WETH, USDC, etc.)
+  currency?: string; // ERC20 token address (0x0000...0000 = native ETH)
   desiredTokenAddress?: string;
   desiredTokenId?: string;
   buyerWhitelistEnabled?: boolean;
@@ -68,6 +68,7 @@ export function useMarketplaceListing(marketplaceAddress: string) {
     tokenAddress,
     tokenId,
     price,
+    currency = "0x0000000000000000000000000000000000000000",
     desiredTokenAddress = "0x0000000000000000000000000000000000000000",
     desiredTokenId = "0",
     buyerWhitelistEnabled = false,

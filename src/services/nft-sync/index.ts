@@ -23,7 +23,7 @@
 import { GraphQLSync } from './graph-subscription';
 import { StatsSync } from './stats-sync';
 import { InsightsSync } from './insights-sync';
-import { MarketplaceEventListenerService } from '../marketplace/event-listener';
+import { getMarketplaceEventListener, type MarketplaceEventListenerService } from '../marketplace/event-listener';
 import { routeMarketplaceEvent } from '../marketplace/event-invalidation-bridge';
 import { syncListingToMongoDB, removeListingFromMongoDB, updateListingInMongoDB } from '../marketplace/event-mongodb-sync';
 import type { ProcessedItemListedEvent, ProcessedItemBoughtEvent, ProcessedItemCanceledEvent, ProcessedItemUpdatedEvent } from '@/types/marketplace/contract-events';
@@ -35,7 +35,7 @@ export class NFTSyncService {
     private graphSync: GraphQLSync;
     private statsSync: StatsSync;
     private insightsSync: InsightsSync;
-    private eventListener: MarketplaceEventListenerService;
+    private eventListener: MarketplaceEventListenerService | null = null;
 
     private isRunning: boolean = false;
 
@@ -44,15 +44,8 @@ export class NFTSyncService {
         this.statsSync = new StatsSync();
         this.insightsSync = new InsightsSync();
 
-        // Initialize event listener with marketplace address
-        const marketplaceAddress = process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS as `0x${string}`;
-        if (!marketplaceAddress) {
-            throw new Error('NEXT_PUBLIC_MARKETPLACE_ADDRESS not configured');
-        }
-        this.eventListener = new MarketplaceEventListenerService(marketplaceAddress);
-
         console.log('🆕 Subgraph v2 sync initialized (OPTIMIZED: listing data only)');
-        console.log('🎧 WebSocket event listener initialized (REAL-TIME)');
+        console.log('🎧 WebSocket event listener will be obtained from global singleton');
     }
 
     /**
@@ -67,54 +60,66 @@ export class NFTSyncService {
         console.log('🚀 Starting NFT Sync Service (HYBRID MODE)...');
 
         try {
-            // Start WebSocket Event Listener (REAL-TIME - Priority #1)
-            console.log('🎧 Starting WebSocket Event Listener...');
+            // Get global event listener (if available)
+            const marketplaceAddress = process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS as `0x${string}`;
+            const wsUrl = process.env.NEXT_PUBLIC_ALCHEMY_URL_WSS 
+                || process.env.ALCHEMY_URL_WSS
+                || process.env.NEXT_PUBLIC_INFURA_URL_WSS
+                || process.env.INFURA_URL_WSS;
 
-            // Subscribe to all marketplace events and route them
-            const eventTypes: Array<'ItemListed' | 'ItemBought' | 'ItemCanceled' | 'ItemUpdated'> = [
-                'ItemListed',
-                'ItemBought',
-                'ItemCanceled',
-                'ItemUpdated'
-            ];
+            if (marketplaceAddress && wsUrl) {
+                console.log('🎧 Configuring WebSocket Event Listener...');
+                this.eventListener = getMarketplaceEventListener(marketplaceAddress, wsUrl);
 
-            eventTypes.forEach(eventName => {
-                this.eventListener.subscribe(eventName, (event) => {
-                    console.log(`📡 [Backend] Received ${event.eventName}:`, {
-                        listingId: (event.data as any).listingId?.toString(),
-                        nft: `${(event.data as any).nftAddress}:${(event.data as any).tokenId}`
+                // Subscribe to all marketplace events and route them
+                const eventTypes: Array<'ItemListed' | 'ItemBought' | 'ItemCanceled' | 'ItemUpdated'> = [
+                    'ItemListed',
+                    'ItemBought',
+                    'ItemCanceled',
+                    'ItemUpdated'
+                ];
+
+                eventTypes.forEach(eventName => {
+                    this.eventListener!.subscribe(eventName, (event) => {
+                        console.log(`📡 [Backend] Received ${event.eventName}:`, {
+                            listingId: (event.data as any).listingId?.toString(),
+                            nft: `${(event.data as any).nftAddress}:${(event.data as any).tokenId}`
+                        });
+
+                        // SERVER-SIDE: Immediately sync to MongoDB
+                        if (event.eventName === 'ItemListed') {
+                            syncListingToMongoDB(event as ProcessedItemListedEvent).catch(error => {
+                                console.error('❌ [Backend] MongoDB sync failed:', error);
+                            });
+                        } else if (event.eventName === 'ItemBought' || event.eventName === 'ItemCanceled') {
+                            const { nftAddress, tokenId, listingId } = event.data;
+                            const buyer = event.eventName === 'ItemBought' ? (event as ProcessedItemBoughtEvent).data.buyer : undefined;
+                            
+                            removeListingFromMongoDB(
+                                nftAddress,
+                                tokenId.toString(),
+                                listingId.toString(),
+                                buyer // Only defined for ItemBought
+                            ).catch(error => {
+                                console.error('❌ [Backend] MongoDB removal failed:', error);
+                            });
+                        } else if (event.eventName === 'ItemUpdated') {
+                            updateListingInMongoDB(event as ProcessedItemUpdatedEvent).catch(error => {
+                                console.error('❌ [Backend] MongoDB update failed:', error);
+                            });
+                        }
+
+                        // Route event through invalidation bridge (triggers client-side cache invalidation)
+                        routeMarketplaceEvent(event);
                     });
-
-                    // SERVER-SIDE: Immediately sync to MongoDB
-                    if (event.eventName === 'ItemListed') {
-                        syncListingToMongoDB(event as ProcessedItemListedEvent).catch(error => {
-                            console.error('❌ [Backend] MongoDB sync failed:', error);
-                        });
-                    } else if (event.eventName === 'ItemBought' || event.eventName === 'ItemCanceled') {
-                        const { nftAddress, tokenId, listingId } = event.data;
-                        const buyer = event.eventName === 'ItemBought' ? (event as ProcessedItemBoughtEvent).data.buyer : undefined;
-                        
-                        removeListingFromMongoDB(
-                            nftAddress,
-                            tokenId.toString(),
-                            listingId.toString(),
-                            buyer // Only defined for ItemBought
-                        ).catch(error => {
-                            console.error('❌ [Backend] MongoDB removal failed:', error);
-                        });
-                    } else if (event.eventName === 'ItemUpdated') {
-                        updateListingInMongoDB(event as ProcessedItemUpdatedEvent).catch(error => {
-                            console.error('❌ [Backend] MongoDB update failed:', error);
-                        });
-                    }
-
-                    // Route event through invalidation bridge (triggers client-side cache invalidation)
-                    routeMarketplaceEvent(event);
                 });
-            });
 
-            await this.eventListener.start();
-            console.log('✅ WebSocket connected - Real-time events active');
+                await this.eventListener.start();
+                console.log('✅ WebSocket connected - Real-time events active');
+            } else {
+                console.warn('⚠️ WebSocket not configured - falling back to GraphQL polling only');
+                console.warn('   Set NEXT_PUBLIC_ALCHEMY_URL_WSS for real-time updates');
+            }
 
             // Start GraphQL sync (FALLBACK - runs every 30s)
             console.log('📡 Starting Subgraph sync (FALLBACK)...');
@@ -149,9 +154,11 @@ export class NFTSyncService {
         console.log('🛑 Stopping NFT Sync Service...');
 
         try {
-            // Stop WebSocket listener
-            await this.eventListener.stop();
-            console.log('✅ WebSocket disconnected');
+            // Stop WebSocket listener (if active)
+            if (this.eventListener) {
+                await this.eventListener.stop();
+                console.log('✅ WebSocket disconnected');
+            }
 
             // Stop GraphQL sync
             await this.graphSync.stop();
@@ -174,7 +181,7 @@ export class NFTSyncService {
         return {
             isRunning: this.isRunning,
             architecture: 'HYBRID (WebSocket + TheGraph)',
-            eventListener: this.eventListener.getState(),
+            eventListener: this.eventListener ? this.eventListener.getState() : { isConnected: false, message: 'WebSocket not configured' },
             graphSync: this.graphSync.getStatus(),
             statsSync: this.statsSync.getStatus(),
             insightsSync: this.insightsSync.getStatus()

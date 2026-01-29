@@ -25,6 +25,7 @@ interface CurrencyContextType {
     currencies: Currency[];
     formatPrice: (price: number) => string;
     convertFromETH: (ethPrice: number) => Promise<number>;
+    convertTokenToUSD: (tokenAmount: number, tokenSymbol: string) => Promise<number>;
     refreshExchangeRates: () => Promise<void>;
     getCacheInfo: () => { status: string; lastUpdate: string | null };
 }
@@ -83,6 +84,89 @@ class ExchangeRateCache {
         } catch (error) {
             devLog.error('currency', `Error fetching rate for ${currency}:`, error);
             return this.getDefaultRate(currency);
+        }
+    }
+
+    /**
+     * Get exchange rate for ERC20 token to USD
+     * Supports: ETH, WETH, USDC, DAI, WBTC, and mock tokens
+     */
+    async getTokenRate(tokenSymbol: string): Promise<number> {
+        const cacheKey = `TOKEN_${tokenSymbol}_USD`;
+
+        // Check cache first
+        const cached = this.cache.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+            return cached.rate;
+        }
+
+        // Check if request is already in flight
+        const inFlight = this.inFlightRequests.get(cacheKey);
+        if (inFlight) {
+            return inFlight;
+        }
+
+        // Make new request
+        const requestPromise = this.fetchTokenRate(tokenSymbol);
+        this.inFlightRequests.set(cacheKey, requestPromise);
+
+        try {
+            const rate = await requestPromise;
+            this.cache.set(cacheKey, { rate, timestamp: Date.now() });
+            this.saveToLocalStorage();
+            return rate;
+        } finally {
+            this.inFlightRequests.delete(cacheKey);
+        }
+    }
+
+    private async fetchTokenRate(tokenSymbol: string): Promise<number> {
+        try {
+            // Mock tokens: use fixed test rates
+            const mockRates: { [key: string]: number } = {
+                'MERC20': 1850.00,  // Mock ERC20 at ~$1850
+                'MWBTC': 45000.00,  // Mock WBTC at ~$45k
+                'MEURS': 1.09,      // Mock EURS at ~1.09 USD
+                'MUSDT': 1.00,      // Mock USDT at $1
+            };
+
+            if (mockRates[tokenSymbol]) {
+                return mockRates[tokenSymbol];
+            }
+
+            // Stablecoins: fixed rate
+            if (tokenSymbol === 'USDC' || tokenSymbol === 'DAI' || tokenSymbol === 'USDT') {
+                return 1.00;
+            }
+
+            // ETH/WETH: fetch live price
+            if (tokenSymbol === 'ETH' || tokenSymbol === 'WETH') {
+                // Try Coinbase first
+                const coinbaseRate = await this.fetchCoinbaseRate('USD');
+                if (coinbaseRate > 0) return coinbaseRate;
+
+                // Fallback to CryptoCompare
+                const cryptoCompareRate = await this.fetchCryptoCompareRate('USD');
+                if (cryptoCompareRate > 0) return cryptoCompareRate;
+
+                return 3500; // Default ETH price
+            }
+
+            // WBTC: fetch live BTC price
+            if (tokenSymbol === 'WBTC') {
+                const response = await fetch('https://api.coinbase.com/v2/exchange-rates?currency=BTC');
+                if (!response.ok) throw new Error('Coinbase BTC API error');
+
+                const data = await response.json();
+                const rate = data?.data?.rates?.['USD'];
+                return rate ? parseFloat(rate) : 45000;
+            }
+
+            // Unknown token: return 0 (will show "X.XX TOKEN" without USD)
+            return 0;
+        } catch (error) {
+            devLog.error('currency', `Error fetching token rate for ${tokenSymbol}:`, error);
+            return 0;
         }
     }
 
@@ -247,6 +331,16 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    const convertTokenToUSD = async (tokenAmount: number, tokenSymbol: string): Promise<number> => {
+        try {
+            const rate = await cacheRef.current.getTokenRate(tokenSymbol);
+            return tokenAmount * rate;
+        } catch (error) {
+            devLog.error('currency', `Error converting ${tokenSymbol} to USD:`, error);
+            return 0;
+        }
+    };
+
     const refreshExchangeRates = async (): Promise<void> => {
         await cacheRef.current.refresh();
     };
@@ -265,6 +359,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         currencies,
         formatPrice,
         convertFromETH,
+        convertTokenToUSD,
         refreshExchangeRates,
         getCacheInfo,
     };

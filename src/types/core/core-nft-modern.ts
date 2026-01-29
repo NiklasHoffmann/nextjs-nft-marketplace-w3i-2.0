@@ -13,6 +13,8 @@ export type ActiveItem = {
     buyer: `0x${string}` | null
     desiredContractAddress: `0x${string}`
     desiredTokenId: string | null
+    currency?: string | null // v2: Payment token (0x0 = ETH, WETH address = WETH)
+    listingType?: 'PURE_ETH' | 'SWAP_AND_ETH' | 'PURE_SWAP' | null // v2: Listing type
 }
 
 export type NftCore = {

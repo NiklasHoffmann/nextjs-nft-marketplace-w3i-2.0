@@ -53,7 +53,7 @@ export const TOKENS: NetworkTokens = {
             name: "Dai Stablecoin",
             decimals: 18
         },
-        
+
         // ========================================
         // MOCK TOKENS (Development/Testing Only)
         // ========================================
@@ -108,7 +108,7 @@ export const TOKENS: NetworkTokens = {
             name: "Dai Stablecoin",
             decimals: 18
         },
-        
+
         // ========================================
         // MOCK TOKENS (Development/Testing Only)
         // ========================================
@@ -170,7 +170,7 @@ export const TOKENS: NetworkTokens = {
  * Get specific token config
  */
 export function getTokenConfig(
-    chainId: number | string, 
+    chainId: number | string,
     tokenSymbol: 'WETH' | 'USDC' | 'DAI' | 'MOCK_ERC20' | 'MOCK_WBTC' | 'MOCK_EURS' | 'MOCK_USDT'
 ): TokenConfig | undefined {
     return TOKENS[chainId.toString()]?.[tokenSymbol];
@@ -184,12 +184,12 @@ export function getTokenConfig(
 export function getAvailableTokens(chainId: number | string, includeMockTokens?: boolean): TokenConfig[] {
     const networkTokens = TOKENS[chainId.toString()];
     if (!networkTokens) return [];
-    
+
     // Auto-detect: include mocks on Hardhat and Sepolia unless explicitly set
     const shouldIncludeMocks = includeMockTokens ?? (chainId.toString() === '31337' || chainId.toString() === '11155111');
-    
+
     const tokens: TokenConfig[] = [];
-    
+
     // ======================================== MOCK TOKENS SECTION (displayed first)
     // Add mock tokens only if requested (easy to remove this entire block)
     if (shouldIncludeMocks) {
@@ -199,12 +199,12 @@ export function getAvailableTokens(chainId: number | string, includeMockTokens?:
         if (networkTokens.MOCK_USDT) tokens.push(networkTokens.MOCK_USDT);
     }
     // ======================================== END MOCK TOKENS
-    
+
     // Production tokens
     if (networkTokens.WETH) tokens.push(networkTokens.WETH);
     if (networkTokens.USDC) tokens.push(networkTokens.USDC);
     if (networkTokens.DAI) tokens.push(networkTokens.DAI);
-    
+
     return tokens;
 }
 
@@ -221,14 +221,14 @@ export function getWETHAddress(chainId: number | string): `0x${string}` | undefi
 export function getTokenSymbolByAddress(chainId: number | string, address: string): string | null {
     const networkTokens = TOKENS[chainId.toString()];
     if (!networkTokens) return null;
-    
+
     const addressLower = address.toLowerCase();
-    
+
     // Standard production tokens
     if (networkTokens.WETH?.address.toLowerCase() === addressLower) return 'WETH';
     if (networkTokens.USDC?.address.toLowerCase() === addressLower) return 'USDC';
     if (networkTokens.DAI?.address.toLowerCase() === addressLower) return 'DAI';
-    
+
     // ======================================== MOCK TOKENS LOOKUP
     // Check mock tokens (easy to remove this entire block)
     if (networkTokens.MOCK_ERC20?.address.toLowerCase() === addressLower) return 'MERC20';
@@ -236,20 +236,20 @@ export function getTokenSymbolByAddress(chainId: number | string, address: strin
     if (networkTokens.MOCK_EURS?.address.toLowerCase() === addressLower) return 'MEURS';
     if (networkTokens.MOCK_USDT?.address.toLowerCase() === addressLower) return 'MUSDT';
     // ======================================== END MOCK TOKENS
-    
+
     return null;
 }
 
 /**
  * Get currency symbol (ETH, WETH, USDC, DAI)
+ * @deprecated Use getCurrencySymbolByAddress with chainId for accurate symbol lookup
  */
 export function getCurrencySymbol(currency?: string | null): string {
     if (!currency || isNativeETH(currency)) {
         return 'ETH';
     }
-    // Return token symbol based on address (future: query from chain)
-    // For now, assume WETH for any non-zero address
-    // TODO: Look up actual token symbol from contract
+    // Fallback for backward compatibility
+    // ⚠️ This cannot determine the correct token without chainId
     return 'WETH';
 }
 
@@ -260,7 +260,7 @@ export function getCurrencySymbolByAddress(chainId: number | string, currency?: 
     if (!currency || isNativeETH(currency)) {
         return 'ETH';
     }
-    
+
     const symbol = getTokenSymbolByAddress(chainId, currency);
     return symbol || 'WETH'; // Fallback to WETH for unknown tokens
 }
