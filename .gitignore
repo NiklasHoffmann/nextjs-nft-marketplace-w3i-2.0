@@ -50,6 +50,22 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# temporary files
+*.tmp
+*.temp
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+next-env.d.ts
+
 # runtime caches
 /public/cached-nft-images/
 
