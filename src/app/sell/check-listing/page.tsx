@@ -18,12 +18,13 @@ export default function CheckListingPage() {
 
     // Guard: Redirect if no NFT selected
     useEffect(() => {
-        if (!formData.selectedNFT) {
+        if (!formData.selectedNFT && !formData.selectedNFTs?.length) {
             router.replace('/sell');
         } else {
+            // Only set progressStep once when component mounts
             setProgressStep('preview');
         }
-    }, [formData.selectedNFT, router, setProgressStep]);
+    }, [formData.selectedNFT, formData.selectedNFTs, router, setProgressStep]);
 
     if (!formData.selectedNFT) {
         return (

@@ -83,6 +83,22 @@ export function SellPage() {
 
     const [listingType, setListingType] = useState<ListingType>('single');
     const [batchSelectedNFTs, setBatchSelectedNFTs] = useState<Set<string>>(new Set());
+    
+    // Clean up batchSelectedNFTs: remove keys that are no longer in filteredNFTs
+    useEffect(() => {
+        if (listingType === 'batch' && batchSelectedNFTs.size > 0) {
+            const validKeys = new Set(filteredNFTs.map(nft => nft.key));
+            const currentKeys = Array.from(batchSelectedNFTs);
+            const hasInvalidKeys = currentKeys.some(key => !validKeys.has(key));
+            
+            if (hasInvalidKeys) {
+                const cleanedSelection = new Set(
+                    currentKeys.filter(key => validKeys.has(key))
+                );
+                setBatchSelectedNFTs(cleanedSelection);
+            }
+        }
+    }, [filteredNFTs, batchSelectedNFTs, listingType]);
     const [whitelistStatus, setWhitelistStatus] = useState<StepStatus>('not-started');
     const [approvalStatus, setApprovalStatus] = useState<StepStatus>('not-started');
     const [showApprovalDialog, setShowApprovalDialog] = useState(false);
@@ -99,6 +115,24 @@ export function SellPage() {
     useEffect(() => {
         setFormData({ userNFTs: allNFTs });
     }, [allNFTs, setFormData]);
+
+    // Sync batchSelectedNFTs to context
+    useEffect(() => {
+        if (listingType === 'batch') {
+            const selectedNFTsList = Array.from(batchSelectedNFTs)
+                .map(key => {
+                    const [contract, tokenId] = key.split('-');
+                    return allNFTs.find(
+                        nft => nft.contractAddress === contract && nft.tokenId === tokenId
+                    );
+                })
+                .filter(Boolean) as AggregatedNFT[];
+            setFormData({ selectedNFTs: selectedNFTsList, selectedNFT: null });
+        } else if (listingType === 'single') {
+            // Clear selectedNFTs in single mode and sync selectedNFT
+            setFormData({ selectedNFTs: undefined, selectedNFT });
+        }
+    }, [batchSelectedNFTs, allNFTs, setFormData, listingType, selectedNFT]);
 
     // Sync status to context
     useEffect(() => {
@@ -118,36 +152,6 @@ export function SellPage() {
         }
     }, [whitelistStatus, approvalStatus, selectedNFT, batchSelectedNFTs]);
 
-    // Intelligente Step-Bestimmung basierend auf Check-Status
-    useEffect(() => {
-        // Wenn NFT ausgewählt ist und Checks laufen
-        if (selectedNFT || batchSelectedNFTs.size > 0) {
-            // Whitelist wird geprüft
-            if (whitelistStatus === 'checking') {
-                setProgressStep('whitelist');
-                return;
-            }
-            // Whitelist fertig, Approval wird geprüft
-            if (whitelistStatus === 'done' && approvalStatus === 'checking') {
-                setProgressStep('approval');
-                return;
-            }
-            // Beide Checks erfolgreich -> Form wird aktiv
-            if (whitelistStatus === 'done' && approvalStatus === 'done') {
-                setProgressStep('form');
-                return;
-            }
-            // Checks fehlgeschlagen -> bleibe bei select
-            if (whitelistStatus === 'failed' || approvalStatus === 'failed') {
-                setProgressStep('select');
-                return;
-            }
-        } else {
-            // Keine NFT ausgewählt -> select ist aktiv
-            setProgressStep('select');
-        }
-    }, [selectedNFT, batchSelectedNFTs, whitelistStatus, approvalStatus, setProgressStep]);
-
     useEffect(() => {
         if (urlContract && urlTokenId && allNFTs.length > 0 && !selectedNFT) {
             const nftToSelect = allNFTs.find(
@@ -160,9 +164,29 @@ export function SellPage() {
         }
     }, [urlContract, urlTokenId, allNFTs, selectedNFT, setSelectedNFT]);
 
+    // Get all unique contract addresses from batch selection
+    const contractsToCheck = useMemo(() => {
+        if (listingType === 'single' && selectedNFT) {
+            return [selectedNFT.contractAddress];
+        }
+        if (listingType === 'batch' && batchSelectedNFTs.size > 0) {
+            const contracts = new Set<string>();
+            Array.from(batchSelectedNFTs).forEach(key => {
+                const [contract] = key.split('-');
+                if (contract) contracts.add(contract);
+            });
+            return Array.from(contracts);
+        }
+        return [];
+    }, [listingType, selectedNFT, batchSelectedNFTs]);
+
+    // Use the first contract for the hook (required by React hooks rules)
+    const primaryContract = contractsToCheck[0] || '0x0000000000000000000000000000000000000000';
+    const { data: isPrimaryWhitelisted, isLoading: isWhitelistLoading, isError: isWhitelistError } = useCollectionWhitelist(primaryContract);
+
     useEffect(() => {
-        const checkApproval = async (contractAddress: string, tokenId: string, ownerAddress: string) => {
-            if (!marketplaceAddress || !ownerAddress) return;
+        const checkApproval = async (contractAddresses: string[], ownerAddress: string) => {
+            if (!marketplaceAddress || !ownerAddress || contractAddresses.length === 0) return;
 
             try {
                 setApprovalStatus('checking');
@@ -173,83 +197,128 @@ export function SellPage() {
                     transport: http()
                 });
 
-                const isApproved = await publicClient.readContract({
-                    address: contractAddress as `0x${string}`,
-                    abi: [
-                        {
-                            name: 'isApprovedForAll',
-                            type: 'function',
-                            stateMutability: 'view',
-                            inputs: [
-                                { name: 'owner', type: 'address' },
-                                { name: 'operator', type: 'address' }
+                // Check approval for all unique contracts
+                const approvalChecks = await Promise.all(
+                    contractAddresses.map(async (contractAddress) => {
+                        const isApproved = await publicClient.readContract({
+                            address: contractAddress as `0x${string}`,
+                            abi: [
+                                {
+                                    name: 'isApprovedForAll',
+                                    type: 'function',
+                                    stateMutability: 'view',
+                                    inputs: [
+                                        { name: 'owner', type: 'address' },
+                                        { name: 'operator', type: 'address' }
+                                    ],
+                                    outputs: [{ name: '', type: 'bool' }]
+                                }
                             ],
-                            outputs: [{ name: '', type: 'bool' }]
-                        }
-                    ],
-                    functionName: 'isApprovedForAll',
-                    args: [ownerAddress as `0x${string}`, marketplaceAddress as `0x${string}`]
-                });
+                            functionName: 'isApprovedForAll',
+                            args: [ownerAddress as `0x${string}`, marketplaceAddress as `0x${string}`]
+                        });
+                        return { contractAddress, isApproved };
+                    })
+                );
 
-                setApprovalStatus(isApproved ? 'done' : 'failed');
+                // All contracts must be approved
+                const allApproved = approvalChecks.every(check => check.isApproved);
+                setApprovalStatus(allApproved ? 'done' : 'failed');
             } catch (error) {
                 console.error('Approval check failed:', error);
                 setApprovalStatus('failed');
             }
         };
 
-        if (whitelistStatus === 'done' && address) {
-            if (listingType === 'single' && selectedNFT) {
-                checkApproval(selectedNFT.contractAddress, selectedNFT.tokenId, address);
-                return;
-            }
-
-            if (listingType === 'batch' && batchSelectedNFTs.size > 0) {
-                const firstKey = Array.from(batchSelectedNFTs)[0];
-                if (!firstKey) {
-                    setApprovalStatus('not-started');
-                    return;
-                }
-                const [contract, tokenId] = firstKey.split('-');
-                if (contract && tokenId) {
-                    checkApproval(contract, tokenId, address);
-                    return;
-                }
-            }
+        if (whitelistStatus === 'done' && address && contractsToCheck.length > 0) {
+            checkApproval(contractsToCheck, address);
+        } else {
+            setApprovalStatus('not-started');
         }
+    }, [contractsToCheck, marketplaceAddress, address, whitelistStatus]);
 
-        setApprovalStatus('not-started');
-    }, [selectedNFT, batchSelectedNFTs, listingType, marketplaceAddress, address, whitelistStatus]);
-
-    // Get contract address to check
-    const contractToCheck = listingType === 'single' && selectedNFT
-        ? selectedNFT.contractAddress
-        : listingType === 'batch' && batchSelectedNFTs.size > 0
-            ? Array.from(batchSelectedNFTs)[0]?.split('-')[0]
-            : null;
-
-    // Direct hook call for whitelist check (reactive, auto-cached)
-    const { data: isWhitelisted, isLoading: isWhitelistLoading, isError: isWhitelistError } = useCollectionWhitelist(
-        contractToCheck || '0x0000000000000000000000000000000000000000'
-    );
-
-    // Update whitelist status based on hook result
+    // Update whitelist status - check all contracts if multiple collections
     useEffect(() => {
-        if (!contractToCheck) {
+        if (contractsToCheck.length === 0) {
             setWhitelistStatus('not-started');
             return;
         }
 
-        if (isWhitelistLoading) {
-            setWhitelistStatus('checking');
-        } else if (isWhitelistError) {
-            setWhitelistStatus('failed');
-        } else if (isWhitelisted) {
-            setWhitelistStatus('done');
-        } else {
-            setWhitelistStatus('failed');
-        }
-    }, [contractToCheck, isWhitelisted, isWhitelistLoading, isWhitelistError]);
+        const checkAllContracts = async () => {
+            // If only one contract, use the hook result
+            if (contractsToCheck.length === 1) {
+                if (isWhitelistLoading) {
+                    setWhitelistStatus('checking');
+                } else if (isWhitelistError) {
+                    setWhitelistStatus('failed');
+                } else if (isPrimaryWhitelisted) {
+                    setWhitelistStatus('done');
+                } else {
+                    setWhitelistStatus('failed');
+                }
+                return;
+            }
+
+            // Multiple contracts - check all manually
+            try {
+                setWhitelistStatus('checking');
+                
+                if (!marketplaceAddress) {
+                    setWhitelistStatus('failed');
+                    return;
+                }
+
+                const { createPublicClient, http } = await import('viem');
+                const { sepolia } = await import('viem/chains');
+                const publicClient = createPublicClient({
+                    chain: sepolia,
+                    transport: http()
+                });
+
+                const whitelistChecks = await Promise.all(
+                    contractsToCheck.map(async (contractAddress) => {
+                        try {
+                            const isWhitelisted = await publicClient.readContract({
+                                address: marketplaceAddress as `0x${string}`,
+                                abi: [
+                                    {
+                                        name: 'isCollectionWhitelisted',
+                                        type: 'function',
+                                        stateMutability: 'view',
+                                        inputs: [{ name: 'collection', type: 'address' }],
+                                        outputs: [{ name: '', type: 'bool' }]
+                                    }
+                                ],
+                                functionName: 'isCollectionWhitelisted',
+                                args: [contractAddress as `0x${string}`]
+                            });
+                            return { contractAddress, isWhitelisted };
+                        } catch (error) {
+                            console.error(`Whitelist check failed for ${contractAddress}:`, error);
+                            return { contractAddress, isWhitelisted: false };
+                        }
+                    })
+                );
+
+                // All contracts must be whitelisted
+                const allWhitelisted = whitelistChecks.every(check => check.isWhitelisted);
+                const notWhitelistedContracts = whitelistChecks
+                    .filter(check => !check.isWhitelisted)
+                    .map(check => check.contractAddress);
+
+                if (notWhitelistedContracts.length > 0) {
+                    console.warn('Not whitelisted collections:', notWhitelistedContracts);
+                }
+
+                setWhitelistStatus(allWhitelisted ? 'done' : 'failed');
+            } catch (error) {
+                console.error('Whitelist check failed:', error);
+                setWhitelistStatus('failed');
+            }
+        };
+
+        checkAllContracts();
+    }, [contractsToCheck, isPrimaryWhitelisted, isWhitelistLoading, isWhitelistError, marketplaceAddress]);
 
     const handleNFTSelect = (nft: AggregatedNFT | null) => {
         setSelectedNFT(nft);
@@ -367,7 +436,12 @@ export function SellPage() {
                     <div className="flex-1 justify-center flex">
                         <div className="inline-flex w-full max-w-md rounded-xl bg-white border border-gray-300 overflow-hidden">
                             <button
-                                onClick={() => setListingType('single')}
+                                onClick={() => {
+                                    setListingType('single');
+                                    setBatchSelectedNFTs(new Set());
+                                    setWhitelistStatus('not-started');
+                                    setApprovalStatus('not-started');
+                                }}
                                 className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-2 border-r border-gray-200 ${listingType === 'single'
                                     ? 'bg-blue-600 text-white'
                                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -379,7 +453,12 @@ export function SellPage() {
                                 Einzeln
                             </button>
                             <button
-                                onClick={() => setListingType('batch')}
+                                onClick={() => {
+                                    setListingType('batch');
+                                    setSelectedNFT(null);
+                                    setWhitelistStatus('not-started');
+                                    setApprovalStatus('not-started');
+                                }}
                                 className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${listingType === 'batch'
                                     ? 'bg-purple-600 text-white'
                                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -547,8 +626,12 @@ export function SellPage() {
                                             </h3>
                                             <p className="text-gray-600">
                                                 {whitelistStatus === 'checking'
-                                                    ? 'Bitte warten Sie, während wir die Collection prüfen.'
-                                                    : 'Diese Collection ist nicht für den Marketplace zugelassen.'}
+                                                    ? contractsToCheck.length > 1 
+                                                        ? `Prüfe ${contractsToCheck.length} Collections...`
+                                                        : 'Bitte warten Sie, während wir die Collection prüfen.'
+                                                    : contractsToCheck.length > 1
+                                                        ? 'Eine oder mehrere Collections sind nicht für den Marketplace zugelassen.'
+                                                        : 'Diese Collection ist nicht für den Marketplace zugelassen.'}
                                             </p>
                                         </div>
                                     </div>

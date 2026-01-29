@@ -1,7 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useChainId } from 'wagmi';
 import { useForm } from '@/hooks';
+import { useListingFlow } from '../../contexts/ListingFlowContext';
+import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
+import { useERC20 } from '@/hooks/tokens';
+import { ExtendedCurrencySelector } from '@/components/marketplace';
+import { ZERO_ADDRESS, getTokenConfig, isNativeETH } from '@/config/tokens';
 
 interface BatchPricingFormProps {
     selectedCount: number;
@@ -12,20 +18,70 @@ interface BatchPricingFormProps {
         fixedPrice?: string;
         startPrice?: string;
         endPrice?: string;
-        currency: 'ETH' | 'USDC';
+        currency: string; // Changed to string (address)
+        priceMode: 'gross' | 'net';
         description: string;
     }) => void;
 }
 
 export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started', approvalStatus = 'not-started', onSubmit }: BatchPricingFormProps) {
     const [pricingType, setPricingType] = useState<'fixed' | 'variable'>('fixed');
+    const { setProgressStep } = useListingFlow();
+    const chainId = useChainId();
+    
+    // Get marketplace address and dynamic fees
+    const { marketplaceAddress } = useMarketplaceContracts();
+    const { calculateFees, innovationFeePercentage, royaltyFeePercentage } = useMarketplaceFees({
+        marketplaceAddress,
+        contractAddress: undefined, // Batch doesn't have single contract
+        tokenId: undefined
+    });
+
+    // Sync progressStep with whitelist/approval status
+    useEffect(() => {
+        if (selectedCount === 0) {
+            setProgressStep('select');
+            return;
+        }
+
+        // Whitelist check is running
+        if (whitelistStatus === 'checking') {
+            setProgressStep('whitelist');
+            return;
+        }
+
+        // Whitelist failed - stay at select
+        if (whitelistStatus === 'failed') {
+            setProgressStep('select');
+            return;
+        }
+
+        // Approval check is running
+        if (whitelistStatus === 'done' && approvalStatus === 'checking') {
+            setProgressStep('approval');
+            return;
+        }
+
+        // Approval failed - stay at select
+        if (approvalStatus === 'failed') {
+            setProgressStep('select');
+            return;
+        }
+
+        // Both checks successful - form is active
+        if (whitelistStatus === 'done' && approvalStatus === 'done') {
+            setProgressStep('form');
+            return;
+        }
+    }, [selectedCount, whitelistStatus, approvalStatus, setProgressStep]);
 
     const form = useForm({
         initialValues: {
             fixedPrice: '',
             startPrice: '',
             endPrice: '',
-            currency: 'ETH' as 'ETH' | 'USDC',
+            currency: ZERO_ADDRESS as string, // Default: ETH (zero address)
+            priceMode: 'gross' as 'gross' | 'net', // gross = Brutto (Käufer zahlt), net = Netto (Seller erhält)
             description: ''
         },
         validate: (values) => {
@@ -53,17 +109,102 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
 
             return errors;
         },
-        onSubmit: (values) => {
+        onSubmit: async (values) => {
+            // ERC20 Token Approval check (WETH, USDC, DAI)
+            const isERC20 = values.currency !== ZERO_ADDRESS;
+            if (isERC20 && pricingType === 'fixed' && values.fixedPrice) {
+                const needsApproval = !hasEnoughAllowance(values.fixedPrice);
+                if (needsApproval) {
+                    try {
+                        await approve(); // Unlimited approval
+                        // Wait a bit for approval to be confirmed
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    } catch (error) {
+                        console.error('Token approval failed:', error);
+                        alert('Token approval failed. Please try again.');
+                        return;
+                    }
+                }
+            }
+
+            // Im Netto-Modus: Brutto-Preis für Contract verwenden
+            const submissionPrice = pricingType === 'fixed' && values.priceMode === 'net' && values.fixedPrice
+                ? fees.grossPrice.toString()
+                : undefined;
+
             onSubmit({
                 pricingType,
-                fixedPrice: pricingType === 'fixed' ? values.fixedPrice : undefined,
+                fixedPrice: pricingType === 'fixed' 
+                    ? (values.priceMode === 'net' ? submissionPrice : values.fixedPrice)
+                    : undefined,
                 startPrice: pricingType === 'variable' ? values.startPrice : undefined,
                 endPrice: pricingType === 'variable' ? values.endPrice : undefined,
                 currency: values.currency,
+                priceMode: values.priceMode,
                 description: values.description
             });
         }
     });
+
+    // Get token config for selected currency
+    const selectedTokenConfig = useMemo(() => {
+        if (isNativeETH(form.values.currency)) return null;
+
+        // Try to find token config (including mock tokens for development)
+        const tokens = ['WETH', 'USDC', 'DAI', 'MOCK_ERC20', 'MOCK_WBTC', 'MOCK_EURS', 'MOCK_USDT'] as const;
+        for (const tokenSymbol of tokens) {
+            const config = getTokenConfig(chainId, tokenSymbol);
+            if (config?.address.toLowerCase() === form.values.currency.toLowerCase()) {
+                return config;
+            }
+        }
+        return null;
+    }, [form.values.currency, chainId]);
+
+    // Generic ERC20 Hook for approval check (works with any token)
+    const {
+        hasEnoughAllowance,
+        approve,
+        balance: tokenBalance,
+        isApproving
+    } = useERC20({
+        tokenAddress: selectedTokenConfig?.address as `0x${string}` | undefined,
+        spenderAddress: marketplaceAddress,
+        decimals: selectedTokenConfig?.decimals || 18
+    });
+
+    // Gebühren berechnen (nur für festen Preis) - dynamisch vom Contract
+    // Unterstützt Brutto (Käufer zahlt) und Netto (Seller erhält) Modi
+    const fees = pricingType === 'fixed' && form.values.fixedPrice && parseFloat(form.values.fixedPrice) > 0
+        ? (() => {
+            const inputPrice = parseFloat(form.values.fixedPrice);
+            const totalFeeRate = innovationFeePercentage + royaltyFeePercentage;
+
+            if (form.values.priceMode === 'net') {
+                // Netto-Modus: Eingegebener Preis = Was Seller erhält
+                // Brutto-Preis = Netto / (1 - feeRate)
+                const netPrice = inputPrice;
+                const grossPrice = netPrice / (1 - totalFeeRate);
+                const marketplaceFee = grossPrice * innovationFeePercentage;
+                const royaltyFee = grossPrice * royaltyFeePercentage;
+
+                return {
+                    grossPrice,
+                    marketplaceFee,
+                    royaltyFee,
+                    totalFees: marketplaceFee + royaltyFee,
+                    youReceive: netPrice,
+                    marketplaceFeePercentage: innovationFeePercentage * 100,
+                    royaltyFeePercentage: royaltyFeePercentage * 100
+                };
+            } else {
+                // Brutto-Modus: Eingegebener Preis = Was Käufer zahlt
+                const grossPrice = inputPrice;
+                const fees = calculateFees(grossPrice);
+                return { ...fees, grossPrice };
+            }
+        })()
+        : { grossPrice: 0, marketplaceFee: 0, royaltyFee: 0, totalFees: 0, youReceive: 0, marketplaceFeePercentage: 0, royaltyFeePercentage: 0 };
 
     return (
         <form onSubmit={form.handleSubmit} className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 p-6">
@@ -115,54 +256,218 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
 
             {/* Fixed Price */}
             {pricingType === 'fixed' && (
-                <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Preis für alle {selectedCount} NFTs *
-                    </label>
-                    <div className="flex">
-                        <input
-                            type="number"
-                            step="0.0001"
-                            {...form.getFieldProps('fixedPrice')}
-                            className={`flex-1 rounded-l-lg border ${form.hasError('fixedPrice') ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50 shadow-sm`}
-                            placeholder="0.00"
+                <>
+                    {/* Currency Selection */}
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Zahlungsmethode *
+                        </label>
+                        <ExtendedCurrencySelector
+                            value={form.values.currency}
+                            onChange={(currency) => form.setFieldValue('currency', currency)}
                         />
-                        <select
-                            {...form.getFieldProps('currency')}
-                            className="rounded-r-lg border border-l-0 border-gray-300 px-3 py-2 text-sm bg-gray-50 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50 shadow-sm"
-                        >
-                            <option value="ETH">ETH</option>
-                            <option value="USDC">USDC</option>
-                        </select>
+                        {form.values.currency !== ZERO_ADDRESS && selectedTokenConfig && (
+                            <div className="mt-2 flex items-center gap-2 text-xs text-purple-600 bg-purple-50 px-3 py-2 rounded-lg">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>{selectedTokenConfig.symbol} Balance: {parseFloat(tokenBalance).toFixed(selectedTokenConfig.decimals === 6 ? 2 : 4)} {selectedTokenConfig.symbol}</span>
+                            </div>
+                        )}
                     </div>
-                    {form.hasError('fixedPrice') && (
-                        <p className="mt-1 text-sm text-red-600">{form.getFieldError('fixedPrice')}</p>
-                    )}
-                </div>
+
+                    {/* Price Mode Selection (Brutto/Netto) */}
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Preisangabe *
+                        </label>
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={() => form.setFieldValue('priceMode', 'gross')}
+                                className={`flex-1 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${form.values.priceMode === 'gross'
+                                        ? 'border-blue-500 bg-blue-50 text-blue-900'
+                                        : 'border-gray-300 bg-white text-gray-700 hover:border-blue-300'
+                                    }`}
+                            >
+                                <div className="flex items-center justify-center gap-2">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                    <span>Brutto-Preis</span>
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">Käufer zahlt</div>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => form.setFieldValue('priceMode', 'net')}
+                                className={`flex-1 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${form.values.priceMode === 'net'
+                                        ? 'border-green-500 bg-green-50 text-green-900'
+                                        : 'border-gray-300 bg-white text-gray-700 hover:border-green-300'
+                                    }`}
+                            >
+                                <div className="flex items-center justify-center gap-2">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>Netto-Preis</span>
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">Sie erhalten</div>
+                            </button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                            {form.values.priceMode === 'gross'
+                                ? 'Geben Sie den Endpreis ein, den der Käufer zahlt. Gebühren werden automatisch abgezogen.'
+                                : 'Geben Sie den Betrag ein, den Sie nach Abzug aller Gebühren erhalten möchten.'
+                            }
+                        </p>
+                    </div>
+
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            {form.values.priceMode === 'gross' ? 'Preis für alle ' + selectedCount + ' NFTs (Brutto)' : 'Gewünschter Betrag (Netto)'} *
+                        </label>
+                        <div className="relative">
+                            <input
+                                type="number"
+                                step="0.0001"
+                                {...form.getFieldProps('fixedPrice')}
+                                className={`w-full rounded-lg border ${form.hasError('fixedPrice') ? 'border-red-300' : 'border-gray-300'} px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500`}
+                                placeholder="0.00"
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500">
+                                {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}
+                            </div>
+                        </div>
+                        {form.hasError('fixedPrice') && (
+                            <p className="mt-1 text-sm text-red-600">{form.getFieldError('fixedPrice')}</p>
+                        )}
+
+                        {/* ERC20 Token Approval Warning */}
+                        {form.values.currency !== ZERO_ADDRESS && form.values.fixedPrice && parseFloat(form.values.fixedPrice) > 0 && !hasEnoughAllowance(form.values.fixedPrice) && (
+                            <div className="mt-2 flex items-start gap-2 text-xs text-orange-700 bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
+                                <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <span>{selectedTokenConfig?.symbol || 'Token'} approval required. You will be asked to approve {selectedTokenConfig?.symbol || 'token'} spending before listing.</span>
+                            </div>
+                        )}
+
+                        {/* Gebühren-Übersicht */}
+                        {form.values.fixedPrice && parseFloat(form.values.fixedPrice) > 0 && (
+                            <div className="mt-3 p-3 bg-white rounded-lg border border-purple-200 text-xs space-y-1">
+                                {form.values.priceMode === 'net' && (
+                                    <div className="flex justify-between text-gray-900 font-semibold pb-1 mb-1 border-b border-gray-200">
+                                        <span>Listing-Preis (Brutto):</span>
+                                        <span>{fees.grossPrice.toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between text-gray-600">
+                                    <span>Marketplace-Gebühr ({(innovationFeePercentage * 100).toFixed(2)}%):</span>
+                                    <span>-{fees.marketplaceFee.toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
+                                </div>
+                                <div className="flex justify-between text-gray-600">
+                                    <span>Royalty-Gebühr ({(royaltyFeePercentage * 100).toFixed(2)}%):</span>
+                                    <span>-{fees.royaltyFee.toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
+                                </div>
+                                <div className="border-t border-gray-200 pt-1 mt-2 flex justify-between font-semibold text-gray-900">
+                                    <span>Sie erhalten pro NFT (Netto):</span>
+                                    <span className="text-green-600">{fees.youReceive.toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
+                                </div>
+                                <div className="flex justify-between font-bold text-green-700 text-sm pt-1 border-t border-green-200">
+                                    <span>Gesamt für {selectedCount} NFTs:</span>
+                                    <span>{(fees.youReceive * selectedCount).toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </>
             )}
 
             {/* Variable Price Range */}
             {pricingType === 'variable' && (
                 <>
+                    {/* Currency Selection */}
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Startpreis (niedrigster) *
+                            Zahlungsmethode *
                         </label>
-                        <div className="flex">
+                        <ExtendedCurrencySelector
+                            value={form.values.currency}
+                            onChange={(currency) => form.setFieldValue('currency', currency)}
+                        />
+                        {form.values.currency !== ZERO_ADDRESS && selectedTokenConfig && (
+                            <div className="mt-2 flex items-center gap-2 text-xs text-green-600 bg-green-50 px-3 py-2 rounded-lg">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>{selectedTokenConfig.symbol} Balance: {parseFloat(tokenBalance).toFixed(selectedTokenConfig.decimals === 6 ? 2 : 4)} {selectedTokenConfig.symbol}</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Price Mode Selection (Brutto/Netto) */}
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Preisangabe *
+                        </label>
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={() => form.setFieldValue('priceMode', 'gross')}
+                                className={`flex-1 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${form.values.priceMode === 'gross'
+                                        ? 'border-blue-500 bg-blue-50 text-blue-900'
+                                        : 'border-gray-300 bg-white text-gray-700 hover:border-blue-300'
+                                    }`}
+                            >
+                                <div className="flex items-center justify-center gap-2">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                    <span>Brutto-Preis</span>
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">Käufer zahlt</div>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => form.setFieldValue('priceMode', 'net')}
+                                className={`flex-1 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${form.values.priceMode === 'net'
+                                        ? 'border-green-500 bg-green-50 text-green-900'
+                                        : 'border-gray-300 bg-white text-gray-700 hover:border-green-300'
+                                    }`}
+                            >
+                                <div className="flex items-center justify-center gap-2">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>Netto-Preis</span>
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">Sie erhalten</div>
+                            </button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                            {form.values.priceMode === 'gross'
+                                ? 'Geben Sie die Preise ein, die Käufer zahlen. Gebühren werden automatisch abgezogen.'
+                                : 'Geben Sie die Beträge ein, die Sie nach Abzug aller Gebühren erhalten möchten.'
+                            }
+                        </p>
+                    </div>
+
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            {form.values.priceMode === 'gross' ? 'Startpreis (niedrigster, Brutto)' : 'Startpreis (niedrigster, Netto)'} *
+                        </label>
+                        <div className="relative">
                             <input
                                 type="number"
                                 step="0.0001"
                                 {...form.getFieldProps('startPrice')}
-                                className={`flex-1 rounded-l-lg border ${form.hasError('startPrice') ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50 shadow-sm`}
+                                className={`w-full rounded-lg border ${form.hasError('startPrice') ? 'border-red-300' : 'border-gray-300'} px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500`}
                                 placeholder="0.00"
                             />
-                            <select
-                                {...form.getFieldProps('currency')}
-                                className="rounded-r-lg border border-l-0 border-gray-300 px-3 py-2 text-sm bg-gray-50 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50 shadow-sm"
-                            >
-                                <option value="ETH">ETH</option>
-                                <option value="USDC">USDC</option>
-                            </select>
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500">
+                                {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}
+                            </div>
                         </div>
                         {form.hasError('startPrice') && (
                             <p className="mt-1 text-sm text-red-600">{form.getFieldError('startPrice')}</p>
@@ -171,15 +476,20 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
 
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Endpreis (höchster) *
+                            {form.values.priceMode === 'gross' ? 'Endpreis (höchster, Brutto)' : 'Endpreis (höchster, Netto)'} *
                         </label>
-                        <input
-                            type="number"
-                            step="0.0001"
-                            {...form.getFieldProps('endPrice')}
-                            className={`w-full rounded-lg border ${form.hasError('endPrice') ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50 shadow-sm`}
-                            placeholder="0.00"
-                        />
+                        <div className="relative">
+                            <input
+                                type="number"
+                                step="0.0001"
+                                {...form.getFieldProps('endPrice')}
+                                className={`w-full rounded-lg border ${form.hasError('endPrice') ? 'border-red-300' : 'border-gray-300'} px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500`}
+                                placeholder="0.00"
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500">
+                                {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}
+                            </div>
+                        </div>
                         {form.hasError('endPrice') && (
                             <p className="mt-1 text-sm text-red-600">{form.getFieldError('endPrice')}</p>
                         )}
@@ -187,6 +497,110 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
                             Preise werden gleichmäßig zwischen Start und Ende verteilt
                         </p>
                     </div>
+
+                    {/* Fee Breakdown für beide Preise */}
+                    {form.values.startPrice && form.values.endPrice && (
+                        <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-4">
+                            {/* Startpreis Gebühren */}
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                    </svg>
+                                    Niedrigster Preis (Startpreis)
+                                </h4>
+                                <div className="pl-6 space-y-1.5 text-xs">
+                                    <div className="flex justify-between text-gray-700">
+                                        <span>{form.values.priceMode === 'gross' ? 'Bruttopreis' : 'Gewünschter Nettoerlös'}</span>
+                                        <span className="font-medium">{parseFloat(form.values.startPrice).toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
+                                    </div>
+                                    <div className="flex justify-between text-gray-600">
+                                        <span>Marketplace Fee ({marketplaceFeePercentage}%)</span>
+                                        <span>-{calculateFees(form.values.startPrice, form.values.priceMode).marketplace.toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
+                                    </div>
+                                    <div className="flex justify-between text-gray-600">
+                                        <span>Creator Royalty (5%)</span>
+                                        <span>-{calculateFees(form.values.startPrice, form.values.priceMode).royalty.toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
+                                    </div>
+                                    <div className="pt-1.5 mt-1.5 border-t border-gray-300 flex justify-between text-gray-900 font-semibold">
+                                        <span>{form.values.priceMode === 'gross' ? 'Sie erhalten (pro NFT)' : 'Käufer zahlt (pro NFT)'}</span>
+                                        <span className="text-green-600">
+                                            {form.values.priceMode === 'gross'
+                                                ? calculateFees(form.values.startPrice, form.values.priceMode).net.toFixed(4)
+                                                : calculateFees(form.values.startPrice, form.values.priceMode).gross.toFixed(4)
+                                            } {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Endpreis Gebühren */}
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                                    </svg>
+                                    Höchster Preis (Endpreis)
+                                </h4>
+                                <div className="pl-6 space-y-1.5 text-xs">
+                                    <div className="flex justify-between text-gray-700">
+                                        <span>{form.values.priceMode === 'gross' ? 'Bruttopreis' : 'Gewünschter Nettoerlös'}</span>
+                                        <span className="font-medium">{parseFloat(form.values.endPrice).toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
+                                    </div>
+                                    <div className="flex justify-between text-gray-600">
+                                        <span>Marketplace Fee ({marketplaceFeePercentage}%)</span>
+                                        <span>-{calculateFees(form.values.endPrice, form.values.priceMode).marketplace.toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
+                                    </div>
+                                    <div className="flex justify-between text-gray-600">
+                                        <span>Creator Royalty (5%)</span>
+                                        <span>-{calculateFees(form.values.endPrice, form.values.priceMode).royalty.toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
+                                    </div>
+                                    <div className="pt-1.5 mt-1.5 border-t border-gray-300 flex justify-between text-gray-900 font-semibold">
+                                        <span>{form.values.priceMode === 'gross' ? 'Sie erhalten (pro NFT)' : 'Käufer zahlt (pro NFT)'}</span>
+                                        <span className="text-green-600">
+                                            {form.values.priceMode === 'gross'
+                                                ? calculateFees(form.values.endPrice, form.values.priceMode).net.toFixed(4)
+                                                : calculateFees(form.values.endPrice, form.values.priceMode).gross.toFixed(4)
+                                            } {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Gesamtbetrag Range */}
+                            <div className="pt-3 mt-3 border-t-2 border-gray-300">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm font-bold text-gray-900">
+                                        {form.values.priceMode === 'gross' ? 'Gesamterlös für alle NFTs' : 'Gesamtbetrag zu zahlen (alle NFTs)'}
+                                    </span>
+                                    <div className="text-right">
+                                        <div className="text-base font-bold text-green-600">
+                                            {form.values.priceMode === 'gross'
+                                                ? `${(calculateFees(form.values.startPrice, form.values.priceMode).net * selectedNFTs.length).toFixed(4)} - ${(calculateFees(form.values.endPrice, form.values.priceMode).net * selectedNFTs.length).toFixed(4)}`
+                                                : `${(calculateFees(form.values.startPrice, form.values.priceMode).gross * selectedNFTs.length).toFixed(4)} - ${(calculateFees(form.values.endPrice, form.values.priceMode).gross * selectedNFTs.length).toFixed(4)}`
+                                            }
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                            {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')} für {selectedNFTs.length} NFTs
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ERC20 Token Approval Warning */}
+                            {form.values.currency !== ZERO_ADDRESS && (
+                                <div className="flex items-start gap-2 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                    <svg className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <div className="text-xs text-amber-800">
+                                        <p className="font-semibold mb-1">ERC20 Token Approval erforderlich</p>
+                                        <p>Käufer müssen den {selectedTokenConfig?.symbol || 'Token'} Contract erst für die Zahlung freigeben, bevor sie kaufen können.</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </>
             )}
 

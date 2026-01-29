@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useChainId } from 'wagmi';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
@@ -8,6 +8,7 @@ import { useERC20 } from '@/hooks/tokens';
 import { useForm } from '@/hooks';
 import { ExtendedCurrencySelector } from '@/components/marketplace';
 import { ZERO_ADDRESS, getTokenConfig, isNativeETH } from '@/config/tokens';
+import { useListingFlow } from '../../contexts/ListingFlowContext';
 
 export type ListingMode = 'sale' | 'trade' | 'hybrid';
 
@@ -33,6 +34,45 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
     const [selectedTargetNFT, setSelectedTargetNFT] = useState<AggregatedNFT | null>(null);
     const [isSearching, setIsSearching] = useState(false);
     const chainId = useChainId();
+    const { setProgressStep } = useListingFlow();
+
+    // Sync progressStep with whitelist/approval status
+    useEffect(() => {
+        if (!selectedNFT) {
+            setProgressStep('select');
+            return;
+        }
+
+        // Whitelist check is running
+        if (whitelistStatus === 'checking') {
+            setProgressStep('whitelist');
+            return;
+        }
+
+        // Whitelist failed - stay at select
+        if (whitelistStatus === 'failed') {
+            setProgressStep('select');
+            return;
+        }
+
+        // Approval check is running
+        if (whitelistStatus === 'done' && approvalStatus === 'checking') {
+            setProgressStep('approval');
+            return;
+        }
+
+        // Approval failed - stay at select
+        if (approvalStatus === 'failed') {
+            setProgressStep('select');
+            return;
+        }
+
+        // Both checks successful - form is active
+        if (whitelistStatus === 'done' && approvalStatus === 'done') {
+            setProgressStep('form');
+            return;
+        }
+    }, [selectedNFT, whitelistStatus, approvalStatus, setProgressStep]);
 
     // Get marketplace address and dynamic fees
     const { marketplaceAddress } = useMarketplaceContracts();

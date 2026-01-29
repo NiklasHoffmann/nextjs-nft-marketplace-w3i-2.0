@@ -12,7 +12,7 @@ import Link from 'next/link';
 export default function ListingPage() {
     const router = useRouter();
     const { address } = useAccount();
-    const { formData, setProgressStep, setCompletedSteps, setTxHash, setError } = useListingFlow();
+    const { formData, setProgressStep, setCompletedSteps, setTxHash, setError, progressData } = useListingFlow();
     const { marketplaceAddress } = useMarketplaceContracts();
     const txService = useTransactionService();
     const { calculateFees, innovationFeePercentage, royaltyFeePercentage } = useMarketplaceFees({
@@ -21,8 +21,6 @@ export default function ListingPage() {
         tokenId: formData.selectedNFT?.tokenId
     });
 
-    const [currentStep, setCurrentStep] = useState<'whitelist' | 'approval' | 'signing' | 'pending' | 'success' | 'error'>('signing');
-    const [completedSteps, setCompletedStepsLocal] = useState<string[]>([]);
     const [progressTxHash, setProgressTxHash] = useState<string | undefined>();
     const [progressError, setProgressError] = useState<string | undefined>();
     const [isProcessing, setIsProcessing] = useState(false);
@@ -52,17 +50,13 @@ export default function ListingPage() {
 
         const startListing = async () => {
             setIsProcessing(true);
-            setCurrentStep('signing');
             setProgressStep('listing', 'signing');
 
             try {
                 // Step 1: Check whitelist (already done on /sell page)
                 console.log('🔍 Step 1: Whitelist already verified');
 
-                setCompletedStepsLocal(['whitelist', 'approval', 'approved']);
                 setCompletedSteps(['whitelist', 'approval', 'approved']);
-                setCurrentStep('signing');
-                setProgressStep('listing', 'signing');
 
                 // Create listing via TransactionService
                 console.log('🔍 Creating listing transaction');
@@ -89,22 +83,17 @@ export default function ListingPage() {
 
                         if (step === 'signing') {
                             console.log('🖊️ User is signing transaction...');
-                            setCurrentStep('signing');
                             setProgressStep('listing', 'signing');
                         } else if (step === 'pending') {
                             console.log('⏳ Transaction pending on blockchain...');
-                            setCurrentStep('pending');
                             setProgressStep('listing', 'pending');
                         } else if (step === 'success') {
                             console.log('✅ Transaction confirmed successful!');
                             // Listing erfolgreich - wechsle zum success Step
                             setProgressStep('success', 'success');
-                            setCurrentStep('success');
-                            setCompletedStepsLocal(['select', 'whitelist', 'approval', 'form', 'preview', 'listing']);
                             setCompletedSteps(['select', 'whitelist', 'approval', 'form', 'preview', 'listing']);
                         } else if (step === 'error') {
                             console.error('❌ Transaction error!');
-                            setCurrentStep('error');
                             setProgressStep('listing', 'error');
                         }
                     },
@@ -112,7 +101,6 @@ export default function ListingPage() {
                         console.error('❌ Listing error:', error);
                         setProgressError(error);
                         setError(error);
-                        setCurrentStep('error');
                         setProgressStep('listing', 'error');
                     },
                     onSuccess: (result: { txHash?: string }) => {
@@ -152,7 +140,6 @@ export default function ListingPage() {
                     return;
                 }
 
-                setCurrentStep('error');
                 setProgressStep('listing', 'error');
                 setProgressError(error.message || 'Transaction failed');
                 setError(error.message || 'Transaction failed');

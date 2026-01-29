@@ -69,7 +69,7 @@ export default function CollectionItemsList({
     };
 
     const handleViewAll = () => {
-        router.push(`/collection/${contractAddress}` as any);
+        router.push(`/collection/${contractAddress}`);
     };
 
     if (loading) {
