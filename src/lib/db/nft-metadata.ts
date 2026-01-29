@@ -95,63 +95,86 @@ export async function updateNFTOwnership(
     source: 'mint' | 'transfer' | 'purchase' | 'unknown' = 'unknown'
 ): Promise<void> {
     const collection = await getNFTMetadataCollection();
-    const now = new Date().toISOString();
+    const now = new Date();
+    const nowISO = now.toISOString();
     const lowerNewOwner = newOwner.toLowerCase();
 
     // Get current document to check if owner changed
     const existing = await getNFTMetadata(contractAddress, tokenId);
 
     if (!existing) {
-        // Create new document
+        // Create new document with new blockchain structure
         await upsertNFTMetadata(contractAddress, tokenId, {
-            currentOwner: lowerNewOwner,
-            ownerHistory: [{
+            blockchain: {
                 owner: lowerNewOwner,
-                acquiredAt: now,
-                source
+                ownerSince: now,
+                approved: null,
+                isApprovedForAll: false,
+                lastSyncedAt: now
+            },
+            ownershipHistory: [{
+                owner: lowerNewOwner,
+                from: now,
+                to: now,
+                detectedAt: now
             }],
-            lastVerified: now
+            lastVerified: nowISO
         } as Partial<NFTMetadata>);
         return;
     }
 
+    const currentOwner = existing.blockchain?.owner;
+
     // Check if owner changed
-    if (existing.currentOwner === lowerNewOwner) {
+    if (currentOwner?.toLowerCase() === lowerNewOwner) {
         // Just update lastVerified
         await collection.updateOne(
             { contractAddress: contractAddress.toLowerCase(), tokenId },
-            { $set: { lastVerified: now, updatedAt: now } }
+            { $set: { lastVerified: nowISO, updatedAt: nowISO } }
         );
         return;
     }
 
     // Owner changed - update history
-    const updatedHistory = [...existing.ownerHistory];
-
-    // Mark previous owner's entry as transferred
-    if (updatedHistory.length > 0) {
-        const lastEntry = updatedHistory[updatedHistory.length - 1];
-        if (lastEntry && !lastEntry.transferredAt) {
-            lastEntry.transferredAt = now;
+    const now2 = new Date();
+    
+    // Add old owner to history if exists
+    if (currentOwner) {
+        // Ensure 'from' timestamp is a Date object
+        let fromDate: Date;
+        if (existing.blockchain?.ownerSince) {
+            fromDate = existing.blockchain.ownerSince;
+        } else if (existing.createdAt) {
+            fromDate = typeof existing.createdAt === 'string' ? new Date(existing.createdAt) : existing.createdAt;
+        } else {
+            fromDate = now2;
         }
+
+        await collection.updateOne(
+            { contractAddress: contractAddress.toLowerCase(), tokenId },
+            {
+                $push: {
+                    ownershipHistory: {
+                        owner: currentOwner,
+                        from: fromDate,
+                        to: now2,
+                        detectedAt: now2
+                    }
+                } as any
+            }
+        );
     }
 
-    // Add new owner entry
-    updatedHistory.push({
-        owner: lowerNewOwner,
-        acquiredAt: now,
-        source
-    });
-
-    // Update document
+    // Update current owner
     await collection.updateOne(
         { contractAddress: contractAddress.toLowerCase(), tokenId },
         {
             $set: {
-                currentOwner: lowerNewOwner,
-                ownerHistory: updatedHistory,
-                lastVerified: now,
-                updatedAt: now
+                'blockchain.owner': lowerNewOwner,
+                'blockchain.ownerSince': now2,
+                'blockchain.lastSyncedAt': now2,
+                lastVerified: nowISO,
+                updatedAt: nowISO
             }
         }
     );

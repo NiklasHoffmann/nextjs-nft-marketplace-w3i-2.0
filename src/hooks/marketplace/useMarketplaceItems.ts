@@ -337,7 +337,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     await fetchItems(newPage, false);
   }, [fetchItems]);
 
-  // Auto-fetch when filters change
+  // Auto-fetch when filters change OR when cache is invalidated via SSE
   useEffect(() => {
     if (!autoFetch) {
       return;
@@ -371,6 +371,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     autoFetch,
+    cacheContext.refreshTrigger, // NEW: Refetch when SSE invalidates cache
     // fetchItems removed from dependencies to prevent infinite loop!
     // Stringify complex types for stable dependencies
     filters.search,
@@ -414,13 +415,18 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
         eventType === 'manual-refresh';
 
       if (shouldReload) {
-        console.log(`🔄 [useMarketplaceItems] ${eventType} event detected, auto-reloading...`);
+        console.log(`🔄 [useMarketplaceItems] ${eventType} event detected, invalidating cache and reloading...`);
+
+        // CRITICAL: Invalidate cache IMMEDIATELY to force fresh fetch
+        const filterKey = createFilterKey();
+        cacheContext.invalidateCache(filterKey);
+        console.log(`🗑️  [useMarketplaceItems] Cache invalidated for key: ${filterKey}`);
 
         // Only reload if component is still mounted and not during initial load
         if (isMountedRef.current && !initialLoading) {
-          // SHORT delay for MongoDB sync (event-bridge now syncs immediately)
-          // Just give MongoDB a moment to complete the write operation
-          const delay = 500; // 500ms is enough for immediate MongoDB sync
+          // Increased delay for MongoDB sync + TheGraph → MongoDB propagation
+          // Event-bridge syncs immediately, but MongoDB write + index update needs time
+          const delay = 2000; // 2 seconds for reliable DB propagation
 
           console.log(`⏱️  [useMarketplaceItems] Waiting ${delay}ms for MongoDB sync...`);
 
@@ -444,7 +450,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
         window.removeEventListener('dataInvalidation', handleInvalidation);
       }
     };
-  }, [initialLoading, fetchItems]);
+  }, [initialLoading, fetchItems, cacheContext, createFilterKey]);
 
   return {
     items,

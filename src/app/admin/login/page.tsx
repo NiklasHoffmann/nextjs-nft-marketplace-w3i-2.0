@@ -1,7 +1,7 @@
 "use client";
 
 import { useAccount, useSignMessage, useConnectorClient } from 'wagmi';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { isAdminAddress } from '@/config/admin';
 import { Web3ConnectButton } from '@/components/layout/Web3ConnectButton';
@@ -21,11 +21,7 @@ export default function AdminLoginPage() {
 
     const redirectTo = searchParams?.get('redirect') || '/admin';
 
-    useEffect(() => {
-        checkExistingSession();
-    }, [address]);
-
-    const checkExistingSession = async () => {
+    const checkExistingSession = useCallback(async () => {
         setIsChecking(true);
 
         try {
@@ -60,7 +56,11 @@ export default function AdminLoginPage() {
             console.error('Session check error:', error);
             setIsChecking(false);
         }
-    };
+    }, [address, isConnected, redirectTo, router]);
+
+    useEffect(() => {
+        checkExistingSession();
+    }, [checkExistingSession]);
 
     const handleLogin = async () => {
         if (!address) {

@@ -184,27 +184,56 @@ export class BlockchainStateSync {
             }
         );
 
-        // Update nft_metadata (source of truth)
+        // Update nft_metadata (source of truth) with ownership history
         const nftMetadata = await getCollection('nft_metadata');
+        
+        // Get existing document to check for owner change
+        const existingNFT = await nftMetadata.findOne({ contractAddress, tokenId });
+        const oldOwner = existingNFT?.blockchain?.owner;
+        const ownerChanged = existingNFT && oldOwner && oldOwner.toLowerCase() !== state.owner.toLowerCase();
+        
+        // Prepare update operations
+        const updateOps: any = {
+            $set: {
+                // CRITICAL: Set contractAddress and tokenId explicitly for upsert
+                contractAddress,
+                tokenId,
+                'blockchain.owner': state.owner,
+                'blockchain.approved': state.approved,
+                'blockchain.isApprovedForAll': state.isApprovedForAll,
+                'blockchain.lastSyncedAt': now,
+                updatedAt: now
+            },
+            $setOnInsert: {
+                // Only set these on new document creation
+                createdAt: now,
+                metadataLastUpdated: now,
+                ownershipHistory: [] // Initialize history array
+            }
+        };
+        
+        // If owner changed, add to ownership history
+        if (ownerChanged) {
+            updateOps.$push = {
+                ownershipHistory: {
+                    owner: oldOwner,
+                    from: existingNFT.blockchain?.ownerSince || existingNFT.createdAt || now,
+                    to: now,
+                    detectedAt: now
+                }
+            };
+            // Set new owner's "ownerSince" timestamp
+            updateOps.$set['blockchain.ownerSince'] = now;
+            
+            console.log(`  🔄 Owner changed: ${oldOwner} → ${state.owner}`);
+        } else if (!existingNFT) {
+            // New NFT, set initial ownerSince
+            updateOps.$setOnInsert['blockchain.ownerSince'] = now;
+        }
+        
         await nftMetadata.updateOne(
             { contractAddress, tokenId },
-            {
-                $set: {
-                    // CRITICAL: Set contractAddress and tokenId explicitly for upsert
-                    contractAddress,
-                    tokenId,
-                    'blockchain.owner': state.owner,
-                    'blockchain.approved': state.approved,
-                    'blockchain.isApprovedForAll': state.isApprovedForAll,
-                    'blockchain.lastSyncedAt': now,
-                    updatedAt: now
-                },
-                $setOnInsert: {
-                    // Only set these on new document creation
-                    createdAt: now,
-                    metadataLastUpdated: now
-                }
-            },
+            updateOps,
             { upsert: true }
         );
     }

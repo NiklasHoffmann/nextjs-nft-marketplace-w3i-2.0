@@ -3,19 +3,23 @@
  * 
  * Uses BaseModal for consistent modal behavior.
  * Uses TransactionService for blockchain interactions.
+ * Supports ETH and WETH payments with approval checking.
  * 
  * ✅ Eliminated TODO - now uses real contract calls
  * ✅ Reduced from 331 to ~250 lines
+ * ✅ WETH support with approval check
  */
 'use client';
 import { memo, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { parseEther } from 'viem';
 import { formatEther } from '@/utils';
-import { useMarketplaceFees } from '@/app/sell/hooks/useMarketplaceFees';
-import { useMarketplaceContracts } from '@/app/sell/hooks/useMarketplaceContracts';
+import { useMarketplaceFees, useMarketplaceContracts } from '@/hooks/marketplace';
 import { useTransactionService } from '@/services/blockchain';
 import { useMarketplaceItems } from '@/contexts/marketplace-items';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
+import { useWETH } from '@/hooks/tokens';
+import { getCurrencySymbol, isNativeETH } from '@/config/tokens';
 import { BaseModal } from '@/components/core/Modal';
 import { LoadingState } from '@/components/core/Loading';
 
@@ -28,6 +32,7 @@ interface BuyNowModalProps {
     nftName?: string;
     nftImage?: string;
     price: string; // in wei
+    currency?: string; // payment currency (0x0 = ETH, WETH address = WETH)
     seller: string;
     buyer?: string; // connected wallet address
     desiredContractAddress?: string;
@@ -43,6 +48,7 @@ function BuyNowModal({
     nftName,
     nftImage,
     price,
+    currency,
     seller,
     buyer,
     desiredContractAddress,
@@ -59,6 +65,19 @@ function BuyNowModal({
     const { removeNFT } = useMarketplaceItems();
     const { refresh: refreshWallet } = useWalletNFTs();
 
+    // WETH Hook for approval check
+    const isWETH = !isNativeETH(currency || '');
+    const { 
+        hasEnoughAllowance, 
+        hasEnoughBalance,
+        approve,
+        wrap,
+        wethBalance,
+        ethBalance,
+        isApproving,
+        isWrapping
+    } = useWETH({ marketplaceAddress });
+
     // Transaction service
     const txService = useTransactionService();
     const { calculateFees, innovationFeePercentage, royaltyFeePercentage } = useMarketplaceFees({
@@ -66,6 +85,8 @@ function BuyNowModal({
         contractAddress: contractAddress as `0x${string}`,
         tokenId
     });
+
+    const currencySymbol = getCurrencySymbol(currency);
 
     // Calculate fees and totals
     const calculations = useMemo(() => {
@@ -85,6 +106,43 @@ function BuyNowModal({
         };
     }, [price, calculateFees, innovationFeePercentage, royaltyFeePercentage]);
 
+    // Check if user needs to wrap ETH to WETH
+    const needsWrapping = useMemo(() => {
+        if (!isWETH) return false;
+        const priceAmount = formatEther(price);
+        const wethBalanceNum = parseFloat(wethBalance || '0');
+        const ethBalanceNum = parseFloat(ethBalance || '0');
+        // Need wrapping if: insufficient WETH BUT sufficient ETH
+        return wethBalanceNum < parseFloat(priceAmount) && ethBalanceNum >= parseFloat(priceAmount);
+    }, [isWETH, price, wethBalance, ethBalance]);
+
+    // Check WETH approval if needed
+    const needsApproval = useMemo(() => {
+        if (!isWETH || needsWrapping) return false; // No approval needed if we need to wrap first
+        const priceInWei = parseEther(formatEther(price));
+        return !hasEnoughAllowance(priceInWei.toString());
+    }, [isWETH, price, hasEnoughAllowance, needsWrapping]);
+
+    const handleWrap = useCallback(async () => {
+        try {
+            const priceAmount = formatEther(price);
+            await wrap(priceAmount);
+        } catch (error) {
+            console.error('❌ ETH wrapping failed:', error);
+            setErrorMessage('Failed to wrap ETH. Please try again.');
+        }
+    }, [price, wrap]);
+
+    const handleApprove = useCallback(async () => {
+        try {
+            const priceInWei = parseEther(formatEther(price));
+            await approve(priceInWei.toString());
+        } catch (error) {
+            console.error('❌ WETH approval failed:', error);
+            setErrorMessage('WETH approval failed. Please try again.');
+        }
+    }, [price, approve]);
+
     const handlePurchase = useCallback(async () => {
         setIsPurchasing(true);
         setPurchaseStep('processing');
@@ -96,12 +154,14 @@ function BuyNowModal({
                 contractAddress,
                 tokenId,
                 price: formatEther(price),
+                currency: currencySymbol,
                 total: calculations.total
             });
 
             const result = await txService.purchaseNFT({
                 listingId,
                 price: formatEther(price),
+                currency,
                 seller,
                 buyer,
                 contractAddress,
@@ -263,21 +323,21 @@ function BuyNowModal({
                             <div className="flex justify-between items-center">
                                 <span className="text-gray-700">NFT Price</span>
                                 <span className="font-semibold text-gray-900">
-                                    {calculations.price.toFixed(4)} ETH
+                                    {calculations.price.toFixed(4)} {currencySymbol}
                                 </span>
                             </div>
 
                             <div className="flex justify-between items-center">
                                 <span className="text-gray-600 text-sm">Platform Fee ({calculations.platformFeePercentage.toFixed(2)}%)</span>
                                 <span className="text-gray-700 text-sm">
-                                    {calculations.platformFee.toFixed(4)} ETH
+                                    {calculations.platformFee.toFixed(4)} {currencySymbol}
                                 </span>
                             </div>
 
                             <div className="flex justify-between items-center">
                                 <span className="text-gray-600 text-sm">Creator Royalty ({calculations.royaltyFeePercentage.toFixed(2)}%)</span>
                                 <span className="text-gray-700 text-sm">
-                                    {calculations.creatorRoyalty.toFixed(4)} ETH
+                                    {calculations.creatorRoyalty.toFixed(4)} {currencySymbol}
                                 </span>
                             </div>
 
@@ -292,11 +352,51 @@ function BuyNowModal({
                                 <div className="flex justify-between items-center">
                                     <span className="text-lg font-bold text-gray-900">Total</span>
                                     <span className="text-2xl font-bold text-blue-600">
-                                        {calculations.total.toFixed(4)} ETH
+                                        {calculations.total.toFixed(4)} {currencySymbol}
                                     </span>
                                 </div>
                             </div>
                         </div>
+
+                        {/* WETH Wrapping Warning */}
+                        {isWETH && needsWrapping && (
+                            <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                                <div className="flex gap-3">
+                                    <svg className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" />
+                                    </svg>
+                                    <div className="flex-1">
+                                        <p className="text-sm font-medium text-purple-900">Wrap ETH to WETH</p>
+                                        <p className="text-sm text-purple-700 mt-1">
+                                            This NFT requires {calculations.price.toFixed(4)} WETH. You have {wethBalance || '0'} WETH but {ethBalance || '0'} ETH.
+                                        </p>
+                                        <p className="text-xs text-purple-600 mt-2">
+                                            Click "Wrap ETH" to convert {calculations.price.toFixed(4)} ETH → WETH, then approve and purchase.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* WETH Approval Warning */}
+                        {isWETH && !needsWrapping && needsApproval && (
+                            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                                <div className="flex gap-3">
+                                    <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                    </svg>
+                                    <div className="flex-1">
+                                        <p className="text-sm font-medium text-blue-900">WETH Approval Required</p>
+                                        <p className="text-sm text-blue-700 mt-1">
+                                            You need to approve the marketplace to spend {calculations.price.toFixed(4)} WETH before purchasing.
+                                        </p>
+                                        <p className="text-xs text-blue-600 mt-2">
+                                            Balance: {wethBalance || '0.0000'} WETH
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Warning */}
                         <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
@@ -318,19 +418,39 @@ function BuyNowModal({
                             <button
                                 type="button"
                                 onClick={handleClose}
-                                disabled={isPurchasing}
+                                disabled={isPurchasing || isApproving || isWrapping}
                                 className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Cancel
                             </button>
-                            <button
-                                type="button"
-                                onClick={handlePurchase}
-                                disabled={isPurchasing}
-                                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Confirm Purchase
-                            </button>
+                            {isWETH && needsWrapping ? (
+                                <button
+                                    type="button"
+                                    onClick={handleWrap}
+                                    disabled={isWrapping}
+                                    className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isWrapping ? 'Wrapping...' : 'Wrap ETH'}
+                                </button>
+                            ) : isWETH && needsApproval ? (
+                                <button
+                                    type="button"
+                                    onClick={handleApprove}
+                                    disabled={isApproving}
+                                    className="flex-1 px-6 py-3 bg-orange-600 text-white rounded-xl font-semibold hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isApproving ? 'Approving...' : 'Approve WETH'}
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={handlePurchase}
+                                    disabled={isPurchasing}
+                                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Confirm Purchase
+                                </button>
+                            )}
                         </div>
                     </>
                 )}
@@ -360,12 +480,12 @@ function BuyNowModal({
                         <div className="space-y-3 text-left max-w-md mx-auto">
                             {/* Step 1: Preparing */}
                             <div className={`flex items-center gap-3 p-3 rounded-lg ${transactionStep === 'preparing' ? 'bg-blue-50 border border-blue-200' :
-                                    ['signing', 'pending', 'confirming', 'success'].includes(transactionStep) ? 'bg-green-50 border border-green-200' :
-                                        'bg-gray-50 border border-gray-200'
+                                ['signing', 'pending', 'confirming', 'success'].includes(transactionStep) ? 'bg-green-50 border border-green-200' :
+                                    'bg-gray-50 border border-gray-200'
                                 }`}>
                                 <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${transactionStep === 'preparing' ? 'bg-blue-500' :
-                                        ['signing', 'pending', 'confirming', 'success'].includes(transactionStep) ? 'bg-green-500' :
-                                            'bg-gray-300'
+                                    ['signing', 'pending', 'confirming', 'success'].includes(transactionStep) ? 'bg-green-500' :
+                                        'bg-gray-300'
                                     }`}>
                                     {['signing', 'pending', 'confirming', 'success'].includes(transactionStep) ? (
                                         <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -378,19 +498,19 @@ function BuyNowModal({
                                     )}
                                 </div>
                                 <span className={`text-sm font-medium ${transactionStep === 'preparing' ? 'text-blue-900' :
-                                        ['signing', 'pending', 'confirming', 'success'].includes(transactionStep) ? 'text-green-900' :
-                                            'text-gray-600'
+                                    ['signing', 'pending', 'confirming', 'success'].includes(transactionStep) ? 'text-green-900' :
+                                        'text-gray-600'
                                     }`}>Preparing transaction</span>
                             </div>
 
                             {/* Step 2: Wallet Confirmation */}
                             <div className={`flex items-center gap-3 p-3 rounded-lg ${transactionStep === 'signing' ? 'bg-blue-50 border border-blue-200' :
-                                    ['pending', 'confirming', 'success'].includes(transactionStep) ? 'bg-green-50 border border-green-200' :
-                                        'bg-gray-50 border border-gray-200'
+                                ['pending', 'confirming', 'success'].includes(transactionStep) ? 'bg-green-50 border border-green-200' :
+                                    'bg-gray-50 border border-gray-200'
                                 }`}>
                                 <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${transactionStep === 'signing' ? 'bg-blue-500' :
-                                        ['pending', 'confirming', 'success'].includes(transactionStep) ? 'bg-green-500' :
-                                            'bg-gray-300'
+                                    ['pending', 'confirming', 'success'].includes(transactionStep) ? 'bg-green-500' :
+                                        'bg-gray-300'
                                     }`}>
                                     {['pending', 'confirming', 'success'].includes(transactionStep) ? (
                                         <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -403,19 +523,19 @@ function BuyNowModal({
                                     )}
                                 </div>
                                 <span className={`text-sm font-medium ${transactionStep === 'signing' ? 'text-blue-900' :
-                                        ['pending', 'confirming', 'success'].includes(transactionStep) ? 'text-green-900' :
-                                            'text-gray-600'
+                                    ['pending', 'confirming', 'success'].includes(transactionStep) ? 'text-green-900' :
+                                        'text-gray-600'
                                     }`}>Confirm in wallet</span>
                             </div>
 
                             {/* Step 3: Blockchain Confirmation */}
                             <div className={`flex items-center gap-3 p-3 rounded-lg ${['pending', 'confirming'].includes(transactionStep) ? 'bg-blue-50 border border-blue-200' :
-                                    transactionStep === 'success' ? 'bg-green-50 border border-green-200' :
-                                        'bg-gray-50 border border-gray-200'
+                                transactionStep === 'success' ? 'bg-green-50 border border-green-200' :
+                                    'bg-gray-50 border border-gray-200'
                                 }`}>
                                 <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${['pending', 'confirming'].includes(transactionStep) ? 'bg-blue-500' :
-                                        transactionStep === 'success' ? 'bg-green-500' :
-                                            'bg-gray-300'
+                                    transactionStep === 'success' ? 'bg-green-500' :
+                                        'bg-gray-300'
                                     }`}>
                                     {transactionStep === 'success' ? (
                                         <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -428,8 +548,8 @@ function BuyNowModal({
                                     )}
                                 </div>
                                 <span className={`text-sm font-medium ${['pending', 'confirming'].includes(transactionStep) ? 'text-blue-900' :
-                                        transactionStep === 'success' ? 'text-green-900' :
-                                            'text-gray-600'
+                                    transactionStep === 'success' ? 'text-green-900' :
+                                        'text-gray-600'
                                     }`}>Blockchain confirmation</span>
                             </div>
                         </div>

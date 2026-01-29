@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:clean": "taskkill /F /IM node.exe /T 2>nul || echo No processes killed & npm run dev",
     "build": "next build",
     "build:analyze": "ANALYZE=true next build",
     "start": "next start",

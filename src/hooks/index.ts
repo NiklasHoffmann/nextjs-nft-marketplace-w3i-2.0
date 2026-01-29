@@ -36,3 +36,8 @@ export * from './admin';
 
 // === CONTEXT RE-EXPORTS ===
 export { useNFTStats, useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
+
+// === UTILITY HOOKS ===
+export { useDebouncedAsync } from './useDebouncedAsync';
+export { useContextDevtools } from './useContextDevtools';
+export { useScrollPosition } from './useScrollPosition';

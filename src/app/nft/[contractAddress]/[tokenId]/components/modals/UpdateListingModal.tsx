@@ -10,7 +10,7 @@
  * ✅ Form management simplified with useForm hook
  */
 'use client'
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useEffect } from 'react';
 import { BaseModal } from '@/components/core/Modal';
 import { useTransactionService } from '@/services/blockchain';
 import { useMarketplaceItems } from '@/contexts/marketplace-items';
@@ -48,6 +48,31 @@ function UpdateListingModal({
         currentDesiredContractAddress && currentDesiredContractAddress !== '' ? 'swap' : 'sale'
     );
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [updateStep, setUpdateStep] = useState<'form' | 'processing' | 'success' | 'error'>('form');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    // Auto-close and reload on success after 2 seconds
+    useEffect(() => {
+        if (updateStep === 'success') {
+            const timer = setTimeout(() => {
+                onClose();
+                // Reload the page to reflect the updated listing
+                window.location.reload();
+            }, 2000);
+
+            return () => clearTimeout(timer);
+        }
+        return undefined;
+    }, [updateStep, onClose]);
+
+    // Reset state when modal closes
+    useEffect(() => {
+        if (!isOpen) {
+            setUpdateStep('form');
+            setErrorMessage(null);
+            setIsSubmitting(false);
+        }
+    }, [isOpen]);
 
     // Form management with useForm hook
     const form = useForm({
@@ -85,6 +110,8 @@ function UpdateListingModal({
         if (!isValid) return;
 
         setIsSubmitting(true);
+        setUpdateStep('processing');
+        setErrorMessage(null);
 
         try {
             console.log('📝 Updating listing:', {
@@ -102,11 +129,16 @@ function UpdateListingModal({
                 newDesiredContractAddress: listingType === 'swap' ? form.values.desiredContractAddress : undefined,
                 newDesiredTokenId: listingType === 'swap' ? form.values.desiredTokenId : undefined,
                 onProgress: (step) => {
-                    // Could add step indicator here
                     console.log('🔄 Update step:', step);
                 },
                 onError: (error) => {
                     console.error('❌ Update error:', error);
+                    setErrorMessage(error);
+                },
+                onSuccess: (result) => {
+                    console.log('✅ Listing updated! TX:', result.txHash);
+                    setUpdateStep('success');
+                    // Modal will auto-close after 2s (see useEffect)
                 },
                 onPostTransaction: async () => {
                     // Force immediate sync from TheGraph via API
@@ -127,24 +159,128 @@ function UpdateListingModal({
                 }
             });
 
-            if (result.success) {
-                console.log('✅ Listing updated! TX:', result.txHash);
-                onClose();
-            } else {
-                throw new Error(result.error || 'Update failed');
+            if (!result.success && result.error) {
+                throw new Error(result.error);
             }
         } catch (error) {
             console.error('Failed to update listing:', error);
-            alert('Failed to update listing. Please try again.');
+            setErrorMessage(error instanceof Error ? error.message : 'Failed to update listing. Please try again.');
+            setUpdateStep('error');
         } finally {
             setIsSubmitting(false);
         }
-    }, [listingId, contractAddress, tokenId, listingType, form, txService, onClose]);
+    }, [listingId, contractAddress, tokenId, listingType, form, txService, refreshMarketplace]);
 
+    const handleClose = useCallback(() => {
+        if (!isSubmitting && updateStep !== 'processing') {
+            onClose();
+        }
+    }, [isSubmitting, updateStep, onClose]);
+
+    // Render different content based on step
+    if (updateStep === 'success') {
+        return (
+            <BaseModal
+                isOpen={isOpen}
+                onClose={handleClose}
+                title="Listing Updated"
+                size="md"
+                disableBackdropClick={true}
+                disableEscapeKey={true}
+            >
+                <div className="text-center py-8">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+                        <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Successfully Updated!</h3>
+                    <p className="text-gray-600 mb-2">
+                        Your listing has been updated with the new details.
+                    </p>
+                    <p className="text-sm text-gray-500">
+                        Redirecting to updated page...
+                    </p>
+                </div>
+            </BaseModal>
+        );
+    }
+
+    if (updateStep === 'error') {
+        return (
+            <BaseModal
+                isOpen={isOpen}
+                onClose={handleClose}
+                title="Update Failed"
+                size="md"
+                footer={
+                    <div className="flex gap-3">
+                        <button
+                            type="button"
+                            onClick={handleClose}
+                            className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
+                        >
+                            Close
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setUpdateStep('form')}
+                            className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+                        >
+                            Try Again
+                        </button>
+                    </div>
+                }
+            >
+                <div className="text-center py-8">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
+                        <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Update Failed</h3>
+                    <p className="text-gray-600 mb-4">
+                        {errorMessage || 'An error occurred while updating the listing. Please try again.'}
+                    </p>
+                </div>
+            </BaseModal>
+        );
+    }
+
+    if (updateStep === 'processing') {
+        return (
+            <BaseModal
+                isOpen={isOpen}
+                onClose={handleClose}
+                title="Updating Listing"
+                size="md"
+                disableBackdropClick={true}
+                disableEscapeKey={true}
+            >
+                <div className="text-center py-8">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4 animate-pulse">
+                        <svg className="w-8 h-8 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Processing Update...</h3>
+                    <p className="text-gray-600 mb-2">
+                        Please confirm the transaction in your wallet
+                    </p>
+                    <p className="text-sm text-gray-500">
+                        This may take a few moments
+                    </p>
+                </div>
+            </BaseModal>
+        );
+    }
+
+    // Default: form step
     return (
         <BaseModal
             isOpen={isOpen}
-            onClose={onClose}
+            onClose={handleClose}
             title="Update Listing"
             size="md"
             disableBackdropClick={isSubmitting}
@@ -153,7 +289,7 @@ function UpdateListingModal({
                 <div className="flex gap-3">
                     <button
                         type="button"
-                        onClick={onClose}
+                        onClick={handleClose}
                         disabled={isSubmitting}
                         className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >

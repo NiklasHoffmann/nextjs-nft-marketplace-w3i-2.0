@@ -10,6 +10,7 @@ import { GET_ACTIVE_LISTINGS, LISTINGS_UPDATED_SUBSCRIPTION } from '@/config/sub
 import { getDatabase } from '@/lib/mongodb';
 import type { ListingV2 } from '@/types/marketplace/listing-v2';
 import { blockchainStateSync } from './blockchain-state-sync';
+import { IPFSMetadataLazySync } from './ipfs-metadata-lazy-sync';
 
 export class GraphQLSync {
     private client: ApolloClient<any> | null = null;
@@ -186,68 +187,109 @@ export class GraphQLSync {
 
             const chainId = 11155111; // Sepolia
 
-            // STEP 1: If no new listings from TheGraph, only delete (marketplace is empty)
+            // STEP 1: Get all existing listings to detect deletions
+            const existingListings = await collection.find(
+                { chainId },
+                { projection: { listingId: 1, contractAddress: 1, tokenId: 1 } }
+            ).toArray();
+
+            // STEP 2: Smart merge strategy using bulkWrite (upsert)
+            // This MERGES data instead of deleting everything
+            // ✅ Prevents race conditions with WebSocket events
+            // ✅ Keeps metadata enrichment from WebSocket events
+            // ✅ No temporary empty state
+
             if (!listings || listings.length === 0) {
-                const deleteResult = await collection.deleteMany({ chainId });
-                console.log(`   🗑️  Deleted ${deleteResult.deletedCount} existing listings`);
+                // Marketplace is empty - DELETE all listings
+                if (existingListings.length > 0) {
+                    await collection.deleteMany({ chainId });
+                    console.log(`   🗑️  Deleted ${existingListings.length} inactive listings`);
+                }
                 console.log('   ✅ Marketplace is empty (no active listings)');
                 return;
             }
 
-            // STEP 2: Perform sequential delete and insert operations
-            // Note: Transactions require replica set configuration
-
             try {
-                // Delete old listings
-                const deleteResult = await collection.deleteMany({ chainId });
-                const deleteCount = deleteResult.deletedCount;
-
-                // STEP 3: Insert all fresh listings from TheGraph
+                // STEP 3: Build bulkWrite operations (upsert all listings from TheGraph)
                 // ✅ OPTIMIZED: Only sync listing data (no metadata/approval here)
                 // Metadata is stored in nft_metadata collection (lazy-loaded)
                 // Blockchain state (owner/approval) is synced on-demand
-                const documents = listings.map((listing) => ({
-                    // V2 → V1 field mapping (LISTING DATA ONLY)
-                    listingId: listing.listingId,
-                    chainId: listing.chainId,
-                    contractAddress: listing.tokenAddress,
-                    nftAddress: listing.tokenAddress,
-                    tokenId: listing.tokenId,
-                    tokenStandard: listing.tokenStandard,
-                    erc1155QuantityListed: listing.erc1155QuantityListed,
-                    remainingQuantity: listing.remainingQuantity,
-                    price: listing.priceTotal || listing.unitPrice,
-                    priceTotal: listing.priceTotal,
-                    unitPrice: listing.unitPrice,
-                    seller: listing.seller,
-                    isListed: listing.active,
-                    active: listing.active,
-                    status: listing.status,
-                    listingType: listing.listingType,
-                    buyerWhitelistEnabled: listing.buyerWhitelistEnabled,
-                    partialBuyEnabled: listing.partialBuyEnabled,
-                    feeRate: listing.feeRate,
-                    desiredTokenAddress: listing.desiredTokenAddress,
-                    desiredTokenId: listing.desiredTokenId,
-                    desiredErc1155Quantity: listing.desiredErc1155Quantity,
-                    currency: listing.currency,
-                    createdAt: listing.createdAt,
-                    firstSyncedAt: new Date(),
-                    syncedAt: new Date()
+                const bulkOps = listings.map((listing) => ({
+                    updateOne: {
+                        filter: {
+                            listingId: listing.listingId,
+                            chainId: listing.chainId
+                        },
+                        update: {
+                            $set: {
+                                // V2 → V1 field mapping (LISTING DATA ONLY)
+                                listingId: listing.listingId,
+                                chainId: listing.chainId,
+                                contractAddress: listing.tokenAddress,
+                                nftAddress: listing.tokenAddress,
+                                // CRITICAL: Store tokenId as STRING (consistent with nft_metadata)
+                                tokenId: String(listing.tokenId),
+                                tokenStandard: listing.tokenStandard,
+                                erc1155QuantityListed: listing.erc1155QuantityListed,
+                                remainingQuantity: listing.remainingQuantity,
+                                // CRITICAL: Convert price to STRING (MongoDB stores as String, not Number/BigInt)
+                                price: String(listing.priceTotal || listing.unitPrice),
+                                priceTotal: String(listing.priceTotal || '0'),
+                                unitPrice: String(listing.unitPrice || '0'),
+                                seller: listing.seller,
+                                isListed: listing.active,
+                                active: listing.active,
+                                status: listing.status,
+                                listingType: listing.listingType,
+                                buyerWhitelistEnabled: listing.buyerWhitelistEnabled,
+                                partialBuyEnabled: listing.partialBuyEnabled,
+                                feeRate: listing.feeRate,
+                                desiredTokenAddress: listing.desiredTokenAddress,
+                                desiredTokenId: listing.desiredTokenId,
+                                desiredErc1155Quantity: listing.desiredErc1155Quantity,
+                                currency: listing.currency,
+                                createdAt: listing.createdAt,
+                                syncedAt: new Date()
+                            },
+                            $setOnInsert: {
+                                firstSyncedAt: new Date()
+                            }
+                        },
+                        upsert: true
+                    }
                 }));
 
-                // Insert new listings
-                const insertResult = await collection.insertMany(documents);
-                const insertCount = insertResult.insertedCount;
+                // Execute bulk upsert
+                const bulkResult = await collection.bulkWrite(bulkOps, { ordered: false });
+                const upsertedCount = bulkResult.upsertedCount + bulkResult.modifiedCount;
+
+                // STEP 4: Mark listings that are no longer in TheGraph as inactive
+                const graphListingIds = new Set(listings.map(l => l.listingId));
+                const inactiveListingIds = existingListings
+                    .filter(existing => !graphListingIds.has(existing.listingId))
+                    .map(l => l.listingId);
+
+                let deletedCount = 0;
+                if (inactiveListingIds.length > 0) {
+                    const deleteResult = await collection.deleteMany(
+                        { listingId: { $in: inactiveListingIds }, chainId }
+                    );
+                    deletedCount = deleteResult.deletedCount;
+                }
 
                 // Operations completed successfully
-                this.itemsProcessed += insertCount;
+                this.itemsProcessed += upsertedCount;
 
                 console.log(`✅ [V2 MongoDB] Database updated:`);
-                // 🔥 OPTIMIZED: Trigger blockchain state sync for ALL listings
-                // (Since we deleted everything, all are "new")
-                if (insertCount > 0) {
-                    console.log(`\n🔄 [Blockchain Sync] Triggering on-demand sync for ${insertCount} listings...`);
+                console.log(`   ✅ Upserted: ${upsertedCount} listings`);
+                console.log(`   �️ Deleted: ${deletedCount} old listings`);
+                
+                // Note: graph-update invalidation happens via SSE in /api/events/marketplace
+                // Server-side invalidation is not needed here since all clients get SSE updates
+                
+                // 🔥 OPTIMIZED: Trigger blockchain state sync for new/updated listings
+                if (upsertedCount > 0) {
+                    console.log(`\n🔄 [Blockchain Sync] Triggering on-demand sync for ${upsertedCount} listings...`);
 
                     const nftsToSync = listings.map(l => ({
                         contractAddress: l.tokenAddress,
@@ -260,6 +302,14 @@ export class GraphQLSync {
                         process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS
                     ).catch(error => {
                         console.error('❌ [Blockchain Sync] Error syncing listings:', error);
+                    });
+
+                    // 🎨 CRITICAL: Also trigger metadata sync for ALL listings
+                    // This ensures images and names are loaded for display
+                    console.log(`\n🎨 [Metadata Sync] Triggering IPFS metadata enrichment for ${listings.length} listings...`);
+                    const metadataSync = new IPFSMetadataLazySync();
+                    metadataSync.ensureBatch(nftsToSync).catch(error => {
+                        console.error('❌ [Metadata Sync] Error enriching metadata:', error);
                     });
                 }
             } catch (syncError) {

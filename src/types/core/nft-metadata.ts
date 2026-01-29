@@ -41,13 +41,22 @@ export interface NFTMetadata {
         approved?: string | null;     // ✅ ERC-721 approved address (for marketplace transfers)
     };
 
-    // Dynamic ownership data
-    currentOwner: string | null;  // Current owner address (lowercase)
-    ownerHistory: Array<{
-        owner: string;          // Owner address
-        acquiredAt: string;     // Timestamp
-        transferredAt?: string; // Timestamp (if transferred)
-        source: 'mint' | 'transfer' | 'purchase' | 'unknown';
+    // Dynamic ownership and blockchain state
+    blockchain: {
+        owner: string | null;           // Current owner address (lowercase)
+        approved: string | null;        // ERC-721 approved address
+        isApprovedForAll: boolean;     // Is marketplace approved for all
+        ownerSince: Date | null;       // When current owner acquired the NFT
+        lastSyncedAt: Date | null;     // Last blockchain sync timestamp
+    };
+
+    // Ownership history (append-only)
+    ownershipHistory: Array<{
+        owner: string;           // Previous owner address
+        from: Date;             // Start of ownership
+        to: Date;               // End of ownership
+        detectedAt: Date;       // When transfer was detected
+        transactionHash?: string; // Optional: transfer transaction hash
     }>;
 
     // Verification & sync

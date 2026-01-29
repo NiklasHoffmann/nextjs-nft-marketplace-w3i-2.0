@@ -6,88 +6,23 @@
  */
 
 export const DIAMOND_ABI = [
-    {
-        type: 'function',
-        name: 'owner',
-        inputs: [],
-        outputs: [{ name: '', type: 'address', internalType: 'address' }],
-        stateMutability: 'view',
-    },
-    {
-        type: 'function',
-        name: 'getPendingOwner',
-        inputs: [],
-        outputs: [{ name: '', type: 'address', internalType: 'address' }],
-        stateMutability: 'view',
-    },
-    {
-        type: 'function',
-        name: 'transferOwnership',
-        inputs: [{ name: 'newOwner', type: 'address', internalType: 'address' }],
-        outputs: [],
-        stateMutability: 'nonpayable',
-    },
-    {
-        type: 'function',
-        name: 'acceptOwnership',
-        inputs: [],
-        outputs: [],
-        stateMutability: 'nonpayable',
-    },
-    {
-        type: 'function',
-        name: 'pause',
-        inputs: [],
-        outputs: [],
-        stateMutability: 'nonpayable',
-    },
-    {
-        type: 'function',
-        name: 'unpause',
-        inputs: [],
-        outputs: [],
-        stateMutability: 'nonpayable',
-    },
-    {
-        type: 'function',
-        name: 'updateListingFee',
-        inputs: [{ name: 'newFee', type: 'uint256', internalType: 'uint256' }],
-        outputs: [],
-        stateMutability: 'nonpayable',
-    },
-    {
-        type: 'function',
-        name: 'updateRoyaltyFee',
-        inputs: [{ name: 'newFee', type: 'uint256', internalType: 'uint256' }],
-        outputs: [],
-        stateMutability: 'nonpayable',
-    },
-    {
-        type: 'function',
-        name: 'addWhitelistedCollection',
-        inputs: [{ name: 'collection', type: 'address', internalType: 'address' }],
-        outputs: [],
-        stateMutability: 'nonpayable',
-    },
-    {
-        type: 'function',
-        name: 'removeWhitelistedCollection',
-        inputs: [{ name: 'collection', type: 'address', internalType: 'address' }],
-        outputs: [],
-        stateMutability: 'nonpayable',
-    },
-    {
-        type: 'function',
-        name: 'addWhitelistedCollections',
-        inputs: [{ name: 'collections', type: 'address[]', internalType: 'address[]' }],
-        outputs: [],
-        stateMutability: 'nonpayable',
-    },
-    {
-        type: 'function',
-        name: 'removeWhitelistedCollections',
-        inputs: [{ name: 'collections', type: 'address[]', internalType: 'address[]' }],
-        outputs: [],
-        stateMutability: 'nonpayable',
-    },
+    // Ownership Functions
+    { type: "function", name: "owner", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+    { type: "function", name: "getPendingOwner", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+    { type: "function", name: "transferOwnership", stateMutability: "nonpayable", inputs: [{ type: "address", name: "newOwner" }], outputs: [] },
+    { type: "function", name: "acceptOwnership", stateMutability: "nonpayable", inputs: [], outputs: [] },
+
+    // Pause Functions
+    { type: "function", name: "pause", stateMutability: "nonpayable", inputs: [], outputs: [] },
+    { type: "function", name: "unpause", stateMutability: "nonpayable", inputs: [], outputs: [] },
+
+    // Fee Management Functions
+    { type: "function", name: "updateListingFee", stateMutability: "nonpayable", inputs: [{ type: "uint256", name: "newFee" }], outputs: [] },
+    { type: "function", name: "updateRoyaltyFee", stateMutability: "nonpayable", inputs: [{ type: "uint256", name: "newFee" }], outputs: [] },
+
+    // Collection Whitelist Functions
+    { type: "function", name: "addWhitelistedCollection", stateMutability: "nonpayable", inputs: [{ type: "address", name: "collection" }], outputs: [] },
+    { type: "function", name: "removeWhitelistedCollection", stateMutability: "nonpayable", inputs: [{ type: "address", name: "collection" }], outputs: [] },
+    { type: "function", name: "addWhitelistedCollections", stateMutability: "nonpayable", inputs: [{ type: "address[]", name: "collections" }], outputs: [] },
+    { type: "function", name: "removeWhitelistedCollections", stateMutability: "nonpayable", inputs: [{ type: "address[]", name: "collections" }], outputs: [] },
 ] as const;

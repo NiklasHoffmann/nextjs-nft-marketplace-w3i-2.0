@@ -30,14 +30,21 @@ export type MarketplaceEventName =
  * Emitted when a new NFT is listed on the marketplace
  */
 export interface ItemListedEventData {
-    listingId: bigint;
+    listingId: string;  // Converted from bigint
     seller: Address;
     nftAddress: Address;
-    tokenId: bigint;
-    price: bigint;
+    tokenId: string;    // Converted from bigint
+    price: string;      // Converted from bigint (Wei)
     buyer: Address; // 0x0 for pure ETH, target address for swap
     desiredNftAddress: Address; // 0x0 if no swap
-    desiredTokenId: bigint;
+    desiredTokenId: string;  // Converted from bigint
+    // V2 fields from ListingCreated event
+    currency: Address;
+    feeRate: string;  // Converted from uint32
+    buyerWhitelistEnabled: boolean;
+    partialBuyEnabled: boolean;
+    erc1155Quantity: string;  // Converted from bigint
+    desiredErc1155Quantity: string;  // Converted from bigint
 }
 
 /**
@@ -45,11 +52,11 @@ export interface ItemListedEventData {
  * Emitted when an NFT is purchased
  */
 export interface ItemBoughtEventData {
-    listingId: bigint;
+    listingId: string;  // Converted from bigint
     buyer: Address;
     nftAddress: Address;
-    tokenId: bigint;
-    price: bigint;
+    tokenId: string;    // Converted from bigint
+    price: string;      // Converted from bigint (Wei)
 }
 
 /**
@@ -57,10 +64,10 @@ export interface ItemBoughtEventData {
  * Emitted when a listing is cancelled by seller
  */
 export interface ItemCanceledEventData {
-    listingId: bigint;
+    listingId: string;  // Converted from bigint
     seller: Address;
     nftAddress: Address;
-    tokenId: bigint;
+    tokenId: string;    // Converted from bigint
 }
 
 /**
@@ -68,12 +75,12 @@ export interface ItemCanceledEventData {
  * Emitted when listing price/terms are updated
  */
 export interface ItemUpdatedEventData {
-    listingId: bigint;
+    listingId: string;        // Converted from bigint
     nftAddress: Address;
-    tokenId: bigint;
-    newPrice: bigint;
+    tokenId: string;          // Converted from bigint
+    newPrice: string;         // Converted from bigint (Wei)
     newDesiredNftAddress: Address;
-    newDesiredTokenId: bigint;
+    newDesiredTokenId: string; // Converted from bigint
 }
 
 // ===== PROCESSED EVENT DATA (enriched for app use) =====

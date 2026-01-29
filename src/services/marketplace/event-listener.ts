@@ -43,6 +43,7 @@ const MAX_RECONNECT_ATTEMPTS = 10;
 const INITIAL_RECONNECT_DELAY = 1000; // 1s
 const MAX_RECONNECT_DELAY = 60000; // 60s
 const EVENT_DEDUP_WINDOW = 5000; // 5s - prevent duplicate event processing
+const KEEPALIVE_INTERVAL = 30000; // 30s - send keepalive to prevent WebSocket timeout
 
 // ===== SERVICE IMPLEMENTATION =====
 
@@ -70,6 +71,9 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
     // Reconnection
     private reconnectTimeout: NodeJS.Timeout | null = null;
     private isReconnecting = false;
+
+    // Keepalive (prevent WebSocket timeout)
+    private keepaliveInterval: NodeJS.Timeout | null = null;
 
     // Event callbacks (for programmatic subscriptions)
     private eventCallbacks = new Map<MarketplaceEventName, Set<MarketplaceEventCallback>>();
@@ -155,6 +159,12 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             this.dedupCleanupInterval = null;
         }
 
+        // Clear keepalive interval
+        if (this.keepaliveInterval) {
+            clearInterval(this.keepaliveInterval);
+            this.keepaliveInterval = null;
+        }
+
         // Clear reconnect timeout
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
@@ -210,40 +220,52 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
      * Connect to WebSocket and start watching events
      */
     private async connect(): Promise<void> {
-        console.log('🔌 [EventListener] Attempting to connect...');
+        const environment = typeof window === 'undefined' ? 'SERVER' : 'CLIENT';
+        console.log(`🔌 [EventListener ${environment}] Attempting to connect...`);
         console.log('   WSS URL:', this.wsUrl);
         console.log('   Chain:', sepolia.name);
         console.log('   Marketplace:', this.marketplaceAddress);
 
         try {
             // Create viem client with WebSocket transport
-            console.log('📡 [EventListener] Creating WebSocket client...');
+            console.log(`📡 [EventListener ${environment}] Creating WebSocket client...`);
             this.client = createPublicClient({
                 chain: sepolia,
                 transport: webSocket(this.wsUrl, {
                     reconnect: false, // We handle reconnection ourselves
-                    timeout: 30000
+                    timeout: 30000,
+                    retryCount: 3,
+                    retryDelay: 1000
                 })
             });
-            console.log('✓ Client created');
+            console.log(`✓ Client created (${environment})`);
 
             // Watch all marketplace events
-            console.log('👀 [EventListener] Starting event watcher...');
+            console.log(`👀 [EventListener ${environment}] Starting event watcher...`);
             this.unwatch = this.client.watchContractEvent({
                 address: this.marketplaceAddress,
                 abi: MARKETPLACE_ABI,
-                onLogs: (logs) => this.handleLogs(logs),
-                onError: (error) => this.handleError(error),
-                strict: false // Don't throw on decode errors
+                onLogs: (logs) => {
+                    console.log(`🔔 [EventListener ${environment}] onLogs callback triggered with ${logs.length} logs`);
+                    this.handleLogs(logs);
+                },
+                onError: (error) => {
+                    console.error(`❌ [EventListener ${environment}] onError callback triggered:`, error);
+                    this.handleError(error);
+                },
+                strict: false, // Don't throw on decode errors
             });
-            console.log('✓ Event watcher started');
+            console.log(`✓ Event watcher started (${environment})`);
 
             this.isConnected = true;
             this.reconnectAttempts = 0;
 
-            console.log('✅ [EventListener] WebSocket connected successfully!');
+            console.log(`✅ [EventListener ${environment}] WebSocket connected successfully!`);
             console.log('   Status: CONNECTED');
             console.log('   Listening for: ItemListed, ItemBought, ItemCanceled, ItemUpdated');
+
+            // Start keepalive to prevent WebSocket timeout
+            this.startKeepalive();
 
             // Notify connection change
             this.config.onConnectionChange?.(true);
@@ -261,6 +283,12 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
      * Disconnect from WebSocket
      */
     private disconnect(): void {
+        // Clear keepalive interval
+        if (this.keepaliveInterval) {
+            clearInterval(this.keepaliveInterval);
+            this.keepaliveInterval = null;
+        }
+
         if (this.unwatch) {
             this.unwatch();
             this.unwatch = null;
@@ -274,14 +302,46 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
     }
 
     /**
+     * Start keepalive to prevent WebSocket timeout
+     * Infura/Alchemy WebSocket connections timeout after ~10-15 minutes of inactivity
+     */
+    private startKeepalive(): void {
+        // Clear any existing interval
+        if (this.keepaliveInterval) {
+            clearInterval(this.keepaliveInterval);
+        }
+
+        const environment = typeof window === 'undefined' ? 'SERVER' : 'CLIENT';
+
+        this.keepaliveInterval = setInterval(async () => {
+            if (!this.isConnected || !this.client) {
+                return;
+            }
+
+            try {
+                // Make a lightweight RPC call to keep connection alive
+                await this.client.getBlockNumber();
+                console.log(`💓 [EventListener ${environment}] Keepalive ping successful`);
+            } catch (error) {
+                console.warn(`⚠️ [EventListener ${environment}] Keepalive ping failed:`, error);
+                // If keepalive fails, trigger reconnection
+                this.handleError(error);
+            }
+        }, KEEPALIVE_INTERVAL);
+
+        console.log(`💓 [EventListener ${environment}] Keepalive started (${KEEPALIVE_INTERVAL}ms interval)`);
+    }
+
+    /**
      * Handle incoming logs from contract
      */
     private async handleLogs(logs: Log[]): Promise<void> {
-        console.log(`📬 [EventListener] Received ${logs.length} log(s)`);
+        const environment = typeof window === 'undefined' ? 'SERVER' : 'CLIENT';
+        console.log(`📬 [EventListener ${environment}] Received ${logs.length} log(s)`);
 
         for (const log of logs) {
             try {
-                console.log('📝 [EventListener] Processing log:', {
+                console.log(`📝 [EventListener ${environment}] Processing log:`, {
                     eventName: (log as any).eventName,
                     txHash: log.transactionHash,
                     blockNumber: log.blockNumber
@@ -290,13 +350,13 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                 const result = await this.processLog(log);
 
                 if (result.success && result.event) {
-                    console.log('✅ [EventListener] Event processed successfully:', result.event.eventName);
+                    console.log(`✅ [EventListener ${environment}] Event processed successfully:`, result.event.eventName);
                     await this.dispatchEvent(result.event);
                 } else if (result.skipped) {
-                    console.log(`⏭️ [EventListener] Event skipped (${result.skipReason})`);
+                    console.log(`⏭️ [EventListener ${environment}] Event skipped (${result.skipReason})`);
                 }
             } catch (error) {
-                console.error('❌ [EventListener] Log processing error:', error);
+                console.error(`❌ [EventListener ${environment}] Log processing error:`, error);
                 this.config.onError?.(error as Error);
             }
         }
@@ -350,12 +410,17 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
         console.log('🔍 [decodeLog] Input log:', {
             eventName: log.eventName,
             topics: log.topics?.length,
-            hasArgs: !!log.args
+            hasArgs: !!log.args,
+            topicSignature: log.topics?.[0] // Log the event signature
         });
 
         // If eventName is not set, try to decode from topics
         if (!log.eventName && log.topics && log.topics.length > 0) {
             console.log('🔍 [decodeLog] No eventName, attempting manual decode...');
+            console.log('   Event Signature:', log.topics[0]);
+            console.log('   From Contract:', log.address);
+            console.log('   Expected Contract:', this.marketplaceAddress);
+
             try {
                 const decoded = decodeEventLog({
                     abi: MARKETPLACE_ABI,
@@ -425,14 +490,21 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                         ...baseEvent,
                         listingType,
                         data: {
-                            listingId: args.listingId,
+                            listingId: String(args.listingId),
                             seller: args.seller,
-                            nftAddress: args.tokenAddress, // Map to expected field name
-                            tokenId: args.tokenId,
-                            price: args.price,
-                            buyer: '0x0000000000000000000000000000000000000000' as Address, // Default for ETH sales
+                            nftAddress: args.tokenAddress,
+                            tokenId: String(args.tokenId),
+                            price: String(args.price),
+                            buyer: '0x0000000000000000000000000000000000000000' as Address,
                             desiredNftAddress: args.desiredTokenAddress || '0x0000000000000000000000000000000000000000' as Address,
-                            desiredTokenId: args.desiredTokenId || BigInt(0)
+                            desiredTokenId: String(args.desiredTokenId || BigInt(0)),
+                            // V2 fields from ListingCreated event
+                            currency: args.currency,
+                            feeRate: String(args.feeRate),
+                            buyerWhitelistEnabled: args.buyerWhitelistEnabled,
+                            partialBuyEnabled: args.partialBuyEnabled,
+                            erc1155Quantity: String(args.erc1155Quantity || BigInt(0)),
+                            desiredErc1155Quantity: String(args.desiredErc1155Quantity || BigInt(0))
                         }
                     } as ProcessedItemListedEvent;
                 }
@@ -442,11 +514,11 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                         eventName: 'ItemBought',
                         ...baseEvent,
                         data: {
-                            listingId: args.listingId,
+                            listingId: String(args.listingId),
                             buyer: args.buyer,
                             nftAddress: args.tokenAddress, // Map to expected field name
-                            tokenId: args.tokenId,
-                            price: args.price
+                            tokenId: String(args.tokenId),
+                            price: String(args.price)
                         }
                     } as ProcessedItemBoughtEvent;
 
@@ -455,10 +527,10 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                         eventName: 'ItemCanceled',
                         ...baseEvent,
                         data: {
-                            listingId: args.listingId,
+                            listingId: String(args.listingId),
                             seller: args.seller,
                             nftAddress: args.tokenAddress, // Map to expected field name
-                            tokenId: args.tokenId
+                            tokenId: String(args.tokenId)
                         }
                     } as ProcessedItemCanceledEvent;
 
@@ -478,12 +550,12 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                         ...baseEvent,
                         listingType,
                         data: {
-                            listingId: args.listingId,
+                            listingId: String(args.listingId),
                             nftAddress: args.tokenAddress, // Map to expected field name
-                            tokenId: args.tokenId,
-                            newPrice: args.price,
+                            tokenId: String(args.tokenId),
+                            newPrice: String(args.price),
                             newDesiredNftAddress: args.desiredTokenAddress || '0x0000000000000000000000000000000000000000' as Address,
-                            newDesiredTokenId: args.desiredTokenId || BigInt(0)
+                            newDesiredTokenId: String(args.desiredTokenId || BigInt(0))
                         }
                     } as ProcessedItemUpdatedEvent;
                 }
@@ -503,11 +575,32 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
      * Dispatch processed event to all listeners
      */
     private async dispatchEvent(event: ProcessedMarketplaceEvent): Promise<void> {
-        console.log(`📡 [EventListener] Dispatching ${event.eventName}:`, {
+        const environment = typeof window === 'undefined' ? 'SERVER' : 'CLIENT';
+        console.log(`📡 [EventListener ${environment}] Dispatching ${event.eventName}:`, {
             txHash: event.transactionHash.substring(0, 10) + '...',
             block: event.blockNumber.toString(),
             data: event.data
         });
+
+        // On client-side: Forward event to server API for MongoDB sync
+        if (typeof window !== 'undefined') {
+            try {
+                console.log(`📤 [EventListener CLIENT] Forwarding event to server API...`);
+                const response = await fetch('/api/events/marketplace', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ event })
+                });
+
+                if (response.ok) {
+                    console.log(`✅ [EventListener CLIENT] Event forwarded to server successfully`);
+                } else {
+                    console.error(`❌ [EventListener CLIENT] Failed to forward event:`, response.status);
+                }
+            } catch (error) {
+                console.error(`❌ [EventListener CLIENT] Error forwarding event:`, error);
+            }
+        }
 
         // Call general event callback
         if (this.config.onEvent) {
@@ -547,7 +640,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             }
         }
 
-        console.log(`✅ [EventListener] ${event.eventName} dispatch complete`);
+        console.log(`✅ [EventListener ${environment}] ${event.eventName} dispatch complete`);
     }
 
     /**

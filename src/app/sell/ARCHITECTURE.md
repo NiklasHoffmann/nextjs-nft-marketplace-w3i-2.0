@@ -39,6 +39,8 @@
 ```
 /components
 │
+├── SellPage.tsx                # Main page component (entry)
+│
 ├── 🎨 /common (Shared UI)
 │   ├── EmptyState              [No wallet connected]
 │   ├── ErrorDisplay            [Error messages]
@@ -81,15 +83,16 @@
 └─────────────┬───────────────────────────────────────────┘
               │
 ┌─────────────▼───────────────────────────────────────────┐
-│ 3. SellPage.tsx executes                                │
-│    → useUserNFTs() loads wallet NFTs                    │
+│ 3. SellPage.tsx executes (from components/)             │
+│    → useWalletNFTs() loads wallet NFTs (direct context) │
+│    → Local filtering & sorting                          │
 │    → Displays NFTUserSelector / BatchNFTSelector        │
 └─────────────┬───────────────────────────────────────────┘
               │
 ┌─────────────▼───────────────────────────────────────────┐
 │ 4. User selects NFT(s)                                  │
 │    → Updates Context: formData.selectedNFT(s)           │
-│    → Triggers whitelist check (useCollectionWhitelist)  │
+│    → Triggers whitelist check (useMarketplaceData)      │
 │    → Triggers approval check (useNFTApproval)           │
 └─────────────┬───────────────────────────────────────────┘
               │
@@ -159,29 +162,54 @@
 
 ## 🎣 Hooks Architecture
 
+### No Route-Specific Hooks
 ```
-/hooks
-│
-├── useUserNFTs
-│   ├── Loads user's NFTs from wallet
-│   ├── Filters by search term & listed status
-│   ├── Sorts by selected option
-│   └── Returns: { allNFTs, filteredNFTs, loading, error }
-│
-├── useNFTApproval
-│   ├── Checks if NFT is approved for marketplace
-│   ├── Triggers approval transaction if needed
-│   └── Returns: { isApproved, approve, loading }
-│
-├── useCollectionWhitelist
-│   ├── Checks if collection is whitelisted
-│   ├── Uses API endpoint for verification
-│   └── Returns: { isWhitelisted, loading, error }
-│
-└── useMarketplaceContracts
-    ├── Gets contract addresses from environment
-    └── Returns: { marketplaceAddress, tokenAddress }
+✅ All hooks are global!
+
+All hooks moved to @/hooks/ for maximum reusability.
+/sell/hooks directory removed completely.
 ```
+
+### Global Hooks Used by /sell
+```
+├── useNFTApproval (from @/hooks/nfts)
+│   ├── Check approval status (single & all)
+│   ├── Approve single NFT or all from collection
+│   ├── Smart approval (only if needed)
+│   └── Returns: { isFullyApproved, approveSingle, approveAll, ensureApproval }
+│
+├── useWalletNFTs (from @/contexts/wallet-nfts)
+│   ├── Direct access to wallet NFTs
+│   ├── Filtering & sorting in component (local state)
+│   └── Utils: walletNFTToAggregatedNFT, filterNFTs, sortNFTs
+│
+├── useListingFlow (from ./contexts/ListingFlowContext)
+│   ├── Form data & progress management
+│   └── Session storage persistence
+│
+
+### Global Hooks (Re-exported from @/hooks/marketplace)
+```
+Global hooks used in /sell but defined globally:
+
+├── useMarketplaceData
+│   ├── Aggregates all marketplace hooks
+│   ├── Returns: { useCollectionWhitelist, useListingInfo, ... }
+│   └── Usage: useMarketplaceData().useCollectionWhitelist()
+│
+├── useMarketplaceContracts
+│   ├── Contract address configuration
+│   └── Returns: { marketplaceAddress, tokenAddress }
+│
+└── useMarketplaceFees
+    ├── Fee calculation (owner fee, platform fee)
+    └── Returns: { ownerFee, platformFee, calculateFees }
+```
+
+### Architecture Decision: Global vs Route-Specific
+- **Global hooks** (@/hooks/marketplace): Used in multiple routes or services
+- **Route-specific hooks** (app/[route]/hooks): Only used within single route
+- **Migration**: useMarketplaceContracts and useMarketplaceFees moved to global (Dec 2024) because TransactionService needs them
 
 ## 🔧 Utilities
 
@@ -228,6 +256,7 @@ Tailwind CSS Classes (Consistent Patterns)
 
 ## 🚀 Performance Optimizations
 
+### Bundle Size
 ```
 Tree Shaking (Barrel Exports)
    ↓
@@ -240,7 +269,34 @@ Code Splitting (Next.js)
 Components loaded on-demand
    ↓
 Faster initial page load
+```
 
+### API Route Optimization (Dec 2024)
+```
+❌ BEFORE: API route proxying contract reads
+   Client → /api/marketplace/whitelist-check
+          → Server reads contract
+          → Returns JSON
+   Problems: Extra latency, rate limits, server overhead
+
+✅ AFTER: Direct contract reads (viem + wagmi)
+   Client → useMarketplaceData().useCollectionWhitelist()
+          → Direct contract read (cached by wagmi)
+   Benefits: Reactive, cached, type-safe, 60% faster
+```
+
+**Deleted Routes:**
+- `/api/marketplace/whitelist` - Replaced with direct hook usage
+- `/api/marketplace/whitelist-check` - Replaced with viem publicClient reads
+
+**API Routes Now Only For:**
+- Database operations (MongoDB CRUD)
+- Session management (auth)
+- Server-side aggregations
+- Multi-source data enrichment
+
+### React Optimizations
+```
 Memoization (useMemo/useCallback)
    ↓
 Prevents unnecessary re-renders

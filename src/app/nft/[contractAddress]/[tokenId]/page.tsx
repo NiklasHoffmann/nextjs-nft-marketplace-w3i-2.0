@@ -207,6 +207,7 @@ function NFTDetailPage() {
         nftImage: finalImageUrl || undefined,
         desiredContractAddress: nftDetails?.desiredContractAddress,
         desiredTokenId: nftDetails?.desiredTokenId,
+        currency: nftDetails?.currency,
         // v2 fields
         status: nftDetails?.status,
         listingType: nftDetails?.listingType,
@@ -214,7 +215,7 @@ function NFTDetailPage() {
     }), [
         nftDetails?.price, nftDetails?.isListed, nftDetails?.seller,
         nftDetails?.desiredContractAddress, nftDetails?.desiredTokenId, nftDetails?.listingId,
-        nftDetails?.status, nftDetails?.listingType, nftDetails?.tokenStandard,
+        nftDetails?.currency, nftDetails?.status, nftDetails?.listingType, nftDetails?.tokenStandard,
         priceData.convertedPrice, priceData.priceLoading, priceData.selectedCurrencySymbol,
         contractAddress, tokenId, nftData?.contract?.owner, userAddress, finalName, finalImageUrl
     ]);

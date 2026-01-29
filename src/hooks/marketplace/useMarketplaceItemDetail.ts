@@ -18,6 +18,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useMarketplaceItems } from '@/contexts/marketplace-items';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
+import { onDataInvalidation, type InvalidationEventDetail } from '@/services/validation';
+import { useServerEvents } from '@/hooks/marketplace/useServerEvents';
 import type { EnrichedNFTDocument } from '@/types/marketplace/enriched-nft';
 
 interface UseMarketplaceItemDetailOptions {
@@ -299,6 +301,54 @@ export function useMarketplaceItemDetail(options: UseMarketplaceItemDetailOption
             fetchNFT();
         }
     }, [autoFetch, fetchNFT]);
+
+    /**
+     * Listen for data invalidation events (auto-refresh when this NFT is affected)
+     */
+    useEffect(() => {
+        const unsubscribe = onDataInvalidation((detail: InvalidationEventDetail) => {
+            // Only refresh if this specific NFT is affected
+            const isAffected =
+                detail.type === 'manual-refresh' ||
+                detail.type === 'graph-update' ||
+                (detail.contractAddress?.toLowerCase() === contractAddress.toLowerCase() &&
+                    detail.tokenId === tokenId);
+
+            if (isAffected) {
+                console.log(`🔄 [useMarketplaceItemDetail] Auto-refreshing after ${detail.type}`);
+                // Clear cache and refetch
+                const cacheKey = createCacheKey();
+                cache.invalidateCache(cacheKey);
+                fetchNFT();
+            }
+        });
+
+        return unsubscribe;
+    }, [contractAddress, tokenId, createCacheKey, cache, fetchNFT]);
+
+    /**
+     * Listen for Server-Sent Events (SSE) - real-time updates from OTHER clients
+     * DISABLED: MarketplaceItemsContext handles SSE and emits dataInvalidation
+     */
+    useServerEvents({
+        enabled: false, // ⚠️ Disabled - rely on dataInvalidation events
+        onEvent: (event) => {
+            console.log(`📡 [useMarketplaceItemDetail SSE] Received event:`, event.eventName);
+            
+            // Check if this event affects our NFT
+            const eventData = event.data as any;
+            if (eventData?.nftAddress?.toLowerCase() === contractAddress.toLowerCase() &&
+                eventData?.tokenId?.toString() === tokenId) {
+                console.log(`🔄 [useMarketplaceItemDetail SSE] Refreshing NFT after ${event.eventName}`);
+                const cacheKey = createCacheKey();
+                cache.invalidateCache(cacheKey);
+                fetchNFT();
+            }
+        },
+        onConnectionChange: (connected) => {
+            console.log(`🔌 [useMarketplaceItemDetail SSE] Connection ${connected ? 'established' : 'lost'}`);
+        }
+    });
 
     /**
      * Refresh function to force refetch

@@ -6,11 +6,12 @@ import { StatCard } from '@/components/ui/StatCard';
 interface CartStatsProps {
     itemCount: number;
     totalValue: string;
+    isCompact?: boolean;
 }
 
-export function CartStats({ itemCount, totalValue }: CartStatsProps) {
+export function CartStats({ itemCount, totalValue, isCompact = false }: CartStatsProps) {
     return (
-        <div className="grid grid-cols-2 gap-4">
+        <div className={isCompact ? "flex flex-wrap gap-2 justify-end" : "grid grid-cols-2 gap-4"}>
             {/* Items Count */}
             <StatCard
                 icon={
@@ -21,6 +22,7 @@ export function CartStats({ itemCount, totalValue }: CartStatsProps) {
                 label="Items"
                 value={itemCount}
                 variant="blue"
+                isCompact={isCompact}
             />
 
             {/* Total Value */}
@@ -33,6 +35,7 @@ export function CartStats({ itemCount, totalValue }: CartStatsProps) {
                 label="Total Value"
                 value={`${totalValue} ETH`}
                 variant="green"
+                isCompact={isCompact}
             />
         </div>
     );

@@ -1,28 +1,32 @@
 /**
  * NFTCardPrice - Price display for NFT cards
- * Shows price in ETH with USD conversion, or "Not Listed" placeholder
+ * Shows price in ETH/WETH with USD conversion, or "Not Listed" placeholder
  */
 
 import { memo, useMemo } from 'react';
 import { useETHPrice } from '@/contexts/CurrencyContext';
 import { formatEther } from '@/utils';
+import { getCurrencySymbol } from '@/config/tokens';
 
 interface NFTCardPriceProps {
     price: string | null;
     isListed: boolean;
     desiredContractAddress?: string | null;
+    currency?: string | null;
 }
 
 export const NFTCardPrice = memo<NFTCardPriceProps>(({
     price,
     isListed,
-    desiredContractAddress
+    desiredContractAddress,
+    currency
 }) => {
     const ethPrice = useMemo(() =>
         price ? parseFloat(formatEther(price)) : 0,
         [price]
     );
     const { convertedPrice, loading } = useETHPrice(ethPrice);
+    const currencySymbol = getCurrencySymbol(currency);
 
     if (!isListed || !price) {
         return (
@@ -40,7 +44,7 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
         <div className="bg-white/95 backdrop-blur-sm p-2 rounded-md shadow-2xl border border-gray-200/60 ring-1 ring-gray-300/20">
             <div className="flex justify-between items-center">
                 <div className="text-left">
-                    <div className="text-orange font-semibold text-lg">{formatEther(price)} ETH</div>
+                    <div className="text-orange font-semibold text-lg">{formatEther(price)} {currencySymbol}</div>
                     {loading ? (
                         <div className="text-xs text-gray-500">Lädt...</div>
                     ) : (

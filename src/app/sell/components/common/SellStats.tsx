@@ -8,11 +8,12 @@ interface SellStatsProps {
     listedCount: number;
     unlistedCount: number;
     selectedCount: number;
+    isCompact?: boolean;
 }
 
-export function SellStats({ totalNFTs, listedCount, unlistedCount, selectedCount }: SellStatsProps) {
+export function SellStats({ totalNFTs, listedCount, unlistedCount, selectedCount, isCompact = false }: SellStatsProps) {
     return (
-        <div className="grid grid-cols-4 gap-3">
+        <div className={isCompact ? "flex flex-wrap gap-2 justify-end" : "grid grid-cols-4 gap-3"}>
             {/* Selected NFTs - ganz links */}
             <StatCard
                 icon={
@@ -24,6 +25,7 @@ export function SellStats({ totalNFTs, listedCount, unlistedCount, selectedCount
                 value={selectedCount}
                 variant="blue"
                 hideSecondaryPlaceholder
+                isCompact={isCompact}
             />
 
             {/* Unlisted NFTs */}
@@ -37,6 +39,7 @@ export function SellStats({ totalNFTs, listedCount, unlistedCount, selectedCount
                 value={unlistedCount}
                 variant="gray"
                 hideSecondaryPlaceholder
+                isCompact={isCompact}
             />
 
             {/* Listed NFTs */}
@@ -50,6 +53,7 @@ export function SellStats({ totalNFTs, listedCount, unlistedCount, selectedCount
                 value={listedCount}
                 variant="green"
                 hideSecondaryPlaceholder
+                isCompact={isCompact}
             />
 
             {/* Total NFTs - ganz rechts */}
@@ -63,6 +67,7 @@ export function SellStats({ totalNFTs, listedCount, unlistedCount, selectedCount
                 value={totalNFTs}
                 variant="purple"
                 hideSecondaryPlaceholder
+                isCompact={isCompact}
             />
         </div>
     );

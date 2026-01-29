@@ -5,9 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { useListingFlow } from '../contexts/ListingFlowContext';
 import { useTransactionService } from '@/services/blockchain';
-import { useMarketplaceContracts } from '../hooks/useMarketplaceContracts';
+import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
 import NFTCard from '@/components/nft/NFTCard';
-import { useMarketplaceFees } from '../hooks/useMarketplaceFees';
 import Link from 'next/link';
 
 export default function ListingPage() {
@@ -37,22 +36,6 @@ export default function ListingPage() {
             setProgressStep('listing', 'whitelist');
         }
     }, [formData.selectedNFT, router, setProgressStep]);
-
-    // Whitelist check function
-    const checkWhitelist = useCallback(async (contractAddress: string): Promise<boolean> => {
-        try {
-            const result = await fetch('/api/marketplace/whitelist-check', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contractAddress, marketplaceAddress })
-            });
-            const data = await result.json();
-            return data.whitelisted === true;
-        } catch (error) {
-            console.error('Whitelist check failed:', error);
-            return false;
-        }
-    }, [marketplaceAddress]);
 
     // Approval check (simplified - assumes approval handled before this step)
     const ensureApproval = async (): Promise<boolean> => {

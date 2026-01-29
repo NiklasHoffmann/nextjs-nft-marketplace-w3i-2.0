@@ -120,6 +120,8 @@ export interface NFTPriceCardProps {
     // For swap/trade functionality
     desiredContractAddress?: string;
     desiredTokenId?: string;
+    // Payment currency
+    currency?: string | null;
     // v2 Marketplace fields
     status?: 'LISTED' | 'PARTIALLY_FILLED' | 'SOLD_OUT' | 'CANCELED' | 'INVALIDATED' | null;
     listingType?: 'PURE_ETH' | 'SWAP_AND_ETH' | 'PURE_SWAP' | null;

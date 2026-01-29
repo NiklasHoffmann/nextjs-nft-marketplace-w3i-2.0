@@ -14,14 +14,16 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAccount } from 'wagmi';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
-import { useUserNFTs, useListingForm } from './hooks';
-import { useListingFlow } from './contexts/ListingFlowContext';
-import { useMarketplaceContracts } from './hooks/useMarketplaceContracts';
-import type { StepStatus, ListingType } from './types';
+import { useListingFlow } from '../contexts/ListingFlowContext';
+import { useMarketplaceContracts, useMarketplaceData } from '@/hooks/marketplace';
+import { useNFTApproval } from '@/hooks/nfts';
+import { useWalletNFTs } from '@/contexts/wallet-nfts';
+import { walletNFTToAggregatedNFT, sortNFTs, filterNFTs } from '../utils';
+import type { StepStatus, ListingType, NFTFilterOptions } from '../types';
 
 // UI Components
 import {
@@ -33,8 +35,7 @@ import {
     UnifiedListingForm,
     BatchPricingForm,
     ApprovalDialog
-} from './components';
-import { useNFTApproval } from './hooks/useNFTApproval';
+} from '.';
 
 export function SellPage() {
     const { isConnected, address } = useAccount();
@@ -42,20 +43,43 @@ export function SellPage() {
     const router = useRouter();
     const { setFormData, setProgressStep, setWhitelistStatus: setWhitelistStatusContext, setApprovalStatus: setApprovalStatusContext } = useListingFlow();
     const { marketplaceAddress } = useMarketplaceContracts();
+    const { useCollectionWhitelist } = useMarketplaceData(marketplaceAddress || '0x0000000000000000000000000000000000000000');
 
     const urlContract = searchParams?.get('contract');
     const urlTokenId = searchParams?.get('tokenId');
 
-    const {
-        allNFTs,
-        filteredNFTs,
-        filterOptions,
-        updateFilter,
-        loading: nftsLoading,
-        error: nftsError
-    } = useUserNFTs();
+    // Direct context usage instead of wrapper hook
+    const walletNFTsContext = useWalletNFTs();
 
-    const { selectedNFT, setSelectedNFT } = useListingForm();
+    // Local filter state
+    const [filterOptions, setFilterOptions] = useState<NFTFilterOptions>({
+        searchTerm: '',
+        showOnlyUnlisted: true,
+        sortBy: 'name',
+        sortOrder: 'asc'
+    });
+
+    // Convert wallet NFTs to aggregated format
+    const allNFTs = useMemo(
+        () => walletNFTsContext.nfts.map(walletNFTToAggregatedNFT),
+        [walletNFTsContext.nfts]
+    );
+
+    // Apply filters and sorting
+    const filteredNFTs = useMemo(() => {
+        const filtered = filterNFTs(allNFTs, {
+            searchTerm: filterOptions.searchTerm,
+            showOnlyUnlisted: filterOptions.showOnlyUnlisted
+        });
+        return sortNFTs(filtered, filterOptions.sortBy, filterOptions.sortOrder);
+    }, [allNFTs, filterOptions]);
+
+    const updateFilter = (updates: Partial<NFTFilterOptions>) => {
+        setFilterOptions(prev => ({ ...prev, ...updates }));
+    };
+
+    // Local form state
+    const [selectedNFT, setSelectedNFT] = useState<AggregatedNFT | null>(null);
 
     const [listingType, setListingType] = useState<ListingType>('single');
     const [batchSelectedNFTs, setBatchSelectedNFTs] = useState<Set<string>>(new Set());
@@ -197,45 +221,35 @@ export function SellPage() {
         setApprovalStatus('not-started');
     }, [selectedNFT, batchSelectedNFTs, listingType, marketplaceAddress, address, whitelistStatus]);
 
+    // Get contract address to check
+    const contractToCheck = listingType === 'single' && selectedNFT
+        ? selectedNFT.contractAddress
+        : listingType === 'batch' && batchSelectedNFTs.size > 0
+            ? Array.from(batchSelectedNFTs)[0]?.split('-')[0]
+            : null;
+
+    // Direct hook call for whitelist check (reactive, auto-cached)
+    const { data: isWhitelisted, isLoading: isWhitelistLoading, isError: isWhitelistError } = useCollectionWhitelist(
+        contractToCheck || '0x0000000000000000000000000000000000000000'
+    );
+
+    // Update whitelist status based on hook result
     useEffect(() => {
-        const checkWhitelist = async (contractAddress: string) => {
-            try {
-                setWhitelistStatus('checking');
-                const result = await fetch('/api/marketplace/whitelist-check', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        collectionAddress: contractAddress,
-                        marketplaceAddress
-                    })
-                });
-                const data = await result.json();
-
-                if (data?.data?.isWhitelisted === true) {
-                    setWhitelistStatus('done');
-                } else {
-                    setWhitelistStatus('failed');
-                }
-            } catch (error) {
-                console.error('Whitelist check failed:', error);
-                setWhitelistStatus('failed');
-            }
-        };
-
-        if (listingType === 'single' && selectedNFT) {
-            checkWhitelist(selectedNFT.contractAddress);
-        } else if (listingType === 'batch' && batchSelectedNFTs.size > 0) {
-            const firstKey = Array.from(batchSelectedNFTs)[0];
-            if (firstKey) {
-                const [contract] = firstKey.split('-');
-                if (contract) {
-                    checkWhitelist(contract);
-                }
-            }
-        } else {
+        if (!contractToCheck) {
             setWhitelistStatus('not-started');
+            return;
         }
-    }, [selectedNFT, batchSelectedNFTs, listingType, marketplaceAddress]);
+
+        if (isWhitelistLoading) {
+            setWhitelistStatus('checking');
+        } else if (isWhitelistError) {
+            setWhitelistStatus('failed');
+        } else if (isWhitelisted) {
+            setWhitelistStatus('done');
+        } else {
+            setWhitelistStatus('failed');
+        }
+    }, [contractToCheck, isWhitelisted, isWhitelistLoading, isWhitelistError]);
 
     const handleNFTSelect = (nft: AggregatedNFT | null) => {
         setSelectedNFT(nft);
@@ -314,11 +328,11 @@ export function SellPage() {
         );
     }
 
-    if (nftsError) {
-        return <ErrorDisplay error={nftsError} />;
+    if (walletNFTsContext.error) {
+        return <ErrorDisplay error={walletNFTsContext.error} />;
     }
 
-    if (nftsLoading) {
+    if (walletNFTsContext.loading) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
                 <div className="text-center">
@@ -329,7 +343,7 @@ export function SellPage() {
         );
     }
 
-    if (!nftsLoading && allNFTs.length === 0) {
+    if (!walletNFTsContext.loading && allNFTs.length === 0) {
         return (
             <EmptyState
                 title="Keine NFTs gefunden"
@@ -388,14 +402,14 @@ export function SellPage() {
                                     userNFTs={filteredNFTs}
                                     selectedNFT={selectedNFT}
                                     onSelect={handleNFTSelect}
-                                    isLoading={nftsLoading}
+                                    isLoading={walletNFTsContext.loading}
                                 />
                             ) : (
                                 <BatchNFTSelector
                                     userNFTs={filteredNFTs}
                                     selectedNFTs={batchSelectedNFTs}
                                     onSelectionChange={setBatchSelectedNFTs}
-                                    isLoading={nftsLoading}
+                                    isLoading={walletNFTsContext.loading}
                                 />
                             )}
                         </div>

@@ -25,6 +25,8 @@ import { devLog } from '@/utils/devLog';
 import { WalletNFTsService, type WalletNFT } from './WalletNFTsService';
 import { onDataInvalidation, type InvalidationEventDetail } from '@/services/validation';
 import { WalletNFTsCache, type WalletNFTsState } from './WalletNFTsCache';
+import { useMarketplaceEventsContext } from '@/contexts/marketplace-events';
+import { useContextDevtools } from '@/hooks/useContextDevtools';
 
 interface WalletNFTsContextType {
     // NFT data
@@ -56,6 +58,33 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
     const { address, isConnected } = useAccount();
     const [state, setState] = useState<WalletNFTsState>(WalletNFTsCache.createInitialState());
     const cache = useMemo(() => new WalletNFTsCache(), []);
+
+    // 🔥 Subscribe to WebSocket events from EventContext
+    const eventsContext = useMarketplaceEventsContext();
+
+    useEffect(() => {
+        if (!isConnected || !address) return;
+
+        console.log('🎯 [WalletNFTsContext] Subscribing to marketplace events');
+
+        // Subscribe to all events - wallet NFTs may change listing status
+        const unsubscribe = eventsContext.subscribe('*', (event) => {
+            console.log('🔔 [WalletNFTsContext] Received event:', event.eventName);
+
+            // Invalidate cache and refetch after delay
+            setTimeout(() => {
+                if (address) {
+                    cache.invalidate(address.toLowerCase());
+                    fetchWalletNFTs(address);
+                }
+            }, 600);
+        });
+
+        return () => {
+            console.log('👋 [WalletNFTsContext] Unsubscribing from events');
+            unsubscribe();
+        };
+    }, [eventsContext, isConnected, address, cache]);
 
     /**
      * Fetch NFTs for the connected wallet using the service
@@ -188,10 +217,10 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
                             });
                     }
 
-                    // Schedule debounced retry after 5s (DB sync typically complete)
+                    // Schedule debounced retry after 2s (DB sync typically complete)
                     debouncedRefreshTimeout = setTimeout(() => {
                         if (!pendingRefreshPromise) {
-                            devLog.info('wallet-nfts', '🔄 [Debounced Retry] After 5s');
+                            devLog.info('wallet-nfts', '🔄 [Debounced Retry] After 2s');
                             pendingRefreshPromise = fetchWalletNFTs(address)
                                 .finally(() => {
                                     pendingRefreshPromise = null;
@@ -199,7 +228,7 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
                         } else {
                             devLog.info('wallet-nfts', '⏸️ Skipping retry - fetch already in progress');
                         }
-                    }, 5000);
+                    }, 2000);
                 } else {
                     // For other events, single fetch is enough (with deduplication)
                     if (!pendingRefreshPromise) {
@@ -219,6 +248,9 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
             }
         };
     }, [address, cache, fetchWalletNFTs]);
+
+    // NOTE: SSE handling removed - we rely on MarketplaceEventsContext to prevent multiple WebSocket connections
+    // All updates come through eventsContext.subscribe() above
 
     /**
      * Get single NFT
@@ -283,7 +315,17 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
         };
     }, [state.nfts]);
 
-    const value: WalletNFTsContextType = {
+    // DevTools (development only)
+    useContextDevtools('WalletNFTs', {
+        nftsCount: state.nfts.length,
+        loading: state.loading,
+        error: state.error,
+        lastFetched: state.lastFetched,
+        stats,
+        walletAddress: address
+    });
+
+    const value: WalletNFTsContextType = React.useMemo(() => ({
         nfts: state.nfts,
         loading: state.loading,
         error: state.error,
@@ -298,7 +340,7 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
         getNFTsByCollection,
         getUnlistedNFTs,
         getListedNFTs
-    };
+    }), [state, stats, refresh, clear, getNFT, getNFTsByCollection, getUnlistedNFTs, getListedNFTs]);
 
     return (
         <WalletNFTsContext.Provider value={value}>

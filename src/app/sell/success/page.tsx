@@ -37,57 +37,29 @@ export default function SuccessPage() {
             setNftDataLoaded(false);
 
             try {
-                console.log('🔄 Invalidating marketplace cache to refresh listings...');
-                // Invalidate marketplace cache so it reloads on next visit
+                console.log('🔄 Invalidating caches after successful listing...');
+
+                // Invalidate marketplace cache (will reload on next visit to /marketplace)
                 invalidateCache();
 
-                // Invalidate WalletNFTs cache so the listed NFT disappears from /sell selection
+                // Emit invalidation event (triggers auto-refresh in WalletNFTs and MarketplaceItems)
                 if (formData.selectedNFT) {
-                    console.log('🔄 Invalidating WalletNFTs cache for listed NFT...');
+                    const contractAddr = formData.selectedNFT.core?.contractAddress || formData.selectedNFT.contractAddress;
+                    const tokenIdStr = formData.selectedNFT.core?.tokenId || formData.selectedNFT.tokenId;
+                    console.log('🔄 Emitting invalidation event for:', contractAddr, tokenIdStr);
                     invalidateAfterListing(
-                        formData.selectedNFT.contractAddress,
-                        formData.selectedNFT.tokenId
+                        contractAddr,
+                        tokenIdStr
                     );
 
-                    // Smart polling: Keep refreshing until data is updated
-                    const maxRetries = 12; // Max 12 retries = ~60 seconds
-                    const retryDelay = 5000; // 5 seconds between retries
-                    let retryCount = 0;
-                    let dataUpdated = false;
+                    // Manual refresh with minimal delay to ensure stats are updated
+                    // (WalletNFTsContext will also auto-refresh via event listener)
+                    console.log('⏱️ Scheduling refresh in 1s for stats update...');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
 
-                    console.log('🔄 Starting smart polling for data update...');
-
-                    while (retryCount < maxRetries && !dataUpdated) {
-                        retryCount++;
-                        console.log(`⏳ [${retryCount}/${maxRetries}] Waiting ${retryDelay / 1000}s before refresh...`);
-                        await new Promise(resolve => setTimeout(resolve, retryDelay));
-
-                        console.log(`🔄 [${retryCount}/${maxRetries}] Refreshing WalletNFTs...`);
-                        await refreshWalletNFTs();
-
-                        // Check if the NFT is now listed (we can't easily check from here, so we rely on the refresh)
-                        // The refresh will trigger the context update which updates the stats
-                        console.log(`✅ [${retryCount}/${maxRetries}] Refresh complete`);
-
-                        // Give React time to process the state update
-                        await new Promise(resolve => setTimeout(resolve, 500));
-
-                        // After first successful refresh, do one more after 5s to ensure stability
-                        if (retryCount === 1) {
-                            console.log('✨ First refresh done, will do one more in 5s for stability...');
-                            continue;
-                        }
-
-                        // After 2 successful refreshes, assume data is updated
-                        if (retryCount >= 2) {
-                            dataUpdated = true;
-                            console.log('✅ Data should be updated now!');
-                        }
-                    }
-
-                    if (!dataUpdated) {
-                        console.warn('⚠️ Max retries reached, data may not be fully synced yet');
-                    }
+                    console.log('🔄 Manual refresh for stats update...');
+                    await refreshWalletNFTs();
+                    console.log('✅ Stats should be updated now');
                 }
 
                 console.log('📡 Querying TheGraph for fresh listing data...');

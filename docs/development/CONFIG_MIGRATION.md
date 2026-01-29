@@ -21,11 +21,10 @@ Migrated all configuration files from `src/constants/` to `src/config/` for bett
   - `src/hooks/marketplace/useMarketplaceListing.ts`
   - `src/hooks/marketplace/useMarketplaceData.ts`
   - `src/hooks/marketplace/useMarketplaceAdmin.ts`
-  - `src/app/sell/hooks/useMarketplaceFees.ts`
+  - `src/hooks/marketplace/useMarketplaceContracts.ts` (moved from sell/hooks)
+  - `src/hooks/marketplace/useMarketplaceFees.ts` (moved from sell/hooks)
   - `src/app/admin/marketplace/page.tsx`
   - `src/app/api/marketplace/facets/route.ts`
-  - `src/app/api/marketplace/whitelist-check/route.ts`
-  - `src/app/api/marketplace/whitelist/route.ts`
   - + 5 archive scripts (not updated, not actively used)
 
 ### 2. Network Mapping

@@ -21,6 +21,9 @@ import { MarketplaceItemsService, type CacheEntry } from './MarketplaceItemsServ
 import { MarketplaceItemsCache } from './MarketplaceItemsCache';
 import { emitStatsUpdate } from './MarketplaceItemsEvents';
 import { onDataInvalidation, type InvalidationEventDetail } from '@/services/validation';
+import { useServerEvents } from '@/hooks/marketplace/useServerEvents';
+import { useMarketplaceEventsContext } from '@/contexts/marketplace-events';
+import { useContextDevtools } from '@/hooks/useContextDevtools';
 
 interface MarketplaceItemsContextType {
     // Cache operations
@@ -39,6 +42,9 @@ interface MarketplaceItemsContextType {
 
     // Update operations
     updateItemInCache: (filterKey: string, contractAddress: string, tokenId: string, updates: Partial<EnrichedNFTDocument>) => void;
+
+    // NEW: Refresh trigger for hooks to watch
+    refreshTrigger: number;
 }
 
 const MarketplaceItemsContext = createContext<MarketplaceItemsContextType | undefined>(undefined);
@@ -47,6 +53,36 @@ export function MarketplaceItemsProvider({ children }: { children: React.ReactNo
     const [cache] = useState(() => new MarketplaceItemsCache());
     const [service] = useState(() => new MarketplaceItemsService(cache));
     const refreshingRef = useRef<Set<string>>(new Set());
+
+    // Refresh trigger: Increment to notify hooks about cache invalidation
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    // Deduplication: Track last invalidation to prevent double-refresh
+    const lastInvalidationRef = useRef<{ type: string; timestamp: number } | null>(null);
+    const DEDUP_WINDOW = 1000; // 1 second window
+
+    // 🔥 Subscribe to WebSocket events from EventContext
+    const eventsContext = useMarketplaceEventsContext();
+
+    useEffect(() => {
+        console.log('🎯 [MarketplaceItemsContext] Subscribing to marketplace events');
+
+        // Subscribe to all events (*)
+        const unsubscribe = eventsContext.subscribe('*', (event) => {
+            console.log('🔔 [MarketplaceItemsContext] Received event:', event.eventName);
+
+            // Invalidate cache after small delay for MongoDB commit
+            setTimeout(() => {
+                service.invalidate();
+                setRefreshTrigger(prev => prev + 1);
+            }, 600);
+        });
+
+        return () => {
+            console.log('👋 [MarketplaceItemsContext] Unsubscribing from events');
+            unsubscribe();
+        };
+    }, [eventsContext, service]);
 
     /**
      * Get cached data if still valid
@@ -174,16 +210,30 @@ export function MarketplaceItemsProvider({ children }: { children: React.ReactNo
 
     /**
      * Listen for data invalidation events from other parts of the app
+     * Deduplication: Skip if same event type within 1s window
      */
     useEffect(() => {
         const unsubscribe = onDataInvalidation((detail: InvalidationEventDetail) => {
             devLog.info('marketplace-items', `🔔 Received invalidation event:`, detail);
+
+            // Deduplication check
+            const now = Date.now();
+            const last = lastInvalidationRef.current;
+            if (last && last.type === detail.type && (now - last.timestamp) < DEDUP_WINDOW) {
+                devLog.info('marketplace-items', `⏭️ Skipping duplicate invalidation (${detail.type}) within 1s window`);
+                return;
+            }
+
+            // Mark as processed
+            lastInvalidationRef.current = { type: detail.type, timestamp: now };
 
             switch (detail.type) {
                 case 'listing-created':
                     // Invalidate all caches to show new listing
                     devLog.info('marketplace-items', `🔄 Invalidating cache after listing created`);
                     service.invalidate();
+                    // Trigger immediate refetch in consuming hooks
+                    setRefreshTrigger(prev => prev + 1);
                     break;
 
                 case 'listing-canceled':
@@ -220,7 +270,69 @@ export function MarketplaceItemsProvider({ children }: { children: React.ReactNo
         });
 
         return unsubscribe;
-    }, [service]);
+    }, [service, DEDUP_WINDOW]);
+
+    /**
+     * Listen for Server-Sent Events (SSE) - real-time updates from OTHER clients
+     * ONLY THIS CONTEXT HANDLES SSE - it will emit dataInvalidation events for others
+     * Deduplication: Skip if same event type within 1s window
+     */
+    useServerEvents({
+        enabled: true, // ✅ This is the ONLY SSE connection per tab
+        onEvent: (event) => {
+            devLog.info('marketplace-items', `📡 [SSE] Received server event:`, event.eventName);
+
+            // Map blockchain event names to invalidation types
+            const eventNameMap: Record<string, string> = {
+                'ItemListed': 'listing-created',
+                'ItemBought': 'nft-purchased',
+                'ItemCanceled': 'listing-canceled',
+                'ItemUpdated': 'listing-created', // Treat as new listing
+            };
+
+            const invalidationType = eventNameMap[event.eventName] || 'marketplace-event';
+
+            // Deduplication check
+            const now = Date.now();
+            const last = lastInvalidationRef.current;
+            if (last && last.type === invalidationType && (now - last.timestamp) < DEDUP_WINDOW) {
+                devLog.info('marketplace-items', `⏭️ [SSE] Skipping duplicate invalidation (${invalidationType}) within 1s window`);
+                return;
+            }
+
+            // Mark as processed
+            lastInvalidationRef.current = { type: invalidationType, timestamp: now };
+
+            // When another client triggers an event, invalidate cache
+            devLog.info('marketplace-items', `🔄 [SSE] Invalidating marketplace cache after ${event.eventName}`);
+            service.invalidate();
+
+            // Trigger refetch in all consuming hooks
+            setRefreshTrigger(prev => prev + 1);
+
+            // ✅ PROPAGATE TO OTHER CONTEXTS via dataInvalidation event
+            const detail = {
+                type: invalidationType,
+                contractAddress: event.data?.nftAddress || '',
+                tokenId: event.data?.tokenId?.toString() || '',
+                timestamp: Date.now()
+            };
+
+            devLog.info('marketplace-items', `📡 [SSE] Broadcasting dataInvalidation event: ${invalidationType}`);
+            window.dispatchEvent(new CustomEvent('dataInvalidation', { detail }));
+        },
+        onConnectionChange: (connected) => {
+            devLog.info('marketplace-items', `🔌 [SSE] Connection ${connected ? 'established' : 'lost'}`);
+        }
+    });
+
+    // DevTools (development only)
+    useContextDevtools('MarketplaceItems', {
+        cacheSize: cache.getSize?.() || 0,
+        refreshTrigger,
+        eventsReceived: eventsContext.eventsReceived,
+        isConnected: eventsContext.isConnected
+    });
 
     const value: MarketplaceItemsContextType = {
         getCached,
@@ -231,7 +343,8 @@ export function MarketplaceItemsProvider({ children }: { children: React.ReactNo
         refreshMarketplace,
         refreshItemStats,
         refreshItemListing,
-        updateItemInCache
+        updateItemInCache,
+        refreshTrigger // NEW: Allows hooks to watch for cache invalidation
     };
 
     return (

@@ -1,0 +1,293 @@
+/**
+ * Extended Currency Selector Component
+ * 
+ * Dropdown selector with category grouping for 76+ tokens
+ */
+
+'use client';
+
+import { useState, useMemo } from 'react';
+import { useChainId } from 'wagmi';
+import { 
+    ZERO_ADDRESS, 
+    getAvailableTokens, 
+    getCurrencySymbolByAddress,
+    getAllExtendedTokens,
+    getTokensByCategory,
+    CATEGORY_NAMES,
+    type TokenCategory,
+    type ExtendedTokenConfig
+} from '@/config/tokens';
+
+interface ExtendedCurrencySelectorProps {
+    value: string; // currency address
+    onChange: (currency: string) => void;
+    disabled?: boolean;
+    className?: string;
+    showCategories?: boolean; // Show tokens grouped by category
+    allowedCategories?: TokenCategory[]; // Limit to specific categories
+}
+
+export function ExtendedCurrencySelector({ 
+    value, 
+    onChange, 
+    disabled = false, 
+    className = '',
+    showCategories = true,
+    allowedCategories
+}: ExtendedCurrencySelectorProps) {
+    const chainId = useChainId();
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // Get tokens based on network
+    const isMainnet = chainId === 1;
+    const extendedTokens = isMainnet ? getAllExtendedTokens() : [];
+    const basicTokens = getAvailableTokens(chainId); // Includes mock tokens on Sepolia/Hardhat
+    
+    // Combine tokens: Extended on Mainnet, Basic+Mock on other networks
+    const allTokens = useMemo(() => {
+        const tokens = isMainnet ? extendedTokens : basicTokens;
+        
+        // Filter by allowed categories if specified
+        if (allowedCategories && allowedCategories.length > 0) {
+            return tokens.filter(token => 
+                token.category && allowedCategories.includes(token.category as TokenCategory)
+            );
+        }
+        
+        return tokens;
+    }, [isMainnet, extendedTokens, basicTokens, allowedCategories]);
+
+    // Group tokens by category (works on all networks if tokens have category field)
+    const tokensByCategory = useMemo(() => {
+        if (!showCategories) return null;
+        
+        const grouped: Record<string, ExtendedTokenConfig[]> = {};
+        
+        allTokens.forEach(token => {
+            const category = token.category || 'MOCK_TOKENS';
+            if (!grouped[category]) {
+                grouped[category] = [];
+            }
+            grouped[category].push(token as ExtendedTokenConfig);
+        });
+        
+        return grouped;
+    }, [showCategories, allTokens]);
+
+    // Filter tokens by search
+    const filteredTokens = useMemo(() => {
+        if (!searchTerm) return allTokens;
+        
+        const term = searchTerm.toLowerCase();
+        return allTokens.filter(token => 
+            token.symbol.toLowerCase().includes(term) ||
+            token.name.toLowerCase().includes(term) ||
+            token.address.toLowerCase().includes(term)
+        );
+    }, [allTokens, searchTerm]);
+
+    // Build options
+    const options = useMemo(() => {
+        const opts: Array<{
+            address: string;
+            symbol: string;
+            name: string;
+            icon: string;
+            category: string;
+        }> = [
+            { address: ZERO_ADDRESS, symbol: 'ETH', name: 'Ether', icon: 'Ξ', category: 'ETH_WRAPPERS' }
+        ];
+        
+        filteredTokens.forEach(token => {
+            let icon = token.icon || 'T';
+            
+            opts.push({
+                address: token.address,
+                symbol: token.symbol,
+                name: token.name,
+                icon: icon,
+                category: token.category || 'OTHER'
+            });
+        });
+        
+        return opts;
+    }, [filteredTokens]);
+
+    const selectedOption = options.find(opt => 
+        opt.address.toLowerCase() === (value || ZERO_ADDRESS).toLowerCase()
+    ) ?? options[0]!;
+
+    return (
+        <div className={`relative ${className}`}>
+            {/* Dropdown Button */}
+            <button
+                type="button"
+                onClick={() => !disabled && setIsOpen(!isOpen)}
+                disabled={disabled}
+                className="w-full px-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg font-medium hover:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <span className="text-lg font-semibold">{selectedOption.icon}</span>
+                        <span className="font-medium">{selectedOption.symbol}</span>
+                        <span className="text-sm text-gray-500">({selectedOption.name})</span>
+                    </div>
+                    <svg 
+                        className={`w-5 h-5 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                </div>
+            </button>
+
+            {/* Dropdown Menu */}
+            {isOpen && !disabled && (
+                <>
+                    {/* Backdrop */}
+                    <div 
+                        className="fixed inset-0 z-10"
+                        onClick={() => setIsOpen(false)}
+                    />
+                    
+                    {/* Options Panel */}
+                    <div className="absolute z-20 w-full mt-2 bg-white border-2 border-gray-200 rounded-lg shadow-xl overflow-hidden max-h-[500px] flex flex-col">
+                        {/* Search Bar */}
+                        {allTokens.length > 10 && (
+                            <div className="p-3 border-b border-gray-200">
+                                <input
+                                    type="text"
+                                    placeholder="Search tokens..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                            </div>
+                        )}
+                        
+                        {/* Token List */}
+                        <div className="overflow-y-auto flex-1">
+                            {showCategories && tokensByCategory ? (
+                                // Grouped by category with grid layout
+                                Object.entries(tokensByCategory).map(([category, tokens]) => {
+                                    const filteredCategoryTokens = tokens.filter(token => 
+                                        !searchTerm || 
+                                        token.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        token.name.toLowerCase().includes(searchTerm.toLowerCase())
+                                    );
+                                    
+                                    if (filteredCategoryTokens.length === 0) return null;
+                                    
+                                    return (
+                                        <div key={category}>
+                                            <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 sticky top-0">
+                                                <span className="text-xs font-semibold text-gray-600 uppercase">
+                                                    {CATEGORY_NAMES[category as TokenCategory] || category}
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2 p-3">
+                                                {filteredCategoryTokens.map((token) => {
+                                                    const isSelected = token.address.toLowerCase() === (value || ZERO_ADDRESS).toLowerCase();
+                                                    return (
+                                                        <TokenGridOption
+                                                            key={token.address}
+                                                            token={token}
+                                                            isSelected={isSelected}
+                                                            onClick={() => {
+                                                                onChange(token.address);
+                                                                setIsOpen(false);
+                                                                setSearchTerm('');
+                                                            }}
+                                                        />
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                // Flat grid
+                                <div className="grid grid-cols-3 gap-2 p-3">
+                                    {options.map((option) => {
+                                        const isSelected = option.address.toLowerCase() === (value || ZERO_ADDRESS).toLowerCase();
+                                        return (
+                                            <button
+                                                key={option.address}
+                                                type="button"
+                                                onClick={() => {
+                                                    onChange(option.address);
+                                                    setIsOpen(false);
+                                                    setSearchTerm('');
+                                                }}
+                                                className={`px-3 py-3 flex flex-col items-center gap-1 rounded-lg border-2 transition-all ${
+                                                    isSelected 
+                                                        ? 'bg-blue-50 border-blue-500 text-blue-700' 
+                                                        : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700'
+                                                }`}
+                                            >
+                                                <span className="text-2xl font-semibold">{option.icon}</span>
+                                                <div className="text-center">
+                                                    <div className="font-bold text-sm">{option.symbol}</div>
+                                                    <div className="text-xs text-gray-500 truncate max-w-full">{option.name}</div>
+                                                </div>
+                                                {isSelected && (
+                                                    <svg className="w-4 h-4 text-blue-600 absolute top-1 right-1" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                    </svg>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                            
+                            {options.length === 0 && (
+                                <div className="px-4 py-8 text-center text-gray-500">
+                                    <p className="text-sm">No tokens found</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
+interface TokenOptionProps {
+    token: ExtendedTokenConfig;
+    isSelected: boolean;
+    onClick: () => void;
+}
+
+function TokenGridOption({ token, isSelected, onClick }: TokenOptionProps) {
+    const icon = token.icon || 'T';
+    
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`relative px-3 py-3 flex flex-col items-center gap-1 rounded-lg border-2 transition-all ${
+                isSelected 
+                    ? 'bg-blue-50 border-blue-500 text-blue-700' 
+                    : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700'
+            }`}
+        >
+            <span className="text-2xl font-semibold">{icon}</span>
+            <div className="text-center w-full">
+                <div className="font-bold text-sm">{token.symbol}</div>
+                <div className="text-xs text-gray-500 truncate max-w-full">{token.name}</div>
+            </div>
+            {isSelected && (
+                <svg className="w-4 h-4 text-blue-600 absolute top-1 right-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+            )}
+        </button>
+    );
+}

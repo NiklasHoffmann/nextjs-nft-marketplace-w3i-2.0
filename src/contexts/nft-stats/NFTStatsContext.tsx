@@ -29,9 +29,62 @@ export interface UserInteractionState {
     userRating: number | null;
 }
 
-// ===== GLOBALER CACHE (außerhalb React, aber einfach) =====
-const statsCache = new Map<string, NFTStats>();
-const interactionsCache = new Map<string, UserInteractionState>();
+// ===== LRU CACHE IMPLEMENTATION =====
+/**
+ * Least Recently Used (LRU) Cache with max size limit
+ * Prevents unbounded memory growth during long sessions
+ */
+class LRUCache<K, V> {
+    private cache = new Map<K, V>();
+    private maxSize: number;
+
+    constructor(maxSize: number = 100) {
+        this.maxSize = maxSize;
+    }
+
+    get(key: K): V | undefined {
+        const value = this.cache.get(key);
+        if (value !== undefined) {
+            // Move to end (most recently used)
+            this.cache.delete(key);
+            this.cache.set(key, value);
+        }
+        return value;
+    }
+
+    set(key: K, value: V): void {
+        // Remove if exists (will re-add at end)
+        if (this.cache.has(key)) {
+            this.cache.delete(key);
+        }
+        // Evict oldest if at capacity
+        else if (this.cache.size >= this.maxSize) {
+            const firstKey = this.cache.keys().next().value;
+            this.cache.delete(firstKey);
+        }
+        this.cache.set(key, value);
+    }
+
+    has(key: K): boolean {
+        return this.cache.has(key);
+    }
+
+    delete(key: K): boolean {
+        return this.cache.delete(key);
+    }
+
+    clear(): void {
+        this.cache.clear();
+    }
+
+    get size(): number {
+        return this.cache.size;
+    }
+}
+
+// ===== GLOBALER CACHE (mit Memory Management) =====
+const statsCache = new LRUCache<string, NFTStats>(100); // Max 100 NFT stats
+const interactionsCache = new LRUCache<string, UserInteractionState>(100); // Max 100 user interactions
 const listeners = new Map<string, Set<() => void>>();
 
 // Cache-Timestamps: Daten sind 60 Sekunden gültig (aligned with TheGraph polling)
@@ -72,7 +125,14 @@ function subscribe(key: string, listener: () => void) {
     }
     listeners.get(key)!.add(listener);
     return () => {
-        listeners.get(key)?.delete(listener);
+        const keyListeners = listeners.get(key);
+        if (keyListeners) {
+            keyListeners.delete(listener);
+            // Cleanup empty listener sets to prevent memory leak
+            if (keyListeners.size === 0) {
+                listeners.delete(key);
+            }
+        }
     };
 }
 

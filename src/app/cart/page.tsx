@@ -1,6 +1,6 @@
 // app/cart/page.tsx
 import { Metadata } from 'next';
-import { CartPage } from './CartPage';
+import { CartPage } from './components/CartPage';
 
 export const metadata: Metadata = {
     title: 'Shopping Cart | W3I Marketplace',

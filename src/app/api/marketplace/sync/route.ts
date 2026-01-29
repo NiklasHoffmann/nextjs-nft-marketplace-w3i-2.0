@@ -8,6 +8,7 @@
 import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, BadRequestError } from '@/lib/api';
 import { getNFTSyncService } from '@/services/nft-sync';
+import { setupMongoDBIndexes } from '@/lib/db/setup-indexes';
 
 // Auto-start service on module load (server-side only)
 if (typeof window === 'undefined') {
@@ -19,6 +20,9 @@ if (typeof window === 'undefined') {
         // Use setImmediate to avoid blocking module initialization
         setImmediate(async () => {
             try {
+                // Setup MongoDB indexes first (prevent duplicate NFTs)
+                await setupMongoDBIndexes();
+
                 const syncService = getNFTSyncService();
                 const status = syncService.getStatus();
 

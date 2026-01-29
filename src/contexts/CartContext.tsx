@@ -10,9 +10,11 @@
  * - Migration: localStorage → DB when wallet connects
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAccount } from 'wagmi';
 import { devLog } from '@/utils/devLog';
+import { SyncQueue } from '@/utils/SyncQueue';
+import { useContextDevtools } from '@/hooks/useContextDevtools';
 import type { ActiveItem } from '@/types';
 
 interface CartItem {
@@ -46,6 +48,32 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const [items, setItems] = useState<CartItem[]>([]);
     const [isLoaded, setIsLoaded] = useState(false);
     const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Sync queue for failed DB operations (with retry)
+    const syncQueueRef = useRef<SyncQueue<{ walletAddress: string; items: CartItem[] }> | null>(null);
+
+    // Initialize sync queue
+    if (!syncQueueRef.current) {
+        syncQueueRef.current = new SyncQueue(
+            async (payload) => {
+                const response = await fetch('/api/cart', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Sync failed: ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.error || 'Sync failed');
+                }
+            },
+            { maxRetries: 3, baseDelay: 1000 }
+        );
+    }
 
     // Load cart on mount or when wallet connects
     useEffect(() => {
@@ -106,7 +134,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             devLog.error('cart', '❌ Failed to save to localStorage:', error);
         }
 
-        // Debounced save to MongoDB (if connected)
+        // Queue DB sync (if connected) - with retry mechanism
         if (isConnected && address) {
             // Clear previous timeout
             if (syncTimeoutRef.current) {
@@ -114,25 +142,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             }
 
             // Debounce DB sync (500ms)
-            syncTimeoutRef.current = setTimeout(async () => {
-                try {
-                    devLog.info('cart', '📡 Syncing to MongoDB for:', address);
-                    const response = await fetch('/api/cart', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            walletAddress: address,
-                            items: updatedItems
-                        })
-                    });
-
-                    const data = await response.json();
-                    if (data.success) {
-                        devLog.info('cart', '✅ Synced to DB:', updatedItems.length, 'items');
-                    }
-                } catch (error) {
-                    devLog.error('cart', '❌ Failed to sync to DB:', error);
-                }
+            syncTimeoutRef.current = setTimeout(() => {
+                devLog.info('cart', '📡 Queuing DB sync for:', address);
+                syncQueueRef.current?.enqueue(
+                    `cart-${address}`,
+                    { walletAddress: address, items: updatedItems }
+                );
             }, 500);
         }
     }, [isLoaded, isConnected, address]);
@@ -140,6 +155,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // Auto-sync when items change
     useEffect(() => {
         syncCart(items);
+
+        // Cleanup timeout on unmount to prevent memory leak
+        return () => {
+            if (syncTimeoutRef.current) {
+                clearTimeout(syncTimeoutRef.current);
+            }
+        };
     }, [items, syncCart]);
 
     const addToCart = useCallback(async (item: ActiveItem) => {
@@ -230,7 +252,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // Format total price to ETH
     const totalPriceFormatted = (Number(totalPrice) / 1e18).toFixed(4);
 
-    const value: CartContextType = {
+    // DevTools (development only)
+    useContextDevtools('Cart', {
+        items,
+        itemCount: items.length,
+        totalPrice: totalPriceFormatted,
+        isLoaded,
+        syncQueueStatus: syncQueueRef.current?.getStatus()
+    });
+
+    const value: CartContextType = React.useMemo(() => ({
         items,
         itemCount: items.length,
         totalPrice,
@@ -240,7 +271,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         clearCart,
         isInCart,
         updateCartItem
-    };
+    }), [items, totalPrice, totalPriceFormatted, addToCart, removeFromCart, clearCart, isInCart, updateCartItem]);
 
     return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

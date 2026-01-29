@@ -254,6 +254,7 @@ export function NFTCard(props: NFTCardAllProps) {
   const isListed = nft.listed || false;
   const price = nft.listing?.price || null;
   const desiredContractAddress = nft.listing?.desiredContractAddress || null;
+  const currency = nft.listing?.currency || null;
 
   // Social stats
   const likeCount = stats?.likeCount || 0;
@@ -351,6 +352,7 @@ export function NFTCard(props: NFTCardAllProps) {
                 price={price}
                 isListed={isListed}
                 desiredContractAddress={desiredContractAddress}
+                currency={currency}
               />
             </div>
 

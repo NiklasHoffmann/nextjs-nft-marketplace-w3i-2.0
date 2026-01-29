@@ -91,13 +91,21 @@ export const POST = apiHandler(async (request: NextRequest) => {
     }
 
     if (currentOwner !== undefined) {
-        updates.currentOwner = currentOwner ? currentOwner.toLowerCase() : null;
+        // Update blockchain.owner in nested structure
+        const nowDate = new Date();
+        updates.blockchain = {
+            owner: currentOwner ? currentOwner.toLowerCase() : null,
+            ownerSince: nowDate,
+            approved: null,
+            isApprovedForAll: false,
+            lastSyncedAt: nowDate
+        };
     }
 
     // Upsert metadata
     const result = await upsertNFTMetadata(contractAddress, tokenId, updates);
 
-    // Handle ownership change if provided
+    // Handle ownership change if provided (triggers history tracking)
     if (currentOwner && source) {
         await updateNFTOwnership(contractAddress, tokenId, currentOwner, source);
     }

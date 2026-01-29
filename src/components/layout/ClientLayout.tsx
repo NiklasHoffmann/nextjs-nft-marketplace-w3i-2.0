@@ -6,6 +6,7 @@ import { ApolloProvider } from "@apollo/client/react";
 import apolloClient from '@/config/apolloClient';
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { NFTStatsProvider } from "@/contexts/nft-stats/NFTStatsContext";
+import { MarketplaceEventsProvider as EventsContextProvider } from "@/contexts/marketplace-events";
 import { MarketplaceItemsProvider } from "@/contexts/marketplace-items";
 import { WalletNFTsProvider } from "@/contexts/wallet-nfts";
 import { CollectionsProvider } from "@/contexts/collections";
@@ -73,11 +74,13 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         <Web3Provider>
           <ApolloProvider client={apolloClient}>
             <NFTStatsProvider>
-              <MarketplaceItemsProvider>
-                <WalletNFTsProvider>
-                  <CollectionsProvider>
-                    <CurrencyProvider>
-                      <CartProvider>
+              {/* 🔥 EventsContext wraps all other contexts - single WebSocket connection */}
+              <EventsContextProvider>
+                <MarketplaceItemsProvider>
+                  <WalletNFTsProvider>
+                    <CollectionsProvider>
+                      <CurrencyProvider>
+                        <CartProvider>
                         {/* Real-time WebSocket event listener for marketplace */}
                         <MarketplaceEventsProvider 
                           autoStart={true}
@@ -93,6 +96,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                   </CollectionsProvider>
                 </WalletNFTsProvider>
               </MarketplaceItemsProvider>
+            </EventsContextProvider>
             </NFTStatsProvider>
           </ApolloProvider>
         </Web3Provider>

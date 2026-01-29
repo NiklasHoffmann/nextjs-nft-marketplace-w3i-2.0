@@ -41,7 +41,7 @@
 import { useState, useCallback } from 'react';
 import { useMarketplacePurchase } from '@/hooks/marketplace/useMarketplacePurchase';
 import { useMarketplaceListing } from '@/hooks/marketplace/useMarketplaceListing';
-import { useMarketplaceContracts } from '@/app/sell/hooks/useMarketplaceContracts';
+import { useMarketplaceContracts } from '@/hooks/marketplace/useMarketplaceContracts';
 import { useNotifications } from '@/contexts/notifications';
 import { formatEther } from 'viem';
 import { usePublicClient } from 'wagmi';
@@ -74,6 +74,7 @@ export interface TransactionResult {
 export interface PurchaseNFTParams {
     listingId: string;
     price: string; // in ETH
+    currency?: string; // payment currency (0x0 = ETH, WETH address = WETH)
     seller: string;
     buyer?: string; // For data invalidation
     contractAddress: string;
@@ -194,6 +195,7 @@ export function useTransactionService() {
         const {
             listingId,
             price,
+            currency,
             desiredContractAddress,
             desiredTokenId,
             onProgress,
@@ -228,6 +230,7 @@ export function useTransactionService() {
             const hash = await purchaseHook.purchaseListing({
                 listingId,
                 expectedPrice: price,
+                expectedCurrency: currency,
                 expectedDesiredTokenAddress: desiredContractAddress,
                 expectedDesiredTokenId: desiredTokenId,
                 onProgress: (step, txHash) => {
@@ -299,10 +302,8 @@ export function useTransactionService() {
             onProgress?.('error');
             onError?.(errorMessage);
 
-            // Clear loading notification
-            if (notificationId) {
-                notifications.removeNotification(notificationId);
-            }
+            // Clear ALL loading notifications
+            notifications.clearAllLoading();
 
             notifications.error('Purchase Failed', errorMessage);
 
@@ -402,7 +403,8 @@ export function useTransactionService() {
             setCurrentStep('success');
             onProgress?.('success');
 
-            notifications.removeNotification(notificationId);
+            // Clear ALL loading notifications
+            notifications.clearAllLoading();
             notifications.success(
                 'Listing Updated!',
                 'Your listing has been successfully updated',
@@ -443,9 +445,8 @@ export function useTransactionService() {
             onProgress?.('error');
             onError?.(errorMessage);
 
-            if (notificationId) {
-                notifications.removeNotification(notificationId);
-            }
+            // Clear ALL loading notifications
+            notifications.clearAllLoading();
 
             notifications.error('Update Failed', errorMessage);
 
@@ -533,7 +534,9 @@ export function useTransactionService() {
             setCurrentStep('success');
             onProgress?.('success');
 
-            notifications.removeNotification(notificationId);
+            // Clear ALL loading notifications (remove any stuck ones)
+            notifications.clearAllLoading();
+            
             notifications.success(
                 'Listing Cancelled!',
                 'Your listing has been successfully cancelled',
@@ -574,9 +577,8 @@ export function useTransactionService() {
             onProgress?.('error');
             onError?.(errorMessage);
 
-            if (notificationId) {
-                notifications.removeNotification(notificationId);
-            }
+            // Clear ALL loading notifications
+            notifications.clearAllLoading();
 
             notifications.error('Cancellation Failed', errorMessage);
 
@@ -684,7 +686,8 @@ export function useTransactionService() {
             setCurrentStep('success');
             onProgress?.('success');
 
-            notifications.removeNotification(notificationId);
+            // Clear ALL loading notifications
+            notifications.clearAllLoading();
             notifications.success(
                 'Listing Created!',
                 'Your NFT is now listed on the marketplace',
@@ -723,9 +726,8 @@ export function useTransactionService() {
                 setCurrentStep('success');
                 onProgress?.('success');
 
-                if (notificationId) {
-                    notifications.removeNotification(notificationId);
-                }
+                // Clear ALL loading notifications
+                notifications.clearAllLoading();
 
                 notifications.success(
                     'NFT bereits gelistet',
@@ -755,9 +757,8 @@ export function useTransactionService() {
             onProgress?.('error');
             onError?.(errorMessage);
 
-            if (notificationId) {
-                notifications.removeNotification(notificationId);
-            }
+            // Clear ALL loading notifications
+            notifications.clearAllLoading();
 
             notifications.error('Listing Failed', errorMessage);
 

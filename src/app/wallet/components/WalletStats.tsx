@@ -9,6 +9,7 @@ interface WalletStatsProps {
     totalListedValue: number;
     totalValueUSD: string | null;
     ethPriceLoading: boolean;
+    isCompact?: boolean;
 }
 
 export function WalletStats({
@@ -16,10 +17,11 @@ export function WalletStats({
     unlistedCount,
     totalListedValue,
     totalValueUSD,
-    ethPriceLoading
+    ethPriceLoading,
+    isCompact = false
 }: WalletStatsProps) {
     return (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className={isCompact ? "flex flex-wrap gap-2 justify-end" : "grid grid-cols-2 lg:grid-cols-4 gap-4"}>
             {/* Listed NFTs */}
             <StatCard
                 icon={
@@ -31,6 +33,7 @@ export function WalletStats({
                 value={listedCount || 0}
                 hideSecondaryPlaceholder
                 variant="green"
+                isCompact={isCompact}
             />
 
             {/* Not Listed NFTs */}
@@ -44,6 +47,7 @@ export function WalletStats({
                 value={unlistedCount || 0}
                 hideSecondaryPlaceholder
                 variant="gray"
+                isCompact={isCompact}
             />
 
             {/* Total NFTs */}
@@ -57,6 +61,7 @@ export function WalletStats({
                 value={(listedCount || 0) + (unlistedCount || 0)}
                 hideSecondaryPlaceholder
                 variant="purple"
+                isCompact={isCompact}
             />
 
             {/* Total Value */}
@@ -70,6 +75,7 @@ export function WalletStats({
                 value={`${totalListedValue > 0 ? totalListedValue.toFixed(4) : '0.0000'} ETH`}
                 hideSecondaryPlaceholder
                 variant="blue"
+                isCompact={isCompact}
             />
         </div>
     );

@@ -10,6 +10,8 @@
 - [x] **Admin Authentication System (signaturbasiert mit Session-Management)**.
 - [x] **API Infrastructure Complete** - apiHandler, middleware, type-safe errors.
 - [x] **Component Refactoring Complete** - BaseCard, BaseModal, LoadingState, useForm.
+- [x] **Hook Architecture Optimized** - All route-specific hooks moved to global @/hooks/.
+- [x] **useNFTApproval global** - Comprehensive approval management in @/hooks/nfts.
 
 ## Status
 ✅ **Production Ready** - Real-time sync via polling (30s interval)
@@ -67,3 +69,16 @@
 - Components use BaseCard, BaseModal, LoadingState for consistency
 - Forms use `useForm` hook for validation and state management
 - Transactions use `TransactionService` for blockchain interactions
+
+## Hook Architecture
+- **Global hooks** (@/hooks/): Used across multiple routes or services
+  - @/hooks/marketplace - Marketplace contract operations
+  - @/hooks/nfts - NFT approval, insights, user actions
+  - @/hooks/wallet - Wallet NFT management
+  - @/hooks/multisig - MultiSig operations
+- **Route-specific hooks** (app/[route]/hooks/): Only used within single route
+- **Rule**: If a hook is used in 2+ places → move to global
+- **Migration history**:
+  - useMarketplaceContracts, useMarketplaceFees → @/hooks/marketplace
+  - useNFTApproval → @/hooks/nfts
+  - useUserNFTs, useCollectionWhitelist → Removed (redundant wrappers)

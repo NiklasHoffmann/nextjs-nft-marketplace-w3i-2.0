@@ -3,6 +3,7 @@ import { formatEther } from '@/utils';
 import { NFTPriceCardProps } from '@/types';
 import { AddToCartButton } from '@/components/ui';
 import type { ActiveItem } from '@/types';
+import { getCurrencySymbol } from '@/config/tokens';
 import {
     BuyNowModal,
     CancelListingModal,
@@ -25,6 +26,7 @@ function NFTPriceCard({
     nftImage,
     desiredContractAddress,
     desiredTokenId,
+    currency,
     status,
     listingType,
     tokenStandard
@@ -36,6 +38,7 @@ function NFTPriceCard({
 
     // Memoize price formatting
     const formattedPrice = useMemo(() => formatEther(price), [price]);
+    const currencySymbol = getCurrencySymbol(currency);
 
     // Check if connected user is the owner
     const isOwner = useMemo(() => {
@@ -148,7 +151,7 @@ function NFTPriceCard({
 
             <div className="space-y-2">
                 <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold text-gray-900">
+                    <span className="text{currencySymbol}l font-bold text-gray-900">
                         {formattedPrice} ETH
                     </span>
                     <span className="text-lg text-gray-500">
@@ -230,6 +233,7 @@ function NFTPriceCard({
                         nftName={nftName}
                         nftImage={nftImage}
                         price={price}
+                        currency={currency}
                         seller={seller || ''}
                         buyer={connectedAddress}
                     />

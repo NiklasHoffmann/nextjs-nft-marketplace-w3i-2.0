@@ -216,6 +216,36 @@ const {
 } = useAdminCollectionInsights();
 ```
 
+#### **NFT Approval**
+```typescript
+import { useNFTApproval } from '@/hooks';
+
+const approval = useNFTApproval({
+  nftContractAddress: '0x...',
+  tokenId: '123',
+  marketplaceAddress: '0x...',
+  enabled: true
+});
+
+// Check status
+if (!approval.isFullyApproved) {
+  // Approve all NFTs from collection (recommended)
+  await approval.approveAll();
+  
+  // Or approve single NFT
+  await approval.approveSingle();
+  
+  // Or smart approval (only if needed)
+  const success = await approval.ensureApproval(true); // preferAll
+}
+
+// Status checks
+console.log('Fully approved:', approval.isFullyApproved);
+console.log('Single approved:', approval.isSingleApproved);
+console.log('All approved:', approval.isApprovedForAll);
+console.log('Loading:', approval.isLoading);
+```
+
 #### **NFT User Actions**
 ```typescript
 import { useNFTUserActions } from '@/hooks';

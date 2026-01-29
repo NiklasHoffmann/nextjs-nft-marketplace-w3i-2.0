@@ -47,7 +47,7 @@ export default function WalletLayout({ children }: { children: ReactNode }) {
                     totalValueUSD={totalValueUSD}
                     ethPriceLoading={ethPriceLoading}
                 />
-                <div className="pt-[120px]">
+                <div className="pt-[100px]">
                     {children}
                 </div>
             </main>

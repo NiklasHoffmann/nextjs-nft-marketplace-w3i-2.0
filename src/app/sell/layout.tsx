@@ -19,27 +19,41 @@ import { devLog } from '@/utils/devLog';
 
 function SellLayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const { formData, progressData } = useListingFlow();
+    const { formData, progressData, reset } = useListingFlow();
     const walletNFTsContext = useWalletNFTs();
 
-    // Listen for listing-created events and force refresh
+    // Reset state when leaving /sell route
+    useEffect(() => {
+        return () => {
+            // Only reset if not navigating within /sell routes
+            // This cleanup runs when the component unmounts (user leaves /sell)
+            devLog.info('sell-layout', '🔄 Leaving /sell route - resetting state');
+            reset();
+        };
+    }, []); // Empty dependency array - only run on unmount
+
+    // Listen for listing-created events and force immediate refresh
     useEffect(() => {
         const handleInvalidation = (event: CustomEvent) => {
             const detail = event.detail;
             devLog.info('sell-layout', '🔔 Received invalidation event:', detail);
 
-            // Force refresh when listing is created/canceled to update stats immediately
+            // Force immediate refresh when listing is created/canceled
             if (detail.type === 'listing-created' || detail.type === 'listing-canceled') {
-                devLog.info('sell-layout', '🔄 Stats will update automatically via WalletNFTsContext refresh');
+                devLog.info('sell-layout', '🔄 Forcing immediate wallet NFTs refresh');
+                // Trigger manual refresh to update stats immediately
+                walletNFTsContext.refresh().then(() => {
+                    devLog.info('sell-layout', '✅ Wallet NFTs refreshed successfully');
+                });
             }
         };
 
-        window.addEventListener('data-invalidation', handleInvalidation as EventListener);
+        window.addEventListener('dataInvalidation', handleInvalidation as EventListener);
 
         return () => {
-            window.removeEventListener('data-invalidation', handleInvalidation as EventListener);
+            window.removeEventListener('dataInvalidation', handleInvalidation as EventListener);
         };
-    }, []);
+    }, [walletNFTsContext]);
 
     // Calculate NFT selection and type first
     const selectedCount = pathname === '/sell/success'
@@ -131,7 +145,7 @@ function SellLayoutContent({ children }: { children: React.ReactNode }) {
             />
 
             {/* Main Content with Sidebar Layout */}
-            <div className="flex pt-[174px]">
+            <div className="flex pt-[154px]">
                 {/* Flow Sidebar - sticky und direkt unter dem SellHeader */}
                 <div className="w-64 flex-shrink-0 sticky top-[173px] self-start h-[calc(100vh-173px)] overflow-y-auto bg-white border-r border-gray-200">
                     <div className="px-4 py-4">

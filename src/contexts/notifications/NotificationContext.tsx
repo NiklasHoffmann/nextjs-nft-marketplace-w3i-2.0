@@ -32,6 +32,7 @@ interface NotificationContextValue {
     addNotification: (notification: Omit<Notification, 'id'>) => string;
     removeNotification: (id: string) => void;
     clearAll: () => void;
+    clearAllLoading: () => void; // NEW: Remove all loading notifications
     // Convenience methods
     success: (title: string, message: string, options?: Partial<Notification>) => string;
     error: (title: string, message: string, options?: Partial<Notification>) => string;
@@ -67,10 +68,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         }
 
         return id;
-    }, []); // removeNotification ist stabil (leere deps), muss nicht in dependencies
+    }, [removeNotification]);
 
     const clearAll = useCallback(() => {
         setNotifications([]);
+    }, []);
+
+    const clearAllLoading = useCallback(() => {
+        setNotifications(prev => prev.filter(n => n.type !== 'loading'));
     }, []);
 
     // Convenience methods
@@ -99,12 +104,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         addNotification,
         removeNotification,
         clearAll,
+        clearAllLoading,
         success,
         error,
         warning,
         info,
         loading
-    }), [notifications, addNotification, removeNotification, clearAll, success, error, warning, info, loading]);
+    }), [notifications, addNotification, removeNotification, clearAll, clearAllLoading, success, error, warning, info, loading]);
 
     return (
         <NotificationContext.Provider value={contextValue}>

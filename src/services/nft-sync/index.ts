@@ -25,8 +25,8 @@ import { StatsSync } from './stats-sync';
 import { InsightsSync } from './insights-sync';
 import { MarketplaceEventListenerService } from '../marketplace/event-listener';
 import { routeMarketplaceEvent } from '../marketplace/event-invalidation-bridge';
-import { syncListingToMongoDB, removeListingFromMongoDB } from '../marketplace/event-mongodb-sync';
-import type { ProcessedItemListedEvent, ProcessedItemBoughtEvent, ProcessedItemCanceledEvent } from '@/types/marketplace/contract-events';
+import { syncListingToMongoDB, removeListingFromMongoDB, updateListingInMongoDB } from '../marketplace/event-mongodb-sync';
+import type { ProcessedItemListedEvent, ProcessedItemBoughtEvent, ProcessedItemCanceledEvent, ProcessedItemUpdatedEvent } from '@/types/marketplace/contract-events';
 
 export { blockchainStateSync } from './blockchain-state-sync';
 export { ipfsMetadataLazySync } from './ipfs-metadata-lazy-sync';
@@ -91,13 +91,20 @@ export class NFTSyncService {
                             console.error('❌ [Backend] MongoDB sync failed:', error);
                         });
                     } else if (event.eventName === 'ItemBought' || event.eventName === 'ItemCanceled') {
-                        const { nftAddress, tokenId, listingId } = (event as ProcessedItemBoughtEvent | ProcessedItemCanceledEvent).data;
+                        const { nftAddress, tokenId, listingId } = event.data;
+                        const buyer = event.eventName === 'ItemBought' ? (event as ProcessedItemBoughtEvent).data.buyer : undefined;
+                        
                         removeListingFromMongoDB(
                             nftAddress,
                             tokenId.toString(),
-                            listingId.toString()
+                            listingId.toString(),
+                            buyer // Only defined for ItemBought
                         ).catch(error => {
                             console.error('❌ [Backend] MongoDB removal failed:', error);
+                        });
+                    } else if (event.eventName === 'ItemUpdated') {
+                        updateListingInMongoDB(event as ProcessedItemUpdatedEvent).catch(error => {
+                            console.error('❌ [Backend] MongoDB update failed:', error);
                         });
                     }
 

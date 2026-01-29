@@ -21,6 +21,7 @@
 import React, { ReactNode } from 'react';
 import Link from 'next/link';
 import type { Route } from 'next';
+import { useScrollPosition } from '@/hooks/useScrollPosition';
 
 // ============================================================================
 // Type Definitions
@@ -79,19 +80,28 @@ export interface PageHeaderProps {
 // ============================================================================
 
 /**
- * BackButton - Navigation back link
+ * BackButton - Navigation back link with compact mode
  */
-function BackButton({ href, label }: BackLink) {
+function BackButton({ href, label, isCompact }: BackLink & { isCompact: boolean }) {
     return (
         <Link
             href={href as Route}
-            className="inline-flex items-center gap-1 sm:gap-1.5 text-gray-500 hover:text-gray-900 transition-colors flex-shrink-0"
+            className="inline-flex items-center gap-1 sm:gap-1.5 text-gray-500 hover:text-gray-900 transition-all duration-300 flex-shrink-0"
             title={label}
         >
-            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg 
+                className={`transition-all duration-300 ${isCompact ? 'w-4 h-4' : 'w-3.5 h-3.5 sm:w-4 sm:h-4'}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+            >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            <span className="text-[11px] sm:text-xs font-medium truncate max-w-[80px] sm:max-w-none">{label}</span>
+            <span className={`text-[11px] sm:text-xs font-medium truncate max-w-[80px] sm:max-w-none transition-all duration-300 ${
+                isCompact ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
+            }`}>
+                {label}
+            </span>
         </Link>
     );
 }
@@ -104,23 +114,27 @@ function Separator() {
 }
 
 /**
- * IconBadge - Displays icon based on configuration
+ * IconBadge - Displays icon based on configuration with size transition
  */
-function IconBadge({ type, svgContent, text, gradientFrom, gradientTo, customContent }: IconConfig) {
-    const baseClasses = "w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0";
+function IconBadge({ type, svgContent, text, gradientFrom, gradientTo, customContent, isCompact }: IconConfig & { isCompact: boolean }) {
+    const baseClasses = `rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
+        isCompact ? 'w-7 h-7' : 'w-9 h-9'
+    }`;
 
     switch (type) {
         case 'svg':
             return (
                 <div className={`${baseClasses} bg-gradient-to-br ${gradientFrom || 'from-blue-500'} ${gradientTo || 'to-purple-500'}`}>
-                    {svgContent}
+                    <div className={`transition-all ${isCompact ? 'scale-75' : 'scale-100'}`}>
+                        {svgContent}
+                    </div>
                 </div>
             );
 
         case 'text-badge':
             return (
                 <div className={`${baseClasses} bg-gradient-to-br ${gradientFrom || 'from-blue-500'} ${gradientTo || 'to-purple-500'}`}>
-                    <span className="text-white font-semibold text-sm">
+                    <span className={`text-white font-semibold transition-all ${isCompact ? 'text-xs' : 'text-sm'}`}>
                         {text || '?'}
                     </span>
                 </div>
@@ -129,7 +143,9 @@ function IconBadge({ type, svgContent, text, gradientFrom, gradientTo, customCon
         case 'gradient-badge':
             return (
                 <div className={`${baseClasses} bg-gradient-to-br ${gradientFrom || 'from-blue-500'} ${gradientTo || 'to-purple-500'}`}>
-                    {svgContent || <span className="text-white font-semibold text-sm">{text || '?'}</span>}
+                    <div className={`transition-all ${isCompact ? 'scale-75' : 'scale-100'}`}>
+                        {svgContent || <span className="text-white font-semibold text-sm">{text || '?'}</span>}
+                    </div>
                 </div>
             );
 
@@ -142,14 +158,16 @@ function IconBadge({ type, svgContent, text, gradientFrom, gradientTo, customCon
 }
 
 /**
- * TitleSection - Title and subtitle display with optional copy functionality
+ * TitleSection - Title and subtitle display with compact mode
  */
 function TitleSection({
     title,
-    subtitle
+    subtitle,
+    isCompact
 }: {
     title: string;
     subtitle?: string | CopyableAddress;
+    isCompact: boolean;
 }) {
     const handleCopy = (address: string) => {
         navigator.clipboard.writeText(address);
@@ -165,10 +183,14 @@ function TitleSection({
 
         return (
             <div className="min-w-0 flex-1">
-                <h1 className="text-base sm:text-lg font-bold text-gray-900 leading-tight truncate">
+                <h1 className={`font-bold text-gray-900 leading-tight truncate transition-all duration-300 ${
+                    isCompact ? 'text-sm' : 'text-base sm:text-lg'
+                }`}>
                     {title}
                 </h1>
-                <div className="flex items-center gap-1.5">
+                <div className={`flex items-center gap-1.5 transition-all duration-300 ${
+                    isCompact ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100 h-auto'
+                }`}>
                     <p className="font-mono text-[10px] sm:text-[11px] text-gray-600 truncate leading-tight">
                         {displayText}
                     </p>
@@ -189,11 +211,15 @@ function TitleSection({
 
     return (
         <div className="min-w-0 flex-1">
-            <h1 className="text-base sm:text-lg font-bold text-gray-900 leading-tight truncate">
+            <h1 className={`font-bold text-gray-900 leading-tight truncate transition-all ${
+                isCompact ? 'text-sm' : 'text-base sm:text-lg'
+            }`}>
                 {title}
             </h1>
             {subtitle && (
-                <p className="text-[10px] sm:text-[11px] text-gray-500 truncate leading-tight">
+                <p className={`text-[10px] sm:text-[11px] text-gray-500 truncate leading-tight transition-all ${
+                    isCompact ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100 h-auto'
+                }`}>
                     {subtitle}
                 </p>
             )}
@@ -264,13 +290,20 @@ export function PageHeader({
     hasSidebar = false,
     className = ''
 }: PageHeaderProps) {
+    // Detect scroll position for compact mode
+    const isScrolled = useScrollPosition(80);
+
     return (
-        <div className={`fixed top-[66px] left-0 right-0 ${hasSidebar ? 'md:left-16' : ''} z-10 bg-white border-b border-gray-200 ${className}`}>
-            <div className="px-4 sm:px-6 md:px-8 py-3 md:py-2.5">
+        <div className={`fixed top-[66px] left-0 right-0 ${hasSidebar ? 'md:left-16' : ''} z-10 bg-white border-b border-gray-200 transition-all duration-300 ${
+            isScrolled ? 'shadow-sm' : ''
+        } ${className}`}>
+            <div className={`px-4 sm:px-6 md:px-8 transition-all duration-300 ${
+                isScrolled ? 'py-1.5 md:py-1.5' : 'py-3 md:py-2.5'
+            }`}>
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-8">
                     {/* Left Side - Navigation, Icon, Title */}
                     <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1 md:flex-initial">
-                        <BackButton href={backLink.href} label={backLink.label} />
+                        <BackButton href={backLink.href} label={backLink.label} isCompact={isScrolled} />
                         <Separator />
                         <div className="flex items-center gap-2 md:gap-2.5 min-w-0 flex-1">
                             <IconBadge
@@ -280,15 +313,18 @@ export function PageHeader({
                                 gradientFrom={icon.gradientFrom}
                                 gradientTo={icon.gradientTo}
                                 customContent={icon.customContent}
+                                isCompact={isScrolled}
                             />
-                            <TitleSection title={title} subtitle={subtitle} />
+                            <TitleSection title={title} subtitle={subtitle} isCompact={isScrolled} />
                         </div>
                     </div>
 
-                    {/* Right Side - Stats or custom content */}
+                    {/* Right Side - Stats with compact mode */}
                     {rightContent && (
-                        <div className="w-full md:flex-1 md:max-w-2xl">
-                            {rightContent}
+                        <div className={`w-full md:flex-1 md:max-w-2xl transition-all duration-300 ${
+                            isScrolled ? 'transform scale-90 origin-right' : ''
+                        }`}>
+                            {React.cloneElement(rightContent as React.ReactElement, { isCompact: isScrolled })}
                         </div>
                     )}
                 </div>

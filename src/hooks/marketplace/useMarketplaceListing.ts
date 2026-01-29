@@ -6,37 +6,14 @@
 
 import { useState } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, usePublicClient, useAccount } from 'wagmi';
-import { parseEther, getAddress } from 'viem';
+import { parseEther, getAddress, erc721Abi } from 'viem';
 import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
-
-const ERC721_ABI = [
-  {
-    inputs: [{ name: 'operator', type: 'address' }, { name: 'approved', type: 'bool' }],
-    name: 'setApprovalForAll',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function'
-  },
-  {
-    inputs: [{ name: 'owner', type: 'address' }, { name: 'operator', type: 'address' }],
-    name: 'isApprovedForAll',
-    outputs: [{ name: '', type: 'bool' }],
-    stateMutability: 'view',
-    type: 'function'
-  },
-  {
-    inputs: [{ name: 'tokenId', type: 'uint256' }],
-    name: 'getApproved',
-    outputs: [{ name: '', type: 'address' }],
-    stateMutability: 'view',
-    type: 'function'
-  }
-] as const;
 
 interface CreateListingParams {
   tokenAddress: string;
   tokenId: string;
   price: string; // in ETH
+  currency?: string; // currency address (0x0 for ETH, WETH address for WETH)
   desiredTokenAddress?: string;
   desiredTokenId?: string;
   buyerWhitelistEnabled?: boolean;
@@ -130,7 +107,7 @@ export function useMarketplaceListing(marketplaceAddress: string) {
         BigInt(tokenId), // tokenId
         "0x0000000000000000000000000000000000000000" as `0x${string}`, // erc1155Holder (not needed for ERC721)
         parseEther(price), // price
-        "0x0000000000000000000000000000000000000000" as `0x${string}`, // currency (0x0 = ETH/native token)
+        (currency || "0x0000000000000000000000000000000000000000") as `0x${string}`, // currency (0x0 = ETH, WETH address = WETH)
         checksummedDesiredTokenAddress as `0x${string}`, // desiredTokenAddress (CHECKSUMMED!)
         BigInt(desiredTokenId), // desiredTokenId
         BigInt("0"), // desiredErc1155Quantity (not needed for ERC721)
@@ -154,90 +131,85 @@ export function useMarketplaceListing(marketplaceAddress: string) {
       console.log('  [10] partialBuyEnabled:', args[10]);
       console.log('  [11] allowedBuyers:', args[11]);
 
-      // CRITICAL: Check and ensure approval before proceeding
+      // CRITICAL: Check and ensure approval using viem's erc721Abi
       if (publicClient && userAddress) {
-        console.log('?? Checking ACTUAL approval status on-chain...');
-        try {
-          // Check if marketplace is approved for all
-          const isApprovedForAll = await publicClient.readContract({
-            address: tokenAddress as `0x${string}`,
-            abi: ERC721_ABI,
-            functionName: 'isApprovedForAll',
-            args: [userAddress, marketplaceAddress as `0x${string}`]
-          });
+        console.log('✅ Checking NFT approval status...');
 
-          // Check if this specific token is approved
-          const approvedAddress = await publicClient.readContract({
-            address: tokenAddress as `0x${string}`,
-            abi: ERC721_ABI,
-            functionName: 'getApproved',
-            args: [BigInt(tokenId)]
-          });
+        // Check if marketplace is approved for all
+        const isApprovedForAll = await publicClient.readContract({
+          address: checksummedTokenAddress as `0x${string}`,
+          abi: erc721Abi,
+          functionName: 'isApprovedForAll',
+          args: [userAddress, marketplaceAddress as `0x${string}`]
+        });
 
-          const isSingleApproved = approvedAddress?.toLowerCase() === marketplaceAddress.toLowerCase();
-          const actuallyApproved = isApprovedForAll || isSingleApproved;
+        // Check if this specific token is approved
+        const approvedAddress = await publicClient.readContract({
+          address: checksummedTokenAddress as `0x${string}`,
+          abi: erc721Abi,
+          functionName: 'getApproved',
+          args: [BigInt(tokenId)]
+        });
 
-          console.log('? ACTUAL Approval Check:', {
-            isApprovedForAll,
-            approvedAddress,
-            isSingleApproved,
-            marketplaceAddress,
-            userAddress,
-            actuallyApproved
-          });
+        const isSingleApproved = approvedAddress?.toLowerCase() === marketplaceAddress.toLowerCase();
+        const actuallyApproved = isApprovedForAll || isSingleApproved;
 
-          if (!actuallyApproved) {
-            console.log('?? NFT NOT APPROVED - Requesting approval from user...');
+        console.log('📋 Approval Check:', {
+          isApprovedForAll,
+          isSingleApproved,
+          actuallyApproved
+        });
 
-            // Ask user to approve
-            if (!window.confirm('This NFT needs to be approved for the marketplace.\n\nClick OK to approve all your NFTs from this collection for trading.\n\n(This is a one-time approval per collection)')) {
-              throw new Error('User cancelled approval. Please approve the NFT collection to list items.');
-            }
+        if (!actuallyApproved) {
+          console.log('⚠️ NFT NOT APPROVED - Requesting approval...');
 
-            console.log('?? Sending setApprovalForAll transaction...');
-
-            // Send approval transaction
-            const approvalTx = await writeContractAsync({
-              address: tokenAddress as `0x${string}`,
-              abi: ERC721_ABI,
-              functionName: 'setApprovalForAll',
-              args: [marketplaceAddress as `0x${string}`, true]
-            });
-
-            console.log('? Waiting for approval transaction confirmation...');
-            console.log('?? Approval TX:', approvalTx);
-
-            // Wait for approval confirmation (we need to create a separate waiter)
-            let approvalConfirmed = false;
-            let attempts = 0;
-            while (!approvalConfirmed && attempts < 60) {
-              await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
-              try {
-                const newApprovalStatus = await publicClient.readContract({
-                  address: tokenAddress as `0x${string}`,
-                  abi: ERC721_ABI,
-                  functionName: 'isApprovedForAll',
-                  args: [userAddress, marketplaceAddress as `0x${string}`]
-                });
-                if (newApprovalStatus) {
-                  approvalConfirmed = true;
-                  console.log('? Approval confirmed on-chain!');
-                }
-              } catch (e) {
-                console.log('? Still waiting for approval confirmation...');
-              }
-              attempts++;
-            }
-
-            if (!approvalConfirmed) {
-              throw new Error('Approval transaction timed out. Please try again.');
-            }
-          } else {
-            console.log('? Already approved - proceeding...');
+          // Ask user to approve
+          if (!window.confirm('This NFT needs to be approved for the marketplace.\n\nClick OK to approve all your NFTs from this collection for trading.\n\n(This is a one-time approval per collection)')) {
+            throw new Error('User cancelled approval. Please approve the NFT collection to list items.');
           }
-        } catch (approvalCheckError: any) {
-          console.error('? Approval check/request failed:', approvalCheckError);
-          throw approvalCheckError;
+
+          console.log('📝 Sending setApprovalForAll transaction...');
+
+          // Send approval transaction
+          const approvalTx = await writeContractAsync({
+            address: checksummedTokenAddress as `0x${string}`,
+            abi: erc721Abi,
+            functionName: 'setApprovalForAll',
+            args: [marketplaceAddress as `0x${string}`, true]
+          });
+
+          console.log('⏳ Waiting for approval confirmation...');
+          console.log('📝 Approval TX:', approvalTx);
+
+          // Wait for approval confirmation with timeout
+          let approvalConfirmed = false;
+          let attempts = 0;
+          const maxAttempts = 30; // 60 seconds total (2s * 30)
+
+          while (!approvalConfirmed && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            try {
+              const newApprovalStatus = await publicClient.readContract({
+                address: checksummedTokenAddress as `0x${string}`,
+                abi: erc721Abi,
+                functionName: 'isApprovedForAll',
+                args: [userAddress, marketplaceAddress as `0x${string}`]
+              });
+              if (newApprovalStatus) {
+                approvalConfirmed = true;
+                console.log('✅ Approval confirmed on-chain!');
+              }
+            } catch (e) {
+              console.log('⏳ Waiting for confirmation...');
+            }
+            attempts++;
+          }
+
+          if (!approvalConfirmed) {
+            throw new Error('Approval transaction timed out. Please try again.');
+          }
+        } else {
+          console.log('✅ Already approved - proceeding...');
         }
       }
 
@@ -418,6 +390,7 @@ export function useMarketplaceListing(marketplaceAddress: string) {
         args: [
           BigInt(listingId),
           newPrice ? parseEther(newPrice) : BigInt(0),
+          "0x0000000000000000000000000000000000000000" as `0x${string}`, // newCurrency (ETH = zero address)
           (newDesiredTokenAddress || "0x0000000000000000000000000000000000000000") as `0x${string}`,
           BigInt(newDesiredTokenId || "0"),
           BigInt("0"), // newDesiredErc1155Quantity (0 for ERC721)

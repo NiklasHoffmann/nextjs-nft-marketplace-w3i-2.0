@@ -51,6 +51,7 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
   const purchaseListing = async ({
     listingId,
     expectedPrice,
+    expectedCurrency = "0x0000000000000000000000000000000000000000", // Default: ETH
     expectedDesiredTokenAddress = "0x0000000000000000000000000000000000000000",
     expectedDesiredTokenId = "0",
     desiredErc1155Holder = "0x0000000000000000000000000000000000000000",
@@ -63,13 +64,17 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
       onProgress?.('preparing');
 
       const isSwap = expectedDesiredTokenAddress !== "0x0000000000000000000000000000000000000000";
-      const ethValue = isSwap ? BigInt(0) : parseEther(expectedPrice);
+      const isWETH = expectedCurrency !== "0x0000000000000000000000000000000000000000";
+      
+      // Only send ETH value if paying with native ETH (not WETH or swap)
+      const ethValue = (isSwap || isWETH) ? BigInt(0) : parseEther(expectedPrice);
 
       console.log('🚀 Calling writeContractAsync with:', {
         listingId,
         expectedPrice,
-        expectedCurrency: '0x0000000000000000000000000000000000000000',
+        expectedCurrency,
         isSwap,
+        isWETH,
         ethValue: ethValue.toString(),
         expectedDesiredTokenAddress,
         expectedDesiredTokenId
@@ -85,7 +90,7 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
         args: [
           BigInt(listingId), // listingId
           parseEther(expectedPrice), // expectedPrice
-          "0x0000000000000000000000000000000000000000" as `0x${string}`, // expectedCurrency (0x0 for ETH)
+          (expectedCurrency || "0x0000000000000000000000000000000000000000") as `0x${string}`, // expectedCurrency (0x0 for ETH, WETH address for WETH)
           BigInt("0"), // expectedErc1155Quantity (0 for ERC721, quantity for ERC1155)
           expectedDesiredTokenAddress as `0x${string}`, // expectedDesiredTokenAddress
           BigInt(expectedDesiredTokenId), // expectedDesiredTokenId

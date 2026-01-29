@@ -500,8 +500,7 @@ npm run build
 - `/api/marketplace/nft/[contractAddress]/[tokenId]` - NFT detail
 - `/api/marketplace/collections` - Collection metadata
 - `/api/marketplace/sync` - Sync status/control (admin)
-- `/api/marketplace/whitelist` - Whitelist check
-- `/api/marketplace/facets` - Diamond facets
+- `/api/marketplace/facets` - Diamond facets (admin debug)
 
 ### **User Endpoints** (Protected with `withAuth`)
 - `/api/user/nfts` - User-owned NFTs from DB

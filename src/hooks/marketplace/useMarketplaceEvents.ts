@@ -180,32 +180,9 @@ export function useMarketplaceEvents(config: UseMarketplaceEventsConfig = {}): U
         // No cleanup - we want the service to keep running
     }, [autoStart]);
 
-    // Periodic state sync (fallback in case callbacks miss updates)
-    useEffect(() => {
-        console.log('⏰ [State Sync] Setting up periodic sync (5s interval)');
-
-        const syncInterval = setInterval(() => {
-            const currentState = listenerRef.current.getState();
-            setState(prev => {
-                // Only update if state actually changed (avoid unnecessary re-renders)
-                if (prev.isActive !== currentState.isActive ||
-                    prev.isConnected !== currentState.isConnected ||
-                    prev.eventsProcessed !== currentState.eventsProcessed) {
-                    console.log('🔄 [Periodic Sync] State changed, updating:', {
-                        isConnected: currentState.isConnected,
-                        isActive: currentState.isActive
-                    });
-                    return currentState;
-                }
-                return prev;
-            });
-        }, 5000); // Every 5 seconds
-
-        return () => {
-            console.log('🧹 [State Sync] Cleanup periodic sync');
-            clearInterval(syncInterval);
-        };
-    }, []); // Empty deps - runs once
+    // REMOVED: Periodic state sync (redundant with WebSocket real-time events)
+    // WebSocket callbacks already update state instantly via setState(listener.getState())
+    // This 5-second polling was causing unnecessary re-renders
 
     // Start listening
     const start = useCallback(async () => {

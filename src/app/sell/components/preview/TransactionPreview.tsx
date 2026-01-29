@@ -3,7 +3,7 @@
 import React from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import type { ListingMode } from '../../types';
-import { useMarketplaceFees, useMarketplaceContracts } from '../../hooks';
+import { useMarketplaceFees, useMarketplaceContracts } from '@/hooks/marketplace';
 import { ButtonSpinner } from '@/components/core/Loading';
 
 interface TransactionData {

@@ -62,7 +62,7 @@ export default function NFTDetailLayout({
                         onShare={handleShare}
                     />
                 )}
-                <div className="pt-[120px]">
+                <div className="pt-[100px]">
                     {children}
                 </div>
             </main>

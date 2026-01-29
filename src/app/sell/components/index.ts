@@ -26,3 +26,6 @@ export * from './preview';
 
 // Listing
 export * from './listing';
+
+// Main Page Component
+export { SellPage } from './SellPage';

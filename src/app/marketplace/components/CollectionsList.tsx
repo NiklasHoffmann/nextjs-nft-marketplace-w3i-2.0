@@ -65,6 +65,8 @@ export function CollectionsList({ currentSort, onSortChange, filters }: Collecti
         autoFetch: true,
     });
 
+    // Events are handled by MarketplaceItemsContext automatically
+
     // Apply client-side filters
     const filteredCollections = useMemo(() => {
         if (!filters) return collections;

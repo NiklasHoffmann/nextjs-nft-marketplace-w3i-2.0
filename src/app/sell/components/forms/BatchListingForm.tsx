@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 import { useForm } from '@/hooks';
+import { useMarketplaceData } from '@/hooks/marketplace';
 
 interface BatchListingFormProps {
     userNFTs: AggregatedNFT[];
@@ -152,74 +153,69 @@ export function BatchListingForm({
         }
     };
 
-    // Check whitelist status for selected NFTs
+    // Check whitelist status for selected NFTs using hooks
     useEffect(() => {
-        const checkWhitelist = async () => {
-            const selectedNFTsList = Array.from(selectedNFTs)
-                .map(key => userNFTs.find(nft => nft.key === key))
-                .filter(Boolean) as AggregatedNFT[];
+        const selectedNFTsList = Array.from(selectedNFTs)
+            .map(key => userNFTs.find(nft => nft.key === key))
+            .filter(Boolean) as AggregatedNFT[];
 
-            console.log('🔍 Checking whitelist for selected NFTs:', selectedNFTsList.length);
+        console.log('🔍 Checking whitelist for selected NFTs:', selectedNFTsList.length);
 
-            // Get unique collections
-            const uniqueCollections = new Map<string, string | undefined>();
-            selectedNFTsList.forEach(nft => {
-                uniqueCollections.set(nft.contractAddress, nft.core.contractName || undefined);
-            });
+        // Get unique collections
+        const uniqueCollections = new Map<string, string | undefined>();
+        selectedNFTsList.forEach(nft => {
+            uniqueCollections.set(nft.contractAddress, nft.core.contractName || undefined);
+        });
 
-            console.log('📋 Unique collections to check:', Array.from(uniqueCollections.keys()));
+        console.log('📋 Unique collections to check:', Array.from(uniqueCollections.keys()));
 
-            // Check each collection
-            const notWhitelisted: Array<{ address: string, name?: string }> = [];
+        // Check each collection using hook (note: for multiple collections, we'd ideally use useReadContracts)
+        // For now, we'll check on-demand. In production, consider batching with useReadContracts
+        const notWhitelisted: Array<{ address: string, name?: string }> = [];
+
+        // Since hooks can't be called conditionally/in loops, we'll do async checks
+        const checkCollections = async () => {
             for (const [address, name] of uniqueCollections) {
                 try {
                     console.log('🔎 Checking collection:', address, name);
-                    const response = await fetch('/api/marketplace/whitelist-check', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            marketplaceAddress,
-                            collectionAddress: address
-                        })
+
+                    // Direct contract read using public client (alternative to hook in loop)
+                    const { createPublicClient, http } = await import('viem');
+                    const { sepolia } = await import('viem/chains');
+                    const { MARKETPLACE_ABI } = await import('@/config/abis/marketplace');
+
+                    const publicClient = createPublicClient({
+                        chain: sepolia,
+                        transport: http()
                     });
 
-                    if (response.ok) {
-                        const result = await response.json();
-                        console.log('✅ Full response for', address, ':', JSON.stringify(result, null, 2));
-                        console.log('✅ result.data:', result.data);
-                        console.log('✅ result.data?.isWhitelisted:', result.data?.isWhitelisted);
-                        console.log('✅ result.isWhitelisted:', result.isWhitelisted);
+                    const isWhitelisted = await publicClient.readContract({
+                        address: marketplaceAddress as `0x${string}`,
+                        abi: MARKETPLACE_ABI,
+                        functionName: 'isCollectionWhitelisted',
+                        args: [address as `0x${string}`]
+                    });
 
-                        // API returns { success: true, data: { isWhitelisted: boolean } }
-                        const isWhitelisted = result.data?.isWhitelisted ?? result.isWhitelisted;
-                        console.log('✅ Final isWhitelisted value:', isWhitelisted, 'Type:', typeof isWhitelisted);
+                    console.log('✅ Whitelist result for', address, ':', isWhitelisted);
 
-                        if (!isWhitelisted) {
-                            console.log('❌ Adding to notWhitelisted:', address);
-                            notWhitelisted.push({ address, name });
-                        } else {
-                            console.log('✅ Collection IS whitelisted, skipping:', address);
-                        }
+                    if (!isWhitelisted) {
+                        console.log('❌ Adding to notWhitelisted:', address);
+                        notWhitelisted.push({ address, name });
                     } else {
-                        // Development: Bei Fehler annehmen dass whitelisted (optimistisch)
-                        console.warn('⚠️ Whitelist check failed (assuming whitelisted for development):', response.status);
-                        // Skip - assume whitelisted
+                        console.log('✅ Collection IS whitelisted, skipping:', address);
                     }
                 } catch (error) {
-                    // Development: Bei Fehler annehmen dass whitelisted (optimistisch)
                     console.warn('⚠️ Whitelist check error (assuming whitelisted for development):', error);
-                    // Skip - assume whitelisted
                 }
             }
 
             console.log('⚠️ Not whitelisted collections:', notWhitelisted);
-            console.log('⚠️ Setting notWhitelistedCollections state to:', notWhitelisted.length, 'items');
             setNotWhitelistedCollections(notWhitelisted);
         };
 
         if (selectedNFTs.size > 0) {
             console.log('🚀 Starting whitelist check for', selectedNFTs.size, 'NFTs');
-            checkWhitelist();
+            checkCollections();
         } else {
             console.log('🚀 No NFTs selected, clearing whitelist warnings');
             setNotWhitelistedCollections([]);

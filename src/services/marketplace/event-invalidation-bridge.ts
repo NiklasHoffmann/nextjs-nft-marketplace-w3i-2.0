@@ -39,14 +39,18 @@ export function handleListingCreated(event: ProcessedItemListedEvent): void {
         seller
     });
 
-    // Invalidate using existing system
-    invalidateAfterListing(
-        nftAddress,
-        tokenId.toString(),
-        listingId.toString()
-    );
+    // CLIENT-SIDE: Invalidate using existing context system (immediate feedback for active user)
+    if (typeof window !== 'undefined') {
+        console.log('🔄 [EventBridge CLIENT] Triggering client-side invalidation...');
+        invalidateAfterListing(
+            nftAddress,
+            tokenId.toString(),
+            listingId.toString()
+        );
+    }
+    // SERVER-SIDE: MongoDB sync + revalidatePath happens in /api/events/marketplace route
 
-    // Emit custom event for real-time UI updates
+    // Emit custom event for real-time UI updates (client-side only)
     emitOptimisticUpdate({
         type: 'listing-created',
         contractAddress: nftAddress,
@@ -76,12 +80,14 @@ export function handleListingPurchased(event: ProcessedItemBoughtEvent): void {
         seller
     });
 
-    // Invalidate using existing system
-    invalidateAfterPurchase(
-        nftAddress,
-        tokenId.toString(),
-        listingId.toString()
-    );
+    // Invalidate using existing system (CLIENT-SIDE ONLY)
+    if (typeof window !== 'undefined') {
+        invalidateAfterPurchase(
+            nftAddress,
+            tokenId.toString(),
+            listingId.toString()
+        );
+    }
 
     // Emit custom event for real-time UI updates
     emitOptimisticUpdate({
@@ -111,12 +117,14 @@ export function handleListingCanceled(event: ProcessedItemCanceledEvent): void {
         seller
     });
 
-    // Invalidate using existing system
-    invalidateAfterCancelListing(
-        nftAddress,
-        tokenId.toString(),
-        listingId.toString()
-    );
+    // Invalidate using existing system (CLIENT-SIDE ONLY)
+    if (typeof window !== 'undefined') {
+        invalidateAfterCancelListing(
+            nftAddress,
+            tokenId.toString(),
+            listingId.toString()
+        );
+    }
 
     // Emit custom event for real-time UI updates
     emitOptimisticUpdate({
@@ -145,12 +153,14 @@ export function handleListingCanceledDueToInvalid(event: ProcessedItemCanceledEv
         reason: 'Invalid listing (NFT transferred or approval revoked)'
     });
 
-    // Same invalidation as regular cancel
-    invalidateAfterCancelListing(
-        nftAddress,
-        tokenId.toString(),
-        listingId.toString()
-    );
+    // Same invalidation as regular cancel (CLIENT-SIDE ONLY)
+    if (typeof window !== 'undefined') {
+        invalidateAfterCancelListing(
+            nftAddress,
+            tokenId.toString(),
+            listingId.toString()
+        );
+    }
 
     // Emit custom event
     emitOptimisticUpdate({
@@ -179,13 +189,15 @@ export function handleCollectionWhitelistRevoked(event: any): void {
         reason: 'Collection removed from whitelist'
     });
 
-    // Invalidate entire collection
+    // Invalidate entire collection (CLIENT-SIDE ONLY)
     // Note: We don't have tokenId in this event, so invalidate broadly
-    invalidateAfterCancelListing(
-        tokenAddress,
-        '0', // Placeholder - will trigger collection-wide refresh
-        listingId.toString()
-    );
+    if (typeof window !== 'undefined') {
+        invalidateAfterCancelListing(
+            tokenAddress,
+            '0', // Placeholder - will trigger collection-wide refresh
+            listingId.toString()
+        );
+    }
 
     // Emit custom event
     emitOptimisticUpdate({
@@ -213,12 +225,14 @@ export function handleListingUpdated(event: ProcessedItemUpdatedEvent): void {
         newPrice: newPrice.toString()
     });
 
-    // Invalidate using existing system (use listing function for updates)
-    invalidateAfterListing(
-        nftAddress,
-        tokenId.toString(),
-        listingId.toString()
-    );
+    // Invalidate using existing system (CLIENT-SIDE ONLY)
+    if (typeof window !== 'undefined') {
+        invalidateAfterCancelListing(
+            nftAddress,
+            tokenId.toString(),
+            listingId.toString()
+        );
+    }
 
     // Emit custom event for real-time UI updates
     emitOptimisticUpdate({
@@ -250,15 +264,18 @@ interface OptimisticUpdateDetail extends InvalidationEventDetail {
  * Used for immediate UI feedback before subgraph indexes
  */
 function emitOptimisticUpdate(detail: OptimisticUpdateDetail): void {
+    // Only run in browser (CustomEvent is not available in Node.js)
+    if (typeof window === 'undefined') {
+        return;
+    }
+
     const event = new CustomEvent('marketplace-optimistic-update', {
         detail,
         bubbles: true,
         cancelable: false
     });
 
-    if (typeof window !== 'undefined') {
-        window.dispatchEvent(event);
-    }
+    window.dispatchEvent(event);
 }
 
 /**
@@ -320,6 +337,10 @@ export function routeMarketplaceEvent(event: ProcessedMarketplaceEvent | any): v
         }
     } catch (error) {
         console.error('❌ [EventBridge] Event routing error:', error);
+        console.error('   Error message:', (error as any)?.message);
+        console.error('   Error stack:', (error as any)?.stack);
+        console.error('   Error name:', (error as any)?.name);
+        console.error('   Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     }
 }
 

@@ -35,8 +35,17 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
             return;
         }
 
-        checkAuthorization();
-    }, [address, isConnected, pathname]);
+        // Only check if we have a connected wallet and address
+        if (isConnected && address) {
+            checkAuthorization();
+        } else if (!isConnected) {
+            // No wallet connected - redirect to login
+            setIsAuthorized(false);
+            setErrorMessage('Bitte verbinde deine Admin-Wallet.');
+            redirectToLogin();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [address, isConnected, isLoginPage]); // Remove pathname to prevent redirect loops
 
     /**
      * Prüft ob User authorisiert ist (Admin-Wallet + gültige Session)
@@ -118,12 +127,16 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
     const redirectToLogin = () => {
         setIsChecking(false);
 
+        // Don't redirect if already on login page
+        if (pathname === '/admin/login') {
+            return;
+        }
+
         // Encode current path for redirect after login
         const redirectUrl = encodeURIComponent(pathname || '/admin');
 
-        setTimeout(() => {
-            router.push(`/admin/login?redirect=${redirectUrl}` as any);
-        }, 1500);
+        // Immediate redirect (no setTimeout to prevent multiple checks)
+        router.push(`/admin/login?redirect=${redirectUrl}` as any);
     };
 
     // Login-Seite immer durchlassen

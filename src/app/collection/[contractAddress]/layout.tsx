@@ -88,7 +88,7 @@ export default function CollectionLayout({
                         totalViews={collectionStats.totalViews}
                         totalLikes={collectionStats.totalLikes}
                     />
-                    <div className="pt-[120px]">
+                    <div className="pt-[100px]">
                         {children}
                     </div>
                 </main>

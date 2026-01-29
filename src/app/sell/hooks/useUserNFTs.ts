@@ -3,8 +3,8 @@
  */
 
 import { useState, useMemo } from 'react';
-import { useWalletNFTs } from '@/contexts/wallet-nfts';
-import { AggregatedNFT } from '@/types/core/core-nft-modern';
+import { useWalletNFTs } from '@/contexts';
+import { AggregatedNFT } from '@/types';
 import { walletNFTToAggregatedNFT, sortNFTs, filterNFTs } from '../utils';
 import { NFTFilterOptions, SortOption, SortOrder } from '../types';
 

@@ -33,6 +33,9 @@ interface NFTInteractionCardsProps {
 
     // Wallet state
     isConnected: boolean;
+    
+    // Compact mode (from PageHeader scroll state)
+    isCompact?: boolean;
 }
 
 export function NFTInteractionCards({
@@ -48,7 +51,8 @@ export function NFTInteractionCards({
     onToggleWatchlist,
     onSetRating,
     onShare,
-    isConnected
+    isConnected,
+    isCompact = false
 }: NFTInteractionCardsProps) {
     const [showRatingMenu, setShowRatingMenu] = useState(false);
 
@@ -70,28 +74,31 @@ export function NFTInteractionCards({
     };
 
     return (
-        <div className="hidden lg:grid grid-cols-5 gap-3 items-stretch" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
+        <div className={
+            isCompact 
+                ? "hidden lg:flex flex-wrap gap-2 justify-end items-stretch transition-all"
+                : "hidden lg:grid grid-cols-5 gap-3 items-stretch transition-all"
+        }>
             {/* Views Card */}
-            <div className="h-full">
-                <StatCard
-                    icon={
-                        <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                    }
-                    label="Views"
-                    value={viewCount}
-                    variant="gray"
-                    hideSecondaryPlaceholder
-                />
-            </div>
+            <StatCard
+                icon={
+                    <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                }
+                label="Views"
+                value={viewCount}
+                variant="gray"
+                hideSecondaryPlaceholder
+                isCompact={isCompact}
+            />
 
             {/* Likes Card - Interactive */}
             <button
                 onClick={() => handleWalletGatedAction(onToggleFavorite, 'like this NFT')}
                 disabled={!isConnected}
-                className={`h-full transition-all ${!isConnected ? 'cursor-not-allowed opacity-50' : ''}`}
+                className={`transition-all ${!isConnected ? 'cursor-not-allowed opacity-50' : ''}`}
                 title={!isConnected ? 'Connect wallet to like NFTs' : isFavorited ? 'Remove like' : 'Like this NFT'}
             >
                 <StatCard
@@ -109,6 +116,7 @@ export function NFTInteractionCards({
                     value={likeCount}
                     variant={isFavorited ? 'red' : 'gray'}
                     hideSecondaryPlaceholder
+                    isCompact={isCompact}
                 />
             </button>
 
@@ -116,7 +124,7 @@ export function NFTInteractionCards({
             <button
                 onClick={() => handleWalletGatedAction(onToggleWatchlist, 'manage your watchlist')}
                 disabled={!isConnected}
-                className={`h-full transition-all ${!isConnected ? 'cursor-not-allowed opacity-50' : ''}`}
+                className={`transition-all ${!isConnected ? 'cursor-not-allowed opacity-50' : ''}`}
                 title={!isConnected ? 'Connect wallet to manage watchlist' : isWatchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
             >
                 <StatCard
@@ -134,11 +142,12 @@ export function NFTInteractionCards({
                     value={watchlistCount}
                     variant={isWatchlisted ? 'blue' : 'gray'}
                     hideSecondaryPlaceholder
+                    isCompact={isCompact}
                 />
             </button>
 
             {/* Rating Card - Interactive */}
-            <div className="relative h-full">
+            <div className="relative">
                 <button
                     onClick={() => {
                         if (!isConnected) {
@@ -169,6 +178,7 @@ export function NFTInteractionCards({
                         }
                         variant={userRating ? 'yellow' : 'gray'}
                         hideSecondaryPlaceholder
+                        isCompact={isCompact}
                     />
                 </button>
 
@@ -207,7 +217,7 @@ export function NFTInteractionCards({
             {/* Share Card - Interactive */}
             <button
                 onClick={onShare}
-                className="h-full hover:opacity-90 transition-all"
+                className="hover:opacity-90 transition-all"
                 title="Share this NFT"
             >
                 <StatCard
@@ -224,6 +234,7 @@ export function NFTInteractionCards({
                     }
                     variant="gray"
                     hideSecondaryPlaceholder
+                    isCompact={isCompact}
                 />
             </button>
         </div>

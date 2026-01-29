@@ -41,7 +41,7 @@
 import { useState, useCallback } from 'react';
 import { useMarketplacePurchase } from '@/hooks/marketplace/useMarketplacePurchase';
 import { useMarketplaceListing } from '@/hooks/marketplace/useMarketplaceListing';
-import { useMarketplaceContracts } from '@/app/sell/hooks/useMarketplaceContracts';
+import { useMarketplaceContracts } from '@/hooks/marketplace/useMarketplaceContracts';
 import { useNotifications } from '@/contexts/notifications';
 import { formatEther } from 'viem';
 import { usePublicClient } from 'wagmi';

@@ -354,4 +354,11 @@ export class MarketplaceItemsCache {
 
         devLog.success('cache', `✅ Removed NFT from ${removedCount} cache entries`);
     }
+
+    /**
+     * Get cache size for DevTools
+     */
+    getSize(): number {
+        return this.state.entries.size;
+    }
 }

@@ -35,6 +35,7 @@ export interface EnrichedNFTDocument {
         price: string | null; // Wei as string (priceTotal or legacy price)
         priceTotal?: string | null; // v2: Total price in Wei
         unitPrice?: string | null; // v2: Price per unit (ERC1155 partial buys)
+        currency?: string | null; // Payment currency (0x0 = native ETH, WETH address = WETH)
 
         // Parties
         seller: string | null;

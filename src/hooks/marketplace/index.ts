@@ -16,6 +16,8 @@ export { useMarketplaceListing } from './useMarketplaceListing';
 export { useMarketplacePurchase } from './useMarketplacePurchase';
 export { useMarketplaceUser } from './useMarketplaceUser';
 export { useMarketplaceEvents } from './useMarketplaceEvents';
+export { useMarketplaceContracts } from './useMarketplaceContracts';
+export { useMarketplaceFees } from './useMarketplaceFees';
 
 // === MARKETPLACE ITEMS HOOKS (MongoDB-backed) ===
 export { useMarketplaceItems, useMarketplaceCollections } from './useMarketplaceItems';

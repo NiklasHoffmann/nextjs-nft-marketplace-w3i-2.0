@@ -100,15 +100,14 @@ app/
 │   ├── ARCHITECTURE.md         # Sell architecture
 │   ├── layout.tsx              # Sell layout with FlowSidebar
 │   ├── page.tsx                # Sell page wrapper
-│   ├── SellPage.tsx            # Main sell page
-│   ├── components/             # Sell-specific components (19 files)
+│   ├── components/             # Sell-specific components (20 files)
+│   │   ├── SellPage.tsx        # Main sell page component
 │   │   ├── common/             # Common components
 │   │   ├── forms/              # Form components
 │   │   ├── listing/            # Listing components
 │   │   ├── nft-selection/      # NFT selection components
 │   │   └── preview/            # Preview components
 │   ├── contexts/               # Sell contexts (ListingFlowContext)
-│   ├── hooks/                  # Sell-specific hooks (5 hooks)
 │   ├── lib/                    # Sell utilities (listing-service)
 │   ├── types/                  # Sell types
 │   ├── utils/                  # Sell utilities

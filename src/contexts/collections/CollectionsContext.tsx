@@ -12,6 +12,8 @@ import { devLog } from '@/utils/devLog';
 import { CollectionsService, type Collection } from './CollectionsService';
 import { CollectionsCache, type CollectionsState } from './CollectionsCache';
 import { onDataInvalidation, type InvalidationEventDetail } from '@/services/validation';
+import { useMarketplaceEventsContext } from '@/contexts/marketplace-events';
+import { useContextDevtools } from '@/hooks/useContextDevtools';
 
 interface CollectionsContextValue {
     collections: Collection[];
@@ -45,6 +47,31 @@ export function CollectionsProvider({
 }: CollectionsProviderProps) {
     const [state, setState] = useState<CollectionsState>(CollectionsCache.createInitialState());
     const cache = useMemo(() => new CollectionsCache(cacheDuration), [cacheDuration]);
+
+    // 🔥 Subscribe to WebSocket events from EventContext
+    const eventsContext = useMarketplaceEventsContext();
+    const { subscribe } = eventsContext;
+
+    useEffect(() => {
+        console.log('🎯 [CollectionsContext] Subscribing to marketplace events');
+
+        // Subscribe to all events - collections stats change on any listing/purchase/cancel
+        const unsubscribe = subscribe('*', (event) => {
+            console.log('🔔 [CollectionsContext] Received event:', event.eventName);
+
+            // Invalidate cache and refetch after delay
+            setTimeout(() => {
+                cache.clearCache();
+                fetchCollections(true);
+            }, 600);
+        });
+
+        return () => {
+            console.log('👋 [CollectionsContext] Unsubscribing from events');
+            unsubscribe();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [subscribe]); // cache and fetchCollections are used in closure, not as dependencies
 
     /**
      * Fetch collections using service and cache
@@ -134,22 +161,33 @@ export function CollectionsProvider({
                 cache.clearCache();
                 fetchCollections(true);
             } else if (needsPartialRefresh && detail.contractAddress) {
-                // Optimized: Only refresh the affected collection
-                devLog.info('collections', `🔄 Partial refresh for collection ${detail.contractAddress}`);
-                // For now, still do full refresh but with shorter delay
-                // Future optimization: Update only affected collection in cache
+                // Refresh for listing events after DB sync delay
+                devLog.info('collections', `🔄 Refresh for collection ${detail.contractAddress}`);
+                cache.clearCache();
+                // Single fetch with delay for DB sync completion
                 setTimeout(() => {
-                    cache.clearCache();
                     fetchCollections(true);
-                }, 2000); // 2s delay for DB to sync
+                }, 600); // 600ms delay matches other contexts
             }
         });
 
         return unsubscribe;
     }, [cache, fetchCollections]);
 
+    // NOTE: SSE handling removed - we rely on MarketplaceEventsContext to prevent multiple WebSocket connections
+    // All updates come through eventsContext.subscribe() above
+
     // Calculate statistics
     const stats = useMemo(() => CollectionsService.calculateStats(state.collections), [state.collections]);
+
+    // DevTools (development only)
+    useContextDevtools('Collections', {
+        collectionsCount: state.collections.length,
+        loading: state.loading,
+        error: state.error,
+        lastFetched: state.lastFetched,
+        stats
+    });
 
     const value: CollectionsContextValue = {
         collections: state.collections,

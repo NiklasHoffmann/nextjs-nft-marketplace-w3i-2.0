@@ -91,10 +91,12 @@ export function useNFTInsights(options: UseNFTInsightsOptions = {}): UseNFTInsig
         if (autoFetch && contractAddress && tokenId !== undefined && tokenId !== null) {
             fetchInsights();
 
-            // Set up background refresh interval for critical insights data
+            // Background refresh - insights change rarely, so 10 minutes is sufficient
+            // PERFORMANCE: Reduced from 2min to 10min to prevent excessive polling
+            // when many NFT cards are rendered (each card creates its own interval)
             const intervalId = setInterval(() => {
                 fetchInsights();
-            }, 2 * 60 * 1000); // Every 2 minutes
+            }, 10 * 60 * 1000); // Every 10 minutes
 
             return () => clearInterval(intervalId);
         }

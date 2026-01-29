@@ -27,7 +27,7 @@ import type {
 } from '@/types/marketplace';
 
 const AVAILABLE_CATEGORIES = [
-    'Art', 'DigitalTwin', 'Collectible', 'Gaming', 'Music', 'Sports', 'Virtual Real Estate', 'Utility'
+    'Art', 'Collectibles', 'Gaming', 'Membership', 'Music', 'Sports'
 ];
 
 interface ListedNFTsListProps {
@@ -46,6 +46,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
     const [isInitialLoad, setIsInitialLoad] = useState(true);
     const [showReloadNotification, setShowReloadNotification] = useState(false);
     const [cachedItems, setCachedItems] = useState<NFTScrollItem[]>([]);
+    const lastVisibleTimestamp = useRef<number>(Date.now());
 
     // Get layout context for total items tracking
     const layoutContext = useMarketplaceLayout();
@@ -128,16 +129,48 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
         autoFetch: true,
     });
 
+    // Events are handled by MarketplaceItemsContext automatically
+
     // Convert MongoDB items to NFTScrollItem format
-    // Note: Intentionally NOT depending on 'loading' to avoid re-renders during sort operations
+    // Re-memoize when items change to ensure fresh data after reload
     const scrollItems: NFTScrollItem[] = useMemo(() => {
+        console.log('🔍 [ListedNFTsList] Converting items:', items.length);
+        if (items.length > 0) {
+            const firstItem = items[0];
+            if (firstItem) {
+                console.log('🔍 [ListedNFTsList] First item structure:', {
+                    hasPrice: 'price' in firstItem,
+                    priceValue: (firstItem as any).price,
+                    priceType: typeof (firstItem as any).price,
+                    hasMarketplace: 'marketplace' in firstItem,
+                    marketplacePrice: firstItem.marketplace?.price,
+                    hasMetadata: 'metadata' in firstItem,
+                    metadataImage: firstItem.metadata?.image,
+                    contractAddress: firstItem.contractAddress,
+                    tokenId: firstItem.tokenId
+                });
+            }
+        }
+        
         return items
             .filter(item => item.contractAddress && item.contractAddress !== 'undefined' && item.contractAddress.trim() !== '')
-            .map((item) => ({
-                contractAddress: item.contractAddress.toLowerCase(),
-                tokenId: item.tokenId,
-                price: (item as any).price || item.marketplace?.price || undefined,
-                isListed: (item as any).isListed ?? item.marketplace?.isListed ?? false,
+            .map((item) => {
+                // CRITICAL: Price handling for BSON Long compatibility
+                // MongoDB may return price as BSON Long object instead of string
+                let price = (item as any).price || item.marketplace?.price;
+                if (price && typeof price === 'object' && 'toString' in price) {
+                    // BSON Long object - convert to string
+                    price = String(price);
+                } else if (price && typeof price !== 'string') {
+                    // Fallback: convert any non-string to string
+                    price = String(price);
+                }
+                
+                return {
+                    contractAddress: item.contractAddress.toLowerCase(),
+                    tokenId: item.tokenId,
+                    price: price || undefined,
+                    isListed: (item as any).isListed ?? item.marketplace?.isListed ?? false,
                 listingId: (item as any).listingId || item.marketplace?.listingId || undefined,
                 seller: (item as any).seller || item.marketplace?.seller || undefined,
                 buyer: (item as any).buyer || item.marketplace?.buyer || undefined,
@@ -173,7 +206,8 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
                     approved: item.contract.approvedAddress || null,
                     ownerBalance: item.contract.ownerBalance
                 } : undefined
-            } as NFTScrollItem));
+            };
+        });
     }, [items]);
 
     // Preload images
@@ -244,6 +278,37 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
             }
         };
     }, []);
+
+    // Auto-reload when returning to marketplace page (e.g., from /sell)
+    // This ensures new listings are always visible without manual refresh
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            // When page becomes visible again
+            if (document.visibilityState === 'visible') {
+                const timeHidden = Date.now() - lastVisibleTimestamp.current;
+
+                // If page was hidden for more than 5 seconds, auto-reload
+                // (Likely user went to /sell, listed NFT, came back)
+                if (timeHidden > 5000) {
+                    console.log(`🔄 [Marketplace] Page visible again after ${Math.round(timeHidden / 1000)}s - auto-reloading...`);
+                    refetch();
+                }
+            } else {
+                // Track when page became hidden
+                lastVisibleTimestamp.current = Date.now();
+            }
+        };
+
+        if (typeof document !== 'undefined') {
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+        }
+
+        return () => {
+            if (typeof document !== 'undefined') {
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+            }
+        };
+    }, [refetch]);
 
     // Infinite Scroll
     useEffect(() => {

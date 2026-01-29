@@ -1,9 +1,10 @@
 /**
  * Hook exports for /sell route
+ * 
+ * All hooks have been moved to global @/hooks/
+ * This file is kept for backwards compatibility.
  */
 
-export { useUserNFTs, useListingForm } from './useUserNFTs';
-export { useNFTApproval } from './useNFTApproval';
-export { useCollectionWhitelist } from './useCollectionWhitelist';
-export { useMarketplaceFees } from './useMarketplaceFees';
-export { useMarketplaceContracts } from './useMarketplaceContracts';
+// Re-export global hooks
+export { useMarketplaceFees, useMarketplaceContracts } from '@/hooks/marketplace';
+export { useNFTApproval } from '@/hooks/nfts';

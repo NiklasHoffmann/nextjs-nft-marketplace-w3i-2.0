@@ -121,7 +121,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
                 from: 'nft_metadata',
                 let: {
                     contractAddr: '$contractAddress',
-                    tokId: '$tokenId'
+                    tokId: { $toString: '$tokenId' } // CRITICAL: Convert number to string for match
                 },
                 pipeline: [
                     {
@@ -136,6 +136,17 @@ export const GET = apiHandler(async (request: NextRequest) => {
                     }
                 ],
                 as: 'nftData'
+            }
+        },
+
+        // DEBUG: Add debug info about nftData lookup
+        {
+            $addFields: {
+                _debug_lookupKeys: {
+                    contractAddr: '$contractAddress',
+                    tokenId: '$tokenId',
+                    nftDataFound: { $size: { $ifNull: ['$nftData', []] } }
+                }
             }
         },
 
@@ -245,7 +256,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
                 // Keep original marketplace_items fields at root level
                 // (for backward compatibility with NFTGallery/NFTCard)
                 contractAddress: '$contractAddress',
-                price: '$price',
+                // CRITICAL: Convert price to STRING (MongoDB may store as BSON Long)
+                price: { $toString: { $ifNull: ['$price', '0'] } },
                 seller: '$seller',
                 isListed: '$isListed',
                 listedAt: '$listedAt',
@@ -253,6 +265,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
                 buyer: '$buyer',
                 desiredContractAddress: '$desiredContractAddress',
                 desiredTokenId: '$desiredTokenId',
+                currency: { $ifNull: ['$currency', '0x0000000000000000000000000000000000000000'] },
 
                 // Add enriched data
                 metadata: '$nftData.metadata',
@@ -274,10 +287,11 @@ export const GET = apiHandler(async (request: NextRequest) => {
                     listingId: '$listingId',
                     isListed: '$isListed',
 
-                    // Pricing (v1 & v2)
-                    price: '$price',
-                    priceTotal: '$priceTotal',
-                    unitPrice: '$unitPrice',
+                    // Pricing (v1 & v2) - Convert to STRING
+                    price: { $toString: { $ifNull: ['$price', '0'] } },
+                    priceTotal: { $toString: { $ifNull: ['$priceTotal', '0'] } },
+                    unitPrice: { $toString: { $ifNull: ['$unitPrice', '0'] } },
+                    currency: { $ifNull: ['$currency', '0x0000000000000000000000000000000000000000'] },
 
                     // Parties
                     seller: '$seller',
@@ -385,28 +399,27 @@ export const GET = apiHandler(async (request: NextRequest) => {
         ];
     }
 
-    // Category filter - include items WITHOUT category (newly listed, not yet indexed by TheGraph)
+    // Category filter - case-insensitive match with special character escaping
     if (category && category.length > 0) {
-        metadataFilters.$and = metadataFilters.$and || [];
-        metadataFilters.$and.push({
-            $or: [
-                { 'insights.category': { $in: category } },
-                { 'insights.category': { $exists: false } },
-                { 'insights.category': null }
-            ]
+        console.log('🏷️ [API] Category filter requested:', category);
+        // Escape special regex characters and create regex for each category to match case-insensitively
+        const categoryRegexes = category.map(cat => {
+            // Escape special regex characters (including spaces)
+            const escapedCat = cat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            return new RegExp(`^${escapedCat}$`, 'i');
+        });
+        metadataFilters['insights.category'] = { $in: categoryRegexes };
+        console.log('🏷️ [API] Category filter applied:', { 
+            input: category, 
+            regexes: categoryRegexes.map(r => r.source) 
         });
     }
 
-    // Rarity filter - include items WITHOUT rarity (newly listed, not yet indexed by TheGraph)
+    // Rarity filter - case-insensitive match
     if (rarity && rarity.length > 0) {
-        metadataFilters.$and = metadataFilters.$and || [];
-        metadataFilters.$and.push({
-            $or: [
-                { 'insights.rarity': { $in: rarity } },
-                { 'insights.rarity': { $exists: false } },
-                { 'insights.rarity': null }
-            ]
-        });
+        // Create regex for each rarity to match case-insensitively
+        const rarityRegexes = rarity.map(r => new RegExp(`^${r}$`, 'i'));
+        metadataFilters['insights.rarity'] = { $in: rarityRegexes };
     }
 
     // Tags filter - strict match (no fallback for missing tags)
@@ -455,6 +468,13 @@ export const GET = apiHandler(async (request: NextRequest) => {
     if (itemsBeforeCleanup.length > 0) {
         const firstItem: any = itemsBeforeCleanup[0];
         console.log('\n🔍 [API Debug] BEFORE $project cleanup:');
+        console.log('  - contractAddress:', firstItem.contractAddress);
+        console.log('  - tokenId:', firstItem.tokenId);
+        console.log('  - Debug lookup keys:', firstItem._debug_lookupKeys);
+        console.log('  - nftData array length:', firstItem.nftData?.length || 0);
+        if (firstItem.nftData?.[0]) {
+            console.log('  - nftData[0] exists with metadata?', !!firstItem.nftData[0].metadata);
+        }
         console.log('  - Has insightsData field?', 'insightsData' in firstItem);
         console.log('  - insightsData value:', firstItem.insightsData);
         console.log('  - Has insights field?', 'insights' in firstItem);
@@ -474,7 +494,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
             sortViewCount: 0,
             sortLikeCount: 0,
             sortWatchlistCount: 0,
-            sortAverageRating: 0
+            sortAverageRating: 0,
+            _debug_lookupKeys: 0 // Remove debug field
         }
     });
 
@@ -518,6 +539,12 @@ export const GET = apiHandler(async (request: NextRequest) => {
         console.log('');
     }
 
+    // Debug: Log all unique categories in result set (if category filter was used)
+    if (category && category.length > 0) {
+        const uniqueCategories = new Set(items.map((item: any) => item.insights?.category).filter(Boolean));
+        console.log('🏷️ [API] Unique categories in filtered results:', Array.from(uniqueCategories));
+    }
+
     // Get filter options (available categories, rarities, price range)
     // Use admin_nft_insights collection for insights-based filters
     const insightsCollection = db.collection('admin_nft_insights');
@@ -535,6 +562,9 @@ export const GET = apiHandler(async (request: NextRequest) => {
             }
         ]).toArray()
     ]);
+
+    // Debug: Log all available categories from insights
+    console.log('🏷️ [API] Available categories in admin_nft_insights:', categories);
 
     const response: MarketplaceItemsResponse = {
         success: true,

@@ -4,8 +4,7 @@ import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useListingFlow } from '../contexts/ListingFlowContext';
 import NFTCard from '@/components/nft/NFTCard';
-import { useMarketplaceFees } from '../hooks/useMarketplaceFees';
-import { useMarketplaceContracts } from '../hooks/useMarketplaceContracts';
+import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
 
 export default function CheckListingPage() {
     const router = useRouter();
