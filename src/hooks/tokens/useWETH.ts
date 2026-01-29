@@ -168,6 +168,15 @@ export function useWETH({ marketplaceAddress }: UseWETHParams = {}) {
         return (allowance as bigint) >= required;
     };
 
+    /**
+     * Check if user has enough WETH balance
+     */
+    const hasEnoughBalance = (requiredAmount: string): boolean => {
+        if (!wethBalance) return false;
+        const required = parseEther(requiredAmount);
+        return (wethBalance as bigint) >= required;
+    };
+
     return {
         // Addresses
         wethAddress,
@@ -182,6 +191,7 @@ export function useWETH({ marketplaceAddress }: UseWETHParams = {}) {
         allowance: allowance ? formatEther(allowance as bigint) : '0',
         allowanceWei: (allowance as bigint) || BigInt(0),
         hasEnoughAllowance,
+        hasEnoughBalance,
         
         // Actions
         wrap,

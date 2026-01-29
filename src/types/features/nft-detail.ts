@@ -121,7 +121,7 @@ export interface NFTPriceCardProps {
     desiredContractAddress?: string;
     desiredTokenId?: string;
     // Payment currency
-    currency?: string | null;
+    currency?: string | null | undefined;
     // v2 Marketplace fields
     status?: 'LISTED' | 'PARTIALLY_FILLED' | 'SOLD_OUT' | 'CANCELED' | 'INVALIDATED' | null;
     listingType?: 'PURE_ETH' | 'SWAP_AND_ETH' | 'PURE_SWAP' | null;

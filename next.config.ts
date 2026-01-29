@@ -37,6 +37,13 @@ const nextConfig: import('next').NextConfig = {
         net: false,
         tls: false,
       };
+
+      // Ignore React Native dependencies (MetaMask SDK)
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        '@react-native-async-storage/async-storage': false,
+        'react-native': false,
+      };
     }
 
     // Production optimizations

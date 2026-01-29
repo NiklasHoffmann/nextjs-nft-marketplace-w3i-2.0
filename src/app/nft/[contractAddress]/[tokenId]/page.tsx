@@ -126,6 +126,7 @@ function NFTDetailPage() {
             tokenStandard: nftData.marketplace?.tokenStandard || 'ERC721',
             listingType: nftData.marketplace?.listingType,
             status: nftData.marketplace?.status,
+            currency: nftData.marketplace?.currency,
 
             // ERC1155
             erc1155QuantityListed: nftData.marketplace?.erc1155QuantityListed,

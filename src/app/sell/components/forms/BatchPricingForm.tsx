@@ -31,11 +31,47 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
     
     // Get marketplace address and dynamic fees
     const { marketplaceAddress } = useMarketplaceContracts();
-    const { calculateFees, innovationFeePercentage, royaltyFeePercentage } = useMarketplaceFees({
+    const { calculateFees: calculateFeesBase, innovationFeePercentage, royaltyFeePercentage } = useMarketplaceFees({
         marketplaceAddress,
         contractAddress: undefined, // Batch doesn't have single contract
         tokenId: undefined
     });
+
+    // Wrapper function to support priceMode parameter (gross/net)
+    const calculateFeesWithMode = (price: string, priceMode: 'gross' | 'net') => {
+        const priceNum = parseFloat(price) || 0;
+        
+        if (priceMode === 'net') {
+            // Net mode: Calculate gross price from desired net amount
+            const totalFeePercentage = innovationFeePercentage + royaltyFeePercentage;
+            const grossPrice = priceNum / (1 - totalFeePercentage);
+            const marketplaceFee = grossPrice * innovationFeePercentage;
+            const royaltyFee = grossPrice * royaltyFeePercentage;
+            
+            return {
+                marketplaceFee,
+                royaltyFee,
+                totalFees: marketplaceFee + royaltyFee,
+                youReceive: priceNum,
+                net: priceNum,
+                gross: grossPrice
+            };
+        } else {
+            // Gross mode: Calculate fees from gross price
+            const marketplaceFee = priceNum * innovationFeePercentage;
+            const royaltyFee = priceNum * royaltyFeePercentage;
+            const youReceive = priceNum - marketplaceFee - royaltyFee;
+            
+            return {
+                marketplaceFee,
+                royaltyFee,
+                totalFees: marketplaceFee + royaltyFee,
+                youReceive,
+                net: youReceive,
+                gross: priceNum
+            };
+        }
+    };
 
     // Sync progressStep with whitelist/approval status
     useEffect(() => {
@@ -515,19 +551,19 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
                                         <span className="font-medium">{parseFloat(form.values.startPrice).toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
                                     </div>
                                     <div className="flex justify-between text-gray-600">
-                                        <span>Marketplace Fee ({marketplaceFeePercentage}%)</span>
-                                        <span>-{calculateFees(form.values.startPrice, form.values.priceMode).marketplace.toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
+                                        <span>Marketplace Fee ({(innovationFeePercentage * 100).toFixed(2)}%)</span>
+                                        <span>-{calculateFeesWithMode(form.values.startPrice, form.values.priceMode).marketplaceFee.toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
                                     </div>
                                     <div className="flex justify-between text-gray-600">
-                                        <span>Creator Royalty (5%)</span>
-                                        <span>-{calculateFees(form.values.startPrice, form.values.priceMode).royalty.toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
+                                        <span>Creator Royalty ({(royaltyFeePercentage * 100).toFixed(2)}%)</span>
+                                        <span>-{calculateFeesWithMode(form.values.startPrice, form.values.priceMode).royaltyFee.toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
                                     </div>
                                     <div className="pt-1.5 mt-1.5 border-t border-gray-300 flex justify-between text-gray-900 font-semibold">
                                         <span>{form.values.priceMode === 'gross' ? 'Sie erhalten (pro NFT)' : 'Käufer zahlt (pro NFT)'}</span>
                                         <span className="text-green-600">
                                             {form.values.priceMode === 'gross'
-                                                ? calculateFees(form.values.startPrice, form.values.priceMode).net.toFixed(4)
-                                                : calculateFees(form.values.startPrice, form.values.priceMode).gross.toFixed(4)
+                                                ? calculateFeesWithMode(form.values.startPrice, form.values.priceMode).net.toFixed(4)
+                                                : calculateFeesWithMode(form.values.startPrice, form.values.priceMode).gross.toFixed(4)
                                             } {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}
                                         </span>
                                     </div>
@@ -548,19 +584,19 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
                                         <span className="font-medium">{parseFloat(form.values.endPrice).toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
                                     </div>
                                     <div className="flex justify-between text-gray-600">
-                                        <span>Marketplace Fee ({marketplaceFeePercentage}%)</span>
-                                        <span>-{calculateFees(form.values.endPrice, form.values.priceMode).marketplace.toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
+                                        <span>Marketplace Fee ({(innovationFeePercentage * 100).toFixed(2)}%)</span>
+                                        <span>-{calculateFeesWithMode(form.values.endPrice, form.values.priceMode).marketplaceFee.toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
                                     </div>
                                     <div className="flex justify-between text-gray-600">
-                                        <span>Creator Royalty (5%)</span>
-                                        <span>-{calculateFees(form.values.endPrice, form.values.priceMode).royalty.toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
+                                        <span>Creator Royalty ({(royaltyFeePercentage * 100).toFixed(2)}%)</span>
+                                        <span>-{calculateFeesWithMode(form.values.endPrice, form.values.priceMode).royaltyFee.toFixed(4)} {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}</span>
                                     </div>
                                     <div className="pt-1.5 mt-1.5 border-t border-gray-300 flex justify-between text-gray-900 font-semibold">
                                         <span>{form.values.priceMode === 'gross' ? 'Sie erhalten (pro NFT)' : 'Käufer zahlt (pro NFT)'}</span>
                                         <span className="text-green-600">
                                             {form.values.priceMode === 'gross'
-                                                ? calculateFees(form.values.endPrice, form.values.priceMode).net.toFixed(4)
-                                                : calculateFees(form.values.endPrice, form.values.priceMode).gross.toFixed(4)
+                                                ? calculateFeesWithMode(form.values.endPrice, form.values.priceMode).net.toFixed(4)
+                                                : calculateFeesWithMode(form.values.endPrice, form.values.priceMode).gross.toFixed(4)
                                             } {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}
                                         </span>
                                     </div>
