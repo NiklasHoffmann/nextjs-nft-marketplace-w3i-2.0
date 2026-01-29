@@ -89,11 +89,11 @@ export function SellPage() {
         if (listingType === 'batch' && batchSelectedNFTs.size > 0) {
             const validKeys = new Set(filteredNFTs.map(nft => nft.key));
             const currentKeys = Array.from(batchSelectedNFTs);
-            const hasInvalidKeys = currentKeys.some(key => !validKeys.has(key));
+            const hasInvalidKeys = currentKeys.some(key => !validKeys.has(key as `${string}-${string}`));
             
             if (hasInvalidKeys) {
                 const cleanedSelection = new Set(
-                    currentKeys.filter(key => validKeys.has(key))
+                    currentKeys.filter(key => validKeys.has(key as `${string}-${string}`))
                 );
                 setBatchSelectedNFTs(cleanedSelection);
             }
