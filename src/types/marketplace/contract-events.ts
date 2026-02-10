@@ -21,7 +21,9 @@ export type MarketplaceEventName =
     | 'ItemCanceled'
     | 'ItemUpdated'
     | 'ListingCanceledDueToInvalidListing'
-    | 'CollectionWhitelistRevokedCancelTriggered';
+    | 'CollectionWhitelistRevokedCancelTriggered'
+    | 'BuyerWhitelisted'
+    | 'BuyerRemovedFromWhitelist';
 
 // ===== RAW EVENT DATA (from contract logs) =====
 
@@ -83,6 +85,45 @@ export interface ItemUpdatedEventData {
     newDesiredTokenId: string; // Converted from bigint
 }
 
+/**
+ * ListingCanceledDueToInvalidListing event data
+ * Emitted when a listing is auto-canceled due to invalid state
+ */
+export interface ListingCanceledDueToInvalidListingEventData {
+    listingId: string;  // Converted from bigint
+    nftAddress: Address;
+    tokenId: string;    // Converted from bigint
+    seller: Address;
+    triggeredBy: Address;
+}
+
+/**
+ * CollectionWhitelistRevokedCancelTriggered event data
+ * Emitted when collection whitelist removal cancels a listing
+ */
+export interface CollectionWhitelistRevokedCancelTriggeredEventData {
+    listingId: string;  // Converted from bigint
+    tokenAddress: Address;
+}
+
+/**
+ * BuyerWhitelisted event data
+ * Emitted when a buyer is added to a listing whitelist
+ */
+export interface BuyerWhitelistedEventData {
+    listingId: string;  // Converted from bigint
+    buyer: Address;
+}
+
+/**
+ * BuyerRemovedFromWhitelist event data
+ * Emitted when a buyer is removed from a listing whitelist
+ */
+export interface BuyerRemovedFromWhitelistEventData {
+    listingId: string;  // Converted from bigint
+    buyer: Address;
+}
+
 // ===== PROCESSED EVENT DATA (enriched for app use) =====
 
 /**
@@ -142,13 +183,49 @@ export interface ProcessedItemUpdatedEvent extends BaseMarketplaceEvent {
 }
 
 /**
+ * Processed ListingCanceledDueToInvalidListing event
+ */
+export interface ProcessedListingCanceledDueToInvalidListingEvent extends BaseMarketplaceEvent {
+    eventName: 'ListingCanceledDueToInvalidListing';
+    data: ListingCanceledDueToInvalidListingEventData;
+}
+
+/**
+ * Processed CollectionWhitelistRevokedCancelTriggered event
+ */
+export interface ProcessedCollectionWhitelistRevokedCancelTriggeredEvent extends BaseMarketplaceEvent {
+    eventName: 'CollectionWhitelistRevokedCancelTriggered';
+    data: CollectionWhitelistRevokedCancelTriggeredEventData;
+}
+
+/**
+ * Processed BuyerWhitelisted event
+ */
+export interface ProcessedBuyerWhitelistedEvent extends BaseMarketplaceEvent {
+    eventName: 'BuyerWhitelisted';
+    data: BuyerWhitelistedEventData;
+}
+
+/**
+ * Processed BuyerRemovedFromWhitelist event
+ */
+export interface ProcessedBuyerRemovedFromWhitelistEvent extends BaseMarketplaceEvent {
+    eventName: 'BuyerRemovedFromWhitelist';
+    data: BuyerRemovedFromWhitelistEventData;
+}
+
+/**
  * Union type of all processed marketplace events
  */
 export type ProcessedMarketplaceEvent =
     | ProcessedItemListedEvent
     | ProcessedItemBoughtEvent
     | ProcessedItemCanceledEvent
-    | ProcessedItemUpdatedEvent;
+    | ProcessedItemUpdatedEvent
+    | ProcessedListingCanceledDueToInvalidListingEvent
+    | ProcessedCollectionWhitelistRevokedCancelTriggeredEvent
+    | ProcessedBuyerWhitelistedEvent
+    | ProcessedBuyerRemovedFromWhitelistEvent;
 
 // ===== EVENT LISTENER TYPES =====
 
@@ -172,6 +249,10 @@ export interface EventListenerConfig {
     onItemBought?: MarketplaceEventCallback<ProcessedItemBoughtEvent>;
     onItemCanceled?: MarketplaceEventCallback<ProcessedItemCanceledEvent>;
     onItemUpdated?: MarketplaceEventCallback<ProcessedItemUpdatedEvent>;
+    onListingCanceledDueToInvalidListing?: MarketplaceEventCallback<ProcessedListingCanceledDueToInvalidListingEvent>;
+    onCollectionWhitelistRevokedCancelTriggered?: MarketplaceEventCallback<ProcessedCollectionWhitelistRevokedCancelTriggeredEvent>;
+    onBuyerWhitelisted?: MarketplaceEventCallback<ProcessedBuyerWhitelistedEvent>;
+    onBuyerRemovedFromWhitelist?: MarketplaceEventCallback<ProcessedBuyerRemovedFromWhitelistEvent>;
     /** Error handler */
     onError?: (error: Error, eventName?: MarketplaceEventName) => void;
     /** Connection status change */

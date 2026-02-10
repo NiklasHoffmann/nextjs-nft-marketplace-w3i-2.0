@@ -29,6 +29,7 @@ export interface NFTDetailsPageData {
     tokenId: string;
     isListed: boolean;
     price: string;
+    currency?: string | null;
     seller: string;
     buyer?: string;
     desiredContractAddress: string;
@@ -205,6 +206,7 @@ export interface FunctionalitiesTabProps {
 
 export interface TokenomicsTabProps {
     price: string;
+    currency?: string | null;
     totalSupply?: number | null;
     rarityRank?: number | null;
     supportsRoyalty: boolean;

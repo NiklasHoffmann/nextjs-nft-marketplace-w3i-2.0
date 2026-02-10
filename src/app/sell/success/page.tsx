@@ -7,14 +7,17 @@ import NFTCard from '@/components/nft/NFTCard';
 import Link from 'next/link';
 import { useMarketplaceItems } from '@/contexts/marketplace-items';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
-import { formatEther } from 'viem';
+import { formatUnits } from 'viem';
 import type { AggregatedNFT } from '@/types/core/core-nft-modern';
 import { invalidateAfterListing } from '@/services/validation';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
+import { useChainId } from 'wagmi';
 
 export default function SuccessPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { formData, progressData, reset, setProgressStep, setFormData, setNftDataLoaded } = useListingFlow();
+    const chainId = useChainId();
+    const { formData, progressData, reset, setProgressStep, setNftDataLoaded } = useListingFlow();
     const { invalidateCache } = useMarketplaceItems();
     const { refresh: refreshWalletNFTs } = useWalletNFTs();
 
@@ -22,6 +25,7 @@ export default function SuccessPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     const txHash = searchParams.get('tx') || progressData.txHash;
+    const isBatch = !!formData.selectedNFTs?.length && !formData.selectedNFT;
 
     // Update progress step
     useEffect(() => {
@@ -31,6 +35,12 @@ export default function SuccessPage() {
     // Load the listed NFT from DB
     useEffect(() => {
         const loadListedNFT = async () => {
+            if (isBatch) {
+                setIsLoading(false);
+                setNftDataLoaded(true);
+                return;
+            }
+
             if (!formData.selectedNFT || !txHash) return;
 
             setIsLoading(true);
@@ -197,16 +207,21 @@ export default function SuccessPage() {
         };
 
         loadListedNFT();
-    }, [formData.selectedNFT, txHash, invalidateCache, setNftDataLoaded]);
+    }, [formData.selectedNFT, formData.selectedNFTs, isBatch, txHash, invalidateCache, setNftDataLoaded]);
 
     // Guard: Redirect if no NFT or no tx hash
     useEffect(() => {
-        if (!formData.selectedNFT || !txHash) {
+        if (!formData.selectedNFT && !formData.selectedNFTs?.length) {
+            router.replace('/sell');
+            return;
+        }
+
+        if (!isBatch && !txHash) {
             router.replace('/sell');
         }
-    }, [formData.selectedNFT, txHash, router]);
+    }, [formData.selectedNFT, formData.selectedNFTs, isBatch, txHash, router]);
 
-    if (!formData.selectedNFT || !txHash) {
+    if ((!formData.selectedNFT && !formData.selectedNFTs?.length) || (!isBatch && !txHash)) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
                 <div className="text-center">
@@ -222,9 +237,135 @@ export default function SuccessPage() {
         router.push('/sell');
     };
 
+    if (isBatch) {
+        const selectedNFTs = formData.selectedNFTs || [];
+        const calculateBatchPrice = (index: number, total: number): string => {
+            if (formData.pricingType === 'fixed') {
+                return formData.fixedPrice || '0';
+            }
+            const start = parseFloat(formData.startPrice || '0');
+            const end = parseFloat(formData.endPrice || '0');
+            if (total <= 1) return start.toFixed(4);
+            const step = (end - start) / (total - 1);
+            return (start + step * index).toFixed(4);
+        };
+
+        const totalValue = selectedNFTs.reduce((sum, _, idx) => sum + parseFloat(calculateBatchPrice(idx, selectedNFTs.length)), 0);
+        const priceRange = formData.pricingType === 'variable'
+            ? `${formData.startPrice || '0'} - ${formData.endPrice || '0'}`
+            : (formData.fixedPrice || '0');
+        const currencySymbol = getCurrencySymbolByAddress(chainId, formData.currency || '0x0000000000000000000000000000000000000000');
+
+        return (
+            <section className="space-y-6 bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-6 text-center">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-green-500 rounded-full mb-4">
+                        <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                        🎉 Batch-Listing erfolgreich!
+                    </h2>
+                    <p className="text-gray-700">
+                        Deine NFTs sind jetzt auf dem Marketplace live
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-1 space-y-4">
+                        <div className="bg-white rounded-xl border border-gray-200 p-6">
+                            <h3 className="text-sm font-medium text-gray-700 mb-2">Batch-Details</h3>
+                            <p className="text-2xl font-bold text-gray-900">{selectedNFTs.length} NFTs</p>
+                            <p className="text-sm text-gray-600 mt-2">Preis</p>
+                            <p className="text-lg font-semibold text-blue-600">{priceRange} {currencySymbol}</p>
+                            <p className="text-sm text-gray-600 mt-2">Gesamtwert</p>
+                            <p className="text-lg font-semibold text-gray-900">{totalValue.toFixed(4)} {currencySymbol}</p>
+                        </div>
+
+                        {txHash && (
+                            <div className="bg-gray-50 rounded-xl border border-gray-200 p-6">
+                                <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    Transaction Hash
+                                </h3>
+                                <a
+                                    href={`https://sepolia.etherscan.io/tx/${txHash}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-blue-600 hover:text-blue-800 font-mono break-all hover:underline block"
+                                >
+                                    {txHash}
+                                </a>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="lg:col-span-2 space-y-6">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-900 mb-4">Gelistete NFTs</h2>
+                            <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+                                {selectedNFTs.map((nft, idx) => (
+                                    <div key={nft.key} className="relative">
+                                        <div className="aspect-square rounded-lg overflow-hidden border border-gray-200">
+                                            <img
+                                                src={nft.meta?.image || '/media/custom-nft.jpg'}
+                                                alt={nft.meta?.name || `NFT #${nft.tokenId}`}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                                            <p className="text-xs text-white font-medium truncate">#{nft.tokenId}</p>
+                                            <p className="text-[10px] text-green-300 font-semibold">
+                                                {calculateBatchPrice(idx, selectedNFTs.length)} {currencySymbol}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                            <Link
+                                href="/marketplace"
+                                className="flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg"
+                            >
+                                Zum Marktplatz
+                            </Link>
+
+                            <button
+                                onClick={handleCreateAnother}
+                                className="flex items-center justify-center gap-3 px-6 py-4 bg-white hover:bg-gray-50 text-gray-900 font-semibold rounded-xl border-2 border-gray-300 hover:border-gray-400 transition-all"
+                            >
+                                Weitere NFTs listen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        );
+    }
+
     const displayNFT = listedNFT || formData.selectedNFT;
+    if (!displayNFT) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Laden...</p>
+                </div>
+            </div>
+        );
+    }
     const listing = displayNFT?.listing;
-    const priceInEth = listing?.price ? formatEther(BigInt(listing.price)) : formData.price;
+    
+    // Get currency symbol from listing or formData
+    const currency = listing?.currency || formData.currency;
+    const currencySymbol = getCurrencySymbolByAddress(chainId, currency || '0x0000000000000000000000000000000000000000');
+    const tokenDecimals = getTokenDecimalsByAddress(chainId, currency || '0x0000000000000000000000000000000000000000');
+    const priceInToken = listing?.price ? formatUnits(BigInt(listing.price), tokenDecimals) : formData.price;
 
     // Derive mode from listing data
     // Check if desiredContractAddress is set and not a zero address
@@ -332,11 +473,11 @@ export default function SuccessPage() {
                                 </div>
                             </div>
 
-                            {priceInEth && parseFloat(priceInEth) > 0 && (
+                            {priceInToken && parseFloat(priceInToken) > 0 && (
                                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
                                     <h3 className="text-sm font-medium text-gray-700 mb-2">Preis</h3>
                                     <p className="text-3xl font-bold text-blue-600">
-                                        {priceInEth} ETH
+                                        {priceInToken} {currencySymbol}
                                     </p>
                                 </div>
                             )}

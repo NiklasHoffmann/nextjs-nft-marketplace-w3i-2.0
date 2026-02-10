@@ -1,7 +1,18 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatCard } from '@/components/ui';
-import { formatEther } from '@/utils';
+import { formatUnits } from 'viem';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
+import { useChainId } from 'wagmi';
+import { useCurrency } from '@/contexts/CurrencyContext';
+
+const formatTokenDisplay = (amount: string, maxDecimals: number) => {
+    if (!amount.includes('.')) return amount;
+
+    const [whole, fraction] = amount.split('.');
+    const trimmedFraction = (fraction || '').slice(0, maxDecimals).replace(/0+$/, '');
+    return trimmedFraction ? `${whole}.${trimmedFraction}` : whole;
+};
 
 interface CollectionHeaderProps {
     contractAddress: string;
@@ -11,6 +22,7 @@ interface CollectionHeaderProps {
     totalVolume?: number;
     avgPrice?: number;
     floorPrice?: number;
+    floorPriceCurrency?: string | null;
     totalViews?: number;
     totalLikes?: number;
 }
@@ -20,6 +32,7 @@ interface CollectionStatsProps {
     totalVolume?: number;
     avgPrice?: number;
     floorPrice?: number;
+    floorPriceCurrency?: string | null;
     totalViews?: number;
     totalLikes?: number;
     isCompact?: boolean;
@@ -30,10 +43,79 @@ function CollectionStats({
     totalVolume,
     avgPrice,
     floorPrice,
+    floorPriceCurrency,
     totalViews,
     totalLikes,
     isCompact = false
 }: CollectionStatsProps) {
+    const chainId = useChainId();
+    const { convertTokenToUSD, convertUSDToETH } = useCurrency();
+    const currencySymbol = floorPriceCurrency 
+        ? getCurrencySymbolByAddress(chainId, floorPriceCurrency)
+        : 'ETH';
+    const tokenDecimals = getTokenDecimalsByAddress(chainId, floorPriceCurrency);
+    const [convertedFloorEth, setConvertedFloorEth] = useState<string | null>(null);
+
+    const isEthLike = useMemo(() => {
+        const symbol = currencySymbol?.toUpperCase();
+        return symbol === 'ETH' || symbol === 'WETH';
+    }, [currencySymbol]);
+
+    const formattedFloorPrice = floorPrice !== null && floorPrice !== undefined
+        ? formatTokenDisplay(
+            formatUnits(BigInt(floorPrice.toString()), tokenDecimals),
+            Math.min(4, tokenDecimals)
+        )
+        : null;
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const convertFloor = async () => {
+            if (floorPrice === null || floorPrice === undefined || isEthLike) {
+                if (isMounted) setConvertedFloorEth(null);
+                return;
+            }
+
+            try {
+                const tokenAmount = parseFloat(formatUnits(BigInt(floorPrice.toString()), tokenDecimals));
+                if (!tokenAmount) {
+                    if (isMounted) setConvertedFloorEth(null);
+                    return;
+                }
+
+                const usdValue = await convertTokenToUSD(tokenAmount, currencySymbol, floorPriceCurrency, chainId);
+                if (!usdValue) {
+                    if (isMounted) setConvertedFloorEth(null);
+                    return;
+                }
+
+                const ethAmount = await convertUSDToETH(usdValue);
+                if (!ethAmount) {
+                    if (isMounted) setConvertedFloorEth(null);
+                    return;
+                }
+
+                const formatted = formatTokenDisplay(ethAmount.toFixed(4), 4);
+                if (isMounted) setConvertedFloorEth(formatted);
+            } catch {
+                if (isMounted) setConvertedFloorEth(null);
+            }
+        };
+
+        void convertFloor();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [floorPrice, tokenDecimals, currencySymbol, isEthLike, convertTokenToUSD, convertUSDToETH]);
+
+    const floorDisplayValue = convertedFloorEth
+        ? `${convertedFloorEth} ETH`
+        : formattedFloorPrice
+            ? `${formattedFloorPrice} ${currencySymbol}`
+            : '—';
+
     return (
         <div className={isCompact ? "flex flex-wrap gap-2 justify-end" : "grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4"}>
             <StatCard
@@ -55,7 +137,7 @@ function CollectionStats({
                     </svg>
                 }
                 label="Floor"
-                value={floorPrice ? formatEther(floorPrice.toString()) : '—'}
+                value={floorDisplayValue}
                 hideSecondaryPlaceholder
                 variant="green"
                 isCompact={isCompact}
@@ -97,6 +179,7 @@ export function CollectionHeader({
     totalVolume,
     avgPrice,
     floorPrice,
+    floorPriceCurrency,
     totalViews,
     totalLikes
 }: CollectionHeaderProps) {
@@ -122,6 +205,7 @@ export function CollectionHeader({
                     totalVolume={totalVolume}
                     avgPrice={avgPrice}
                     floorPrice={floorPrice}
+                    floorPriceCurrency={floorPriceCurrency}
                     totalViews={totalViews}
                     totalLikes={totalLikes}
                 />

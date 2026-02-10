@@ -23,9 +23,15 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useAccount } from 'wagmi';
 import { devLog } from '@/utils/devLog';
 import { WalletNFTsService, type WalletNFT } from './WalletNFTsService';
-import { onDataInvalidation, type InvalidationEventDetail } from '@/services/validation';
+import {
+    onDataInvalidation,
+    type InvalidationEventDetail,
+    GLOBAL_INVALIDATION_TYPES,
+    WALLET_LISTING_INVALIDATION_TYPES,
+    DB_SYNC_DELAY_MS,
+    createDebouncedScheduler
+} from '@/services/validation';
 import { WalletNFTsCache, type WalletNFTsState } from './WalletNFTsCache';
-import { useMarketplaceEventsContext } from '@/contexts/marketplace-events';
 import { useContextDevtools } from '@/hooks/useContextDevtools';
 
 interface WalletNFTsContextType {
@@ -58,33 +64,7 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
     const { address, isConnected } = useAccount();
     const [state, setState] = useState<WalletNFTsState>(WalletNFTsCache.createInitialState());
     const cache = useMemo(() => new WalletNFTsCache(), []);
-
-    // 🔥 Subscribe to WebSocket events from EventContext
-    const eventsContext = useMarketplaceEventsContext();
-
-    useEffect(() => {
-        if (!isConnected || !address) return;
-
-        console.log('🎯 [WalletNFTsContext] Subscribing to marketplace events');
-
-        // Subscribe to all events - wallet NFTs may change listing status
-        const unsubscribe = eventsContext.subscribe('*', (event) => {
-            console.log('🔔 [WalletNFTsContext] Received event:', event.eventName);
-
-            // Invalidate cache and refetch after delay
-            setTimeout(() => {
-                if (address) {
-                    cache.invalidate(address.toLowerCase());
-                    fetchWalletNFTs(address);
-                }
-            }, 600);
-        });
-
-        return () => {
-            console.log('👋 [WalletNFTsContext] Unsubscribing from events');
-            unsubscribe();
-        };
-    }, [eventsContext, isConnected, address, cache]);
+    const listingRetryScheduler = useMemo(() => createDebouncedScheduler(), []);
 
     /**
      * Fetch NFTs for the connected wallet using the service
@@ -97,6 +77,7 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
 
             // Force new array and object references to trigger React re-renders
             const freshNfts = nfts.map(nft => ({ ...nft }));
+            
             const newState = WalletNFTsCache.createSuccessState(freshNfts);
 
             devLog.info('wallet-nfts', `✅ Fetched ${freshNfts.length} NFTs, setting new state`);
@@ -172,7 +153,6 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
      * (e.g., after listing, purchasing, or canceling NFTs)
      */
     useEffect(() => {
-        let debouncedRefreshTimeout: NodeJS.Timeout | null = null;
         let pendingRefreshPromise: Promise<void> | null = null;
 
         const unsubscribe = onDataInvalidation(async (detail: InvalidationEventDetail) => {
@@ -184,10 +164,8 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
             // 3. Transfer involving current wallet
             // 4. Listing created/canceled (affects all wallets that own NFTs)
             const shouldRefresh =
-                detail.type === 'manual-refresh' ||
-                detail.type === 'graph-update' ||
-                detail.type === 'listing-created' || // Always refresh after listing (NFT moved to marketplace)
-                detail.type === 'listing-canceled' || // Always refresh after cancel (NFT returned to wallet)
+                GLOBAL_INVALIDATION_TYPES.has(detail.type) ||
+                WALLET_LISTING_INVALIDATION_TYPES.has(detail.type) ||
                 (detail.walletAddress && address && detail.walletAddress.toLowerCase() === address.toLowerCase());
 
             if (shouldRefresh && address) {
@@ -204,11 +182,6 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
                 if (detail.type === 'listing-created') {
                     devLog.info('wallet-nfts', '⏱️ Listing detected - using debounced retry strategy');
 
-                    // Cancel any pending retry
-                    if (debouncedRefreshTimeout) {
-                        clearTimeout(debouncedRefreshTimeout);
-                    }
-
                     // Immediate fetch (if not already pending)
                     if (!pendingRefreshPromise) {
                         pendingRefreshPromise = fetchWalletNFTs(address)
@@ -218,9 +191,9 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
                     }
 
                     // Schedule debounced retry after 2s (DB sync typically complete)
-                    debouncedRefreshTimeout = setTimeout(() => {
+                    listingRetryScheduler.schedule(DB_SYNC_DELAY_MS, () => {
                         if (!pendingRefreshPromise) {
-                            devLog.info('wallet-nfts', '🔄 [Debounced Retry] After 2s');
+                            devLog.info('wallet-nfts', `🔄 [Debounced Retry] After ${DB_SYNC_DELAY_MS}ms`);
                             pendingRefreshPromise = fetchWalletNFTs(address)
                                 .finally(() => {
                                     pendingRefreshPromise = null;
@@ -228,7 +201,7 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
                         } else {
                             devLog.info('wallet-nfts', '⏸️ Skipping retry - fetch already in progress');
                         }
-                    }, 2000);
+                    });
                 } else {
                     // For other events, single fetch is enough (with deduplication)
                     if (!pendingRefreshPromise) {
@@ -243,11 +216,9 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
 
         return () => {
             unsubscribe();
-            if (debouncedRefreshTimeout) {
-                clearTimeout(debouncedRefreshTimeout);
-            }
+            listingRetryScheduler.clear();
         };
-    }, [address, cache, fetchWalletNFTs]);
+    }, [address, cache, fetchWalletNFTs, listingRetryScheduler]);
 
     // NOTE: SSE handling removed - we rely on MarketplaceEventsContext to prevent multiple WebSocket connections
     // All updates come through eventsContext.subscribe() above

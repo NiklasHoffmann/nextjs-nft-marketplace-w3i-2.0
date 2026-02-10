@@ -8,8 +8,7 @@ interface WalletHeaderProps {
     address: string;
     listedCount: number;
     unlistedCount: number;
-    totalListedValue: number;
-    totalValueUSD: string | null;
+    totalValueDisplay: string;
     ethPriceLoading: boolean;
 }
 
@@ -17,8 +16,7 @@ export function WalletHeader({
     address,
     listedCount,
     unlistedCount,
-    totalListedValue,
-    totalValueUSD,
+    totalValueDisplay,
     ethPriceLoading
 }: WalletHeaderProps) {
     return (
@@ -46,8 +44,7 @@ export function WalletHeader({
                 <WalletStats
                     listedCount={listedCount}
                     unlistedCount={unlistedCount}
-                    totalListedValue={totalListedValue}
-                    totalValueUSD={totalValueUSD}
+                    totalValueDisplay={totalValueDisplay}
                     ethPriceLoading={ethPriceLoading}
                 />
             }

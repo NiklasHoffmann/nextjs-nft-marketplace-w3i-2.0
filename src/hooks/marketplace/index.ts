@@ -2,19 +2,19 @@
  * MARKETPLACE CONTRACT HOOKS
  * 
  * Direkte Interaktion mit Marketplace Smart Contract Funktionen:
- * â€¢ Data: getListingById, getListingsByNFT, isBuyerWhitelisted
+ * â€¢ Data: getListingById, isBuyerWhitelisted
  * â€¢ Listing: createListing, updateListing, cancelListing  
  * â€¢ Purchase: purchaseListing (ETH & NFT swaps)
  * â€¢ Admin: setInnovationFee, whitelisting, cleanListing
- * â€¢ User: withdrawProceeds, getProceeds
+ * â€¢ User: (removed; proceeds are forwarded directly)
  */
 
 // === CORE MARKETPLACE CONTRACT FUNCTIONS ===
 export { useMarketplaceAdmin } from './useMarketplaceAdmin';
+export { useBuyerWhitelist } from './useBuyerWhitelist';
 export { useMarketplaceData } from './useMarketplaceData';
 export { useMarketplaceListing } from './useMarketplaceListing';
 export { useMarketplacePurchase } from './useMarketplacePurchase';
-export { useMarketplaceUser } from './useMarketplaceUser';
 export { useMarketplaceEvents } from './useMarketplaceEvents';
 export { useMarketplaceContracts } from './useMarketplaceContracts';
 export { useMarketplaceFees } from './useMarketplaceFees';

@@ -104,6 +104,9 @@ export function FlowSidebar({
         if (stepId === 'form') {
             return listingType === 'batch' ? 'NFTs konfigurieren' : 'NFT konfigurieren';
         }
+        if (stepId === 'listing') {
+            return listingType === 'batch' ? 'Transaktionen signieren' : 'Signieren';
+        }
         const step = flowSteps.find(s => s.id === stepId);
         return step?.label || stepId;
     };

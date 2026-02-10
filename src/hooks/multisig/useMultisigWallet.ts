@@ -10,6 +10,7 @@
 import { useState, useCallback } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
 import { MULTISIG_WALLET_ABI } from '@/config/abis/multisig-wallet';
+import { getMultisigAddress } from '@/config';
 import { MULTISIG_ADDRESSES, type SubmitTransactionRequest, type TransactionSubmissionResult, type ConfirmationResult } from '@/types';
 
 export function useMultisigWallet() {
@@ -20,9 +21,9 @@ export function useMultisigWallet() {
     const [isRevoking, setIsRevoking] = useState(false);
 
     // Get MultiSig address based on chain
-    const multiSigAddress = chainId === 1
-        ? MULTISIG_ADDRESSES.mainnet
-        : MULTISIG_ADDRESSES.sepolia;
+    const multiSigAddress = chainId
+        ? (getMultisigAddress(chainId) || (chainId === 1 ? MULTISIG_ADDRESSES.mainnet : MULTISIG_ADDRESSES.sepolia))
+        : undefined;
 
     // Contract write hooks
     const { writeContractAsync } = useWriteContract();
@@ -35,7 +36,7 @@ export function useMultisigWallet() {
      * Get total transaction count
      */
     const { data: transactionCount, refetch: refetchTransactionCount } = useReadContract({
-        address: multiSigAddress,
+        address: multiSigAddress ? (multiSigAddress as `0x${string}`) : undefined,
         abi: MULTISIG_WALLET_ABI,
         functionName: 'getTransactionCount',
         query: {
@@ -47,7 +48,7 @@ export function useMultisigWallet() {
      * Get wallet owners
      */
     const { data: owners, refetch: refetchOwners } = useReadContract({
-        address: multiSigAddress,
+        address: multiSigAddress ? (multiSigAddress as `0x${string}`) : undefined,
         abi: MULTISIG_WALLET_ABI,
         functionName: 'getOwners',
         query: {
@@ -59,7 +60,7 @@ export function useMultisigWallet() {
      * Get owner count
      */
     const { data: ownerCount, refetch: refetchOwnerCount } = useReadContract({
-        address: multiSigAddress,
+        address: multiSigAddress ? (multiSigAddress as `0x${string}`) : undefined,
         abi: MULTISIG_WALLET_ABI,
         functionName: 'getOwnerCount',
         query: {
@@ -71,7 +72,7 @@ export function useMultisigWallet() {
      * Check if address is owner
      */
     const { data: isOwner } = useReadContract({
-        address: multiSigAddress,
+        address: multiSigAddress ? (multiSigAddress as `0x${string}`) : undefined,
         abi: MULTISIG_WALLET_ABI,
         functionName: 'isOwner',
         args: address ? [address] : undefined,
@@ -104,7 +105,7 @@ export function useMultisigWallet() {
                 setIsSubmitting(true);
 
                 const hash = await writeContractAsync({
-                    address: multiSigAddress,
+                    address: multiSigAddress as `0x${string}`,
                     abi: MULTISIG_WALLET_ABI,
                     functionName: 'submitTransaction',
                     args: [request.transactionType, request.to as `0x${string}`, request.value, request.data as `0x${string}`],
@@ -153,7 +154,7 @@ export function useMultisigWallet() {
                 setIsConfirming(true);
 
                 const hash = await writeContractAsync({
-                    address: multiSigAddress,
+                    address: multiSigAddress as `0x${string}`,
                     abi: MULTISIG_WALLET_ABI,
                     functionName: 'confirmTransaction',
                     args: [BigInt(txIndex)],
@@ -201,7 +202,7 @@ export function useMultisigWallet() {
                 setIsRevoking(true);
 
                 const hash = await writeContractAsync({
-                    address: multiSigAddress,
+                    address: multiSigAddress as `0x${string}`,
                     abi: MULTISIG_WALLET_ABI,
                     functionName: 'revokeConfirmation',
                     args: [BigInt(txIndex)],
@@ -240,7 +241,7 @@ export function useMultisigWallet() {
 
             try {
                 const hash = await writeContractAsync({
-                    address: multiSigAddress,
+                    address: multiSigAddress as `0x${string}`,
                     abi: MULTISIG_WALLET_ABI,
                     functionName: 'executeTransaction',
                     args: [BigInt(txIndex)],

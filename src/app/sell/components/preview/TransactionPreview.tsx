@@ -1,16 +1,19 @@
 ﻿'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import type { ListingMode } from '../../types';
 import { useMarketplaceFees, useMarketplaceContracts } from '@/hooks/marketplace';
 import { ButtonSpinner } from '@/components/core/Loading';
+import { useChainId } from 'wagmi';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
+import { formatTokenDisplay } from '../../utils';
 
 interface TransactionData {
     mode: ListingMode;
     selectedNFT: AggregatedNFT | null;
     price?: string;
-    currency?: 'ETH' | 'USDC';
+    currency?: string;
     description?: string;
     duration?: string;
     allowOffers?: boolean;
@@ -28,6 +31,7 @@ interface TransactionPreviewProps {
 
 export function TransactionPreview({ data, onConfirm, onCancel, isLoading }: TransactionPreviewProps) {
     const { selectedNFT, mode } = data;
+    const chainId = useChainId();
 
     // Get marketplace address and dynamic fees
     const { marketplaceAddress } = useMarketplaceContracts();
@@ -40,6 +44,16 @@ export function TransactionPreview({ data, onConfirm, onCancel, isLoading }: Tra
     if (!selectedNFT) {
         return null;
     }
+
+    const currencySymbol = useMemo(
+        () => getCurrencySymbolByAddress(chainId, data.currency || ZERO_ADDRESS),
+        [chainId, data.currency]
+    );
+
+    const tokenDecimals = useMemo(
+        () => getTokenDecimalsByAddress(chainId, data.currency || ZERO_ADDRESS),
+        [chainId, data.currency]
+    );
 
     const renderNFTCard = (nft: AggregatedNFT, title: string) => (
         <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-5 border border-gray-200 shadow-sm">
@@ -66,7 +80,9 @@ export function TransactionPreview({ data, onConfirm, onCancel, isLoading }: Tra
     const renderPriceSection = () => {
         if (!data.price) return null;
 
-        const fees = calculateFees(parseFloat(data.price));
+        const rawPrice = parseFloat(data.price);
+        const displayPrice = formatTokenDisplay(rawPrice, tokenDecimals);
+        const fees = calculateFees(rawPrice);
 
         return (
             <div className="bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-100 border border-blue-200 rounded-xl p-5 shadow-md">
@@ -80,27 +96,27 @@ export function TransactionPreview({ data, onConfirm, onCancel, isLoading }: Tra
                     <div className="flex justify-between items-center">
                         <span className="text-sm font-medium text-gray-700">Verkaufspreis</span>
                         <span className="text-xl font-bold text-blue-600">
-                            {data.price} {data.currency}
+                            {displayPrice} {currencySymbol}
                         </span>
                     </div>
 
                     <div className="bg-white rounded-lg border border-blue-200 p-4 text-xs space-y-2 shadow-sm">
                         <div className="flex justify-between text-gray-600">
                             <span>Listing-Preis:</span>
-                            <span>{data.price} {data.currency}</span>
+                            <span>{displayPrice} {currencySymbol}</span>
                         </div>
                         <div className="flex justify-between text-red-600">
                             <span>Marketplace-Gebühr ({(innovationFeePercentage * 100).toFixed(2)}%):</span>
-                            <span>-{fees.marketplaceFee.toFixed(4)} {data.currency}</span>
+                            <span>-{fees.marketplaceFee.toFixed(4)} {currencySymbol}</span>
                         </div>
                         <div className="flex justify-between text-red-600">
                             <span>Creator Royalty ({(royaltyFeePercentage * 100).toFixed(2)}%):</span>
-                            <span>-{fees.royaltyFee.toFixed(4)} {data.currency}</span>
+                            <span>-{fees.royaltyFee.toFixed(4)} {currencySymbol}</span>
                         </div>
                         <hr className="border-blue-200" />
                         <div className="flex justify-between font-semibold text-green-600">
                             <span>Sie erhalten:</span>
-                            <span>{fees.youReceive.toFixed(4)} {data.currency}</span>
+                            <span>{fees.youReceive.toFixed(4)} {currencySymbol}</span>
                         </div>
                     </div>
                 </div>

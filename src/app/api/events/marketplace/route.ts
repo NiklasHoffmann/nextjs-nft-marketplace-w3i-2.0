@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         console.log(`📡 [Events API] Processing ${event.eventName}...`);
 
         // Import sync functions dynamically (avoid top-level import issues)
-        const { syncListingToMongoDB, removeListingFromMongoDB, updateListingInMongoDB } = await import('@/services/marketplace/event-mongodb-sync');
+        const { syncListingToMongoDB, removeListingFromMongoDB, removeListingByListingId, updateListingInMongoDB } = await import('@/services/marketplace/event-mongodb-sync');
         const { routeMarketplaceEvent } = await import('@/services/marketplace/event-invalidation-bridge');
         const { broadcastMarketplaceEvent } = await import('@/services/sse/broadcast');
 
@@ -87,6 +87,26 @@ export async function POST(request: NextRequest) {
                 event.eventName === 'ItemBought' ? buyer : undefined // Only pass buyer for purchases
             );
             
+            // Wait for MongoDB to fully commit
+            console.log('⏳ [Events API] Waiting for MongoDB commit...');
+            await new Promise(resolve => setTimeout(resolve, 500));
+        } else if (event.eventName === 'ListingCanceledDueToInvalidListing') {
+            console.log('🗑️ [Events API] Removing invalid listing from MongoDB...');
+            const { nftAddress, tokenId, listingId } = event.data;
+            await removeListingFromMongoDB(
+                nftAddress,
+                tokenId.toString(),
+                listingId.toString()
+            );
+
+            // Wait for MongoDB to fully commit
+            console.log('⏳ [Events API] Waiting for MongoDB commit...');
+            await new Promise(resolve => setTimeout(resolve, 500));
+        } else if (event.eventName === 'CollectionWhitelistRevokedCancelTriggered') {
+            console.log('🗑️ [Events API] Removing listing by listingId (collection whitelist revoked)...');
+            const { tokenAddress, listingId } = event.data;
+            await removeListingByListingId(tokenAddress, listingId.toString());
+
             // Wait for MongoDB to fully commit
             console.log('⏳ [Events API] Waiting for MongoDB commit...');
             await new Promise(resolve => setTimeout(resolve, 500));

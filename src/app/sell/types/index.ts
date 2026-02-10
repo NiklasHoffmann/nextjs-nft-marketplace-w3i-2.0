@@ -102,6 +102,8 @@ export interface TransactionData {
     price?: string;
     currency?: Currency;
     description?: string;
+    buyerWhitelistEnabled?: boolean;
+    allowedBuyers?: string[];
     targetNFT?: AggregatedNFT | null;
     targetCollection?: string;
     tradeType?: TradeType;
@@ -118,6 +120,7 @@ export interface BatchTransactionData {
     startPrice?: string;
     endPrice?: string;
     currency: Currency;
+    priceMode?: 'gross' | 'net';
     description: string;
 }
 

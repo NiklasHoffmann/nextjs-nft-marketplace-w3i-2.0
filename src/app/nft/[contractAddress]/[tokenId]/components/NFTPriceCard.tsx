@@ -1,9 +1,10 @@
 import { memo, useMemo, useCallback, useState } from 'react';
-import { formatEther } from '@/utils';
+import { formatUnits } from 'viem';
 import { NFTPriceCardProps } from '@/types';
 import { AddToCartButton } from '@/components/ui';
 import type { ActiveItem } from '@/types';
-import { getCurrencySymbol } from '@/config/tokens';
+import { getAvailableTokens, getCurrencySymbolByAddress, ZERO_ADDRESS } from '@/config/tokens';
+import { useChainId } from 'wagmi';
 import {
     BuyNowModal,
     CancelListingModal,
@@ -36,9 +37,35 @@ function NFTPriceCard({
     const [showUpdateModal, setShowUpdateModal] = useState(false);
     const [showCancelModal, setShowCancelModal] = useState(false);
 
-    // Memoize price formatting
-    const formattedPrice = useMemo(() => formatEther(price), [price]);
-    const currencySymbol = getCurrencySymbol(currency);
+    // Get chainId for currency lookup
+    const chainId = useChainId();
+
+    const currencyDecimals = useMemo(() => {
+        if (!currency || currency === ZERO_ADDRESS) {
+            return 18;
+        }
+
+        const tokens = getAvailableTokens(chainId);
+        const match = tokens.find((token) => token.address.toLowerCase() === currency.toLowerCase());
+        return match?.decimals ?? 18;
+    }, [chainId, currency]);
+
+    const formattedPrice = useMemo(() => {
+        if (!price) {
+            return '0';
+        }
+
+        try {
+            return formatUnits(BigInt(price), currencyDecimals);
+        } catch {
+            return '0';
+        }
+    }, [price, currencyDecimals]);
+
+    const currencySymbol = useMemo(() =>
+        getCurrencySymbolByAddress(chainId, currency),
+        [chainId, currency]
+    );
 
     // Check if connected user is the owner
     const isOwner = useMemo(() => {
@@ -107,13 +134,14 @@ function NFTPriceCard({
             contractAddress: contractAddress as `0x${string}`,
             tokenId,
             price,
+            currency: currency || null,
             seller: seller as `0x${string}`,
             isListed: true,
             buyer: null,
             desiredContractAddress: contractAddress as `0x${string}`,
             desiredTokenId: null
         };
-    }, [isListed, contractAddress, tokenId, seller, price, listingId]);
+    }, [isListed, contractAddress, tokenId, seller, price, listingId, currency]);
 
     // Memoize action handlers
     const handleBuyNow = useCallback(() => {
@@ -151,11 +179,8 @@ function NFTPriceCard({
 
             <div className="space-y-2">
                 <div className="flex items-baseline gap-2">
-                    <span className="text{currencySymbol}l font-bold text-gray-900">
-                        {formattedPrice} ETH
-                    </span>
-                    <span className="text-lg text-gray-500">
-                        ({selectedCurrencySymbol})
+                    <span className="text-3xl font-bold text-gray-900">
+                        {formattedPrice} {currencySymbol}
                     </span>
                 </div>
                 {!priceLoading && (
@@ -242,6 +267,7 @@ function NFTPriceCard({
                         onClose={handleCloseUpdateModal}
                         listingId={listingId || ''}
                         currentPrice={formattedPrice}
+                        currentCurrency={currency || undefined}
                         contractAddress={contractAddress}
                         tokenId={tokenId}
                         nftName={nftName}

@@ -21,6 +21,7 @@ interface UpdateListingModalProps {
     onClose: () => void;
     listingId: string;
     currentPrice: string;
+    currentCurrency?: string;
     contractAddress: string;
     tokenId: string;
     nftName?: string;
@@ -33,6 +34,7 @@ function UpdateListingModal({
     onClose,
     listingId,
     currentPrice,
+    currentCurrency,
     contractAddress,
     tokenId,
     nftName,
@@ -126,6 +128,7 @@ function UpdateListingModal({
                 contractAddress,
                 tokenId,
                 newPrice: listingType === 'sale' ? form.values.newPrice : form.values.swapPrice,
+                newCurrency: currentCurrency,
                 newDesiredContractAddress: listingType === 'swap' ? form.values.desiredContractAddress : undefined,
                 newDesiredTokenId: listingType === 'swap' ? form.values.desiredTokenId : undefined,
                 onProgress: (step) => {

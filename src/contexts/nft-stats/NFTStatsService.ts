@@ -31,7 +31,7 @@ export class NFTStatsService {
     /**
      * Record a view for an NFT
      */
-    async recordView(contractAddress: string, tokenId: string): Promise<NFTStatsApiResponse> {
+    async recordView(contractAddress: string, tokenId: string, userId?: string | null): Promise<NFTStatsApiResponse> {
         try {
             // Debounce: Check if we recently recorded a view for this NFT
             const viewKey = `${contractAddress}:${tokenId}`;
@@ -60,7 +60,7 @@ export class NFTStatsService {
                 body: JSON.stringify({
                     contractAddress: contractAddress,
                     tokenId: tokenId,
-                    userId: null // Anonymous view for now
+                    userId: userId || null
                 })
             });
 

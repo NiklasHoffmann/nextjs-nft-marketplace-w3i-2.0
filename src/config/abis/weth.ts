@@ -1,10 +1,18 @@
 /**
- * WETH (Wrapped ETH) ABI
- * Standard ERC20 + wrap/unwrap functions
+ * WETH ABI
+ *
+ * Standard ERC20 + wrap/unwrap functions.
+ * Contract: https://sepolia.etherscan.io/address/0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9
+ *
+ * Deployed:
+ * - Sepolia: 0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9
+ * - Mainnet: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
  */
 
 export const WETH_ABI = [
-    // ERC20 Standard
+    // ============================================================================
+    // ERC20 Functions
+    // ============================================================================
     {
         "inputs": [
             { "internalType": "address", "name": "owner", "type": "address" },
@@ -81,7 +89,9 @@ export const WETH_ABI = [
         "stateMutability": "nonpayable",
         "type": "function"
     },
-    // WETH-specific functions
+    // ============================================================================
+    // WETH Functions
+    // ============================================================================
     {
         "inputs": [],
         "name": "deposit",
@@ -96,7 +106,9 @@ export const WETH_ABI = [
         "stateMutability": "nonpayable",
         "type": "function"
     },
+    // ============================================================================
     // Events
+    // ============================================================================
     {
         "anonymous": false,
         "inputs": [

@@ -29,13 +29,34 @@ Cache Invalidation (WalletNFTsContext, MarketplaceItemsContext)
 UI Auto-Updates
 ```
 
+## 🔁 Data Invalidation Types
+
+The application uses the data invalidation service to keep contexts in sync.
+
+**Global events (refresh everything):**
+
+- `graph-update`
+- `manual-refresh`
+
+**Listing events (refresh marketplace + collections):**
+
+- `listing-created`
+- `listing-canceled`
+- `nft-purchased`
+
+**Wallet-scoped events:**
+
+- `nft-transferred` (emitted for both sender and receiver)
+
+These event types are centralized in [src/services/validation/data-invalidation.ts](../services/validation/data-invalidation.ts).
+
 ## 🚀 Quick Start
 
 ### 1. Wrap Your App
 
 ```tsx
 // src/app/layout.tsx
-import { MarketplaceEventsProvider } from '@/providers/MarketplaceEventsProvider';
+import { MarketplaceEventsProvider } from "@/providers/MarketplaceEventsProvider";
 
 export default function RootLayout({ children }) {
   return (
@@ -57,7 +78,7 @@ export default function RootLayout({ children }) {
 // Events are automatically handled by the provider
 
 // Optional: Show connection status
-import { EventConnectionStatus } from '@/providers/MarketplaceEventsProvider';
+import { EventConnectionStatus } from "@/providers/MarketplaceEventsProvider";
 
 function MyComponent() {
   return (
@@ -72,21 +93,21 @@ function MyComponent() {
 ### 3. Custom Event Handling (Optional)
 
 ```tsx
-import { useMarketplaceEvents } from '@/hooks/marketplace/useMarketplaceEvents';
+import { useMarketplaceEvents } from "@/hooks/marketplace/useMarketplaceEvents";
 
 function CustomEventHandler() {
   const { isConnected, eventsReceived } = useMarketplaceEvents({
     onItemListed: (event) => {
-      console.log('New listing!', event.data.listingId);
+      console.log("New listing!", event.data.listingId);
       // Custom logic here
     },
     onItemBought: (event) => {
-      console.log('NFT sold!', event.data.buyer);
+      console.log("NFT sold!", event.data.buyer);
       // Show notification, confetti, etc.
-    }
+    },
   });
 
-  return <div>Connected: {isConnected ? '✅' : '❌'}</div>;
+  return <div>Connected: {isConnected ? "✅" : "❌"}</div>;
 }
 ```
 
@@ -94,31 +115,32 @@ function CustomEventHandler() {
 
 ### MarketplaceEventsProvider Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `autoStart` | `boolean` | `true` | Auto-start listening on mount |
-| `debug` | `boolean` | `false` | Log events to console |
-| `marketplaceAddress` | `Address` | Sepolia address | Custom marketplace contract |
-| `wsUrl` | `string` | From env vars | Custom WebSocket URL |
+| Prop                 | Type      | Default         | Description                   |
+| -------------------- | --------- | --------------- | ----------------------------- |
+| `autoStart`          | `boolean` | `true`          | Auto-start listening on mount |
+| `debug`              | `boolean` | `false`         | Log events to console         |
+| `marketplaceAddress` | `Address` | Sepolia address | Custom marketplace contract   |
+| `wsUrl`              | `string`  | From env vars   | Custom WebSocket URL          |
 
 ### useMarketplaceEvents Hook
 
 ```typescript
 const {
-  isConnected,      // WebSocket connection status
-  isActive,         // Service active status
-  eventsReceived,   // Total events processed
-  lastEventAt,      // Timestamp of last event
-  state,            // Full service state
-  start,            // Manually start
-  stop,             // Manually stop
-  subscribe         // Subscribe to specific events
+  isConnected, // WebSocket connection status
+  isActive, // Service active status
+  eventsReceived, // Total events processed
+  lastEventAt, // Timestamp of last event
+  state, // Full service state
+  start, // Manually start
+  stop, // Manually stop
+  subscribe, // Subscribe to specific events
 } = useMarketplaceEvents(config);
 ```
 
 ### Event Types
 
 #### ListingCreated (ItemListed)
+
 ```typescript
 {
   eventName: 'ItemListed',
@@ -140,6 +162,7 @@ const {
 ```
 
 #### ListingPurchased (ItemBought)
+
 ```typescript
 {
   eventName: 'ItemBought',
@@ -157,6 +180,7 @@ const {
 ```
 
 #### ListingCanceled (ItemCanceled)
+
 ```typescript
 {
   eventName: 'ItemCanceled',
@@ -173,6 +197,7 @@ const {
 ```
 
 #### ListingUpdated (ItemUpdated)
+
 ```typescript
 {
   eventName: 'ItemUpdated',
@@ -196,20 +221,20 @@ const {
 ### 1. User's Own Listings
 
 ```tsx
-import { useMyListingEvents } from '@/hooks/marketplace/useMarketplaceEvents';
+import { useMyListingEvents } from "@/hooks/marketplace/useMarketplaceEvents";
 
 function MyListings() {
   useMyListingEvents({
     onListed: (event) => {
-      showNotification('Your NFT is now listed!');
+      showNotification("Your NFT is now listed!");
     },
     onSold: (event) => {
-      showNotification('Your NFT sold! 🎉');
+      showNotification("Your NFT sold! 🎉");
       triggerConfetti();
     },
     onCanceled: (event) => {
-      showNotification('Listing cancelled');
-    }
+      showNotification("Listing cancelled");
+    },
   });
 
   return <div>My Active Listings</div>;
@@ -219,17 +244,19 @@ function MyListings() {
 ### 2. Watch Specific NFT
 
 ```tsx
-import { useMarketplaceEvents } from '@/hooks/marketplace/useMarketplaceEvents';
+import { useMarketplaceEvents } from "@/hooks/marketplace/useMarketplaceEvents";
 
 function NFTDetailPage({ contractAddress, tokenId }) {
   useMarketplaceEvents({
     onItemListed: (event) => {
-      if (event.data.nftAddress === contractAddress && 
-          event.data.tokenId.toString() === tokenId) {
+      if (
+        event.data.nftAddress === contractAddress &&
+        event.data.tokenId.toString() === tokenId
+      ) {
         // This NFT was just listed!
         refreshData();
       }
-    }
+    },
   });
 
   return <div>NFT Details</div>;
@@ -239,23 +266,23 @@ function NFTDetailPage({ contractAddress, tokenId }) {
 ### 3. Global Activity Feed
 
 ```tsx
-import { useMarketplaceEvents } from '@/hooks/marketplace/useMarketplaceEvents';
-import { useState } from 'react';
+import { useMarketplaceEvents } from "@/hooks/marketplace/useMarketplaceEvents";
+import { useState } from "react";
 
 function ActivityFeed() {
   const [activities, setActivities] = useState([]);
 
   useMarketplaceEvents({
     onEvent: (event) => {
-      setActivities(prev => [
+      setActivities((prev) => [
         {
           type: event.eventName,
           timestamp: event.processedAt,
-          data: event.data
+          data: event.data,
         },
-        ...prev.slice(0, 49) // Keep last 50
+        ...prev.slice(0, 49), // Keep last 50
       ]);
-    }
+    },
   });
 
   return (
@@ -271,16 +298,16 @@ function ActivityFeed() {
 ### 4. Live Statistics
 
 ```tsx
-import { useMarketplaceEventsContext } from '@/providers/MarketplaceEventsProvider';
-import { useState, useEffect } from 'react';
+import { useMarketplaceEventsContext } from "@/providers/MarketplaceEventsProvider";
+import { useState, useEffect } from "react";
 
 function LiveStats() {
   const { state } = useMarketplaceEventsContext();
   const [stats, setStats] = useState({ listings: 0, sales: 0 });
 
   useMarketplaceEvents({
-    onItemListed: () => setStats(s => ({ ...s, listings: s.listings + 1 })),
-    onItemBought: () => setStats(s => ({ ...s, sales: s.sales + 1 }))
+    onItemListed: () => setStats((s) => ({ ...s, listings: s.listings + 1 })),
+    onItemBought: () => setStats((s) => ({ ...s, sales: s.sales + 1 })),
   });
 
   return (
@@ -314,7 +341,7 @@ INFURA_URL_WSS=wss://sepolia.infura.io/ws/v3/YOUR_KEY
   marketplaceAddress="0xYourMarketplaceAddress"
   wsUrl="wss://your-custom-rpc.com"
   autoStart={true}
-  debug={process.env.NODE_ENV === 'development'}
+  debug={process.env.NODE_ENV === "development"}
 >
   {children}
 </MarketplaceEventsProvider>
@@ -331,7 +358,7 @@ INFURA_URL_WSS=wss://sepolia.infura.io/ws/v3/YOUR_KEY
 ### 2. Show Debug Panel (Development Only)
 
 ```tsx
-import { EventDebugPanel } from '@/providers/MarketplaceEventsProvider';
+import { EventDebugPanel } from "@/providers/MarketplaceEventsProvider";
 
 function App() {
   return (
@@ -348,9 +375,9 @@ function App() {
 ```tsx
 const { isConnected, state } = useMarketplaceEventsContext();
 
-console.log('Connected:', isConnected);
-console.log('Reconnect attempts:', state.reconnectAttempts);
-console.log('Events processed:', state.eventsProcessed);
+console.log("Connected:", isConnected);
+console.log("Reconnect attempts:", state.reconnectAttempts);
+console.log("Events processed:", state.eventsProcessed);
 ```
 
 ## 🔄 Comparison: Before vs After
@@ -368,6 +395,7 @@ Next poll detects change
      ↓
 UI updates
 ```
+
 **Delay: 30-300 seconds** ⏰
 
 ### After (Event-Driven)
@@ -383,6 +411,7 @@ Cache invalidated
      ↓
 UI updates immediately
 ```
+
 **Delay: < 1 second** ⚡
 
 ## 📊 Performance

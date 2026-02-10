@@ -81,7 +81,9 @@ export function useMarketplaceItemDetail(options: UseMarketplaceItemDetailOption
         setError(null);
 
         try {
-            const response = await fetch(`/api/nft/detail?contractAddress=${contractAddress}&tokenId=${tokenId}`);
+            const response = await fetch(`/api/nft/detail?contractAddress=${contractAddress}&tokenId=${tokenId}`, {
+                cache: 'no-store'
+            });
 
             if (!response.ok) {
                 // 404 is expected for NFTs not on marketplace - try WalletNFTs as fallback

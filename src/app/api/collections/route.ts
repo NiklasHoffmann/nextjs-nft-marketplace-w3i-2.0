@@ -2,6 +2,9 @@ import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, getQueryParam } from '@/lib/api';
 import { getCollection } from '@/lib/mongodb';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * GET /api/collections
  * 
@@ -22,13 +25,31 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
         // Aggregate collections from marketplace_items
         const pipeline: any[] = [
-            { $match: { isListed: true, listingId: { $ne: null } } },
+            {
+                $match: {
+                    isListed: true,
+                    listingId: { $ne: null },
+                    price: { $ne: null }
+                }
+            },
+            {
+                $addFields: {
+                    priceDecimal: { $toDecimal: '$price' }
+                }
+            },
+            {
+                $sort: {
+                    contractAddress: 1,
+                    priceDecimal: 1
+                }
+            },
             {
                 $group: {
                     _id: '$contractAddress',
                     contractAddress: { $first: '$contractAddress' },
                     itemCount: { $sum: 1 },
-                    floorPrice: { $min: '$price' },
+                    floorPrice: { $first: '$price' },
+                    floorPriceCurrency: { $first: '$currency' },
                     totalValue: { $sum: { $toDouble: '$price' } },
                     averagePrice: { $avg: { $toDouble: '$price' } },
                     // Collect token IDs for preview images
@@ -103,7 +124,15 @@ export const GET = apiHandler(async (request: NextRequest) => {
                     totalLikes: { $sum: { $ifNull: ['$likeCount', 0] } },
                     totalWatchlist: { $sum: { $ifNull: ['$watchlistCount', 0] } },
                     totalRatings: { $sum: { $ifNull: ['$ratingCount', 0] } },
-                    avgRating: { $avg: { $ifNull: ['$averageRating', 0] } },
+                    totalRatingScore: {
+                        $sum: {
+                            $cond: [
+                                { $gt: ['$ratingCount', 0] },
+                                { $multiply: ['$averageRating', '$ratingCount'] },
+                                0
+                            ]
+                        }
+                    },
                     ratedCount: {
                         $sum: {
                             $cond: [{ $gt: ['$ratingCount', 0] }, 1, 0]
@@ -120,7 +149,9 @@ export const GET = apiHandler(async (request: NextRequest) => {
                 totalLikes: stat.totalLikes || 0,
                 totalWatchlist: stat.totalWatchlist || 0,
                 totalRatings: stat.totalRatings || 0,
-                averageRating: stat.ratedCount > 0 ? (stat.avgRating || 0) : 0
+                averageRating: stat.totalRatings > 0
+                    ? (stat.totalRatingScore || 0) / stat.totalRatings
+                    : 0
             });
         });
 
@@ -160,6 +191,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
                 contractSymbol: contractInfo.contractSymbol || 'NFT',
                 itemCount: col.itemCount,
                 floorPrice: col.floorPrice || null,
+                floorPriceCurrency: col.floorPriceCurrency || null,
                 totalValue: col.totalValue || 0,
                 averagePrice: col.averagePrice || null,
                 imageUrl: previewImages[0] || null,
@@ -182,11 +214,13 @@ export const GET = apiHandler(async (request: NextRequest) => {
         console.log(`📊 [Collections API] Total processing time: ${totalTime}ms`);
         console.log(`📸 [Collections API] Preview images loaded for ${transformedCollections.filter((c: any) => c.previewImages.length > 0).length} collections`);
 
-        return apiSuccess({
+        const response = apiSuccess({
             collections: transformedCollections,
             count: transformedCollections.length,
             timestamp: new Date().toISOString()
         });
+        response.headers.set('Cache-Control', 'no-store, max-age=0');
+        return response;
     } catch (error: any) {
         console.error('❌ [Collections API] Error:', error);
 

@@ -7,7 +7,8 @@
 'use client';
 
 import { useAccount, useReadContract, useChainId } from 'wagmi';
-import { DIAMOND_ABI } from '@/config/abis/diamond';
+import { OWNERSHIP_FACET_ABI } from '@/config/abis/ownership-facet';
+import { GETTER_FACET_ABI } from '@/config/abis/getter-facet';
 import { MULTISIG_ADDRESSES, AdminMode, type AdminModeInfo } from '@/types';
 
 export function useAdminMode(diamondAddress: string): AdminModeInfo {
@@ -19,14 +20,14 @@ export function useAdminMode(diamondAddress: string): AdminModeInfo {
     // Get current owner
     const { data: currentOwner } = useReadContract({
         address: diamondAddress as `0x${string}`,
-        abi: DIAMOND_ABI,
+        abi: OWNERSHIP_FACET_ABI,
         functionName: 'owner',
     });
 
     // Get pending owner (if ownership transfer is in progress)
     const { data: pendingOwner } = useReadContract({
         address: diamondAddress as `0x${string}`,
-        abi: DIAMOND_ABI,
+        abi: GETTER_FACET_ABI,
         functionName: 'getPendingOwner',
     });
 

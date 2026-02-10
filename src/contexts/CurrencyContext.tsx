@@ -25,7 +25,9 @@ interface CurrencyContextType {
     currencies: Currency[];
     formatPrice: (price: number) => string;
     convertFromETH: (ethPrice: number) => Promise<number>;
-    convertTokenToUSD: (tokenAmount: number, tokenSymbol: string) => Promise<number>;
+    convertFromUSD: (usdAmount: number) => Promise<number>;
+    convertTokenToUSD: (tokenAmount: number, tokenSymbol: string, tokenAddress?: string | null, chainId?: number) => Promise<number>;
+    convertUSDToETH: (usdAmount: number) => Promise<number>;
     refreshExchangeRates: () => Promise<void>;
     getCacheInfo: () => { status: string; lastUpdate: string | null };
 }
@@ -35,17 +37,65 @@ const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined
 // Enhanced cache management
 const EXCHANGE_RATE_CACHE_KEY = 'eth_exchange_rates_optimized';
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+const TOKEN_PRICE_TTL = 5 * 60 * 1000; // 5 minutes
+const TOKEN_ADDRESS_PRICE_TTL = 2 * 60 * 1000; // 2 minutes
+const ERROR_TTL = 30 * 1000; // 30 seconds
+const MAX_RETRIES = 3;
+const BASE_RETRY_DELAY_MS = 500;
 
 class ExchangeRateCache {
-    private cache: Map<string, { rate: number; timestamp: number }> = new Map();
+    private cache: Map<string, { rate: number; timestamp: number; ttlMs?: number }> = new Map();
     private inFlightRequests: Map<string, Promise<number>> = new Map();
+
+    private isCacheValid(entry?: { rate: number; timestamp: number; ttlMs?: number }): boolean {
+        if (!entry) return false;
+        const ttl = entry.ttlMs ?? CACHE_DURATION;
+        return Date.now() - entry.timestamp < ttl;
+    }
+
+    private setCache(key: string, rate: number, ttlMs?: number) {
+        this.cache.set(key, { rate, timestamp: Date.now(), ttlMs });
+        this.saveToLocalStorage();
+    }
+
+    private async sleep(ms: number) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    private async fetchWithRetry(url: string): Promise<Response> {
+        let attempt = 0;
+
+        while (attempt <= MAX_RETRIES) {
+            const response = await fetch(url);
+
+            if (response.ok) {
+                return response;
+            }
+
+            const shouldRetry = response.status === 429 || response.status >= 500;
+            if (!shouldRetry || attempt === MAX_RETRIES) {
+                return response;
+            }
+
+            const retryAfterHeader = response.headers.get('retry-after');
+            const retryAfterSeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 0;
+            const jitter = Math.floor(Math.random() * 200);
+            const backoff = Math.pow(2, attempt) * BASE_RETRY_DELAY_MS;
+            const delayMs = retryAfterSeconds > 0 ? retryAfterSeconds * 1000 : backoff + jitter;
+
+            await this.sleep(delayMs);
+            attempt += 1;
+        }
+
+        return fetch(url);
+    }
 
     async getRate(currency: string): Promise<number> {
         const cacheKey = `ETH_${currency}`;
 
         // Check cache first
         const cached = this.cache.get(cacheKey);
-        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        if (this.isCacheValid(cached)) {
             return cached.rate;
         }
 
@@ -61,8 +111,7 @@ class ExchangeRateCache {
 
         try {
             const rate = await requestPromise;
-            this.cache.set(cacheKey, { rate, timestamp: Date.now() });
-            this.saveToLocalStorage();
+            this.setCache(cacheKey, rate);
             return rate;
         } finally {
             this.inFlightRequests.delete(cacheKey);
@@ -96,7 +145,7 @@ class ExchangeRateCache {
 
         // Check cache first
         const cached = this.cache.get(cacheKey);
-        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        if (this.isCacheValid(cached)) {
             return cached.rate;
         }
 
@@ -112,8 +161,7 @@ class ExchangeRateCache {
 
         try {
             const rate = await requestPromise;
-            this.cache.set(cacheKey, { rate, timestamp: Date.now() });
-            this.saveToLocalStorage();
+            this.setCache(cacheKey, rate, TOKEN_PRICE_TTL);
             return rate;
         } finally {
             this.inFlightRequests.delete(cacheKey);
@@ -131,7 +179,7 @@ class ExchangeRateCache {
             };
 
             if (mockRates[tokenSymbol]) {
-                return mockRates[tokenSymbol];
+                return mockRates[tokenSymbol]!;
             }
 
             // Stablecoins: fixed rate
@@ -252,6 +300,52 @@ class ExchangeRateCache {
 
         await Promise.allSettled(refreshPromises);
     }
+
+    async getTokenRateByAddress(chainId: number, tokenAddress: string): Promise<number> {
+        const addressLower = tokenAddress.toLowerCase();
+        const cacheKey = `TOKENADDR_${chainId}_${addressLower}_USD`;
+
+        const cached = this.cache.get(cacheKey);
+        if (this.isCacheValid(cached)) {
+            return cached.rate;
+        }
+
+        const inFlight = this.inFlightRequests.get(cacheKey);
+        if (inFlight) {
+            return inFlight;
+        }
+
+        const requestPromise = this.fetchTokenRateByAddress(chainId, addressLower);
+        this.inFlightRequests.set(cacheKey, requestPromise);
+
+        try {
+            const rate = await requestPromise;
+            this.setCache(cacheKey, rate, TOKEN_ADDRESS_PRICE_TTL);
+            return rate;
+        } finally {
+            this.inFlightRequests.delete(cacheKey);
+        }
+    }
+
+    private async fetchTokenRateByAddress(chainId: number, tokenAddress: string): Promise<number> {
+        try {
+            if (chainId !== 1) {
+                return 0;
+            }
+
+            const url = `https://api.coingecko.com/api/v3/simple/token_price/ethereum?contract_addresses=${tokenAddress}&vs_currencies=usd`;
+            const response = await this.fetchWithRetry(url);
+            if (!response.ok) throw new Error(`Coingecko token API error: ${response.status}`);
+
+            const data = await response.json();
+            const usdRate = data?.[tokenAddress]?.usd;
+            return usdRate ? parseFloat(usdRate) : 0;
+        } catch (error) {
+            devLog.error('currency', `Error fetching token rate for ${tokenAddress}:`, error);
+            this.setCache(`TOKENADDR_${chainId}_${tokenAddress.toLowerCase()}_USD`, 0, ERROR_TTL);
+            return 0;
+        }
+    }
 }
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
@@ -331,12 +425,59 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const convertTokenToUSD = async (tokenAmount: number, tokenSymbol: string): Promise<number> => {
+    const convertFromUSD = async (usdAmount: number): Promise<number> => {
+        if (selectedCurrency.code === 'USD') return usdAmount;
+
         try {
+            // Get ETH/Currency rate and calculate USD/Currency rate
+            // Since we have ETH/USD rate, we need to get the cross rate
+            const ethToUsd = await cacheRef.current.getTokenRate('ETH');
+            const ethToCurrency = await cacheRef.current.getRate(selectedCurrency.code);
+            const usdToCurrency = ethToCurrency / ethToUsd;
+            return usdAmount * usdToCurrency;
+        } catch (error) {
+            devLog.error('currency', 'Error converting from USD:', error);
+            // Fallback rates (approximate)
+            const fallbackRates: { [key: string]: number } = {
+                'EUR': 0.92,
+                'GBP': 0.79,
+                'JPY': 149.0,
+                'CHF': 0.88,
+                'CAD': 1.36,
+            };
+            return usdAmount * (fallbackRates[selectedCurrency.code] || 1);
+        }
+    };
+
+    const convertTokenToUSD = async (
+        tokenAmount: number,
+        tokenSymbol: string,
+        tokenAddress?: string | null,
+        chainId?: number
+    ): Promise<number> => {
+        try {
+            if (tokenAddress && typeof chainId === 'number') {
+                const rateByAddress = await cacheRef.current.getTokenRateByAddress(chainId, tokenAddress);
+                if (rateByAddress > 0) {
+                    return tokenAmount * rateByAddress;
+                }
+            }
+
             const rate = await cacheRef.current.getTokenRate(tokenSymbol);
             return tokenAmount * rate;
         } catch (error) {
             devLog.error('currency', `Error converting ${tokenSymbol} to USD:`, error);
+            return 0;
+        }
+    };
+
+    const convertUSDToETH = async (usdAmount: number): Promise<number> => {
+        try {
+            const ethUsdRate = await cacheRef.current.getTokenRate('ETH');
+            if (!ethUsdRate) return 0;
+            return usdAmount / ethUsdRate;
+        } catch (error) {
+            devLog.error('currency', 'Error converting USD to ETH:', error);
             return 0;
         }
     };
@@ -359,7 +500,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         currencies,
         formatPrice,
         convertFromETH,
+        convertFromUSD,
         convertTokenToUSD,
+        convertUSDToETH,
         refreshExchangeRates,
         getCacheInfo,
     };

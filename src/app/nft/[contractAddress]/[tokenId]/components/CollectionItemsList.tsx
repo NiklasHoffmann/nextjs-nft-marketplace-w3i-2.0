@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { formatEther } from '@/utils';
+import { formatUnits } from 'viem';
 import { CollectionItemsListProps } from '@/types';
 import { formatNFTDisplayName, truncateAddress } from '@/utils';
 import { OptimizedNFTImage } from '@/components/nft';
 import { LoadingState } from '@/components/core/Loading';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
+import { useChainId } from 'wagmi';
 
 interface CollectionNFT {
     contractAddress: string;
@@ -18,6 +20,7 @@ interface CollectionNFT {
     marketplace?: {
         price?: string;
         isListed?: boolean;
+        currency?: string | null;
     };
 }
 
@@ -29,6 +32,7 @@ export default function CollectionItemsList({
     price
 }: CollectionItemsListProps) {
     const router = useRouter();
+    const chainId = useChainId();
     const [collectionItems, setCollectionItems] = useState<CollectionNFT[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -152,7 +156,13 @@ export default function CollectionItemsList({
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs text-gray-500">Price</span>
                                     <span className="text-sm font-semibold text-gray-900">
-                                        {parseFloat(formatEther(item.marketplace.price)).toFixed(3)} ETH
+                                        {(() => {
+                                            const currencyAddress = item.marketplace?.currency;
+                                            const decimals = getTokenDecimalsByAddress(chainId, currencyAddress);
+                                            const symbol = getCurrencySymbolByAddress(chainId, currencyAddress);
+                                            const amount = formatUnits(BigInt(item.marketplace?.price || '0'), decimals);
+                                            return `${parseFloat(amount).toFixed(3)} ${symbol}`;
+                                        })()}
                                     </span>
                                 </div>
                             )}

@@ -11,8 +11,14 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { devLog } from '@/utils/devLog';
 import { CollectionsService, type Collection } from './CollectionsService';
 import { CollectionsCache, type CollectionsState } from './CollectionsCache';
-import { onDataInvalidation, type InvalidationEventDetail } from '@/services/validation';
-import { useMarketplaceEventsContext } from '@/contexts/marketplace-events';
+import {
+    onDataInvalidation,
+    type InvalidationEventDetail,
+    GLOBAL_INVALIDATION_TYPES,
+    LISTING_INVALIDATION_TYPES,
+    DB_SYNC_DELAY_MS,
+    createRetryScheduler
+} from '@/services/validation';
 import { useContextDevtools } from '@/hooks/useContextDevtools';
 
 interface CollectionsContextValue {
@@ -47,31 +53,8 @@ export function CollectionsProvider({
 }: CollectionsProviderProps) {
     const [state, setState] = useState<CollectionsState>(CollectionsCache.createInitialState());
     const cache = useMemo(() => new CollectionsCache(cacheDuration), [cacheDuration]);
-
-    // 🔥 Subscribe to WebSocket events from EventContext
-    const eventsContext = useMarketplaceEventsContext();
-    const { subscribe } = eventsContext;
-
-    useEffect(() => {
-        console.log('🎯 [CollectionsContext] Subscribing to marketplace events');
-
-        // Subscribe to all events - collections stats change on any listing/purchase/cancel
-        const unsubscribe = subscribe('*', (event) => {
-            console.log('🔔 [CollectionsContext] Received event:', event.eventName);
-
-            // Invalidate cache and refetch after delay
-            setTimeout(() => {
-                cache.clearCache();
-                fetchCollections(true);
-            }, 600);
-        });
-
-        return () => {
-            console.log('👋 [CollectionsContext] Unsubscribing from events');
-            unsubscribe();
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [subscribe]); // cache and fetchCollections are used in closure, not as dependencies
+    const refreshInFlightRef = React.useRef(false);
+    const retryScheduler = useMemo(() => createRetryScheduler(), []);
 
     /**
      * Fetch collections using service and cache
@@ -142,40 +125,47 @@ export function CollectionsProvider({
      * Optimized: Only full refresh on global events, partial on NFT-specific events
      */
     useEffect(() => {
+        const scheduleRefreshWithRetries = (delayMs: number) => {
+            retryScheduler.schedule(delayMs, () => {
+                if (!refreshInFlightRef.current) {
+                    refreshInFlightRef.current = true;
+                    fetchCollections(true)
+                        .finally(() => {
+                            refreshInFlightRef.current = false;
+                        });
+                }
+            });
+        };
+
         const unsubscribe = onDataInvalidation((detail: InvalidationEventDetail) => {
             devLog.info('collections', `🔔 Received invalidation event:`, detail);
 
             // Full refresh only for global events
-            const needsFullRefresh =
-                detail.type === 'graph-update' ||
-                detail.type === 'manual-refresh';
+            const needsFullRefresh = GLOBAL_INVALIDATION_TYPES.has(detail.type);
 
             // Partial refresh for NFT-specific events (only affects one collection)
-            const needsPartialRefresh =
-                detail.type === 'listing-created' ||
-                detail.type === 'listing-canceled' ||
-                detail.type === 'nft-purchased';
+            const needsPartialRefresh = LISTING_INVALIDATION_TYPES.has(detail.type);
 
             if (needsFullRefresh) {
                 devLog.info('collections', `🔄 Full refresh after ${detail.type}`);
                 cache.clearCache();
-                fetchCollections(true);
+                scheduleRefreshWithRetries(DB_SYNC_DELAY_MS);
             } else if (needsPartialRefresh && detail.contractAddress) {
                 // Refresh for listing events after DB sync delay
                 devLog.info('collections', `🔄 Refresh for collection ${detail.contractAddress}`);
                 cache.clearCache();
                 // Single fetch with delay for DB sync completion
-                setTimeout(() => {
-                    fetchCollections(true);
-                }, 600); // 600ms delay matches other contexts
+                scheduleRefreshWithRetries(DB_SYNC_DELAY_MS);
             }
         });
 
-        return unsubscribe;
-    }, [cache, fetchCollections]);
+        return () => {
+            unsubscribe();
+            retryScheduler.clear();
+        };
+    }, [cache, fetchCollections, retryScheduler]);
 
-    // NOTE: SSE handling removed - we rely on MarketplaceEventsContext to prevent multiple WebSocket connections
-    // All updates come through eventsContext.subscribe() above
+    // NOTE: SSE handling removed - updates flow through data invalidation events
 
     // Calculate statistics
     const stats = useMemo(() => CollectionsService.calculateStats(state.collections), [state.collections]);

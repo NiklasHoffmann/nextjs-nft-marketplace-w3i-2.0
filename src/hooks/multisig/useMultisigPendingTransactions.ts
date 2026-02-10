@@ -9,6 +9,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAccount, useReadContract, useChainId, usePublicClient } from 'wagmi';
 import { MULTISIG_WALLET_ABI } from '@/config/abis/multisig-wallet';
+import { getMultisigAddress } from '@/config';
 import { MULTISIG_ADDRESSES, type PendingMultiSigTx, type MultiSigTransaction } from '@/types';
 import { enhancePendingTransaction } from '@/services/multisig';
 
@@ -20,32 +21,43 @@ export function useMultisigPendingTransactions(diamondAddress: string) {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const multiSigAddress = chainId === 1 ? MULTISIG_ADDRESSES.mainnet : MULTISIG_ADDRESSES.sepolia;
+    const multiSigAddress = chainId
+        ? (getMultisigAddress(chainId) || (chainId === 1 ? MULTISIG_ADDRESSES.mainnet : MULTISIG_ADDRESSES.sepolia))
+        : undefined;
 
     // Get transaction count
     const { data: txCount } = useReadContract({
-        address: multiSigAddress,
+        address: multiSigAddress ? (multiSigAddress as `0x${string}`) : undefined,
         abi: MULTISIG_WALLET_ABI,
         functionName: 'getTransactionCount',
+        query: {
+            enabled: !!multiSigAddress,
+        },
     });
 
     // Get owner count
     const { data: ownerCount } = useReadContract({
-        address: multiSigAddress,
+        address: multiSigAddress ? (multiSigAddress as `0x${string}`) : undefined,
         abi: MULTISIG_WALLET_ABI,
         functionName: 'getOwnerCount',
+        query: {
+            enabled: !!multiSigAddress,
+        },
     });
 
     // Get owners
     const { data: owners } = useReadContract({
-        address: multiSigAddress,
+        address: multiSigAddress ? (multiSigAddress as `0x${string}`) : undefined,
         abi: MULTISIG_WALLET_ABI,
         functionName: 'getOwners',
+        query: {
+            enabled: !!multiSigAddress,
+        },
     });
 
     // Fetch all pending transactions
     const fetchPendingTransactions = useCallback(async () => {
-        if (!txCount || !ownerCount || !owners || !address || !publicClient) {
+        if (!multiSigAddress || !txCount || !ownerCount || !owners || !address || !publicClient) {
             setIsLoading(false);
             return;
         }
@@ -61,7 +73,7 @@ export function useMultisigPendingTransactions(diamondAddress: string) {
             for (let i = 0; i < count; i++) {
                 try {
                     const tx = await publicClient.readContract({
-                        address: multiSigAddress,
+                        address: multiSigAddress as `0x${string}`,
                         abi: MULTISIG_WALLET_ABI,
                         functionName: 'getTransaction',
                         args: [BigInt(i)],
@@ -74,7 +86,7 @@ export function useMultisigPendingTransactions(diamondAddress: string) {
                     const confirmations: string[] = [];
                     for (const owner of owners as string[]) {
                         const isConfirmed = await publicClient.readContract({
-                            address: multiSigAddress,
+                            address: multiSigAddress as `0x${string}`,
                             abi: MULTISIG_WALLET_ABI,
                             functionName: 'isConfirmed',
                             args: [BigInt(i), owner as `0x${string}`],

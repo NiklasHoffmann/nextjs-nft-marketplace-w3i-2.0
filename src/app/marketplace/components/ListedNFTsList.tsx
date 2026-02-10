@@ -19,12 +19,13 @@ import { useMarketplaceLayout } from '@/app/marketplace/context';
 import { ImagePreloader } from '@/components/nft';
 import { NFTGallery } from '@/components/shared';
 import { RefreshButton } from '@/components/ui';
-import { CheckCircleIcon, SpinnerIcon } from '@/components/icons';
+import { SpinnerIcon } from '@/components/icons';
 import type {
     NFTFilters,
     NFTSortOptions,
     NFTScrollItem
 } from '@/types/marketplace';
+import { mapEnrichedNFTToScrollItem } from '@/utils/nft/scrollItem';
 
 const AVAILABLE_CATEGORIES = [
     'Art', 'Collectibles', 'Gaming', 'Membership', 'Music', 'Sports'
@@ -68,6 +69,17 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
 
     const filters = externalFilters || localFilters;
     const sort = externalSort || localSort;
+
+    const hasActiveFilters = Boolean(
+        filters.searchTerm ||
+        (filters.rarities && filters.rarities.length > 0) ||
+        (filters.priceMin && filters.priceMin > 0) ||
+        (filters.priceMax && filters.priceMax > 0) ||
+        (filters.minLikes && filters.minLikes > 0) ||
+        (filters.minViews && filters.minViews > 0) ||
+        (filters.minRating && filters.minRating > 0) ||
+        (filters.minWatchlistCount && filters.minWatchlistCount > 0)
+    );
 
     // Category toggle handler
     const toggleCategory = (category: string) => {
@@ -134,86 +146,28 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
     // Convert MongoDB items to NFTScrollItem format
     // Re-memoize when items change to ensure fresh data after reload
     const scrollItems: NFTScrollItem[] = useMemo(() => {
-        console.log('🔍 [ListedNFTsList] Converting items:', items.length);
-        if (items.length > 0) {
-            const firstItem = items[0];
-            if (firstItem) {
-                console.log('🔍 [ListedNFTsList] First item structure:', {
-                    hasPrice: 'price' in firstItem,
-                    priceValue: (firstItem as any).price,
-                    priceType: typeof (firstItem as any).price,
-                    hasMarketplace: 'marketplace' in firstItem,
-                    marketplacePrice: firstItem.marketplace?.price,
-                    hasMetadata: 'metadata' in firstItem,
-                    metadataImage: firstItem.metadata?.image,
-                    contractAddress: firstItem.contractAddress,
-                    tokenId: firstItem.tokenId
-                });
-            }
-        }
-
         return items
             .filter(item => item.contractAddress && item.contractAddress !== 'undefined' && item.contractAddress.trim() !== '')
-            .map((item) => {
-                // CRITICAL: Price handling for BSON Long compatibility
-                // MongoDB may return price as BSON Long object instead of string
-                let price = (item as any).price || item.marketplace?.price;
-                if (price && typeof price === 'object' && 'toString' in price) {
-                    // BSON Long object - convert to string
-                    price = String(price);
-                } else if (price && typeof price !== 'string') {
-                    // Fallback: convert any non-string to string
-                    price = String(price);
-                }
-
-                return {
-                    contractAddress: item.contractAddress.toLowerCase(),
-                    tokenId: item.tokenId,
-                    price: price || undefined,
-                    isListed: (item as any).isListed ?? item.marketplace?.isListed ?? false,
-                    listingId: (item as any).listingId || item.marketplace?.listingId || undefined,
-                    seller: (item as any).seller || item.marketplace?.seller || undefined,
-                    buyer: (item as any).buyer || item.marketplace?.buyer || undefined,
-                    desiredContractAddress: (item as any).desiredContractAddress || item.marketplace?.desiredContractAddress || undefined,
-                    desiredTokenId: (item as any).desiredTokenId || item.marketplace?.desiredTokenId || undefined,
-                    metadata: item.metadata ? {
-                        name: item.metadata.name,
-                        description: item.metadata.description,
-                        image: item.metadata.image,
-                        animationUrl: item.metadata.animationUrl,
-                        externalUrl: item.metadata.externalUrl,
-                        attributes: item.metadata.attributes
-                    } : undefined,
-                    insights: item.insights ? {
-                        customTitle: item.insights.customTitle || undefined,
-                        category: item.insights.category || undefined,
-                        tags: item.insights.tags || undefined,
-                        rarity: item.insights.rarity || undefined,
-                        cardDescriptions: item.insights.cardDescriptions || undefined,
-                        projectDescriptions: item.insights.projectDescriptions || undefined,
-                        functionalitiesDescriptions: item.insights.functionalitiesDescriptions || undefined,
-                        projectWebsite: item.insights.projectWebsite || undefined,
-                        projectTwitter: item.insights.projectTwitter || undefined,
-                        projectDiscord: item.insights.projectDiscord || undefined,
-                        partnerships: item.insights.partnerships || undefined
-                    } : undefined,
-                    contract: item.contract ? {
-                        name: item.contract.name,
-                        symbol: item.contract.symbol,
-                        totalSupply: item.contract.totalSupply,
-                        owner: item.contract.owner,
-                        tokenURI: item.contract.tokenURI,
-                        approved: item.contract.approvedAddress || null,
-                        ownerBalance: item.contract.ownerBalance
-                    } : undefined
-                };
-            });
+            .map((item) => mapEnrichedNFTToScrollItem(item));
     }, [items]);
 
     // Preload images
     const imageUrls = useMemo(() => {
         return items.map(item => item.metadata?.image).filter((url): url is string => !!url);
     }, [items]);
+
+    const gallerySubtitle = useMemo(() => {
+        if (items.length > 0) {
+            return (
+                <>
+                    Showing {items.length} of {pagination?.total || 0} Utilities
+                    {pagination?.hasMore && <span className="text-gray-400 ml-1">(scroll for more)</span>}
+                </>
+            );
+        }
+
+        return `${pagination?.total || 0} Utilities listed`;
+    }, [items.length, pagination?.total, pagination?.hasMore]);
 
     // Cache items to prevent empty state flash during refetch
     useEffect(() => {
@@ -402,14 +356,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
                     </div>
 
                     {/* Active Filter Pills */}
-                    {(filters.searchTerm ||
-                        (filters.rarities && filters.rarities.length > 0) ||
-                        (filters.priceMin && filters.priceMin > 0) ||
-                        (filters.priceMax && filters.priceMax > 0) ||
-                        (filters.minLikes && filters.minLikes > 0) ||
-                        (filters.minViews && filters.minViews > 0) ||
-                        (filters.minRating && filters.minRating > 0) ||
-                        (filters.minWatchlistCount && filters.minWatchlistCount > 0)) && (
+                    {hasActiveFilters && (
                             <div className="flex flex-wrap gap-2 items-center pt-2 border-t border-gray-100">
                                 {/* Search Term */}
                                 {filters.searchTerm && (
@@ -517,14 +464,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
                     title="Utilities"
                     largeTitle={true}
                     subtitle={
-                        items.length > 0 ? (
-                            <>
-                                Showing {items.length} of {pagination?.total || 0} Utilities
-                                {pagination?.hasMore && <span className="text-gray-400 ml-1">(scroll for more)</span>}
-                            </>
-                        ) : (
-                            `${pagination?.total || 0} Utilities listed`
-                        )
+                        gallerySubtitle
                     }
                     actions={
                         <RefreshButton

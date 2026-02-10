@@ -1,8 +1,10 @@
 import { truncateAddress } from '@/utils';
+import { getCurrencySymbolByAddress } from '@/config/tokens';
 import { NFTAttribute } from '@/types/features/nft-detail';
 import { NFTInsights } from '@/types';
 import { PublicNFTInsights } from '@/types';
 import { InvalidListingWarning } from '../InvalidListingWarning';
+import { useChainId } from 'wagmi';
 
 interface OverviewTabProps {
     contractAddress: string;
@@ -54,6 +56,8 @@ export default function OverviewTab({ contractAddress,
     invalidatedAt,
     nftDetails
 }: OverviewTabProps) {
+    const chainId = useChainId();
+
     // Name priority: contractName (collection) > collection > fallback
     // Note: customTitle was removed from NFTInsights schema
     const displayName = contractName || collection || 'Unknown NFT';
@@ -255,8 +259,8 @@ export default function OverviewTab({ contractAddress,
                             <div className="bg-white rounded-lg p-3">
                                 <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Listing Type</label>
                                 <p className="text-sm font-semibold text-gray-900 mt-1">
-                                    {nftDetails.listingType === 'PURE_ETH' && '💰 ETH Only'}
-                                    {nftDetails.listingType === 'SWAP_AND_ETH' && '🔄 Swap + ETH'}
+                                    {nftDetails.listingType === 'PURE_ETH' && `💰 ${getCurrencySymbolByAddress(nftDetails.chainId, nftDetails.currency)} Only`}
+                                    {nftDetails.listingType === 'SWAP_AND_ETH' && `🔄 Swap + ${getCurrencySymbolByAddress(nftDetails.chainId, nftDetails.currency)}`}
                                     {nftDetails.listingType === 'PURE_SWAP' && '🔁 Pure Swap'}
                                 </p>
                             </div>

@@ -161,8 +161,8 @@ export const POST = apiHandler(async (request: NextRequest) => {
   console.log('📊 POST /api/nft/stats - Recording view...');
 
   // Parse and validate request body
-  const body = await parseJsonBody<{ contractAddress: string; tokenId: string; userId?: string }>(request);
-  const { contractAddress, tokenId, userId } = body;
+  const body = await parseJsonBody<{ contractAddress: string; tokenId: string; userId?: string; viewerId?: string }>(request);
+  const { contractAddress, tokenId, userId, viewerId: clientViewerId } = body;
   console.log('📝 Request body:', { contractAddress, tokenId, userId });
 
   if (!contractAddress || !tokenId) {
@@ -175,6 +175,16 @@ export const POST = apiHandler(async (request: NextRequest) => {
 
   const lowerContractAddress = contractAddress.toLowerCase();
   const timestamp = new Date().toISOString();
+  const normalizedUserId = userId?.toLowerCase();
+  const viewerCookieName = 'nft_viewer_id';
+  const existingViewerId = request.cookies.get(viewerCookieName)?.value || null;
+  let viewerId = clientViewerId || existingViewerId;
+  let shouldSetViewerCookie = false;
+
+  if (!normalizedUserId && !viewerId) {
+    viewerId = crypto.randomUUID();
+    shouldSetViewerCookie = true;
+  }
   console.log('✅ Validation passed, recording view for:', lowerContractAddress, tokenId);
 
   // Invalidate cache when recording a view
@@ -186,40 +196,107 @@ export const POST = apiHandler(async (request: NextRequest) => {
   const viewRecord = {
     contractAddress: lowerContractAddress,
     tokenId: tokenId,
-    userId: userId?.toLowerCase(), // Optional - can track anonymous views
+    userId: normalizedUserId || null,
+    viewerId: viewerId || null,
     viewedAt: timestamp
   };
 
   console.log('💾 Inserting view record and updating stats...');
-  // Insert view record and update stats atomically
-  await Promise.all([
-    collection.insertOne(viewRecord),
-    // Update viewCount in stats collection
-    (async () => {
-      console.log('📈 Getting nft_stats collection...');
-      const statsCollection = await getCollection('nft_stats');
-      console.log('⬆️  Updating viewCount...');
-      await statsCollection.updateOne(
-        { contractAddress: lowerContractAddress, tokenId },
-        {
-          $inc: { viewCount: 1 },
-          $set: { lastUpdated: timestamp },
-          $setOnInsert: {
-            contractAddress: lowerContractAddress,
-            tokenId,
-            likeCount: 0,
-            watchlistCount: 0,
-            averageRating: 0,
-            ratingCount: 0,
-            createdAt: timestamp
-          }
-        },
-        { upsert: true }
-      );
-      console.log('✅ Stats updated successfully');
-    })()
-  ]);
+  let shouldIncrement = true;
+
+  if (normalizedUserId) {
+    const existingUserView = await collection.findOne({
+      contractAddress: lowerContractAddress,
+      tokenId,
+      userId: normalizedUserId
+    });
+
+    if (existingUserView) {
+      shouldIncrement = false;
+    } else if (viewerId) {
+      const existingViewerView = await collection.findOne({
+        contractAddress: lowerContractAddress,
+        tokenId,
+        viewerId
+      });
+
+      if (existingViewerView) {
+        await collection.updateOne(
+          { _id: existingViewerView._id },
+          { $set: { userId: normalizedUserId } }
+        );
+        shouldIncrement = false;
+      } else {
+        await collection.insertOne(viewRecord);
+      }
+    } else {
+      await collection.insertOne(viewRecord);
+    }
+  } else if (viewerId) {
+    const existingViewerView = await collection.findOne({
+      contractAddress: lowerContractAddress,
+      tokenId,
+      viewerId
+    });
+
+    if (existingViewerView) {
+      shouldIncrement = false;
+    } else {
+      await collection.insertOne(viewRecord);
+    }
+  }
+
+  if (shouldIncrement) {
+    console.log('📈 Getting nft_stats collection...');
+    const statsCollection = await getCollection('nft_stats');
+    console.log('⬆️  Updating viewCount...');
+    await statsCollection.updateOne(
+      { contractAddress: lowerContractAddress, tokenId },
+      {
+        $inc: { viewCount: 1 },
+        $set: { lastUpdated: timestamp },
+        $setOnInsert: {
+          contractAddress: lowerContractAddress,
+          tokenId,
+          likeCount: 0,
+          watchlistCount: 0,
+          averageRating: 0,
+          ratingCount: 0,
+          createdAt: timestamp
+        }
+      },
+      { upsert: true }
+    );
+    console.log('✅ Stats updated successfully');
+  }
+
+  const statsCollection = await getCollection('nft_stats');
+  const updatedStats = await statsCollection.findOne({
+    contractAddress: lowerContractAddress,
+    tokenId
+  });
 
   console.log('🎉 View recorded successfully');
-  return apiSuccess({ message: 'View recorded' });
+  const response = apiSuccess({
+    message: shouldIncrement ? 'View recorded' : 'View already recorded',
+    stats: updatedStats ? {
+      viewCount: updatedStats.viewCount || 0,
+      likeCount: updatedStats.likeCount || 0,
+      watchlistCount: updatedStats.watchlistCount || 0,
+      averageRating: updatedStats.averageRating || 0,
+      ratingCount: updatedStats.ratingCount || 0,
+      lastUpdated: updatedStats.lastUpdated
+    } : null
+  });
+
+  if (shouldSetViewerCookie && viewerId) {
+    response.cookies.set(viewerCookieName, viewerId, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30
+    });
+  }
+
+  return response;
 });

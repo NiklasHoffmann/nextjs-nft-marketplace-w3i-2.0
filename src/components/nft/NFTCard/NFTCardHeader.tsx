@@ -24,28 +24,32 @@ export const NFTCardHeader = memo<NFTCardHeaderProps>(({
     nftName,
     averageRating
 }) => {
+    const displaySymbol = contractSymbol || `${contractAddress.slice(0, 6)}...${contractAddress.slice(-4)}`;
+    const displayTitle = customTitle || nftName || contractName || `#${tokenId}`;
+    const ratingValue = averageRating ? Math.round(averageRating) : 0;
+
     return (
         <div className="bg-white/95 backdrop-blur-md p-2 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20">
             <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                     {/* Collection Symbol/Address */}
                     <h3 className="text-sm font-semibold text-gray-900 truncate">
-                        {contractSymbol || `${contractAddress.slice(0, 6)}...${contractAddress.slice(-4)}`}
+                        {displaySymbol}
                     </h3>
                     {/* NFT Name: customTitle > metadata name > contract name */}
                     <p className="text-xs text-gray-600 truncate">
-                        {customTitle || nftName || contractName || `#${tokenId}`}
+                        {displayTitle}
                     </p>
                 </div>
 
                 {/* Average Rating Stars */}
-                {averageRating && averageRating > 0 && (
+                {ratingValue > 0 && (
                     <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-md border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center gap-1 ml-2">
                         <div className="flex items-center gap-0.5">
                             {Array.from({ length: 5 }, (_, i) => (
                                 <svg
                                     key={i}
-                                    className={`w-2.5 h-2.5 ${i < Math.round(averageRating) ? 'text-yellow-400' : 'text-gray-300'}`}
+                                    className={`w-2.5 h-2.5 ${i < ratingValue ? 'text-yellow-400' : 'text-gray-300'}`}
                                     fill="currentColor"
                                     viewBox="0 0 24 24"
                                 >

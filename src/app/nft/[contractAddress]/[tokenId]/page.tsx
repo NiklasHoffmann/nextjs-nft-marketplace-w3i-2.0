@@ -20,6 +20,16 @@ import {
 
 // Global set to track recorded views - survives component remounts
 const recordedViews = new Set<string>();
+const VIEWER_ID_STORAGE_KEY = 'nft_viewer_id';
+
+function getOrCreateViewerId(): string | null {
+    if (typeof window === 'undefined') return null;
+    const existing = window.localStorage.getItem(VIEWER_ID_STORAGE_KEY);
+    if (existing) return existing;
+    const newId = crypto.randomUUID();
+    window.localStorage.setItem(VIEWER_ID_STORAGE_KEY, newId);
+    return newId;
+}
 
 // Don't memo NFTDetailHeader - it needs to re-render when context changes
 // The header has its own useNFTUserStats hook that reads from context
@@ -56,7 +66,8 @@ function NFTDetailPage() {
         toggleFavorite: statsToggleFavorite,
         toggleWatchlist: statsToggleWatchlist,
         setRating: statsSetRating,
-        incrementViews
+        incrementViews,
+        refresh
     } = useNFTUserStats(contractAddress, tokenId, userAddress);
 
     // UI state
@@ -144,7 +155,7 @@ function NFTDetailPage() {
         };
     }, [contractAddress, tokenId, isValidParams, nftData]);
 
-    const priceData = useNFTPriceData(nftDetails?.price || null);
+    const priceData = useNFTPriceData(nftDetails?.price || null, nftDetails?.currency, nftDetails?.chainId);
 
     const isLoading = dataLoading;
     const error = dataError;
@@ -156,15 +167,29 @@ function NFTDetailPage() {
         return publicInsights?.customTitle || metadata?.name || `Token #${tokenId}`;
     }, [publicInsights?.customTitle, metadata?.name, tokenId]);
 
-    // Record view on mount - DISABLED temporarily to fix infinite loop
-    // TODO: Re-enable with proper debouncing after stats sync is fixed
-    // useEffect(() => {
-    //     if (!isValidParams || !contractAddress || !tokenId) return;
-    //     const viewKey = `${contractAddress}-${tokenId}`;
-    //     if (recordedViews.has(viewKey)) return;
-    //     recordedViews.add(viewKey);
-    //     incrementViews();
-    // }, [isValidParams, contractAddress, tokenId]);
+    const viewRecordedRef = useRef(false);
+    const viewerIdRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (!isValidParams || !contractAddress || !tokenId) return;
+        if (viewRecordedRef.current) return;
+
+        if (!viewerIdRef.current) {
+            viewerIdRef.current = getOrCreateViewerId();
+        }
+
+        const viewKey = `${contractAddress}-${tokenId}-${viewerIdRef.current || 'anon'}`;
+        if (recordedViews.has(viewKey)) return;
+
+        recordedViews.add(viewKey);
+        viewRecordedRef.current = true;
+        incrementViews();
+    }, [isValidParams, contractAddress, tokenId, incrementViews]);
+
+    useEffect(() => {
+        if (!isValidParams || !contractAddress || !tokenId) return;
+        refresh();
+    }, [isValidParams, contractAddress, tokenId, refresh]);
 
     const categoryPillsProps = useMemo(() => ({
         categories: [],

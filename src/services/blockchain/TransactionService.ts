@@ -92,6 +92,7 @@ export interface UpdateListingParams {
     contractAddress: string;
     tokenId: string;
     newPrice?: string;
+    newCurrency?: string;
     newDesiredContractAddress?: string;
     newDesiredTokenId?: string;
     onProgress?: (step: TransactionStep) => void;
@@ -114,6 +115,7 @@ export interface CreateListingParams {
     contractAddress: string;
     tokenId: string;
     price: string;
+    currency?: string; // Payment token address (0x0000...0000 = ETH, WETH/USDC/etc = token address)
     desiredContractAddress?: string;
     desiredTokenId?: string;
     onProgress?: (step: TransactionStep) => void;
@@ -320,6 +322,7 @@ export function useTransactionService() {
         const {
             listingId,
             newPrice,
+            newCurrency,
             newDesiredContractAddress,
             newDesiredTokenId,
             onProgress,
@@ -359,6 +362,7 @@ export function useTransactionService() {
             await listingHook.updateListing({
                 listingId,
                 newPrice,
+                newCurrency,
                 newDesiredTokenAddress: newDesiredContractAddress,
                 newDesiredTokenId: newDesiredTokenId
             });
@@ -617,12 +621,13 @@ export function useTransactionService() {
                 'Setting up your NFT listing...'
             );
 
-            console.log('📝 Preparing create listing transaction:', {
-                contractAddress,
-                tokenId,
-                price,
-                hasSwap: !!desiredContractAddress
-            });
+            console.log('📝 [TRANSACTION SERVICE] Preparing create listing transaction:');
+            console.log('   contractAddress:', contractAddress);
+            console.log('   tokenId:', tokenId);
+            console.log('   price:', price);
+            console.log('   currency:', params.currency);
+            console.log('   desiredContractAddress:', desiredContractAddress);
+            console.log('   hasSwap:', !!desiredContractAddress);
 
             setCurrentStep('signing');
             onProgress?.('signing');
@@ -633,10 +638,19 @@ export function useTransactionService() {
                 'Please confirm the listing in your wallet'
             );
 
+            console.log('🔍 [TRANSACTION SERVICE] Calling listingHook.createListing with:');
+            console.log('   tokenAddress:', contractAddress);
+            console.log('   tokenId:', tokenId);
+            console.log('   price:', price);
+            console.log('   currency:', params.currency);
+            console.log('   desiredTokenAddress:', desiredContractAddress);
+            console.log('   desiredTokenId:', desiredTokenId);
+
             const txHash = await listingHook.createListing({
                 tokenAddress: contractAddress,
                 tokenId,
                 price,
+                currency: params.currency, // Pass currency parameter
                 desiredTokenAddress: desiredContractAddress,
                 desiredTokenId: desiredTokenId
             });

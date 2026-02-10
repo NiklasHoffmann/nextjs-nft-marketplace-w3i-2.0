@@ -5,9 +5,11 @@
 "use client";
 
 import { useState } from 'react';
-import { useWriteContract, useWaitForTransactionReceipt, usePublicClient, useAccount } from 'wagmi';
-import { parseEther, getAddress, erc721Abi } from 'viem';
-import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
+import { useWriteContract, useWaitForTransactionReceipt, usePublicClient, useAccount, useChainId } from 'wagmi';
+import { parseUnits, getAddress, erc721Abi } from 'viem';
+import { IDEATION_MARKET_FACET_ABI } from '@/config/abis/ideation-market-facet';
+import { GETTER_FACET_ABI } from '@/config/abis/getter-facet';
+import { getAvailableTokens, ZERO_ADDRESS } from '@/config/tokens';
 
 interface CreateListingParams {
   tokenAddress: string;
@@ -23,6 +25,7 @@ interface CreateListingParams {
 interface UpdateListingParams {
   listingId: string;
   newPrice?: string;
+  newCurrency?: string;
   newDesiredTokenAddress?: string;
   newDesiredTokenId?: string;
   newBuyerWhitelistEnabled?: boolean;
@@ -34,6 +37,7 @@ export function useMarketplaceListing(marketplaceAddress: string) {
   const [submittedHash, setSubmittedHash] = useState<string | undefined>();
   const publicClient = usePublicClient();
   const { address: userAddress } = useAccount();
+  const chainId = useChainId();
 
   // Write contract hooks - capture errors from wagmi
   const {
@@ -64,37 +68,50 @@ export function useMarketplaceListing(marketplaceAddress: string) {
   const error = receiptError || writeError;
   const isError = isReceiptError || isWriteError;
 
+  const resolveCurrencyDecimals = (currencyAddress?: string): number => {
+    if (!currencyAddress || currencyAddress === ZERO_ADDRESS) {
+      return 18;
+    }
+
+    const tokens = getAvailableTokens(chainId);
+    const match = tokens.find((token) => token.address.toLowerCase() === currencyAddress.toLowerCase());
+    return match?.decimals ?? 18;
+  };
+
   const createListing = async ({
     tokenAddress,
     tokenId,
     price,
-    currency = "0x0000000000000000000000000000000000000000",
-    desiredTokenAddress = "0x0000000000000000000000000000000000000000",
+    currency = ZERO_ADDRESS,
+    desiredTokenAddress = ZERO_ADDRESS,
     desiredTokenId = "0",
     buyerWhitelistEnabled = false,
     allowedBuyers = []
   }: CreateListingParams) => {
     try {
-      console.log('?? [useMarketplaceListing] createListing called');
-      console.log('?? Parameters:', {
-        tokenAddress,
-        tokenId,
-        price,
-        priceInWei: parseEther(price).toString(),
-        marketplaceAddress,
-        desiredTokenAddress,
-        desiredTokenId,
-        buyerWhitelistEnabled,
-        allowedBuyers
-      });
+      const priceDecimals = resolveCurrencyDecimals(currency);
+      const priceInUnits = parseUnits(price, priceDecimals);
+
+      console.log('🔍 [useMarketplaceListing] createListing called');
+      console.log('📦 [useMarketplaceListing] Received Parameters:');
+      console.log('   tokenAddress:', tokenAddress);
+      console.log('   tokenId:', tokenId);
+      console.log('   price:', price);
+      console.log('   priceInUnits:', priceInUnits.toString());
+      console.log('   currency:', currency);
+      console.log('   marketplaceAddress:', marketplaceAddress);
+      console.log('   desiredTokenAddress:', desiredTokenAddress);
+      console.log('   desiredTokenId:', desiredTokenId);
+      console.log('   buyerWhitelistEnabled:', buyerWhitelistEnabled);
+      console.log('   allowedBuyers:', allowedBuyers);
 
       setIsLoading(true);
 
       // CRITICAL: Ensure all addresses are checksummed
       const checksummedTokenAddress = getAddress(tokenAddress);
-      const checksummedDesiredTokenAddress = desiredTokenAddress !== "0x0000000000000000000000000000000000000000"
+      const checksummedDesiredTokenAddress = desiredTokenAddress !== ZERO_ADDRESS
         ? getAddress(desiredTokenAddress)
-        : "0x0000000000000000000000000000000000000000";
+        : ZERO_ADDRESS;
 
       console.log('?? Checksummed addresses:', {
         original: tokenAddress,
@@ -107,8 +124,8 @@ export function useMarketplaceListing(marketplaceAddress: string) {
         checksummedTokenAddress as `0x${string}`, // tokenAddress (CHECKSUMMED!)
         BigInt(tokenId), // tokenId
         "0x0000000000000000000000000000000000000000" as `0x${string}`, // erc1155Holder (not needed for ERC721)
-        parseEther(price), // price
-        (currency || "0x0000000000000000000000000000000000000000") as `0x${string}`, // currency (0x0 = ETH, WETH address = WETH)
+        priceInUnits, // price
+        (currency || ZERO_ADDRESS) as `0x${string}`, // currency (0x0 = ETH, WETH address = WETH)
         checksummedDesiredTokenAddress as `0x${string}`, // desiredTokenAddress (CHECKSUMMED!)
         BigInt(desiredTokenId), // desiredTokenId
         BigInt("0"), // desiredErc1155Quantity (not needed for ERC721)
@@ -118,12 +135,12 @@ export function useMarketplaceListing(marketplaceAddress: string) {
         allowedBuyers as readonly `0x${string}`[] // allowedBuyers
       ] as const;
 
-      console.log('?? Contract args (detailed):');
+      console.log('🚀 [useMarketplaceListing] Contract args being sent to createListing():');
       console.log('  [0] tokenAddress:', args[0]);
       console.log('  [1] tokenId:', args[1]?.toString());
       console.log('  [2] erc1155Holder:', args[2]);
-      console.log('  [3] price (wei):', args[3]?.toString());
-      console.log('  [4] currency:', args[4]);
+      console.log('  [3] price (units):', args[3]?.toString());
+      console.log('  [4] currency:', args[4], '<-- CURRENCY PARAMETER');
       console.log('  [5] desiredTokenAddress:', args[5]);
       console.log('  [6] desiredTokenId:', args[6]?.toString());
       console.log('  [7] desiredErc1155Quantity:', args[7]?.toString());
@@ -131,6 +148,9 @@ export function useMarketplaceListing(marketplaceAddress: string) {
       console.log('  [9] buyerWhitelistEnabled:', args[9]);
       console.log('  [10] partialBuyEnabled:', args[10]);
       console.log('  [11] allowedBuyers:', args[11]);
+      console.log('📝 [useMarketplaceListing] Full args array:', JSON.stringify(args, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+      , 2));
 
       // CRITICAL: Check and ensure approval using viem's erc721Abi
       if (publicClient && userAddress) {
@@ -220,7 +240,7 @@ export function useMarketplaceListing(marketplaceAddress: string) {
         if (publicClient && userAddress) {
           await publicClient.simulateContract({
             address: marketplaceAddress as `0x${string}`,
-            abi: MARKETPLACE_ABI,
+            abi: IDEATION_MARKET_FACET_ABI,
             functionName: 'createListing',
             args,
             account: userAddress, // Use actual user address for simulation
@@ -272,7 +292,7 @@ export function useMarketplaceListing(marketplaceAddress: string) {
           try {
             const whitelistStatus = await publicClient.readContract({
               address: marketplaceAddress as `0x${string}`,
-              abi: MARKETPLACE_ABI,
+              abi: GETTER_FACET_ABI,
               functionName: 'isCollectionWhitelisted',
               args: [checksummedTokenAddress as `0x${string}`]
             });
@@ -300,7 +320,7 @@ export function useMarketplaceListing(marketplaceAddress: string) {
 
       const contractConfig = {
         address: marketplaceAddress as `0x${string}`,
-        abi: MARKETPLACE_ABI,
+        abi: IDEATION_MARKET_FACET_ABI,
         functionName: 'createListing' as const,
         args,
         gas: BigInt(800000) // Increased from 500k
@@ -376,6 +396,7 @@ export function useMarketplaceListing(marketplaceAddress: string) {
   const updateListing = async ({
     listingId,
     newPrice,
+    newCurrency,
     newDesiredTokenAddress,
     newDesiredTokenId,
     newBuyerWhitelistEnabled,
@@ -383,16 +404,19 @@ export function useMarketplaceListing(marketplaceAddress: string) {
   }: UpdateListingParams) => {
     try {
       setIsLoading(true);
+      const effectiveCurrency = newCurrency || ZERO_ADDRESS;
+      const priceDecimals = resolveCurrencyDecimals(effectiveCurrency);
+      const priceValue = newPrice ? parseUnits(newPrice, priceDecimals) : BigInt(0);
 
       await writeContractAsync({
         address: marketplaceAddress as `0x${string}`,
-        abi: MARKETPLACE_ABI,
+        abi: IDEATION_MARKET_FACET_ABI,
         functionName: 'updateListing',
         args: [
           BigInt(listingId),
-          newPrice ? parseEther(newPrice) : BigInt(0),
-          "0x0000000000000000000000000000000000000000" as `0x${string}`, // newCurrency (ETH = zero address)
-          (newDesiredTokenAddress || "0x0000000000000000000000000000000000000000") as `0x${string}`,
+          priceValue,
+          effectiveCurrency as `0x${string}`,
+          (newDesiredTokenAddress || ZERO_ADDRESS) as `0x${string}`,
           BigInt(newDesiredTokenId || "0"),
           BigInt("0"), // newDesiredErc1155Quantity (0 for ERC721)
           BigInt("0"), // newErc1155Quantity (0 for ERC721)
@@ -416,7 +440,7 @@ export function useMarketplaceListing(marketplaceAddress: string) {
 
       await writeContractAsync({
         address: marketplaceAddress as `0x${string}`,
-        abi: MARKETPLACE_ABI,
+        abi: IDEATION_MARKET_FACET_ABI,
         functionName: 'cancelListing',
         args: [BigInt(listingId)],
         gas: BigInt(150000)

@@ -9,19 +9,21 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount } from 'wagmi';
+import { useAccount, useChainId } from 'wagmi';
 import { useCart } from '@/contexts';
-import { formatEther } from '@/utils';
+import { formatUnits } from 'viem';
 import Link from 'next/link';
 import { ButtonSpinner } from '@/components/core/Loading';
 import { EmptyState } from '@/components/core/Empty';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
 
 interface EnrichedCartItem {
     listingId: string;
     contractAddress: string;
     tokenId: string;
     price: string;
+    currency?: string | null;
     seller: string;
     name?: string;
     imageUrl?: string;
@@ -30,9 +32,13 @@ interface EnrichedCartItem {
 export function CartPage() {
     const router = useRouter();
     const { address, isConnected } = useAccount();
-    const { items, itemCount, totalPrice, totalPriceFormatted, removeFromCart, clearCart, updateCartItem } = useCart();
+    const chainId = useChainId();
+    const { items, itemCount, totalPrice, totalPriceByToken, totalPriceDisplay, removeFromCart, clearCart, updateCartItem } = useCart();
     const [isProcessing, setIsProcessing] = useState(false);
     const [enrichedItems, setEnrichedItems] = useState<EnrichedCartItem[]>([]);
+
+    const hasSingleToken = totalPriceByToken.length === 1;
+    const primaryTotal = hasSingleToken ? totalPriceByToken[0] : null;
 
     // Enrich cart items with metadata from MongoDB
     useEffect(() => {
@@ -233,7 +239,12 @@ export function CartPage() {
                                         <div className="flex flex-col items-end justify-between">
                                             <div className="text-right">
                                                 <p className="text-lg font-bold text-gray-900">
-                                                    {formatEther(item.price)} ETH
+                                                    {(() => {
+                                                        const symbol = getCurrencySymbolByAddress(chainId || 11155111, item.currency);
+                                                        const decimals = getTokenDecimalsByAddress(chainId || 11155111, item.currency);
+                                                        const amount = formatUnits(BigInt(item.price), decimals);
+                                                        return `${amount} ${symbol}`;
+                                                    })()}
                                                 </p>
                                             </div>
                                             <button
@@ -262,7 +273,11 @@ export function CartPage() {
                             <div className="space-y-3 mb-6">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-600">Items ({itemCount})</span>
-                                    <span className="font-medium text-gray-900">{totalPriceFormatted} ETH</span>
+                                    <span className="font-medium text-gray-900">
+                                        {hasSingleToken && primaryTotal
+                                            ? `${primaryTotal.total.toFixed(4)} ${primaryTotal.symbol}`
+                                            : totalPriceDisplay}
+                                    </span>
                                 </div>
 
                                 <div className="flex justify-between text-sm">
@@ -282,7 +297,11 @@ export function CartPage() {
                                 <div className="flex justify-between">
                                     <span className="text-base font-semibold text-gray-900">Total</span>
                                     <span className="text-lg font-bold text-gray-900">
-                                        {(parseFloat(totalPriceFormatted) + 0.005).toFixed(4)} ETH
+                                        {hasSingleToken && primaryTotal && primaryTotal.symbol === 'ETH'
+                                            ? `${(primaryTotal.total + 0.005).toFixed(4)} ETH`
+                                            : (hasSingleToken && primaryTotal)
+                                                ? `${primaryTotal.total.toFixed(4)} ${primaryTotal.symbol}`
+                                                : totalPriceDisplay}
                                     </span>
                                 </div>
                             </div>

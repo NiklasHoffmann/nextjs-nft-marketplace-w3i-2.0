@@ -5,3 +5,4 @@
  */
 
 export * from './data-invalidation';
+export * from './invalidation-scheduling';

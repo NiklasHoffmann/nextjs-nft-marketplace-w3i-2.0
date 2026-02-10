@@ -188,6 +188,7 @@ function NewNFTInfoTabs({
                 return (
                     <MemoizedInvestmentTab
                         price={nftDetails.price}
+                        currency={nftDetails.currency}
                         isListed={nftDetails.isListed}
                         totalSupply={totalSupply}
                         rarityRank={rarityRank}
@@ -219,6 +220,7 @@ function NewNFTInfoTabs({
                 return (
                     <MemoizedTokenomicsTab
                         price={nftDetails.price}
+                        currency={nftDetails.currency}
                         totalSupply={totalSupply}
                         rarityRank={rarityRank}
                         supportsRoyalty={supportsRoyalty}

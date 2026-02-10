@@ -1,12 +1,14 @@
 import * as React from 'react';
-import { useAccount } from 'wagmi';
-import { formatEther } from 'viem';
+import { useAccount, useChainId } from 'wagmi';
+import { formatUnits } from 'viem';
 
 import { NFTGallery } from '@/components/shared';
 import { EmptyState } from '@/components/core/Empty';
 import type { NFTScrollItem } from '@/types/marketplace';
 import type { WalletNFT } from '@/contexts/wallet-nfts/WalletNFTsService';
-import { useETHPrice } from '@/contexts/CurrencyContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
+import { mapWalletNFTToScrollItem } from '@/utils/nft/scrollItem';
 
 export interface WalletNFTsListProps {
     /** NFTs to display (pre-filtered from server) */
@@ -21,6 +23,19 @@ export interface WalletNFTsListProps {
     separateSections?: boolean;
     /** Limit number of NFTs per section when using separateSections */
     limitPerSection?: number;
+}
+
+function renderEmptySection(message: string) {
+    return (
+        <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <div className="text-gray-400 mb-2">
+                <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+            </div>
+            <p className="text-gray-500">{message}</p>
+        </div>
+    );
 }
 
 /**
@@ -46,76 +61,15 @@ export function WalletNFTsList({
     limitPerSection
 }: WalletNFTsListProps) {
     const { address: connectedWallet } = useAccount();
+    const chainId = useChainId(); // Get current chain ID
 
     // Convert NFTs to NFTCard format (server already filtered them)
     const nftItems: NFTScrollItem[] = React.useMemo(() => {
-        return nfts.map((nft) => {
-            const item = {
-                contractAddress: nft.contractAddress,
-                tokenId: nft.tokenId,
-                price: nft.listingPrice,
-                isListed: nft.isListed || false,
-                listingId: nft.listingId,
-                seller: nft.seller,
-                buyer: undefined,
-                desiredContractAddress: undefined,
-                desiredTokenId: undefined,
-                name: nft.name || `NFT #${nft.tokenId}`,
-                symbol: nft.contractSymbol || undefined,
-                category: nft.insights?.category || nft.category || null,
-                categories: nft.insights?.category ? [nft.insights.category] : nft.category ? [nft.category] : [],
-                description: nft.description || null,
-                imageUrl: nft.image || null, // ExternalNFT uses 'image', not 'imageUrl'
-                rarity: nft.insights?.rarity || nft.rarity || null,
-                customTitle: nft.insights?.customTitle || null,
-                cardDescriptions: nft.insights?.cardDescriptions || null,
-                tags: [],
-                // Stats - use from API response if available
-                averageRating: nft.stats?.averageRating ?? undefined,
-                ratingCount: nft.stats?.ratingCount ?? undefined,
-                viewCount: nft.stats?.viewCount ?? undefined,
-                favoriteCount: nft.stats?.likeCount ?? undefined, // API uses likeCount
-                watchlistCount: nft.stats?.watchlistCount ?? undefined,
-                // NFTCard expects metadata object with nested image
-                metadata: {
-                    name: nft.name || null,
-                    description: nft.description || null,
-                    image: nft.image || null,
-                    animationUrl: nft.animationUrl || undefined,
-                    externalUrl: undefined,
-                    attributes: nft.attributes || undefined,
-                },
-                // Pass insights data for NFTCard
-                insights: nft.insights ? {
-                    customTitle: nft.insights.customTitle || undefined,
-                    category: nft.insights.category || nft.category || undefined,
-                    tags: [],
-                    rarity: nft.insights.rarity || nft.rarity || undefined,
-                    cardDescriptions: nft.insights.cardDescriptions || undefined,
-                    projectDescriptions: undefined,
-                    functionalitiesDescriptions: undefined,
-                    projectWebsite: undefined,
-                    projectTwitter: undefined,
-                    projectDiscord: undefined,
-                    partnerships: [],
-                } : undefined,
-                // Pass contract info - map from the nft object properly
-                contract: {
-                    name: nft.contractName || null,
-                    symbol: nft.contractSymbol || null,
-                    totalSupply: nft.totalSupply || null,
-                    owner: nft.owner || connectedWallet || null,
-                    tokenURI: nft.tokenURI || null,
-                    approved: nft.approved || null,
-                    ownerBalance: nft.ownerBalance || null,
-                },
-            };
-            return item;
-        });
+        return nfts.map((nft) => mapWalletNFTToScrollItem(nft, connectedWallet));
     }, [nfts, connectedWallet]);
 
     // Split into listed and unlisted (server already filtered)
-    const { listedNFTs, unlistedNFTs, totalListedValue } = React.useMemo(() => {
+    const { listedNFTs, unlistedNFTs, listedPricesByToken } = React.useMemo(() => {
         const listed = nftItems.filter((nft) => nft.isListed);
         const unlisted = nftItems.filter((nft) => !nft.isListed)
             // Sort unlisted by newest first (recently purchased NFT at top)
@@ -125,30 +79,76 @@ export function WalletNFTsList({
                 return dateB - dateA; // Newest first
             });
 
-        // Calculate total value of listed NFTs
-        const totalValue = listed.reduce((sum, nft) => {
+        // Group listed NFT prices by token for multi-currency support
+        const pricesByToken = new Map<string, { total: number; symbol: string; address: string | null }>();
+
+        listed.forEach((nft) => {
             if (nft.price) {
                 try {
                     const price = typeof nft.price === 'string'
                         ? BigInt(nft.price)
                         : nft.price;
-                    return sum + parseFloat(formatEther(price));
+                    const tokenSymbol = getCurrencySymbolByAddress(chainId, nft.currency);
+                    const tokenAddress = nft.currency || null;
+                    const tokenDecimals = getTokenDecimalsByAddress(chainId, nft.currency);
+                    const priceInToken = parseFloat(formatUnits(price, tokenDecimals));
+
+                    const tokenKey = tokenAddress || tokenSymbol;
+                    const existing = pricesByToken.get(tokenKey) || { total: 0, symbol: tokenSymbol, address: tokenAddress };
+                    existing.total += priceInToken;
+                    pricesByToken.set(tokenKey, existing);
                 } catch (e) {
-                    return sum;
+                    console.error('Error parsing price:', e);
                 }
             }
-            return sum;
-        }, 0);
+        });
 
         return {
             listedNFTs: limitPerSection ? listed.slice(0, limitPerSection) : listed,
             unlistedNFTs: limitPerSection ? unlisted.slice(0, limitPerSection) : unlisted,
-            totalListedValue: totalValue
+            listedPricesByToken: pricesByToken
         };
-    }, [nftItems, limitPerSection]);
+    }, [nftItems, limitPerSection, chainId]);
 
-    // Convert total value to USD
-    const { convertedPrice: totalListedValueUSD, loading: ethPriceLoading } = useETHPrice(totalListedValue);
+    // Convert all token prices to USD for total value calculation
+    const { convertTokenToUSD } = useCurrency();
+    const [totalListedValueUSD, setTotalListedValueUSD] = React.useState<number>(0);
+    const [ethPriceLoading, setEthPriceLoading] = React.useState<boolean>(true);
+
+    React.useEffect(() => {
+        let isMounted = true;
+
+        async function calculateTotalUSD() {
+            if (listedPricesByToken.size === 0) {
+                setTotalListedValueUSD(0);
+                setEthPriceLoading(false);
+                return;
+            }
+
+            setEthPriceLoading(true);
+            let totalUSD = 0;
+
+            for (const [, { total, symbol, address }] of listedPricesByToken.entries()) {
+                try {
+                    const usdValue = await convertTokenToUSD(total, symbol, address, chainId);
+                    totalUSD += usdValue;
+                } catch (error) {
+                    console.error(`Error converting ${symbol} to USD:`, error);
+                }
+            }
+
+            if (isMounted) {
+                setTotalListedValueUSD(totalUSD);
+                setEthPriceLoading(false);
+            }
+        }
+
+        calculateTotalUSD();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [listedPricesByToken, convertTokenToUSD]);
 
     // Determine title
     const displayTitle = title || 'Your NFTs';
@@ -246,7 +246,6 @@ export function WalletNFTsList({
             </div>
         );
     }
-
     // Separate sections layout
     return (
         <div>
@@ -270,14 +269,7 @@ export function WalletNFTsList({
                     emptyMessage="No listed NFTs"
                     enableViewAll={true}
                     emptyComponent={
-                        <div className="text-center py-12 bg-gray-50 rounded-lg">
-                            <div className="text-gray-400 mb-2">
-                                <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                            </div>
-                            <p className="text-gray-500">No listed Utilities</p>
-                        </div>
+                        renderEmptySection('No listed Utilities')
                     }
                 />
             </div>
@@ -299,14 +291,7 @@ export function WalletNFTsList({
                     emptyMessage="No unlisted NFTs"
                     enableViewAll={true}
                     emptyComponent={
-                        <div className="text-center py-12 bg-gray-50 rounded-lg">
-                            <div className="text-gray-400 mb-2">
-                                <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                            </div>
-                            <p className="text-gray-500">No unlisted Utilities</p>
-                        </div>
+                        renderEmptySection('No unlisted Utilities')
                     }
                 />
             </div>

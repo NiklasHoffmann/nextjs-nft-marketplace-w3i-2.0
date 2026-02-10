@@ -1,10 +1,13 @@
-import { formatEther } from '@/utils';
+import { formatUnits } from 'viem';
 import { NFTInsights } from '@/types';
 import { PublicNFTInsights } from '@/types';
 import { RoyaltyInfo } from '@/types';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
+import { useChainId } from 'wagmi';
 
 interface InvestmentTabProps {
     price: string;
+    currency?: string | null;
     isListed: boolean;
     totalSupply?: number | null;
     rarityRank?: number | null;
@@ -18,6 +21,7 @@ interface InvestmentTabProps {
 
 export default function InvestmentTab({
     price,
+    currency,
     isListed,
     totalSupply,
     rarityRank,
@@ -28,14 +32,17 @@ export default function InvestmentTab({
     blockchain,
     tokenStandard
 }: InvestmentTabProps) {
-    const currentPriceNum = parseFloat(formatEther(price));
+    const chainId = useChainId();
+    const tokenDecimals = getTokenDecimalsByAddress(chainId, currency);
+    const currencySymbol = getCurrencySymbolByAddress(chainId, currency);
+    const formattedPrice = formatUnits(BigInt(price), tokenDecimals);
 
     return (
         <div className="space-y-6">
             {/* Price Overview */}
             <div className="grid grid-cols-1 gap-4">
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 text-center">
-                    <div className="text-3xl font-bold text-blue-600 mb-2">{formatEther(price)}</div>
+                    <div className="text-3xl font-bold text-blue-600 mb-2">{formattedPrice} {currencySymbol}</div>
                     <div className="text-sm text-blue-800 font-medium">Current Listing Price</div>
                     <div className="text-xs text-blue-600 mt-1">
                         {isListed ? '💰 Listed for Sale' : '🔒 Not Listed'}
@@ -133,8 +140,8 @@ export default function InvestmentTab({
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <div className="text-xl font-bold text-gray-900">{formatEther(price)}</div>
-                        <div className="text-xs text-gray-600">Current Price (ETH)</div>
+                        <div className="text-xl font-bold text-gray-900">{formattedPrice}</div>
+                        <div className="text-xs text-gray-600">Current Price ({currencySymbol})</div>
                     </div>
 
                     {totalSupply && (

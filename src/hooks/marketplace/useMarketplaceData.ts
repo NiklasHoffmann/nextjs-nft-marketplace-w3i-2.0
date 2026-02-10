@@ -4,14 +4,14 @@
  * All functions here are read-only and do not modify state
  * Use with caution: heavy queries may impact performance
  * Consider using pagination or batching for large datasets
- * All functions: getListingById, getListingsByNFT, isBuyerWhitelisted, isCollectionWhitelisted,
+ * All functions: getListingById, isBuyerWhitelisted, isCollectionWhitelisted,
  * getInnovationFee, getNextListingId, getContractOwner, getWhitelistedCollections
  * 
  */
 "use client";
 
 import { useReadContract, useReadContracts } from 'wagmi';
-import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
+import { GETTER_FACET_ABI } from '@/config/abis/getter-facet';
 
 export function useMarketplaceData(marketplaceAddress: string) {
 
@@ -19,7 +19,7 @@ export function useMarketplaceData(marketplaceAddress: string) {
   const useListingById = (listingId: string) => {
     return useReadContract({
       address: marketplaceAddress as `0x${string}`,
-      abi: MARKETPLACE_ABI,
+      abi: GETTER_FACET_ABI,
       functionName: 'getListingByListingId',
       args: [BigInt(listingId)],
       query: {
@@ -28,24 +28,11 @@ export function useMarketplaceData(marketplaceAddress: string) {
     });
   };
 
-  // All listings for a specific NFT
-  const useListingsByNFT = (tokenAddress: string, tokenId: string) => {
-    return useReadContract({
-      address: marketplaceAddress as `0x${string}`,
-      abi: MARKETPLACE_ABI,
-      functionName: 'getListingsByNFT',
-      args: [tokenAddress as `0x${string}`, BigInt(tokenId)],
-      query: {
-        enabled: !!tokenAddress && !!tokenId
-      }
-    });
-  };
-
   // Check if buyer is whitelisted for a listing
   const useBuyerWhitelist = (listingId: string, buyerAddress: string) => {
     return useReadContract({
       address: marketplaceAddress as `0x${string}`,
-      abi: MARKETPLACE_ABI,
+      abi: GETTER_FACET_ABI,
       functionName: 'isBuyerWhitelisted',
       args: [BigInt(listingId), buyerAddress as `0x${string}`],
       query: {
@@ -58,7 +45,7 @@ export function useMarketplaceData(marketplaceAddress: string) {
   const useCollectionWhitelist = (collectionAddress: string) => {
     return useReadContract({
       address: marketplaceAddress as `0x${string}`,
-      abi: MARKETPLACE_ABI,
+      abi: GETTER_FACET_ABI,
       functionName: 'isCollectionWhitelisted',
       args: [collectionAddress as `0x${string}`],
       query: {
@@ -73,22 +60,22 @@ export function useMarketplaceData(marketplaceAddress: string) {
       contracts: [
         {
           address: marketplaceAddress as `0x${string}`,
-          abi: MARKETPLACE_ABI,
+          abi: GETTER_FACET_ABI,
           functionName: 'getInnovationFee'
         },
         {
           address: marketplaceAddress as `0x${string}`,
-          abi: MARKETPLACE_ABI,
+          abi: GETTER_FACET_ABI,
           functionName: 'getNextListingId'
         },
         {
           address: marketplaceAddress as `0x${string}`,
-          abi: MARKETPLACE_ABI,
+          abi: GETTER_FACET_ABI,
           functionName: 'getContractOwner'
         },
         {
           address: marketplaceAddress as `0x${string}`,
-          abi: MARKETPLACE_ABI,
+          abi: GETTER_FACET_ABI,
           functionName: 'getWhitelistedCollections'
         }
       ]
@@ -97,19 +84,18 @@ export function useMarketplaceData(marketplaceAddress: string) {
 
   // Helper to get marketplace fee percentage
   const getMarketplaceFeePercentage = (feeRate: number): number => {
-    // Assuming feeRate is in basis points (e.g., 250 = 2.5%)
-    return feeRate / 100;
+    // Fee rate is per 100000 (e.g., 1000 = 1.00%)
+    return feeRate / 1000;
   };
 
   // Helper to calculate total cost including fees
   const calculateTotalCost = (price: bigint, feeRate: number): bigint => {
-    const feeAmount = (price * BigInt(feeRate)) / BigInt(10000);
+    const feeAmount = (price * BigInt(feeRate)) / BigInt(100000);
     return price + feeAmount;
   };
 
   return {
     useListingById,
-    useListingsByNFT,
     useBuyerWhitelist,
     useCollectionWhitelist,
     useMarketplaceInfo,

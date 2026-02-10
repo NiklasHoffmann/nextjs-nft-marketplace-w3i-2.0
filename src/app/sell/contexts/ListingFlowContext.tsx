@@ -22,8 +22,15 @@ export interface ListingFormData {
     selectedNFTs?: AggregatedNFT[];
     userNFTs?: AggregatedNFT[];
     price?: string;
+    pricingType?: 'fixed' | 'variable';
+    fixedPrice?: string;
+    startPrice?: string;
+    endPrice?: string;
+    priceMode?: 'gross' | 'net';
     currency?: Currency;
     description?: string;
+    buyerWhitelistEnabled?: boolean;
+    allowedBuyers?: string[];
     duration?: string;
     allowOffers?: boolean;
     tradeType?: TradeType;

@@ -1,9 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import { useMarketplaceFees, useMarketplaceContracts } from '@/hooks/marketplace';
 import { ButtonSpinner } from '@/components/core/Loading';
+import { useChainId } from 'wagmi';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
+import { formatTokenDisplay } from '../../utils';
 
 interface BatchTransactionData {
     selectedNFTs: AggregatedNFT[];
@@ -11,7 +14,7 @@ interface BatchTransactionData {
     fixedPrice?: string;
     startPrice?: string;
     endPrice?: string;
-    currency: 'ETH' | 'USDC';
+    currency: string;
     description: string;
 }
 
@@ -23,6 +26,7 @@ interface BatchTransactionPreviewProps {
 }
 
 export function BatchTransactionPreview({ data, onConfirm, onCancel, isLoading }: BatchTransactionPreviewProps) {
+    const chainId = useChainId();
     // Get marketplace address and dynamic fees (using first NFT for fee calculation)
     const { marketplaceAddress } = useMarketplaceContracts();
     const firstNFT = data.selectedNFTs[0];
@@ -32,19 +36,31 @@ export function BatchTransactionPreview({ data, onConfirm, onCancel, isLoading }
         tokenId: firstNFT?.tokenId
     });
 
-    const calculatePrice = (index: number, total: number): string => {
+    const currencySymbol = useMemo(
+        () => getCurrencySymbolByAddress(chainId, data.currency || ZERO_ADDRESS),
+        [chainId, data.currency]
+    );
+
+    const tokenDecimals = useMemo(
+        () => getTokenDecimalsByAddress(chainId, data.currency || ZERO_ADDRESS),
+        [chainId, data.currency]
+    );
+
+    const calculatePrice = (index: number, total: number): number => {
         if (data.pricingType === 'fixed') {
-            return data.fixedPrice || '0';
+            return parseFloat(data.fixedPrice || '0');
         }
         const start = parseFloat(data.startPrice || '0');
         const end = parseFloat(data.endPrice || '0');
-        if (total === 1) return start.toFixed(4);
+        if (total === 1) return start;
         const increment = (end - start) / (total - 1);
-        return (start + increment * index).toFixed(4);
+        return start + increment * index;
     };
 
+    const formatPrice = (value: number) => formatTokenDisplay(value, tokenDecimals);
+
     const totalValue = data.selectedNFTs.reduce((sum, _, idx) => {
-        return sum + parseFloat(calculatePrice(idx, data.selectedNFTs.length));
+        return sum + calculatePrice(idx, data.selectedNFTs.length);
     }, 0);
 
     const totalFees = calculateFees(totalValue);
@@ -86,7 +102,7 @@ export function BatchTransactionPreview({ data, onConfirm, onCancel, isLoading }
                         <div>
                             <p className="text-sm text-purple-700">Gesamt</p>
                             <p className="text-lg font-bold text-purple-900">
-                                {totalValue.toFixed(4)} {data.currency}
+                                {formatPrice(totalValue)} {currencySymbol}
                             </p>
                         </div>
                     </div>
@@ -105,7 +121,7 @@ export function BatchTransactionPreview({ data, onConfirm, onCancel, isLoading }
                         <div className="bg-white rounded-lg p-4 border border-blue-200 shadow-sm">
                             <p className="text-sm text-gray-700 mb-2">Fester Preis pro NFT:</p>
                             <p className="text-2xl font-bold text-blue-600">
-                                {data.fixedPrice} {data.currency}
+                                {formatPrice(parseFloat(data.fixedPrice || '0'))} {currencySymbol}
                             </p>
                         </div>
                     ) : (
@@ -114,13 +130,13 @@ export function BatchTransactionPreview({ data, onConfirm, onCancel, isLoading }
                                 <div className="bg-white rounded-lg p-3 border border-blue-200 shadow-sm">
                                     <p className="text-xs text-gray-600 mb-1">Start-Preis</p>
                                     <p className="text-lg font-bold text-blue-600">
-                                        {data.startPrice} {data.currency}
+                                        {formatPrice(parseFloat(data.startPrice || '0'))} {currencySymbol}
                                     </p>
                                 </div>
                                 <div className="bg-white rounded-lg p-3 border border-blue-200 shadow-sm">
                                     <p className="text-xs text-gray-600 mb-1">End-Preis</p>
                                     <p className="text-lg font-bold text-blue-600">
-                                        {data.endPrice} {data.currency}
+                                        {formatPrice(parseFloat(data.endPrice || '0'))} {currencySymbol}
                                     </p>
                                 </div>
                             </div>
@@ -129,20 +145,20 @@ export function BatchTransactionPreview({ data, onConfirm, onCancel, isLoading }
                                 <div className="space-y-1 text-xs text-green-800">
                                     <div className="flex justify-between">
                                         <span>NFT #1:</span>
-                                        <span className="font-semibold">{calculatePrice(0, data.selectedNFTs.length)} {data.currency}</span>
+                                        <span className="font-semibold">{formatPrice(calculatePrice(0, data.selectedNFTs.length))} {currencySymbol}</span>
                                     </div>
                                     {data.selectedNFTs.length > 2 && (
                                         <div className="flex justify-between">
                                             <span>NFT #{Math.ceil(data.selectedNFTs.length / 2)}:</span>
                                             <span className="font-semibold">
-                                                {calculatePrice(Math.floor(data.selectedNFTs.length / 2), data.selectedNFTs.length)} {data.currency}
+                                                {formatPrice(calculatePrice(Math.floor(data.selectedNFTs.length / 2), data.selectedNFTs.length))} {currencySymbol}
                                             </span>
                                         </div>
                                     )}
                                     <div className="flex justify-between">
                                         <span>NFT #{data.selectedNFTs.length}:</span>
                                         <span className="font-semibold">
-                                            {calculatePrice(data.selectedNFTs.length - 1, data.selectedNFTs.length)} {data.currency}
+                                            {formatPrice(calculatePrice(data.selectedNFTs.length - 1, data.selectedNFTs.length))} {currencySymbol}
                                         </span>
                                     </div>
                                 </div>
@@ -154,20 +170,20 @@ export function BatchTransactionPreview({ data, onConfirm, onCancel, isLoading }
                     <div className="mt-4 bg-white rounded-lg border border-blue-200 p-4 text-sm space-y-2 shadow-sm">
                         <div className="flex justify-between text-gray-600">
                             <span>Gesamt-Listing-Wert:</span>
-                            <span>{totalValue.toFixed(4)} {data.currency}</span>
+                            <span>{formatPrice(totalValue)} {currencySymbol}</span>
                         </div>
                         <div className="flex justify-between text-red-600">
                             <span>Marketplace-Gebühr ({(innovationFeePercentage * 100).toFixed(2)}%):</span>
-                            <span>-{totalFees.marketplaceFee.toFixed(4)} {data.currency}</span>
+                            <span>-{totalFees.marketplaceFee.toFixed(4)} {currencySymbol}</span>
                         </div>
                         <div className="flex justify-between text-red-600">
                             <span>Creator Royalty ({(royaltyFeePercentage * 100).toFixed(2)}%):</span>
-                            <span>-{totalFees.royaltyFee.toFixed(4)} {data.currency}</span>
+                            <span>-{totalFees.royaltyFee.toFixed(4)} {currencySymbol}</span>
                         </div>
                         <hr className="border-blue-200" />
                         <div className="flex justify-between font-semibold text-green-600 text-base">
                             <span>Sie erhalten insgesamt:</span>
-                            <span>{totalFees.youReceive.toFixed(4)} {data.currency}</span>
+                            <span>{totalFees.youReceive.toFixed(4)} {currencySymbol}</span>
                         </div>
                     </div>
                 </div>
@@ -192,7 +208,7 @@ export function BatchTransactionPreview({ data, onConfirm, onCancel, isLoading }
                                         #{nft.tokenId}
                                     </p>
                                     <p className="text-[10px] text-green-300 font-semibold">
-                                        {calculatePrice(index, data.selectedNFTs.length)} {data.currency}
+                                        {formatPrice(calculatePrice(index, data.selectedNFTs.length))} {currencySymbol}
                                     </p>
                                 </div>
                             </div>

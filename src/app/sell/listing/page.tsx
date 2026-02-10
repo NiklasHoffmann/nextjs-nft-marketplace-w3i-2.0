@@ -1,20 +1,20 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount, useChainId } from 'wagmi';
+import { useChainId } from 'wagmi';
 import { useListingFlow } from '../contexts/ListingFlowContext';
 import { useTransactionService } from '@/services/blockchain';
 import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
 import NFTCard from '@/components/nft/NFTCard';
 import Link from 'next/link';
-import { getCurrencySymbolByAddress } from '@/config/tokens';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
+import { formatTokenDisplay } from '../utils';
 
 export default function ListingPage() {
     const router = useRouter();
-    const { address } = useAccount();
     const chainId = useChainId();
-    const { formData, setProgressStep, setCompletedSteps, setTxHash, setError, progressData } = useListingFlow();
+    const { formData, setProgressStep, setCompletedSteps, setTxHash, setError } = useListingFlow();
     const { marketplaceAddress } = useMarketplaceContracts();
     const txService = useTransactionService();
     const { calculateFees, innovationFeePercentage, royaltyFeePercentage } = useMarketplaceFees({
@@ -23,8 +23,11 @@ export default function ListingPage() {
         tokenId: formData.selectedNFT?.tokenId
     });
 
+    const isBatch = !!formData.selectedNFTs?.length && !formData.selectedNFT;
+    const batchNFTs = formData.selectedNFTs || [];
+
     // Get currency symbol for display (address → symbol)
-    const currencySymbol = getCurrencySymbolByAddress(chainId, formData.currency);
+    const currencySymbol = getCurrencySymbolByAddress(chainId, formData.currency || ZERO_ADDRESS);
 
     const [progressTxHash, setProgressTxHash] = useState<string | undefined>();
     const [progressError, setProgressError] = useState<string | undefined>();
@@ -33,27 +36,33 @@ export default function ListingPage() {
 
     // Guard: Redirect if no NFT selected
     useEffect(() => {
-        if (!formData.selectedNFT) {
+        if (!formData.selectedNFT && !formData.selectedNFTs?.length) {
             router.replace('/sell');
         } else {
             setProgressStep('listing', 'whitelist');
         }
-    }, [formData.selectedNFT, router, setProgressStep]);
+    }, [formData.selectedNFT, formData.selectedNFTs, router, setProgressStep]);
 
-    // Approval check (simplified - assumes approval handled before this step)
-    const ensureApproval = async (): Promise<boolean> => {
-        // In real implementation, check approval status and request if needed
-        // For now, we assume approval was handled in previous steps
-        return true;
+    const calculateBatchPrice = (index: number, total: number): string => {
+        if (formData.pricingType === 'fixed') {
+            return formData.fixedPrice || '0';
+        }
+        const start = parseFloat(formData.startPrice || '0');
+        const end = parseFloat(formData.endPrice || '0');
+        if (total <= 1) return start.toFixed(4);
+        const step = (end - start) / (total - 1);
+        return (start + step * index).toFixed(4);
     };
 
     // Start transaction automatically when page loads
     useEffect(() => {
-        if (!formData.selectedNFT || isProcessing || hasStartedRef.current) return;
+        if (isProcessing || hasStartedRef.current) return;
+
+        if (!formData.selectedNFT && !formData.selectedNFTs?.length) return;
 
         hasStartedRef.current = true;
 
-        const startListing = async () => {
+        const startSingleListing = async () => {
             setIsProcessing(true);
             setProgressStep('listing', 'signing');
 
@@ -77,12 +86,17 @@ export default function ListingPage() {
                     price: formData.mode === 'sale' || formData.mode === 'hybrid'
                         ? formData.price || '0'
                         : '0',
+                    currency: formData.mode === 'sale' || formData.mode === 'hybrid'
+                        ? formData.currency
+                        : ZERO_ADDRESS,
                     desiredContractAddress: formData.mode === 'trade' || formData.mode === 'hybrid'
                         ? formData.targetNFT?.core?.contractAddress
                         : undefined,
                     desiredTokenId: formData.mode === 'trade' || formData.mode === 'hybrid'
                         ? formData.targetNFT?.core?.tokenId
                         : undefined,
+                    buyerWhitelistEnabled: formData.buyerWhitelistEnabled || false,
+                    allowedBuyers: formData.allowedBuyers || [],
                     onProgress: (step: string) => {
                         console.log('📊 Listing progress:', step);
 
@@ -128,6 +142,17 @@ export default function ListingPage() {
                     }
                 };
 
+                console.log('🔍 [LISTING PAGE] Listing params being sent to TransactionService:');
+                console.log('   contractAddress:', listingParams.contractAddress);
+                console.log('   tokenId:', listingParams.tokenId);
+                console.log('   price:', listingParams.price);
+                console.log('   currency:', listingParams.currency);
+                console.log('   desiredContractAddress:', listingParams.desiredContractAddress);
+                console.log('   desiredTokenId:', listingParams.desiredTokenId);
+                console.log('   buyerWhitelistEnabled:', listingParams.buyerWhitelistEnabled);
+                console.log('   allowedBuyers:', listingParams.allowedBuyers);
+                console.log('   formData.currency from context:', formData.currency);
+
                 await txService.createListing(listingParams);
             } catch (error: any) {
                 console.error('Transaction failed:', error);
@@ -151,10 +176,78 @@ export default function ListingPage() {
             }
         };
 
-        startListing();
+        const startBatchListing = async () => {
+            if (batchNFTs.length === 0) return;
+
+            setIsProcessing(true);
+            setProgressStep('listing', 'signing');
+
+            try {
+                setCompletedSteps(['whitelist', 'approval', 'approved']);
+
+                let lastHash: string | undefined;
+                for (let i = 0; i < batchNFTs.length; i += 1) {
+                    const nft = batchNFTs[i];
+                    if (!nft) continue;
+
+                    const price = calculateBatchPrice(i, batchNFTs.length);
+
+                    await txService.createListing({
+                        contractAddress: nft.core.contractAddress,
+                        tokenId: nft.core.tokenId,
+                        price,
+                        currency: formData.currency || ZERO_ADDRESS,
+                        desiredContractAddress: ZERO_ADDRESS,
+                        desiredTokenId: '0',
+                        onProgress: (step: string) => {
+                            if (step === 'signing') {
+                                setProgressStep('listing', 'signing');
+                            } else if (step === 'pending') {
+                                setProgressStep('listing', 'pending');
+                            } else if (step === 'error') {
+                                setProgressStep('listing', 'error');
+                            }
+                        },
+                        onSuccess: (result: { txHash?: string }) => {
+                            if (result.txHash) {
+                                lastHash = result.txHash;
+                                setProgressTxHash(result.txHash);
+                                setTxHash(result.txHash);
+                            }
+                        },
+                        onError: (errorMessage: string) => {
+                            setProgressError(errorMessage);
+                            setError(errorMessage);
+                        }
+                    });
+                }
+
+                setProgressStep('success', 'success');
+                setCompletedSteps(['select', 'whitelist', 'approval', 'form', 'preview', 'listing']);
+
+                if (lastHash) {
+                    setTimeout(() => {
+                        const successUrl = `/sell/success?tx=${lastHash}`;
+                        router.push(successUrl as any);
+                    }, 1500);
+                } else {
+                    router.push('/sell/success' as any);
+                }
+            } catch (error: any) {
+                setProgressStep('listing', 'error');
+                setProgressError(error.message || 'Batch transaction failed');
+                setError(error.message || 'Batch transaction failed');
+            }
+        };
+
+        if (isBatch) {
+            startBatchListing();
+        } else {
+            startSingleListing();
+        }
     }, []); // Only run once on mount
 
-    if (!formData.selectedNFT) {
+    if (!formData.selectedNFT && !formData.selectedNFTs?.length) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
                 <div className="text-center">
@@ -165,28 +258,96 @@ export default function ListingPage() {
         );
     }
 
-    const fees = formData.price && parseFloat(formData.price) > 0
-        ? calculateFees(parseFloat(formData.price))
-        : { marketplaceFee: 0, royaltyFee: 0, youReceive: 0 };
-
-    const priceInWei = formData.price
-        ? BigInt(Math.floor(parseFloat(formData.price) * 10 ** 18)).toString()
+    const rawPrice = formData.price ? parseFloat(formData.price) : 0;
+    const tokenDecimals = getTokenDecimalsByAddress(chainId, formData.currency || ZERO_ADDRESS);
+    const displayPrice = rawPrice > 0
+        ? formatTokenDisplay(rawPrice, tokenDecimals)
         : '0';
 
-    const previewNFT = {
-        ...formData.selectedNFT,
-        listed: true,
-        listing: {
-            listingId: 'preview',
-            price: priceInWei,
-            currency: formData.currency || '0x0000000000000000000000000000000000000000', // Native ETH
-            seller: formData.selectedNFT.core.owner,
-            mode: formData.mode || 'sale',
-            status: 'LISTED',
-            createdAt: Date.now(),
-            updatedAt: Date.now()
-        }
-    };
+    const fees = rawPrice > 0
+        ? calculateFees(rawPrice)
+        : { marketplaceFee: 0, royaltyFee: 0, youReceive: 0 };
+
+    if (isBatch) {
+        const totalValue = batchNFTs.reduce((sum, _, idx) => sum + parseFloat(calculateBatchPrice(idx, batchNFTs.length)), 0);
+        const priceRange = formData.pricingType === 'variable'
+            ? `${formData.startPrice || '0'} - ${formData.endPrice || '0'}`
+            : (formData.fixedPrice || '0');
+
+        return (
+            <section className="space-y-6 bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-1">
+                        <div className="mb-4">
+                            <h2 className="text-xl font-bold text-gray-900">Batch wird gelistet</h2>
+                            <p className="text-sm text-gray-600">Transaktionen werden ausgefuehrt...</p>
+                        </div>
+                        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
+                            <p className="text-sm text-gray-600">NFTs</p>
+                            <p className="text-2xl font-bold text-gray-900">{batchNFTs.length}</p>
+                            <p className="text-sm text-gray-600">Preis</p>
+                            <p className="text-lg font-semibold text-blue-600">
+                                {priceRange} {currencySymbol}
+                            </p>
+                            <p className="text-sm text-gray-600">Gesamtwert</p>
+                            <p className="text-lg font-semibold text-gray-900">
+                                {totalValue.toFixed(4)} {currencySymbol}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="lg:col-span-2 space-y-6">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-900 mb-4">Listing Details</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div className="bg-white rounded-xl border border-gray-200 p-6">
+                                    <h3 className="text-sm font-medium text-gray-700 mb-2">Listing-Typ</h3>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                                            <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-gray-900">Batch-Verkauf</p>
+                                            <p className="text-xs text-gray-600">Nur Verkauf gegen Geld</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
+                                    <h3 className="text-sm font-medium text-gray-700 mb-2">Preis</h3>
+                                    <p className="text-3xl font-bold text-blue-600">
+                                        {priceRange} {currencySymbol}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl border border-yellow-200 p-6">
+                            <div className="flex items-center gap-3">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
+                                <div>
+                                    <p className="font-semibold text-gray-900">Batch-Transaktionen laufen</p>
+                                    <p className="text-sm text-gray-600">Bitte bestaetige jede Transaktion in deiner Wallet.</p>
+                                </div>
+                            </div>
+                            {progressTxHash && (
+                                <div className="mt-4 text-xs text-gray-600">
+                                    <p>Transaction Hash:</p>
+                                    <p className="font-mono truncate">{progressTxHash}</p>
+                                </div>
+                            )}
+                            {progressError && (
+                                <div className="mt-4 bg-red-100 border border-red-200 rounded-lg p-3">
+                                    <p className="text-sm text-red-700 font-medium">Fehler</p>
+                                    <p className="text-xs text-red-600 mt-1">{progressError}</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </section>
+        );
+    }
 
     return (
         <section className="space-y-6 bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
@@ -197,11 +358,13 @@ export default function ListingPage() {
                         <p className="text-sm text-gray-600">Transaktion wird ausgeführt...</p>
                     </div>
                     <div className="w-60 mx-auto">
-                        <NFTCard
-                            nft={formData.selectedNFT}
-                            showStats={true}
-                            enableInsights={true}
-                        />
+                        {formData.selectedNFT && (
+                            <NFTCard
+                                nft={formData.selectedNFT}
+                                showStats={true}
+                                enableInsights={true}
+                            />
+                        )}
                     </div>
                 </div>
                 <div className="lg:col-span-2 space-y-6">
@@ -270,13 +433,13 @@ export default function ListingPage() {
                                 <div className="flex justify-between items-center mb-3">
                                     <span className="text-sm text-gray-700">Verkaufspreis</span>
                                     <span className="text-2xl font-bold text-blue-600">
-                                        {formData.price} {currencySymbol}
+                                        {displayPrice} {currencySymbol}
                                     </span>
                                 </div>
                                 <div className="bg-white rounded-lg border border-blue-200 p-4 text-xs space-y-2">
                                     <div className="flex justify-between text-gray-600">
                                         <span>Listing-Preis:</span>
-                                        <span>{formData.price} {currencySymbol}</span>
+                                        <span>{displayPrice} {currencySymbol}</span>
                                     </div>
                                     <div className="flex justify-between text-red-600">
                                         <span>Marketplace-Gebühr ({(innovationFeePercentage * 100).toFixed(2)}%):</span>

@@ -1,14 +1,15 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
-import { formatEther } from 'viem';
+import { formatUnits } from 'viem';
 import { WalletHeader } from './components';
 import { useWalletNFTsV2 } from '@/hooks/wallet/useWalletNFTsV2';
-import { useETHPrice } from '@/contexts/CurrencyContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
 
 export default function WalletLayout({ children }: { children: ReactNode }) {
-    const { address, isConnected } = useAccount();
+    const { address, isConnected, chain } = useAccount();
 
     // Simple data fetching without filters
     const { nfts, total, listed, unlisted } = useWalletNFTsV2({
@@ -16,20 +17,76 @@ export default function WalletLayout({ children }: { children: ReactNode }) {
         autoFetch: true
     });
 
-    // Calculate total listed value (convert Wei to ETH)
-    const totalListedValue = nfts
+    // Group listed NFT prices by token for multi-currency support
+    const listedPricesByToken = new Map<string, { total: number; symbol: string; address: string | null }>();
+    
+    nfts
         .filter(nft => nft.isListed && nft.listingPrice)
-        .reduce((sum, nft) => {
+        .forEach(nft => {
             try {
-                const priceInEth = parseFloat(formatEther(BigInt(nft.listingPrice || '0')));
-                return sum + priceInEth;
-            } catch {
-                return sum;
-            }
-        }, 0);
+                const chainId = chain?.id || 11155111; // Default to Sepolia
+                const tokenSymbol = getCurrencySymbolByAddress(chainId, nft.currency);
+                const tokenAddress = nft.currency || null;
+                const tokenDecimals = getTokenDecimalsByAddress(chainId, nft.currency);
+                const priceInToken = parseFloat(formatUnits(BigInt(nft.listingPrice || '0'), tokenDecimals));
 
-    // Convert total value to USD
-    const { convertedPrice: totalValueUSD, loading: ethPriceLoading } = useETHPrice(totalListedValue);
+                const tokenKey = tokenAddress || tokenSymbol;
+                const existing = listedPricesByToken.get(tokenKey) || { total: 0, symbol: tokenSymbol, address: tokenAddress };
+                existing.total += priceInToken;
+                listedPricesByToken.set(tokenKey, existing);
+            } catch (error) {
+                console.error('Error parsing price:', error);
+            }
+        });
+
+    // Convert all token prices to USD for total value calculation
+    const { convertTokenToUSD, convertFromUSD, formatPrice } = useCurrency();
+    const [totalValueUSD, setTotalValueUSD] = useState<number>(0);
+    const [totalValueDisplay, setTotalValueDisplay] = useState<string>(formatPrice(0));
+    const [ethPriceLoading, setEthPriceLoading] = useState<boolean>(true);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        async function calculateTotalUSD() {
+            if (listedPricesByToken.size === 0) {
+                setTotalValueUSD(0);
+                setTotalValueDisplay(formatPrice(0));
+                setEthPriceLoading(false);
+                return;
+            }
+
+            setEthPriceLoading(true);
+            let totalUSD = 0;
+
+            for (const [, { total, symbol, address }] of listedPricesByToken.entries()) {
+                try {
+                    const usdValue = await convertTokenToUSD(total, symbol, address, chain?.id || 11155111);
+                    totalUSD += usdValue;
+                } catch (error) {
+                    console.error(`Error converting ${symbol} to USD:`, error);
+                }
+            }
+
+            if (isMounted) {
+                setTotalValueUSD(totalUSD);
+                try {
+                    const convertedAmount = await convertFromUSD(totalUSD);
+                    setTotalValueDisplay(formatPrice(convertedAmount));
+                } catch (error) {
+                    console.error('Error converting total value:', error);
+                    setTotalValueDisplay(formatPrice(totalUSD));
+                }
+                setEthPriceLoading(false);
+            }
+        }
+
+        calculateTotalUSD();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [nfts, convertTokenToUSD, convertFromUSD, formatPrice]);
 
     // Only render header if connected
     if (!isConnected || !address) {
@@ -43,8 +100,7 @@ export default function WalletLayout({ children }: { children: ReactNode }) {
                     address={address}
                     listedCount={listed}
                     unlistedCount={unlisted}
-                    totalListedValue={totalListedValue}
-                    totalValueUSD={totalValueUSD}
+                    totalValueDisplay={totalValueDisplay}
                     ethPriceLoading={ethPriceLoading}
                 />
                 <div className="pt-[100px]">

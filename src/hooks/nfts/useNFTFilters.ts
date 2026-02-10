@@ -1,5 +1,6 @@
 ﻿import { useMemo } from 'react';
-import { formatEther } from '@/utils';
+import { formatUnits } from 'viem';
+import { getTokenDecimalsByAddress } from '@/config/tokens';
 import type { NFTFilters, NFTSortOptions, FilterableNFTItem } from '@/types/marketplace';
 
 /**
@@ -11,6 +12,16 @@ export function useNFTFilters(
     sort: NFTSortOptions
 ) {
     const filteredAndSortedItems = useMemo(() => {
+        const getItemPrice = (item: FilterableNFTItem): number => {
+            if (!item.isListed || !item.price) return -Infinity;
+
+            const chainId = item.chainId || 11155111;
+            const tokenDecimals = getTokenDecimalsByAddress(chainId, item.currency || null);
+            const price = typeof item.price === 'string' ? BigInt(item.price) : item.price;
+
+            return parseFloat(formatUnits(price, tokenDecimals));
+        };
+
         let result = [...items];
 
         // Apply filters
@@ -53,13 +64,13 @@ export function useNFTFilters(
             if (filters.priceMin !== undefined || filters.priceMax !== undefined) {
                 if (item.isListed && item.price) {
                     // Listed item - apply price filter
-                    const priceInEth = parseFloat(formatEther(item.price));
+                    const priceInToken = getItemPrice(item);
 
-                    if (filters.priceMin !== undefined && priceInEth < filters.priceMin) {
+                    if (filters.priceMin !== undefined && priceInToken < filters.priceMin) {
                         return false;
                     }
 
-                    if (filters.priceMax !== undefined && priceInEth > filters.priceMax) {
+                    if (filters.priceMax !== undefined && priceInToken > filters.priceMax) {
                         return false;
                     }
                 }
@@ -125,8 +136,8 @@ export function useNFTFilters(
                 case 'price':
                     // Convert price to number for comparison (handle both listed and unlisted)
                     // Unlisted items get value 0 and are sorted to the end when desc
-                    aValue = (a.isListed && a.price) ? parseFloat(formatEther(a.price)) : -Infinity;
-                    bValue = (b.isListed && b.price) ? parseFloat(formatEther(b.price)) : -Infinity;
+                    aValue = getItemPrice(a);
+                    bValue = getItemPrice(b);
                     break;
 
                 case 'rating':
@@ -176,8 +187,8 @@ export function useNFTFilters(
 
                 default:
                     // Default to price if unknown field
-                    aValue = (a.isListed && a.price) ? parseFloat(formatEther(a.price)) : -Infinity;
-                    bValue = (b.isListed && b.price) ? parseFloat(formatEther(b.price)) : -Infinity;
+                    aValue = getItemPrice(a);
+                    bValue = getItemPrice(b);
             }
 
             // Handle different data types
@@ -239,7 +250,12 @@ export function getUniqueRarities(items: FilterableNFTItem[]): string[] {
 export function getPriceRange(items: FilterableNFTItem[]): { min: number; max: number } {
     const prices = items
         .filter(item => item.isListed && item.price)
-        .map(item => parseFloat(formatEther(item.price!)));
+        .map(item => {
+            const chainId = item.chainId || 11155111;
+            const tokenDecimals = getTokenDecimalsByAddress(chainId, item.currency || null);
+            const price = typeof item.price === 'string' ? BigInt(item.price) : item.price!;
+            return parseFloat(formatUnits(price, tokenDecimals));
+        });
 
     if (prices.length === 0) {
         return { min: 0, max: 0 };

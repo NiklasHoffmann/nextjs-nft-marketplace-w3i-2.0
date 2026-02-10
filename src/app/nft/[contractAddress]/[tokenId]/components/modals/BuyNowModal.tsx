@@ -3,7 +3,7 @@
  * 
  * Uses BaseModal for consistent modal behavior.
  * Uses TransactionService for blockchain interactions.
- * Supports ETH and WETH payments with approval checking.
+ * Supports native ETH and ERC20 payments with approval checking.
  * 
  * ✅ Eliminated TODO - now uses real contract calls
  * ✅ Reduced from 331 to ~250 lines
@@ -12,16 +12,17 @@
 'use client';
 import { memo, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { parseEther } from 'viem';
-import { formatEther } from '@/utils';
+import { formatUnits } from 'viem';
 import { useMarketplaceFees, useMarketplaceContracts } from '@/hooks/marketplace';
 import { useTransactionService } from '@/services/blockchain';
 import { useMarketplaceItems } from '@/contexts/marketplace-items';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
 import { useWETH } from '@/hooks/tokens';
-import { getCurrencySymbol, isNativeETH } from '@/config/tokens';
+import { useERC20 } from '@/hooks/tokens/useERC20';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, getWETHAddress, isNativeETH } from '@/config/tokens';
 import { BaseModal } from '@/components/core/Modal';
 import { LoadingState } from '@/components/core/Loading';
+import { useChainId } from 'wagmi';
 
 interface BuyNowModalProps {
     isOpen: boolean;
@@ -32,7 +33,7 @@ interface BuyNowModalProps {
     nftName?: string;
     nftImage?: string;
     price: string; // in wei
-    currency?: string; // payment currency (0x0 = ETH, WETH address = WETH)
+    currency?: string | null; // payment currency (0x0 = ETH, WETH address = WETH)
     seller: string;
     buyer?: string; // connected wallet address
     desiredContractAddress?: string;
@@ -64,12 +65,14 @@ function BuyNowModal({
     const { marketplaceAddress } = useMarketplaceContracts();
     const { removeNFT } = useMarketplaceItems();
     const { refresh: refreshWallet } = useWalletNFTs();
+    const chainId = useChainId();
 
     // WETH Hook for approval check
-    const isWETH = !isNativeETH(currency || '');
-    const { 
-        hasEnoughAllowance, 
-        hasEnoughBalance,
+    const isNative = isNativeETH(currency || '');
+    const wethAddress = getWETHAddress(chainId);
+    const isWETH = !!currency && !!wethAddress && currency.toLowerCase() === wethAddress.toLowerCase();
+    const {
+        hasEnoughAllowance,
         approve,
         wrap,
         wethBalance,
@@ -77,6 +80,22 @@ function BuyNowModal({
         isApproving,
         isWrapping
     } = useWETH({ marketplaceAddress });
+
+    const tokenDecimals = useMemo(() => getTokenDecimalsByAddress(chainId, currency), [chainId, currency]);
+    const currencySymbol = useMemo(() => getCurrencySymbolByAddress(chainId, currency), [chainId, currency]);
+    const priceAmount = useMemo(() => formatUnits(BigInt(price), tokenDecimals), [price, tokenDecimals]);
+    const priceAmountNum = useMemo(() => parseFloat(priceAmount), [priceAmount]);
+
+    const {
+        hasEnoughAllowance: hasEnoughTokenAllowance,
+        approve: approveToken,
+        balance: tokenBalance,
+        isApproving: isApprovingToken
+    } = useERC20({
+        tokenAddress: !isNative ? (currency as `0x${string}` | undefined) : undefined,
+        spenderAddress: marketplaceAddress,
+        decimals: tokenDecimals
+    });
 
     // Transaction service
     const txService = useTransactionService();
@@ -86,17 +105,14 @@ function BuyNowModal({
         tokenId
     });
 
-    const currencySymbol = getCurrencySymbol(currency);
-
     // Calculate fees and totals
     const calculations = useMemo(() => {
-        const priceInEth = parseFloat(formatEther(price));
-        const fees = calculateFees(priceInEth);
+        const fees = calculateFees(priceAmountNum);
         const gasFee = 0.003; // Estimated gas fee in ETH
-        const total = priceInEth + fees.marketplaceFee + fees.royaltyFee + gasFee;
+        const total = priceAmountNum + fees.marketplaceFee + fees.royaltyFee + gasFee;
 
         return {
-            price: priceInEth,
+            price: priceAmountNum,
             platformFee: fees.marketplaceFee,
             creatorRoyalty: fees.royaltyFee,
             gasFee,
@@ -104,44 +120,53 @@ function BuyNowModal({
             platformFeePercentage: innovationFeePercentage,
             royaltyFeePercentage
         };
-    }, [price, calculateFees, innovationFeePercentage, royaltyFeePercentage]);
+    }, [priceAmountNum, calculateFees, innovationFeePercentage, royaltyFeePercentage]);
 
     // Check if user needs to wrap ETH to WETH
     const needsWrapping = useMemo(() => {
         if (!isWETH) return false;
-        const priceAmount = formatEther(price);
         const wethBalanceNum = parseFloat(wethBalance || '0');
         const ethBalanceNum = parseFloat(ethBalance || '0');
         // Need wrapping if: insufficient WETH BUT sufficient ETH
         return wethBalanceNum < parseFloat(priceAmount) && ethBalanceNum >= parseFloat(priceAmount);
-    }, [isWETH, price, wethBalance, ethBalance]);
+    }, [isWETH, priceAmount, wethBalance, ethBalance]);
 
     // Check WETH approval if needed
     const needsApproval = useMemo(() => {
-        if (!isWETH || needsWrapping) return false; // No approval needed if we need to wrap first
-        const priceInWei = parseEther(formatEther(price));
-        return !hasEnoughAllowance(priceInWei.toString());
-    }, [isWETH, price, hasEnoughAllowance, needsWrapping]);
+        if (isNative || needsWrapping) return false; // No approval needed if we need to wrap first
+        if (isWETH) {
+            return !hasEnoughAllowance(priceAmount);
+        }
+        return !hasEnoughTokenAllowance(priceAmount);
+    }, [isNative, isWETH, priceAmount, hasEnoughAllowance, hasEnoughTokenAllowance, needsWrapping]);
+
+    const isApprovingAny = useMemo(() => {
+        if (isNative) return false;
+        return isWETH ? isApproving : isApprovingToken;
+    }, [isNative, isWETH, isApproving, isApprovingToken]);
 
     const handleWrap = useCallback(async () => {
         try {
-            const priceAmount = formatEther(price);
             await wrap(priceAmount);
         } catch (error) {
             console.error('❌ ETH wrapping failed:', error);
             setErrorMessage('Failed to wrap ETH. Please try again.');
         }
-    }, [price, wrap]);
+    }, [priceAmount, wrap]);
 
     const handleApprove = useCallback(async () => {
         try {
-            const priceInWei = parseEther(formatEther(price));
-            await approve(priceInWei.toString());
+            if (isWETH) {
+                await approve(priceAmount);
+                return;
+            }
+
+            await approveToken(priceAmount);
         } catch (error) {
             console.error('❌ WETH approval failed:', error);
-            setErrorMessage('WETH approval failed. Please try again.');
+            setErrorMessage('Token approval failed. Please try again.');
         }
-    }, [price, approve]);
+    }, [approve, approveToken, isWETH, priceAmount]);
 
     const handlePurchase = useCallback(async () => {
         setIsPurchasing(true);
@@ -153,15 +178,15 @@ function BuyNowModal({
                 listingId,
                 contractAddress,
                 tokenId,
-                price: formatEther(price),
+                price: priceAmount,
                 currency: currencySymbol,
                 total: calculations.total
             });
 
             const result = await txService.purchaseNFT({
                 listingId,
-                price: formatEther(price),
-                currency,
+                price: priceAmount,
+                currency: currency || undefined,
                 seller,
                 buyer,
                 contractAddress,
@@ -249,7 +274,7 @@ function BuyNowModal({
         } finally {
             setIsPurchasing(false);
         }
-    }, [listingId, contractAddress, tokenId, price, seller, desiredContractAddress, desiredTokenId, buyer, calculations.total, txService, router, removeNFT, refreshWallet]);
+    }, [listingId, contractAddress, tokenId, priceAmount, seller, desiredContractAddress, desiredTokenId, buyer, calculations.total, txService, router, removeNFT, refreshWallet, currency, currencySymbol]);
 
     const handleClose = useCallback(() => {
         if (!isPurchasing) {
@@ -378,20 +403,20 @@ function BuyNowModal({
                             </div>
                         )}
 
-                        {/* WETH Approval Warning */}
-                        {isWETH && !needsWrapping && needsApproval && (
+                        {/* Token Approval Warning */}
+                        {!isNative && !needsWrapping && needsApproval && (
                             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
                                 <div className="flex gap-3">
                                     <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                                         <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                                     </svg>
                                     <div className="flex-1">
-                                        <p className="text-sm font-medium text-blue-900">WETH Approval Required</p>
+                                        <p className="text-sm font-medium text-blue-900">Token Approval Required</p>
                                         <p className="text-sm text-blue-700 mt-1">
-                                            You need to approve the marketplace to spend {calculations.price.toFixed(4)} WETH before purchasing.
+                                            You need to approve the marketplace to spend {calculations.price.toFixed(4)} {currencySymbol} before purchasing.
                                         </p>
                                         <p className="text-xs text-blue-600 mt-2">
-                                            Balance: {wethBalance || '0.0000'} WETH
+                                            Balance: {(isWETH ? wethBalance : tokenBalance) || '0.0000'} {currencySymbol}
                                         </p>
                                     </div>
                                 </div>
@@ -418,7 +443,7 @@ function BuyNowModal({
                             <button
                                 type="button"
                                 onClick={handleClose}
-                                disabled={isPurchasing || isApproving || isWrapping}
+                                disabled={isPurchasing || isApprovingAny || isWrapping}
                                 className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Cancel
@@ -432,14 +457,14 @@ function BuyNowModal({
                                 >
                                     {isWrapping ? 'Wrapping...' : 'Wrap ETH'}
                                 </button>
-                            ) : isWETH && needsApproval ? (
+                            ) : !isNative && needsApproval ? (
                                 <button
                                     type="button"
                                     onClick={handleApprove}
-                                    disabled={isApproving}
+                                    disabled={isApprovingAny}
                                     className="flex-1 px-6 py-3 bg-orange-600 text-white rounded-xl font-semibold hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {isApproving ? 'Approving...' : 'Approve WETH'}
+                                    {isApprovingAny ? 'Approving...' : `Approve ${currencySymbol}`}
                                 </button>
                             ) : (
                                 <button
@@ -610,8 +635,8 @@ function BuyNowModal({
                                 <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-left">
                                     <p className="text-sm font-medium text-red-900 mb-2">💸 Insufficient Funds</p>
                                     <p className="text-sm text-red-700">
-                                        Your wallet doesn't have enough ETH to complete this purchase.
-                                        You need at least <span className="font-semibold">{calculations.total.toFixed(4)} ETH</span> (including gas fees).
+                                        Your wallet doesn't have enough funds to complete this purchase.
+                                        You need at least <span className="font-semibold">{calculations.total.toFixed(4)} {currencySymbol}</span> (plus gas fees in ETH).
                                     </p>
                                     <p className="text-sm text-red-600 mt-2">
                                         Please add funds to your wallet and try again.

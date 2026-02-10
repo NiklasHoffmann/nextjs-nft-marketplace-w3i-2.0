@@ -7,6 +7,9 @@ import crypto from 'crypto';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * Einfache JWT-Alternative mit HMAC
  */
@@ -94,8 +97,10 @@ export const POST = apiHandler(async (request: NextRequest) => {
         expiresIn: '24h'
     });
 
-    return apiSuccess({
+    const response = apiSuccess({
         address: address.toLowerCase(),
         isAdmin: true
     });
+    response.headers.set('Cache-Control', 'no-store, max-age=0');
+    return response;
 });

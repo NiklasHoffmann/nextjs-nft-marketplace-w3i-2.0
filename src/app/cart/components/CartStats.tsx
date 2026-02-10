@@ -33,7 +33,7 @@ export function CartStats({ itemCount, totalValue, isCompact = false }: CartStat
                     </svg>
                 }
                 label="Total Value"
-                value={`${totalValue} ETH`}
+                value={totalValue}
                 variant="green"
                 isCompact={isCompact}
             />

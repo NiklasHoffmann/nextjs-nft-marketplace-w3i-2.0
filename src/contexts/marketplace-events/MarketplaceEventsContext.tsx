@@ -16,7 +16,11 @@ import type {
     ProcessedItemListedEvent,
     ProcessedItemBoughtEvent,
     ProcessedItemCanceledEvent,
-    ProcessedItemUpdatedEvent
+    ProcessedItemUpdatedEvent,
+    ProcessedListingCanceledDueToInvalidListingEvent,
+    ProcessedCollectionWhitelistRevokedCancelTriggeredEvent,
+    ProcessedBuyerWhitelistedEvent,
+    ProcessedBuyerRemovedFromWhitelistEvent
 } from '@/types/marketplace/contract-events';
 
 // ===== TYPES =====
@@ -25,7 +29,11 @@ type MarketplaceEvent =
     | ProcessedItemListedEvent 
     | ProcessedItemBoughtEvent 
     | ProcessedItemCanceledEvent 
-    | ProcessedItemUpdatedEvent;
+    | ProcessedItemUpdatedEvent
+    | ProcessedListingCanceledDueToInvalidListingEvent
+    | ProcessedCollectionWhitelistRevokedCancelTriggeredEvent
+    | ProcessedBuyerWhitelistedEvent
+    | ProcessedBuyerRemovedFromWhitelistEvent;
 
 type EventCallback = (event: MarketplaceEvent) => void;
 
@@ -69,6 +77,26 @@ export function MarketplaceEventsProvider({ children }: { children: React.ReactN
             console.log('📡 [EventContext] ItemUpdated:', event.data.listingId);
             setLastEvent(event);
             notifySubscribers('ItemUpdated', event);
+        },
+        onListingCanceledDueToInvalidListing: (event) => {
+            console.log('📡 [EventContext] ListingCanceledDueToInvalidListing:', event.data.listingId);
+            setLastEvent(event);
+            notifySubscribers('ListingCanceledDueToInvalidListing', event);
+        },
+        onCollectionWhitelistRevokedCancelTriggered: (event) => {
+            console.log('📡 [EventContext] CollectionWhitelistRevokedCancelTriggered:', event.data.listingId);
+            setLastEvent(event);
+            notifySubscribers('CollectionWhitelistRevokedCancelTriggered', event);
+        },
+        onBuyerWhitelisted: (event) => {
+            console.log('📡 [EventContext] BuyerWhitelisted:', event.data.listingId);
+            setLastEvent(event);
+            notifySubscribers('BuyerWhitelisted', event);
+        },
+        onBuyerRemovedFromWhitelist: (event) => {
+            console.log('📡 [EventContext] BuyerRemovedFromWhitelist:', event.data.listingId);
+            setLastEvent(event);
+            notifySubscribers('BuyerRemovedFromWhitelist', event);
         }
     });
 

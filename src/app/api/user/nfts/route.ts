@@ -109,7 +109,9 @@ export const GET = apiHandler(async (request: NextRequest) => {
                             listingId: 1,
                             price: 1,
                             seller: 1,
-                            listedAt: 1
+                            listedAt: 1,
+                            currency: 1,
+                            listingType: 1
                         }
                     }
                 ],
@@ -204,7 +206,13 @@ export const GET = apiHandler(async (request: NextRequest) => {
             $addFields: {
                 isListed: { $gt: [{ $size: '$listings' }, 0] },
                 insights: '$insightsData',
-                stats: '$statsData'
+                stats: '$statsData',
+                // Flatten first listing data to top level for easier access
+                listingId: { $arrayElemAt: ['$listings.listingId', 0] },
+                price: { $arrayElemAt: ['$listings.price', 0] },
+                seller: { $arrayElemAt: ['$listings.seller', 0] },
+                currency: { $arrayElemAt: ['$listings.currency', 0] },
+                listingType: { $arrayElemAt: ['$listings.listingType', 0] }
             }
         },
         // Apply filters that need computed fields
@@ -300,7 +308,17 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
     console.log(`✅ [User NFTs] Found ${nfts.length} NFTs`);
 
-
+    // DEBUG: Log first listed NFT to check currency/listingType
+    const firstListed = nfts.find((n: any) => n.isListed);
+    if (firstListed) {
+        console.log('🔍 [API /user/nfts] First listed NFT from MongoDB:', {
+            tokenId: firstListed.tokenId,
+            price: firstListed.price,
+            currency: firstListed.currency,
+            listingType: firstListed.listingType,
+            listingsArray: firstListed.listings
+        });
+    }
 
     // Calculate stats
     const listed = nfts.filter((nft: any) => nft.isListed).length;

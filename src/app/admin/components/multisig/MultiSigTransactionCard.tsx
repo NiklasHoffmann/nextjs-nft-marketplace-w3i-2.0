@@ -66,7 +66,7 @@ export function MultiSigTransactionCard({
                         <span className="text-sm text-gray-500">#{transaction.txIndex}</span>
                     </div>
                     <h3 className="mt-2 text-lg font-semibold text-gray-900">
-                        {transaction.decodedCall?.description || 'Transaction'}
+                        {transaction.decodedCall?.description || TRANSACTION_TYPE_LABELS[transaction.transactionType]}
                     </h3>
                 </div>
                 <span className={`rounded-full bg-${statusColor}-100 px-3 py-1 text-xs font-medium text-${statusColor}-800`}>

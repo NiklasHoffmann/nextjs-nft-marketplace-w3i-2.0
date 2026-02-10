@@ -29,11 +29,14 @@ import { getMarketplaceEventListener } from '@/services/marketplace/event-listen
 import type {
     EventListenerConfig,
     EventListenerState,
-    ProcessedMarketplaceEvent,
     ProcessedItemListedEvent,
     ProcessedItemBoughtEvent,
     ProcessedItemCanceledEvent,
     ProcessedItemUpdatedEvent,
+    ProcessedListingCanceledDueToInvalidListingEvent,
+    ProcessedCollectionWhitelistRevokedCancelTriggeredEvent,
+    ProcessedBuyerWhitelistedEvent,
+    ProcessedBuyerRemovedFromWhitelistEvent,
     MarketplaceEventCallback
 } from '@/types/marketplace/contract-events';
 import type { Address } from 'viem';
@@ -148,6 +151,22 @@ export function useMarketplaceEvents(config: UseMarketplaceEventsConfig = {}): U
         onItemUpdated: async (event) => {
             updateState();
             await configRef.current.onItemUpdated?.(event);
+        },
+        onListingCanceledDueToInvalidListing: async (event) => {
+            updateState();
+            await configRef.current.onListingCanceledDueToInvalidListing?.(event as ProcessedListingCanceledDueToInvalidListingEvent);
+        },
+        onCollectionWhitelistRevokedCancelTriggered: async (event) => {
+            updateState();
+            await configRef.current.onCollectionWhitelistRevokedCancelTriggered?.(event as ProcessedCollectionWhitelistRevokedCancelTriggeredEvent);
+        },
+        onBuyerWhitelisted: async (event) => {
+            updateState();
+            await configRef.current.onBuyerWhitelisted?.(event as ProcessedBuyerWhitelistedEvent);
+        },
+        onBuyerRemovedFromWhitelist: async (event) => {
+            updateState();
+            await configRef.current.onBuyerRemovedFromWhitelist?.(event as ProcessedBuyerRemovedFromWhitelistEvent);
         },
         onConnectionChange: (connected) => {
             updateState();

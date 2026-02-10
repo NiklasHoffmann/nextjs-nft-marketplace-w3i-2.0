@@ -73,7 +73,8 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
 
             // 3. Prüfe Session-Cookie via API
             const response = await fetch('/api/auth/session', {
-                credentials: 'include'
+                credentials: 'include',
+                cache: 'no-store'
             });
 
             console.log('🔍 AdminAuthGuard session check:', {

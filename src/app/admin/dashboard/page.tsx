@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAccount, useChainId } from 'wagmi';
 import { formatEther } from 'viem';
+import { AdminPageShell } from '@/app/admin/components/shared/AdminPageShell';
 
 interface DashboardStats {
     totalNFTs: number;
@@ -167,9 +168,7 @@ export default function AdminDashboard() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 py-8">
-            <div className="container mx-auto px-4">
-                <div className="max-w-6xl mx-auto">
+        <AdminPageShell>
                     {/* Back Button */}
                     <div className="mb-6">
                         <Link
@@ -432,8 +431,6 @@ export default function AdminDashboard() {
                             )}
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
+        </AdminPageShell>
     );
 }

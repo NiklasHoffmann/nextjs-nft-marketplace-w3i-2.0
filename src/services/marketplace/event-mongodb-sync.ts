@@ -221,6 +221,41 @@ export async function removeListingFromMongoDB(contractAddress: string, tokenId:
 }
 
 /**
+ * Remove listing by listingId (used when tokenId is not available)
+ * SERVER-SIDE ONLY
+ */
+export async function removeListingByListingId(contractAddress: string, listingId: string): Promise<void> {
+    try {
+        console.log('💾 [MongoDB Sync] Removing listing by listingId...');
+
+        const db = await getDatabase();
+        const marketplaceCollection = db.collection('marketplace_items');
+
+        const listing = await marketplaceCollection.findOne({
+            contractAddress: contractAddress.toLowerCase(),
+            listingId: listingId.toString()
+        });
+
+        if (!listing) {
+            console.warn('⚠️ [MongoDB Sync] Listing not found for listingId removal:', {
+                contractAddress,
+                listingId
+            });
+            return;
+        }
+
+        await removeListingFromMongoDB(
+            contractAddress,
+            listing.tokenId?.toString() || '0',
+            listingId.toString()
+        );
+    } catch (error) {
+        console.error('❌ [MongoDB Sync] Failed to remove listing by listingId:', error);
+        throw error;
+    }
+}
+
+/**
  * Update listing in MongoDB after price/terms change
  * SERVER-SIDE ONLY
  */

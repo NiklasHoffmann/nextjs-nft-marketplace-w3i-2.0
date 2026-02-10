@@ -11,11 +11,13 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useAccount } from 'wagmi';
+import { useAccount, useChainId } from 'wagmi';
 import { devLog } from '@/utils/devLog';
 import { SyncQueue } from '@/utils/SyncQueue';
 import { useContextDevtools } from '@/hooks/useContextDevtools';
 import type { ActiveItem } from '@/types';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
+import { formatUnits } from 'viem';
 
 interface CartItem {
     listingId: string;
@@ -23,6 +25,7 @@ interface CartItem {
     tokenId: string;
     price: string;
     seller: string;
+    currency?: string | null;
     name?: string;
     imageUrl?: string;
 }
@@ -31,7 +34,8 @@ interface CartContextType {
     items: CartItem[];
     itemCount: number;
     totalPrice: bigint;
-    totalPriceFormatted: string;
+    totalPriceDisplay: string;
+    totalPriceByToken: Array<{ symbol: string; total: number }>;
     addToCart: (item: ActiveItem) => void;
     removeFromCart: (listingId: string) => void;
     clearCart: () => void;
@@ -45,6 +49,7 @@ const CART_STORAGE_KEY = 'nft-marketplace-cart';
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
     const { address, isConnected } = useAccount();
+    const chainId = useChainId();
     const [items, setItems] = useState<CartItem[]>([]);
     const [isLoaded, setIsLoaded] = useState(false);
     const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -58,7 +63,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             async (payload) => {
                 const response = await fetch('/api/cart', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-Wallet-Address': payload.walletAddress
+                    },
                     body: JSON.stringify(payload)
                 });
 
@@ -184,6 +192,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 tokenId: item.tokenId,
                 price: item.price,
                 seller: item.seller,
+                currency: item.currency,
                 name: data.metadata?.name || data.name || undefined,
                 imageUrl: data.metadata?.image || data.image || undefined
             };
@@ -200,6 +209,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 tokenId: item.tokenId,
                 price: item.price,
                 seller: item.seller,
+                currency: item.currency,
                 name: undefined,
                 imageUrl: undefined
             };
@@ -249,14 +259,36 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
     }, BigInt(0));
 
-    // Format total price to ETH
-    const totalPriceFormatted = (Number(totalPrice) / 1e18).toFixed(4);
+    const totalPriceByToken = useMemo(() => {
+        const totals = new Map<string, number>();
+
+        items.forEach((item) => {
+            try {
+                const symbol = getCurrencySymbolByAddress(chainId || 11155111, item.currency);
+                const decimals = getTokenDecimalsByAddress(chainId || 11155111, item.currency);
+                const amount = parseFloat(formatUnits(BigInt(item.price), decimals));
+
+                totals.set(symbol, (totals.get(symbol) || 0) + amount);
+            } catch {
+                // Ignore parse errors for malformed items
+            }
+        });
+
+        return Array.from(totals.entries()).map(([symbol, total]) => ({ symbol, total }));
+    }, [items, chainId]);
+
+    const totalPriceDisplay = useMemo(() => {
+        if (totalPriceByToken.length === 0) return '0';
+        return totalPriceByToken
+            .map((entry) => `${entry.total.toFixed(4)} ${entry.symbol}`)
+            .join(' + ');
+    }, [totalPriceByToken]);
 
     // DevTools (development only)
     useContextDevtools('Cart', {
         items,
         itemCount: items.length,
-        totalPrice: totalPriceFormatted,
+        totalPrice: totalPriceDisplay,
         isLoaded,
         syncQueueStatus: syncQueueRef.current?.getStatus()
     });
@@ -265,13 +297,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         items,
         itemCount: items.length,
         totalPrice,
-        totalPriceFormatted,
+        totalPriceDisplay,
+        totalPriceByToken,
         addToCart,
         removeFromCart,
         clearCart,
         isInCart,
         updateCartItem
-    }), [items, totalPrice, totalPriceFormatted, addToCart, removeFromCart, clearCart, isInCart, updateCartItem]);
+    }), [items, totalPrice, totalPriceDisplay, totalPriceByToken, addToCart, removeFromCart, clearCart, isInCart, updateCartItem]);
 
     return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

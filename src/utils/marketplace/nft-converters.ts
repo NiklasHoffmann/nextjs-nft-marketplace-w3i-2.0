@@ -108,6 +108,8 @@ export function convertToFilterableItems(
 
         // Marketplace Daten
         price: item.price,
+        currency: item.currency,
+        listingType: item.listingType,
         isListed: item.isListed,
         listingId: item.listingId,
         seller: item.seller,

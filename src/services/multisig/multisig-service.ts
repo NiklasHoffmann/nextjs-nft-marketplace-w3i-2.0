@@ -15,7 +15,13 @@ import {
     type DecodedContractCall,
     type SubmitTransactionRequest,
 } from '@/types';
-import { DIAMOND_ABI } from '@/config/abis/diamond';
+import { OWNERSHIP_FACET_ABI } from '@/config/abis/ownership-facet';
+import { PAUSE_FACET_ABI } from '@/config/abis/pause-facet';
+import { IDEATION_MARKET_FACET_ABI } from '@/config/abis/ideation-market-facet';
+import { COLLECTION_WHITELIST_FACET_ABI } from '@/config/abis/collection-whitelist-facet';
+import { BUYER_WHITELIST_FACET_ABI } from '@/config/abis/buyer-whitelist-facet';
+import { CURRENCY_WHITELIST_FACET_ABI } from '@/config/abis/currency-whitelist-facet';
+import { DIAMOND_CUT_ABI } from '@/config/abis/diamond-cut';
 
 // ============================================================================
 // Transaction Encoding
@@ -29,10 +35,28 @@ export function encodeDiamondOperation(
     args: any[]
 ): string {
     const template = DIAMOND_OPERATION_TEMPLATES[operation];
+    const operationAbiMap: Record<DiamondOperation, readonly unknown[]> = {
+        [DiamondOperation.TRANSFER_OWNERSHIP]: OWNERSHIP_FACET_ABI,
+        [DiamondOperation.ACCEPT_OWNERSHIP]: OWNERSHIP_FACET_ABI,
+        [DiamondOperation.PAUSE]: PAUSE_FACET_ABI,
+        [DiamondOperation.UNPAUSE]: PAUSE_FACET_ABI,
+        [DiamondOperation.SET_INNOVATION_FEE]: IDEATION_MARKET_FACET_ABI,
+        [DiamondOperation.ADD_WHITELISTED_COLLECTION]: COLLECTION_WHITELIST_FACET_ABI,
+        [DiamondOperation.REMOVE_WHITELISTED_COLLECTION]: COLLECTION_WHITELIST_FACET_ABI,
+        [DiamondOperation.BATCH_ADD_COLLECTIONS]: COLLECTION_WHITELIST_FACET_ABI,
+        [DiamondOperation.BATCH_REMOVE_COLLECTIONS]: COLLECTION_WHITELIST_FACET_ABI,
+        [DiamondOperation.ADD_BUYER_WHITELIST_ADDRESSES]: BUYER_WHITELIST_FACET_ABI,
+        [DiamondOperation.REMOVE_BUYER_WHITELIST_ADDRESSES]: BUYER_WHITELIST_FACET_ABI,
+        [DiamondOperation.ADD_ALLOWED_CURRENCY]: CURRENCY_WHITELIST_FACET_ABI,
+        [DiamondOperation.REMOVE_ALLOWED_CURRENCY]: CURRENCY_WHITELIST_FACET_ABI,
+        [DiamondOperation.CLEAN_LISTING]: IDEATION_MARKET_FACET_ABI,
+        [DiamondOperation.DIAMOND_CUT]: DIAMOND_CUT_ABI,
+    };
+    const operationAbi = operationAbiMap[operation];
 
     try {
         const data = encodeFunctionData({
-            abi: DIAMOND_ABI,
+            abi: operationAbi,
             functionName: template.functionSignature.split('(')[0] as any,
             args: args as any,
         });
@@ -89,7 +113,15 @@ export function decodeContractCall(
     try {
         // Try to decode as Diamond function
         const decoded = decodeFunctionData({
-            abi: DIAMOND_ABI,
+            abi: [
+                ...OWNERSHIP_FACET_ABI,
+                ...PAUSE_FACET_ABI,
+                ...IDEATION_MARKET_FACET_ABI,
+                ...COLLECTION_WHITELIST_FACET_ABI,
+                ...BUYER_WHITELIST_FACET_ABI,
+                ...CURRENCY_WHITELIST_FACET_ABI,
+                ...DIAMOND_CUT_ABI,
+            ],
             data: data as `0x${string}`,
         });
 
@@ -384,9 +416,9 @@ export function validateOperationArgs(
             }
         }
 
-        if (argDef.type === 'uint256') {
+        if (argDef.type === 'uint256' || argDef.type === 'uint128') {
             if (isNaN(Number(arg)) || Number(arg) < 0) {
-                return { valid: false, error: `Invalid uint256 for ${argDef.name}` };
+                return { valid: false, error: `Invalid ${argDef.type} for ${argDef.name}` };
             }
         }
 

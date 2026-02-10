@@ -7,10 +7,18 @@
 import { memo, useMemo, useState, useEffect } from 'react';
 import { useChainId } from 'wagmi';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { formatEther } from '@/utils';
-import { getCurrencySymbolByAddress, isNativeETH } from '@/config/tokens';
+import { formatUnits } from 'viem';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
 import type { ListingType } from '@/types/marketplace/listing-v2';
 import { isSwapListing } from '@/types/marketplace/listing-v2';
+
+const formatTokenDisplay = (amount: string, maxDecimals: number) => {
+    if (!amount.includes('.')) return amount;
+
+    const [whole, fraction] = amount.split('.');
+    const trimmedFraction = (fraction || '').slice(0, maxDecimals).replace(/0+$/, '');
+    return trimmedFraction ? `${whole}.${trimmedFraction}` : whole;
+};
 
 interface NFTCardPriceProps {
     price: string | null;
@@ -31,15 +39,10 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
 }) => {
     const chainIdFromHook = useChainId();
     const chainId = chainIdProp || chainIdFromHook;
-    const { formatPrice, convertTokenToUSD } = useCurrency();
+    const { formatPrice, convertTokenToUSD, convertFromUSD } = useCurrency();
 
     const [usdPrice, setUsdPrice] = useState<string>('');
     const [loading, setLoading] = useState(false);
-
-    const ethPrice = useMemo(() =>
-        price ? parseFloat(formatEther(price)) : 0,
-        [price]
-    );
 
     // Get accurate currency symbol based on chain and address
     const currencySymbol = useMemo(() =>
@@ -47,15 +50,41 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
         [chainId, currency]
     );
 
-    // Check if this is native ETH or an ERC20 token
-    const isETH = useMemo(() =>
-        !currency || isNativeETH(currency),
-        [currency]
+    const tokenDecimals = useMemo(() =>
+        getTokenDecimalsByAddress(chainId, currency),
+        [chainId, currency]
+    );
+
+    // DEBUG: Log incoming props for listed NFTs
+    useEffect(() => {
+        if (isListed && price) {
+            console.log('🔍 [NFTCardPrice] Listed NFT:', {
+                price,
+                currency,
+                listingType,
+                symbol: currencySymbol
+            });
+        }
+    }, [isListed, price, currency, listingType, chainId, currencySymbol]);
+
+    const tokenAmount = useMemo(() =>
+        price ? formatUnits(BigInt(price), tokenDecimals) : '0',
+        [price, tokenDecimals]
+    );
+
+    const displayAmount = useMemo(() =>
+        formatTokenDisplay(tokenAmount, Math.min(4, tokenDecimals)),
+        [tokenAmount, tokenDecimals]
+    );
+
+    const tokenAmountNum = useMemo(() =>
+        price ? parseFloat(tokenAmount) : 0,
+        [price, tokenAmount]
     );
 
     // Convert token price to USD
     useEffect(() => {
-        if (!price || ethPrice === 0) {
+        if (!price || tokenAmountNum === 0) {
             setUsdPrice('');
             return;
         }
@@ -63,9 +92,10 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
         const convert = async () => {
             setLoading(true);
             try {
-                const usdValue = await convertTokenToUSD(ethPrice, currencySymbol);
+                const usdValue = await convertTokenToUSD(tokenAmountNum, currencySymbol, currency, chainId);
                 if (usdValue > 0) {
-                    setUsdPrice(formatPrice(usdValue));
+                    const convertedAmount = await convertFromUSD(usdValue);
+                    setUsdPrice(formatPrice(convertedAmount));
                 } else {
                     setUsdPrice(''); // No USD rate available
                 }
@@ -78,7 +108,7 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
         };
 
         convert();
-    }, [ethPrice, currencySymbol, convertTokenToUSD, formatPrice, price]);
+    }, [tokenAmountNum, currencySymbol, convertTokenToUSD, convertFromUSD, formatPrice, price]);
 
     if (!isListed || !price) {
         return (
@@ -96,16 +126,16 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
     // 2. desiredContractAddress is set AND differs from the NFT's own contract (legacy check)
     const isSwap = listingType
         ? isSwapListing({ listingType } as any) // Use helper function from listing-v2.ts
-        : (desiredContractAddress && 
-           desiredContractAddress !== "0x0000000000000000000000000000000000000000" &&
-           desiredContractAddress !== null);
+        : (desiredContractAddress &&
+            desiredContractAddress !== "0x0000000000000000000000000000000000000000" &&
+            desiredContractAddress !== null);
 
     return (
         <div className="bg-white/95 backdrop-blur-sm p-2 rounded-md shadow-2xl border border-gray-200/60 ring-1 ring-gray-300/20">
             <div className="flex justify-between items-center">
                 <div className="text-left">
                     <div className="text-orange font-semibold text-lg">
-                        {formatEther(price)} {currencySymbol}
+                        {displayAmount} {currencySymbol}
                     </div>
                     {loading ? (
                         <div className="text-xs text-gray-500">Lädt...</div>

@@ -82,7 +82,10 @@ export const GET = apiHandler(async (request: NextRequest) => {
         throw new BadRequestError('User ID is required');
     }
 
-    const lowerUserId = userId.toLowerCase();
+    const lowerUserId = authenticatedUser.toLowerCase();
+    if (userId.toLowerCase() !== lowerUserId) {
+        console.warn('[user/interactions] userId mismatch, using authenticated user instead');
+    }
     const lowerContractAddress = contractAddress.toLowerCase();
 
     // Check cache first
@@ -159,11 +162,18 @@ export const POST = apiHandler(async (request: NextRequest) => {
     const body = await request.json();
     const { userId, contractAddress, tokenId, ...updates } = body;
 
-    if (!userId || !contractAddress || !tokenId) {
-        return apiBadRequest('userId, contractAddress, and tokenId are required');
+    if (!contractAddress || !tokenId) {
+        return apiBadRequest('contractAddress and tokenId are required');
     }
 
-    const lowerUserId = userId.toLowerCase();
+    if (!isValidAddress(contractAddress)) {
+        return apiBadRequest('Invalid contract address format');
+    }
+
+    const lowerUserId = authenticatedUser.toLowerCase();
+    if (userId && userId.toLowerCase() !== lowerUserId) {
+        console.warn('[user/interactions] userId mismatch, using authenticated user instead');
+    }
     const lowerContractAddress = contractAddress.toLowerCase();
     const timestamp = new Date().toISOString();
 
@@ -176,34 +186,38 @@ export const POST = apiHandler(async (request: NextRequest) => {
     ]);
 
     const results = [];
-    const statUpdates = []; // Track stat updates to execute atomically
+    const statUpdates: Array<{
+        contractAddress: string;
+        tokenId: string;
+        field: 'likeCount' | 'watchlistCount' | 'rating';
+        delta?: number;
+    }> = []; // Track stat updates to execute atomically
 
     // Update favorites if specified (TOGGLE logic)
     if (updates.isFavorite !== undefined) {
-        const existingFavorite = await favoritesCollection.findOne({
+        const existingCount = await favoritesCollection.countDocuments({
             userId: lowerUserId,
             contractAddress: lowerContractAddress,
             tokenId
         });
 
-        if (existingFavorite) {
-            // Remove favorite
-            const result = await favoritesCollection.deleteOne({
+        if (existingCount > 0) {
+            const result = await favoritesCollection.deleteMany({
                 userId: lowerUserId,
                 contractAddress: lowerContractAddress,
                 tokenId
             });
             results.push({ type: 'favorite', action: 'removed', result });
 
-            // Queue atomic stat update
-            statUpdates.push({
-                contractAddress: lowerContractAddress,
-                tokenId,
-                field: 'likeCount',
-                increment: false
-            });
+            if (result.deletedCount && result.deletedCount > 0) {
+                statUpdates.push({
+                    contractAddress: lowerContractAddress,
+                    tokenId,
+                    field: 'likeCount',
+                    delta: -result.deletedCount
+                });
+            }
         } else {
-            // Add favorite
             const result = await favoritesCollection.updateOne(
                 { userId: lowerUserId, contractAddress: lowerContractAddress, tokenId },
                 {
@@ -218,12 +232,11 @@ export const POST = apiHandler(async (request: NextRequest) => {
             );
             results.push({ type: 'favorite', action: 'added', result });
 
-            // Queue atomic stat update
             statUpdates.push({
                 contractAddress: lowerContractAddress,
                 tokenId,
                 field: 'likeCount',
-                increment: true
+                delta: 1
             });
         }
     }
@@ -231,64 +244,41 @@ export const POST = apiHandler(async (request: NextRequest) => {
     // Update rating if specified (PUBLIC ratings only)
     if (typeof updates.rating === 'number' && updates.rating >= 0 && updates.rating <= 5) {
         if (updates.rating === 0) {
-            // Get old rating before removing
-            const oldRating = await ratingsCollection.findOne({
-                userId: lowerUserId,
-                contractAddress: lowerContractAddress,
-                tokenId
-            });
-
-            // Remove rating when rating is 0
-            const result = await ratingsCollection.deleteOne({
+            const result = await ratingsCollection.deleteMany({
                 userId: lowerUserId,
                 contractAddress: lowerContractAddress,
                 tokenId
             });
             results.push({ type: 'rating', action: 'removed', result });
 
-            // Queue rating recalculation (remove old rating from average)
-            if (oldRating) {
+            if (result.deletedCount && result.deletedCount > 0) {
                 statUpdates.push({
                     contractAddress: lowerContractAddress,
                     tokenId,
-                    field: 'rating',
-                    action: 'remove',
-                    oldValue: oldRating.rating
+                    field: 'rating'
                 });
             }
         } else {
-            // Check if updating existing rating
-            const oldRating = await ratingsCollection.findOne({
+            await ratingsCollection.deleteMany({
                 userId: lowerUserId,
                 contractAddress: lowerContractAddress,
                 tokenId
             });
 
-            // Add or update rating when rating is 1-5
-            const result = await ratingsCollection.updateOne(
-                { userId: lowerUserId, contractAddress: lowerContractAddress, tokenId },
-                {
-                    $set: {
-                        userId: lowerUserId,
-                        contractAddress: lowerContractAddress,
-                        tokenId,
-                        rating: updates.rating,
-                        isPublic: true, // All ratings are public for community averages
-                        ratedAt: timestamp
-                    }
-                },
-                { upsert: true }
-            );
+            const result = await ratingsCollection.insertOne({
+                userId: lowerUserId,
+                contractAddress: lowerContractAddress,
+                tokenId,
+                rating: updates.rating,
+                isPublic: true,
+                ratedAt: timestamp
+            });
             results.push({ type: 'rating', action: 'updated', result });
 
-            // Queue rating recalculation
             statUpdates.push({
                 contractAddress: lowerContractAddress,
                 tokenId,
-                field: 'rating',
-                action: oldRating ? 'update' : 'add',
-                newValue: updates.rating,
-                oldValue: oldRating?.rating
+                field: 'rating'
             });
         }
     }
@@ -334,30 +324,29 @@ export const POST = apiHandler(async (request: NextRequest) => {
 
     // Update watchlist if specified (TOGGLE logic)
     if (updates.isWatchlisted !== undefined) {
-        const existingWatchlist = await watchlistCollection.findOne({
+        const existingCount = await watchlistCollection.countDocuments({
             userId: lowerUserId,
             contractAddress: lowerContractAddress,
             tokenId
         });
 
-        if (existingWatchlist) {
-            // Remove from watchlist
-            const result = await watchlistCollection.deleteOne({
+        if (existingCount > 0) {
+            const result = await watchlistCollection.deleteMany({
                 userId: lowerUserId,
                 contractAddress: lowerContractAddress,
                 tokenId
             });
             results.push({ type: 'watchlist', action: 'removed', result });
 
-            // Queue atomic stat update
-            statUpdates.push({
-                contractAddress: lowerContractAddress,
-                tokenId,
-                field: 'watchlistCount',
-                increment: false
-            });
+            if (result.deletedCount && result.deletedCount > 0) {
+                statUpdates.push({
+                    contractAddress: lowerContractAddress,
+                    tokenId,
+                    field: 'watchlistCount',
+                    delta: -result.deletedCount
+                });
+            }
         } else {
-            // Add to watchlist
             const result = await watchlistCollection.updateOne(
                 { userId: lowerUserId, contractAddress: lowerContractAddress, tokenId },
                 {
@@ -372,12 +361,11 @@ export const POST = apiHandler(async (request: NextRequest) => {
             );
             results.push({ type: 'watchlist', action: 'added', result });
 
-            // Queue atomic stat update
             statUpdates.push({
                 contractAddress: lowerContractAddress,
                 tokenId,
                 field: 'watchlistCount',
-                increment: true
+                delta: 1
             });
         }
     }
@@ -421,53 +409,49 @@ export const POST = apiHandler(async (request: NextRequest) => {
                     { upsert: true }
                 );
             } else {
-                // Check if stats document exists
                 const existingDoc = await statsCollection.findOne({
                     contractAddress: update.contractAddress,
                     tokenId: update.tokenId
                 });
 
-                if (existingDoc) {
-                    // Document exists - use $inc with $max to prevent negative values
-                    if (update.increment) {
-                        // Increment by 1
-                        await statsCollection.updateOne(
-                            { contractAddress: update.contractAddress, tokenId: update.tokenId },
-                            {
-                                $inc: { [update.field]: 1 },
-                                $set: { lastUpdated: timestamp }
-                            }
-                        );
-                    } else {
-                        // Decrement by 1, but ensure it doesn't go below 0
-                        const currentValue = existingDoc[update.field as keyof typeof existingDoc] as number || 0;
-                        const newValue = Math.max(0, currentValue - 1);
-
-                        await statsCollection.updateOne(
-                            { contractAddress: update.contractAddress, tokenId: update.tokenId },
-                            {
-                                $set: {
-                                    [update.field]: newValue,
-                                    lastUpdated: timestamp
-                                }
-                            }
-                        );
+                const delta = update.delta ?? 0;
+                if (!existingDoc) {
+                    if (delta > 0) {
+                        await statsCollection.insertOne({
+                            contractAddress: update.contractAddress,
+                            tokenId: update.tokenId,
+                            viewCount: 0,
+                            likeCount: update.field === 'likeCount' ? delta : 0,
+                            watchlistCount: update.field === 'watchlistCount' ? delta : 0,
+                            averageRating: 0,
+                            ratingCount: 0,
+                            createdAt: timestamp,
+                            lastUpdated: timestamp
+                        });
                     }
-                } else {
-                    // Document doesn't exist - create with initial value
-                    const initialValue = update.increment ? 1 : 0;
+                    continue;
+                }
 
-                    await statsCollection.insertOne({
-                        contractAddress: update.contractAddress,
-                        tokenId: update.tokenId,
-                        viewCount: 0,
-                        likeCount: update.field === 'likeCount' ? initialValue : 0,
-                        watchlistCount: update.field === 'watchlistCount' ? initialValue : 0,
-                        averageRating: 0,
-                        ratingCount: 0,
-                        createdAt: timestamp,
-                        lastUpdated: timestamp
-                    });
+                if (delta > 0) {
+                    await statsCollection.updateOne(
+                        { contractAddress: update.contractAddress, tokenId: update.tokenId },
+                        {
+                            $inc: { [update.field]: delta },
+                            $set: { lastUpdated: timestamp }
+                        }
+                    );
+                } else if (delta < 0) {
+                    const currentValue = existingDoc[update.field as keyof typeof existingDoc] as number || 0;
+                    const newValue = Math.max(0, currentValue + delta);
+                    await statsCollection.updateOne(
+                        { contractAddress: update.contractAddress, tokenId: update.tokenId },
+                        {
+                            $set: {
+                                [update.field]: newValue,
+                                lastUpdated: timestamp
+                            }
+                        }
+                    );
                 }
             }
         }

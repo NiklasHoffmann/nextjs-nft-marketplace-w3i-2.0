@@ -110,8 +110,8 @@ export class ListingService {
                 currency: data.currency, // Pass currency to contract
                 desiredTokenAddress: '0x0000000000000000000000000000000000000000',
                 desiredTokenId: '0',
-                buyerWhitelistEnabled: false,
-                allowedBuyers: []
+                buyerWhitelistEnabled: data.buyerWhitelistEnabled || false,
+                allowedBuyers: data.allowedBuyers || []
             });
 
             console.log('✅ [Step 3] Listing transaction sent to wallet');
@@ -150,8 +150,8 @@ export class ListingService {
                 price: '0', // No ETH price for pure trade
                 desiredTokenAddress: data.targetNFT.contractAddress,
                 desiredTokenId: data.targetNFT.tokenId,
-                buyerWhitelistEnabled: false,
-                allowedBuyers: []
+                buyerWhitelistEnabled: data.buyerWhitelistEnabled || false,
+                allowedBuyers: data.allowedBuyers || []
             });
         } catch (error: any) {
             throw error;
@@ -186,8 +186,8 @@ export class ListingService {
                 price: data.price,
                 desiredTokenAddress: data.targetNFT.contractAddress,
                 desiredTokenId: data.targetNFT.tokenId,
-                buyerWhitelistEnabled: false,
-                allowedBuyers: []
+                buyerWhitelistEnabled: data.buyerWhitelistEnabled || false,
+                allowedBuyers: data.allowedBuyers || []
             });
         } catch (error: any) {
             throw error;

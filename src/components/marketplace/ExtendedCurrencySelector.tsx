@@ -103,7 +103,7 @@ export function ExtendedCurrencySelector({
             if (!grouped[category]) {
                 grouped[category] = [];
             }
-            grouped[category].push(token as ExtendedTokenConfig);
+            grouped[category]!.push(token as ExtendedTokenConfig);
         });
 
         return grouped;

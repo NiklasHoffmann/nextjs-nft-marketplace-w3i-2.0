@@ -19,14 +19,17 @@ export const NFTCardImage = memo<NFTCardImageProps>(({
     descriptions,
     priority = false
 }) => {
+    const hasImage = Boolean(imageUrl);
+    const hasDescription = descriptions.length > 0;
+
     return (
         <div className="flex gap-1 h-full">
             {/* Left: Image - 50% - full height, auto width, center-aligned */}
-            {imageUrl && (
+            {hasImage && (
                 <div className="w-1/2 flex justify-center items-stretch overflow-hidden">
                     <div className="rounded-md border-2 border-white/50 backdrop-blur-sm overflow-hidden relative h-full">
                         <OptimizedNFTImage
-                            imageUrl={imageUrl}
+                            imageUrl={imageUrl ?? ''}
                             tokenId={tokenId}
                             className="object-contain h-full w-auto"
                             fill={false}
@@ -41,7 +44,7 @@ export const NFTCardImage = memo<NFTCardImageProps>(({
             )}
 
             {/* Right: Description - 50% - fills available space */}
-            {descriptions.length > 0 && (
+            {hasDescription && (
                 <div className="w-1/2">
                     <div
                         className="bg-white/95 backdrop-blur-sm pr-1 pt-1 rounded-md shadow-lg text-xs h-full overflow-hidden text-right break-words hyphens-auto"

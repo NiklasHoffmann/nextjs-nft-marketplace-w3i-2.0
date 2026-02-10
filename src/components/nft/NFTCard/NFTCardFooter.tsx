@@ -21,6 +21,14 @@ export const NFTCardFooter = memo<NFTCardFooterProps>(({
     enableInsights = true,
     nft
 }) => {
+    const hasInsightCategory = Boolean(enableInsights && nft?.insight?.category);
+    const categoryBadgeClass = `backdrop-blur-sm px-2 py-1 rounded-md shadow-md border h-6 flex items-center ring-1 ${hasInsightCategory
+        ? 'bg-purple-100/95 border-purple-200/60 ring-purple-300/20'
+        : 'bg-white/95 border-gray-200/60 ring-gray-300/20'
+        }`;
+    const categoryTextClass = `text-xs font-medium truncate ${hasInsightCategory ? 'text-purple-700' : 'text-gray-700'}`;
+    const categoryCountClass = `text-xs font-medium ${hasInsightCategory ? 'text-purple-600' : 'text-gray-500'}`;
+
     return (
         <div className="flex items-center gap-1">
             {/* Categories - left side */}
@@ -29,26 +37,18 @@ export const NFTCardFooter = memo<NFTCardFooterProps>(({
                     {categories.slice(0, 1).map((cat, index) => (
                         <div
                             key={index}
-                            className={`backdrop-blur-sm px-2 py-1 rounded-md shadow-md border h-6 flex items-center ring-1 ${enableInsights && nft?.insight?.category
-                                    ? 'bg-purple-100/95 border-purple-200/60 ring-purple-300/20'
-                                    : 'bg-white/95 border-gray-200/60 ring-gray-300/20'
-                                }`}
+                            className={categoryBadgeClass}
                         >
-                            <span className={`text-xs font-medium truncate ${enableInsights && nft?.insight?.category ? 'text-purple-700' : 'text-gray-700'
-                                }`}>
+                            <span className={categoryTextClass}>
                                 {cat}
                             </span>
                         </div>
                     ))}
                     {categories.length > 1 && (
                         <div
-                            className={`backdrop-blur-sm px-2 py-1 rounded-md shadow-md border h-6 flex items-center ring-1 ${enableInsights && nft?.insight?.category
-                                    ? 'bg-purple-100/95 border-purple-200/60 ring-purple-300/20'
-                                    : 'bg-white/95 border-gray-200/60 ring-gray-300/20'
-                                }`}
+                            className={categoryBadgeClass}
                         >
-                            <span className={`text-xs font-medium ${enableInsights && nft?.insight?.category ? 'text-purple-600' : 'text-gray-500'
-                                }`}>
+                            <span className={categoryCountClass}>
                                 +{categories.length - 1}
                             </span>
                         </div>

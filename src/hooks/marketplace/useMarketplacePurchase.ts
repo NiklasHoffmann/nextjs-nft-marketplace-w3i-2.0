@@ -5,13 +5,15 @@
 "use client";
 
 import { useState } from 'react';
-import { useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
-import { parseEther } from 'viem';
-import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
+import { useWriteContract, useWaitForTransactionReceipt, usePublicClient, useChainId } from 'wagmi';
+import { parseUnits } from 'viem';
+import { IDEATION_MARKET_FACET_ABI } from '@/config/abis/ideation-market-facet';
+import { getAvailableTokens, ZERO_ADDRESS } from '@/config/tokens';
 
 interface PurchaseListingParams {
   listingId: string;
   expectedPrice: string; // in ETH
+  expectedCurrency?: string; // Payment token address (default: ETH)
   expectedDesiredTokenAddress?: string;
   expectedDesiredTokenId?: string;
   desiredErc1155Holder?: string; // for swap transactions
@@ -22,6 +24,7 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submittedHash, setSubmittedHash] = useState<`0x${string}` | undefined>(undefined);
+  const chainId = useChainId();
 
   const publicClient = usePublicClient();
 
@@ -51,10 +54,10 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
   const purchaseListing = async ({
     listingId,
     expectedPrice,
-    expectedCurrency = "0x0000000000000000000000000000000000000000", // Default: ETH
-    expectedDesiredTokenAddress = "0x0000000000000000000000000000000000000000",
+    expectedCurrency = ZERO_ADDRESS, // Default: ETH
+    expectedDesiredTokenAddress = ZERO_ADDRESS,
     expectedDesiredTokenId = "0",
-    desiredErc1155Holder = "0x0000000000000000000000000000000000000000",
+    desiredErc1155Holder = ZERO_ADDRESS,
     onProgress
   }: PurchaseListingParams) => {
     try {
@@ -63,18 +66,23 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
 
       onProgress?.('preparing');
 
-      const isSwap = expectedDesiredTokenAddress !== "0x0000000000000000000000000000000000000000";
-      const isWETH = expectedCurrency !== "0x0000000000000000000000000000000000000000";
+      const isSwap = expectedDesiredTokenAddress !== ZERO_ADDRESS;
+      const isNative = expectedCurrency === ZERO_ADDRESS;
+
+      const tokens = getAvailableTokens(chainId);
+      const match = tokens.find((token) => token.address.toLowerCase() === expectedCurrency.toLowerCase());
+      const priceDecimals = isNative ? 18 : (match?.decimals ?? 18);
+      const expectedPriceUnits = parseUnits(expectedPrice, priceDecimals);
       
       // Only send ETH value if paying with native ETH (not WETH or swap)
-      const ethValue = (isSwap || isWETH) ? BigInt(0) : parseEther(expectedPrice);
+      const ethValue = (isSwap || !isNative) ? BigInt(0) : parseUnits(expectedPrice, 18);
 
       console.log('🚀 Calling writeContractAsync with:', {
         listingId,
         expectedPrice,
         expectedCurrency,
         isSwap,
-        isWETH,
+        isNative,
         ethValue: ethValue.toString(),
         expectedDesiredTokenAddress,
         expectedDesiredTokenId
@@ -85,12 +93,12 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
       // Use writeContractAsync which returns the transaction hash directly
       const hash = await writeContractAsync({
         address: marketplaceAddress as `0x${string}`,
-        abi: MARKETPLACE_ABI,
+        abi: IDEATION_MARKET_FACET_ABI,
         functionName: 'purchaseListing',
         args: [
           BigInt(listingId), // listingId
-          parseEther(expectedPrice), // expectedPrice
-          (expectedCurrency || "0x0000000000000000000000000000000000000000") as `0x${string}`, // expectedCurrency (0x0 for ETH, WETH address for WETH)
+          expectedPriceUnits, // expectedPrice
+          (expectedCurrency || ZERO_ADDRESS) as `0x${string}`, // expectedCurrency (0x0 for ETH, WETH address for WETH)
           BigInt("0"), // expectedErc1155Quantity (0 for ERC721, quantity for ERC1155)
           expectedDesiredTokenAddress as `0x${string}`, // expectedDesiredTokenAddress
           BigInt(expectedDesiredTokenId), // expectedDesiredTokenId

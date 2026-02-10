@@ -54,6 +54,7 @@ export default function CollectionLayout({
         totalVolume: collection?.totalValue || 0,
         avgPrice: collection?.averagePrice || 0,
         floorPrice: collection?.floorPrice || 0,
+        floorPriceCurrency: collection?.floorPriceCurrency || null,
         totalViews: collection?.totalViews || 0,
         totalLikes: collection?.totalLikes || 0,
     }), [collection]);
@@ -85,6 +86,7 @@ export default function CollectionLayout({
                         totalVolume={collectionStats.totalVolume}
                         avgPrice={collectionStats.avgPrice}
                         floorPrice={collectionStats.floorPrice}
+                        floorPriceCurrency={collectionStats.floorPriceCurrency}
                         totalViews={collectionStats.totalViews}
                         totalLikes={collectionStats.totalLikes}
                     />

@@ -1,17 +1,18 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
-import { useAccount } from 'wagmi';
+import { useChainId } from 'wagmi';
 import { NFTCard } from '@/components/nft/NFTCard';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 import { CheckCircleIcon, SpinnerIcon } from '@/components/icons';
+import { getCurrencySymbolByAddress, ZERO_ADDRESS } from '@/config/tokens';
 
 interface ListingProgressInlineProps {
     nft: AggregatedNFT;
     mode: 'sale' | 'trade' | 'hybrid';
     price?: string;
-    currency?: 'ETH' | 'USDC';
+    currency?: string;
     
     currentStep?: 'whitelist' | 'approval' | 'approved' | 'signing' | 'pending' | 'success' | 'error';
     completedSteps?: string[];
@@ -31,7 +32,11 @@ export function ListingProgressInline({
     error,
     onReset
 }: ListingProgressInlineProps) {
-    const { address: account } = useAccount();
+    const chainId = useChainId();
+    const currencySymbol = useMemo(
+        () => getCurrencySymbolByAddress(chainId, currency || ZERO_ADDRESS),
+        [chainId, currency]
+    );
 
     const steps = [
         {
@@ -218,7 +223,7 @@ export function ListingProgressInline({
                                 {price && (
                                     <div>
                                         <p className="text-xs text-gray-600 mb-1">Preis</p>
-                                        <p className="text-2xl font-bold text-blue-600">{price} {currency || 'ETH'}</p>
+                                        <p className="text-2xl font-bold text-blue-600">{price} {currencySymbol}</p>
                                     </div>
                                 )}
                             </div>

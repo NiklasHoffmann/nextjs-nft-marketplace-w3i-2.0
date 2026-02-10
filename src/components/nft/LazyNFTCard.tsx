@@ -12,6 +12,9 @@ interface LazyNFTCardProps {
   // Marketplace props
   listingId?: string;
   price?: string;
+  currency?: string;
+  chainId?: number;
+  listingType?: 'PURE_ETH' | 'SWAP_AND_ETH' | 'PURE_SWAP';
   seller?: string;
   buyer?: string | null;
   isListed?: boolean;

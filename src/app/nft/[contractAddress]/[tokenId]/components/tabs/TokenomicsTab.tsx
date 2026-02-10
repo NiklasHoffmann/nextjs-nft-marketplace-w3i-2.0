@@ -1,9 +1,12 @@
-import { formatEther } from '@/utils';
+import { formatUnits } from 'viem';
 import { TokenomicsTabProps } from '@/types';
 import { EmptyState } from '@/components/core/Empty';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
+import { useChainId } from 'wagmi';
 
 export default function TokenomicsTab({
     price,
+    currency,
     totalSupply,
     rarityRank,
     supportsRoyalty,
@@ -12,6 +15,11 @@ export default function TokenomicsTab({
     blockchain,
     currentOwner
 }: TokenomicsTabProps) {
+    const chainId = useChainId();
+    const tokenDecimals = getTokenDecimalsByAddress(chainId, currency);
+    const currencySymbol = getCurrencySymbolByAddress(chainId, currency);
+    const formattedPrice = formatUnits(BigInt(price), tokenDecimals);
+
     return (
         <div className="space-y-6">
             {/* Coming Soon Notice */}
@@ -35,7 +43,7 @@ export default function TokenomicsTab({
                     <div className="space-y-3">
                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                             <span className="text-sm font-medium text-gray-600">Current Price</span>
-                            <span className="text-sm text-gray-900 font-bold">{formatEther(price)} ETH</span>
+                            <span className="text-sm text-gray-900 font-bold">{formattedPrice} {currencySymbol}</span>
                         </div>
 
                         <div className="flex justify-between items-center py-2 border-b border-gray-100">

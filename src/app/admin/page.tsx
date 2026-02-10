@@ -1,16 +1,16 @@
 ﻿import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { hasAdminAccess } from '@/utils';
+import { AdminPageShell } from '@/app/admin/components/shared/AdminPageShell';
 
 // Separate component to handle URL parameters (requires Suspense in Next.js 15)
 function AdminContent() {
     return (
-        <div className="container mx-auto px-4">
-            <div className="max-w-6xl mx-auto">
+        <AdminPageShell>
                 {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Panel</h1>
-                    <p className="text-gray-600">Zentrale Verwaltung für NFT Marketplace, MultiSig Governance und System-Konfiguration</p>
+                    <p className="text-gray-600">Zentrale Verwaltung für Marketplace Governance, MultiSig Wallet und System-Konfiguration</p>
                 </div>
 
                 {/* Admin Features Grid - Sortiert von weniger wichtig zu WICHTIG */}
@@ -94,46 +94,85 @@ function AdminContent() {
                         </div>
                     </div>
 
-                    {/* 3. MultiSig Governance (Off-Chain) */}
-                    <div className="bg-white border border-indigo-200 rounded-lg p-6 hover:shadow-lg transition-shadow flex flex-col">
+                    {/* 3. MultiSig Wallet (On-Chain) - HÖCHSTE PRIORITÄT */}
+                    <div className="bg-white border border-green-200 rounded-lg p-6 hover:shadow-lg transition-shadow flex flex-col">
                         <div className="flex items-center mb-4">
-                            <div className="p-3 bg-indigo-100 rounded-lg">
-                                <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                            <div className="p-3 bg-green-100 rounded-lg">
+                                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                 </svg>
                             </div>
                             <div className="ml-3">
-                                <h3 className="text-lg font-semibold text-gray-900">MultiSig Governance</h3>
-                                <span className="text-xs text-indigo-600 font-medium">Off-Chain Proposals</span>
+                                <h3 className="text-lg font-semibold text-gray-900">MultiSig Wallet</h3>
+                                <span className="text-xs text-green-600 font-medium">On-Chain Wallet</span>
                             </div>
                         </div>
                         <p className="text-gray-600 text-sm mb-4">
-                            Off-Chain Proposal System für Multi-Admin Confirmations und Ownership Transfer.
+                            MultiSig Wallet und Transaction Queue fuer alle Owner-Operationen.
                         </p>
                         <div className="flex-grow"></div>
                         <Link
-                            href="/admin/multisig"
-                            className="block w-full px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors text-center"
+                            href="/admin/multisig-wallet"
+                            className="block w-full px-4 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors text-center"
                         >
-                            Governance öffnen
+                            MultiSig Wallet oeffnen
                         </Link>
                         <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500 space-y-1">
                             <div className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>
-                                <span>Proposal System</span>
+                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                                <span>Owner Confirmations</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>
-                                <span>Multi-Admin Confirmations</span>
+                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                                <span>Transaction Queue</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>
-                                <span>Ownership Transfer</span>
+                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                                <span>Wallet Operations</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* 4. Direct Marketplace Admin */}
+                    {/* 4. Marketplace Governance (via MultiSig) */}
+                    <div className="bg-white border border-amber-200 rounded-lg p-6 hover:shadow-lg transition-shadow flex flex-col">
+                        <div className="flex items-center mb-4">
+                            <div className="p-3 bg-amber-100 rounded-lg">
+                                <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 1.343-3 3v2a3 3 0 106 0v-2c0-1.657-1.343-3-3-3zm7 3a7 7 0 10-14 0v2a7 7 0 0014 0v-2z" />
+                                </svg>
+                            </div>
+                            <div className="ml-3">
+                                <h3 className="text-lg font-semibold text-gray-900">Marketplace Governance</h3>
+                                <span className="text-xs text-amber-600 font-medium">Via MultiSig</span>
+                            </div>
+                        </div>
+                        <p className="text-gray-600 text-sm mb-4">
+                            Steuere Marketplace-Parameter ueber MultiSig (Fees, Whitelists, Pause, Cleanup).
+                        </p>
+                        <div className="flex-grow"></div>
+                        <Link
+                            href="/admin/marketplace-governance"
+                            className="block w-full px-4 py-2.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 transition-colors text-center"
+                        >
+                            Governance oeffnen
+                        </Link>
+                        <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500 space-y-1">
+                            <div className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+                                <span>Innovation Fee</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+                                <span>Collection & Currency Whitelists</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+                                <span>Pause & Listing Cleanup</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 5. Direct Marketplace Admin (Legacy) */}
                     <div className="bg-white border border-purple-200 rounded-lg p-6 hover:shadow-lg transition-shadow flex flex-col">
                         <div className="flex items-center mb-4">
                             <div className="p-3 bg-purple-100 rounded-lg">
@@ -143,11 +182,11 @@ function AdminContent() {
                             </div>
                             <div className="ml-3">
                                 <h3 className="text-lg font-semibold text-gray-900">Marketplace Admin</h3>
-                                <span className="text-xs text-purple-600 font-medium">Direct Access</span>
+                                <span className="text-xs text-purple-600 font-medium">Legacy Direct Access</span>
                             </div>
                         </div>
                         <p className="text-gray-600 text-sm mb-4">
-                            Direkte Marketplace-Funktionen als Contract Owner ohne MultiSig (für Notfälle).
+                            Direkte Marketplace-Funktionen nur im Single-Owner Modus (für Notfälle).
                         </p>
                         <div className="flex-grow"></div>
                         <Link
@@ -168,45 +207,6 @@ function AdminContent() {
                             <div className="flex items-center gap-2">
                                 <span className="w-1.5 h-1.5 bg-purple-500 rounded-full"></span>
                                 <span>Listings bereinigen</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 5. MultiSig Wallet (On-Chain) - HÖCHSTE PRIORITÄT */}
-                    <div className="bg-white border border-green-200 rounded-lg p-6 hover:shadow-lg transition-shadow flex flex-col">
-                        <div className="flex items-center mb-4">
-                            <div className="p-3 bg-green-100 rounded-lg">
-                                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                </svg>
-                            </div>
-                            <div className="ml-3">
-                                <h3 className="text-lg font-semibold text-gray-900">MultiSig Wallet</h3>
-                                <span className="text-xs text-green-600 font-medium">On-Chain Security</span>
-                            </div>
-                        </div>
-                        <p className="text-gray-600 text-sm mb-4">
-                            Sichere Diamond Contract Operationen mit 2/3 MultiSig Consensus auf Mainnet & Sepolia.
-                        </p>
-                        <div className="flex-grow"></div>
-                        <Link
-                            href="/admin/multisig-wallet"
-                            className="block w-full px-4 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors text-center"
-                        >
-                            MultiSig Wallet öffnen
-                        </Link>
-                        <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500 space-y-1">
-                            <div className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                                <span>2/3 Owner Confirmations</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                                <span>Auto-Execution on Threshold</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                                <span>Diamond Operations via MultiSig</span>
                             </div>
                         </div>
                     </div>
@@ -286,8 +286,7 @@ function AdminContent() {
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
+        </AdminPageShell>
     );
 }
 

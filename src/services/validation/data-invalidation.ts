@@ -24,6 +24,32 @@ export type InvalidationType =
     | 'graph-update'
     | 'manual-refresh';
 
+export const GLOBAL_INVALIDATION_TYPES = new Set<InvalidationType>([
+    'graph-update',
+    'manual-refresh'
+]);
+
+export const LISTING_INVALIDATION_TYPES = new Set<InvalidationType>([
+    'listing-created',
+    'listing-canceled',
+    'nft-purchased'
+]);
+
+export const WALLET_LISTING_INVALIDATION_TYPES = new Set<InvalidationType>([
+    'listing-created',
+    'listing-canceled'
+]);
+
+export const MARKETPLACE_INVALIDATION_TYPES = new Set<InvalidationType>([
+    'listing-created',
+    'listing-canceled',
+    'nft-purchased',
+    'graph-update',
+    'manual-refresh'
+]);
+
+export const DB_SYNC_DELAY_MS = 2000;
+
 export interface InvalidationEventDetail {
     type: InvalidationType;
     contractAddress?: string;

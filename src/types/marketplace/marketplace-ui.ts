@@ -83,6 +83,12 @@ export interface NFTScrollItem {
     desiredContractAddress?: string;
     /** Gewünschte Token ID (bei Trade) */
     desiredTokenId?: string;
+    /** Payment Currency Address (ERC20 token or native ETH: 0x0000...) */
+    currency?: string;
+    /** Listing Type (PURE_ETH | SWAP_AND_ETH | PURE_SWAP) */
+    listingType?: 'PURE_ETH' | 'SWAP_AND_ETH' | 'PURE_SWAP';
+    /** Chain ID for currency symbol resolution */
+    chainId?: number;
 
     // ===== MongoDB-Optimierte Daten (optional) =====
     /** Metadata aus MongoDB (verhindert API calls) */

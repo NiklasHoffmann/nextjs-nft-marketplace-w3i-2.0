@@ -13,6 +13,7 @@ import { getDatabase } from '@/lib/mongodb';
 import type { ListingV2 } from '@/types/marketplace/listing-v2';
 import { blockchainStateSync } from './blockchain-state-sync';
 import { IPFSMetadataLazySync } from './ipfs-metadata-lazy-sync';
+import { getCurrencyFixSync } from './currency-fix-sync';
 
 export class GraphQLSync {
     private client: ApolloClient<any> | null = null;
@@ -285,10 +286,23 @@ export class GraphQLSync {
                 console.log(`✅ [V2 MongoDB] Database updated:`);
                 console.log(`   ✅ Upserted: ${upsertedCount} listings`);
                 console.log(`   �️ Deleted: ${deletedCount} old listings`);
-                
+                // STEP 5: Fix currency fields from blockchain (SubGraph may not capture correctly)
+                if (upsertedCount > 0) {
+                    try {
+                        console.log('🔧 [Currency Fix] Correcting currency from blockchain...');
+                        const currencyFix = getCurrencyFixSync();
+                        const result = await currencyFix.fixAllListings();
+                        if (result.fixed > 0) {
+                            console.log(`✅ [Currency Fix] Fixed ${result.fixed} listings`);
+                        }
+                    } catch (error) {
+                        console.error('❌ [Currency Fix] Error:', error);
+                        // Don't fail the whole sync, currency fix is optional
+                    }
+                }
                 // Note: graph-update invalidation happens via SSE in /api/events/marketplace
                 // Server-side invalidation is not needed here since all clients get SSE updates
-                
+
                 // 🔥 OPTIMIZED: Trigger blockchain state sync for new/updated listings
                 if (upsertedCount > 0) {
                     console.log(`\n🔄 [Blockchain Sync] Triggering on-demand sync for ${upsertedCount} listings...`);

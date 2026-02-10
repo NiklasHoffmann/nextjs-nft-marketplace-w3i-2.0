@@ -87,6 +87,17 @@ const statsCache = new LRUCache<string, NFTStats>(100); // Max 100 NFT stats
 const interactionsCache = new LRUCache<string, UserInteractionState>(100); // Max 100 user interactions
 const listeners = new Map<string, Set<() => void>>();
 
+const VIEWER_ID_STORAGE_KEY = 'nft_viewer_id';
+
+function getOrCreateViewerId(): string | null {
+    if (typeof window === 'undefined') return null;
+    const existing = window.localStorage.getItem(VIEWER_ID_STORAGE_KEY);
+    if (existing) return existing;
+    const newId = crypto.randomUUID();
+    window.localStorage.setItem(VIEWER_ID_STORAGE_KEY, newId);
+    return newId;
+}
+
 // Cache-Timestamps: Daten sind 60 Sekunden gültig (aligned with TheGraph polling)
 const statsCacheTimestamps = new Map<string, number>();
 const interactionsCacheTimestamps = new Map<string, number>();
@@ -349,7 +360,7 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
                     'Content-Type': 'application/json',
                     'x-wallet-address': userAddress // Add wallet address to header for auth
                 },
-                body: JSON.stringify({ contractAddress, tokenId, userId: userAddress, isFavorite: true })
+                body: JSON.stringify({ contractAddress, tokenId, isFavorite: true })
             });
 
             if (!res.ok) {
@@ -411,7 +422,7 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
                     'Content-Type': 'application/json',
                     'x-wallet-address': userAddress // Add wallet address to header for auth
                 },
-                body: JSON.stringify({ contractAddress, tokenId, userId: userAddress, isWatchlisted: true })
+                body: JSON.stringify({ contractAddress, tokenId, isWatchlisted: true })
             });
 
             if (!res.ok) {
@@ -475,7 +486,7 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
                     'Content-Type': 'application/json',
                     'x-wallet-address': userAddress // Add wallet address to header for auth
                 },
-                body: JSON.stringify({ contractAddress, tokenId, userId: userAddress, rating })
+                body: JSON.stringify({ contractAddress, tokenId, rating })
             });
 
             if (!res.ok) {
@@ -528,7 +539,12 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
             const res = await fetch('/api/nft/stats', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contractAddress, tokenId })
+                body: JSON.stringify({
+                    contractAddress,
+                    tokenId,
+                    userId: userAddress || null,
+                    viewerId: getOrCreateViewerId()
+                })
             });
 
             if (!res.ok) {
@@ -563,7 +579,7 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
             }
             // Don't throw for view increments - not critical
         }
-    }, [contractAddress, tokenId, updateStatsCache]);
+    }, [contractAddress, tokenId, userAddress, updateStatsCache]);
 
     const refresh = useCallback(async () => {
         try {

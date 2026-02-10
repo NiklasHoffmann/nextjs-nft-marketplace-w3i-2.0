@@ -182,7 +182,7 @@ export function BatchListingForm({
                     // Direct contract read using public client (alternative to hook in loop)
                     const { createPublicClient, http } = await import('viem');
                     const { sepolia } = await import('viem/chains');
-                    const { MARKETPLACE_ABI } = await import('@/config/abis/marketplace');
+                    const { GETTER_FACET_ABI } = await import('@/config/abis/getter-facet');
 
                     const publicClient = createPublicClient({
                         chain: sepolia,
@@ -191,7 +191,7 @@ export function BatchListingForm({
 
                     const isWhitelisted = await publicClient.readContract({
                         address: marketplaceAddress as `0x${string}`,
-                        abi: MARKETPLACE_ABI,
+                        abi: GETTER_FACET_ABI,
                         functionName: 'isCollectionWhitelisted',
                         args: [address as `0x${string}`]
                     });

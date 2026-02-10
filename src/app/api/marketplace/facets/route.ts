@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createPublicClient, http } from 'viem';
 import { sepolia } from 'viem/chains';
-import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
+import { DIAMOND_LOUPE_FACET_ABI } from '@/config/abis/diamond-loupe-facet';
 import { apiHandler } from '@/lib/api/handler';
 import { apiSuccess } from '@/lib/api/responses';
 
@@ -16,7 +16,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
   // Get all facets
   const facets = await publicClient.readContract({
     address: MARKETPLACE_ADDRESS,
-    abi: MARKETPLACE_ABI,
+    abi: DIAMOND_LOUPE_FACET_ABI,
     functionName: 'facets',
   }) as Array<{ facetAddress: `0x${string}`; functionSelectors: `0x${string}`[] }>;
 

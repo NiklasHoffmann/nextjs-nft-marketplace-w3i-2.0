@@ -27,7 +27,7 @@ export function BatchListingInfoBanner({ onBatchClick }: BatchListingInfoBannerP
                         >
                             Batch-Listing Funktion
                         </button>{' '}
-                        für effizientes Listing mit festen oder aufsteigenden Preisen.
+                        fuer effizientes Listing (nur Verkauf) mit festen oder aufsteigenden Preisen.
                     </p>
                 </div>
             </div>

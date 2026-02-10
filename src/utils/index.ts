@@ -42,3 +42,6 @@ export * from './features';
 
 // API: API layer utilities (includes updated createNFTKey and isDataFresh)
 export * from './api';
+
+// NFT: Scroll item mappers and NFT-specific helpers
+export * from './nft';

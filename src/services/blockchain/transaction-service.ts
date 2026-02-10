@@ -74,6 +74,7 @@ export interface TransactionResult {
 export interface PurchaseNFTParams {
     listingId: string;
     price: string; // in ETH
+    currency?: string; // payment currency (0x0 = ETH, WETH address = WETH)
     seller: string;
     buyer?: string; // For data invalidation
     contractAddress: string;
@@ -91,6 +92,7 @@ export interface UpdateListingParams {
     contractAddress: string;
     tokenId: string;
     newPrice?: string;
+    newCurrency?: string;
     newDesiredContractAddress?: string;
     newDesiredTokenId?: string;
     onProgress?: (step: TransactionStep) => void;
@@ -113,8 +115,11 @@ export interface CreateListingParams {
     contractAddress: string;
     tokenId: string;
     price: string;
+    currency?: string; // Payment token address (0x0000...0000 = ETH, WETH/USDC/etc = token address)
     desiredContractAddress?: string;
     desiredTokenId?: string;
+    buyerWhitelistEnabled?: boolean;
+    allowedBuyers?: string[];
     onProgress?: (step: TransactionStep) => void;
     onError?: (error: string) => void;
     onSuccess?: (result: TransactionResult) => void;
@@ -319,6 +324,7 @@ export function useTransactionService() {
         const {
             listingId,
             newPrice,
+            newCurrency,
             newDesiredContractAddress,
             newDesiredTokenId,
             onProgress,
@@ -358,6 +364,7 @@ export function useTransactionService() {
             await listingHook.updateListing({
                 listingId,
                 newPrice,
+                newCurrency,
                 newDesiredTokenAddress: newDesiredContractAddress,
                 newDesiredTokenId: newDesiredTokenId
             });
@@ -594,8 +601,11 @@ export function useTransactionService() {
             contractAddress,
             tokenId,
             price,
+            currency,
             desiredContractAddress,
             desiredTokenId,
+            buyerWhitelistEnabled,
+            allowedBuyers,
             onProgress,
             onError,
             onSuccess,
@@ -615,12 +625,13 @@ export function useTransactionService() {
                 'Setting up your NFT listing...'
             );
 
-            console.log('📝 Preparing create listing transaction:', {
-                contractAddress,
-                tokenId,
-                price,
-                hasSwap: !!desiredContractAddress
-            });
+            console.log('📝 [TRANSACTION SERVICE] Preparing create listing transaction:');
+            console.log('   contractAddress:', contractAddress);
+            console.log('   tokenId:', tokenId);
+            console.log('   price:', price);
+            console.log('   currency:', currency);
+            console.log('   desiredContractAddress:', desiredContractAddress);
+            console.log('   hasSwap:', !!desiredContractAddress);
 
             setCurrentStep('signing');
             onProgress?.('signing');
@@ -631,12 +642,25 @@ export function useTransactionService() {
                 'Please confirm the listing in your wallet'
             );
 
+            console.log('🔍 [TRANSACTION SERVICE] Calling listingHook.createListing with:');
+            console.log('   tokenAddress:', contractAddress);
+            console.log('   tokenId:', tokenId);
+            console.log('   price:', price);
+            console.log('   currency:', currency);
+            console.log('   desiredTokenAddress:', desiredContractAddress);
+            console.log('   desiredTokenId:', desiredTokenId);
+            console.log('   buyerWhitelistEnabled:', buyerWhitelistEnabled);
+            console.log('   allowedBuyers:', allowedBuyers);
+
             const txHash = await listingHook.createListing({
                 tokenAddress: contractAddress,
                 tokenId,
                 price,
+                currency: currency, // Pass currency parameter
                 desiredTokenAddress: desiredContractAddress,
-                desiredTokenId: desiredTokenId
+                desiredTokenId: desiredTokenId,
+                buyerWhitelistEnabled: buyerWhitelistEnabled || false,
+                allowedBuyers: allowedBuyers || []
             });
 
             console.log('✅ Create listing transaction submitted, hash:', txHash);

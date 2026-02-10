@@ -1,5 +1,6 @@
 # Utils Organization Audit
-**Date:** December 19, 2025  
+
+**Date:** February 9, 2026  
 **Status:** ✅ Well Organized (Minor optimization opportunities)
 
 ---
@@ -35,6 +36,9 @@ src/utils/
 ├── marketplace/
 │   ├── index.ts
 │   └── nft-converters.ts      # Type converters
+├── nft/
+│   ├── index.ts
+│   └── scrollItem.ts           # NFT scroll item mappers
 └── blockchain/
     └── contract-calls.ts       # Contract interaction utilities
 ```
@@ -44,11 +48,13 @@ src/utils/
 ## ✅ What's Working Well
 
 ### 1. Clear Organization
+
 - **By Purpose**: Each folder has a clear responsibility
 - **Centralized Exports**: `index.ts` files provide clean imports
 - **Type Safety**: All utilities are strongly typed
 
 ### 2. Good Separation
+
 - `core/`: Fundamental data operations
 - `formatters/`: Display logic
 - `validation/`: Input validation
@@ -59,11 +65,12 @@ src/utils/
 - `blockchain/`: Smart contract interactions
 
 ### 3. Documentation
+
 ```typescript
 // utils/index.ts has clear comments
 /**
  * UTILS - Central Utility Functions Export
- * 
+ *
  * Organized Utility Categories:
  * • core: Basic data processing (BigInt, Media)
  * • formatters: Display formatting (Currency, Dates, Text)
@@ -77,10 +84,12 @@ src/utils/
 ## 🟡 Minor Optimization Opportunities
 
 ### 1. Blockchain Utils Location (Optional)
+
 **Current:** `src/utils/blockchain/contract-calls.ts`  
 **Alternative:** Move to `src/services/blockchain/` for consistency
 
 **Reasoning:**
+
 - Services folder contains other blockchain code
 - Contract calls are more "service" than "utility"
 - Current location works fine though
@@ -90,12 +99,15 @@ src/utils/
 ---
 
 ### 2. Duplicate Validation Logic (Low Priority)
+
 **Potential duplication:**
+
 - `utils/validation/general.ts` - Input validation
 - `lib/middleware/validation.ts` - API validation (Zod)
 - `utils/features/admin-access.ts` - Address validation
 
 **Analysis:**
+
 - Each serves different purpose (frontend vs backend vs feature)
 - Minimal actual duplication
 - Separation is intentional and useful
@@ -105,10 +117,12 @@ src/utils/
 ---
 
 ### 3. DevLog Utility Placement
+
 **Current:** `src/utils/devLog.ts`  
 **Alternative:** `src/utils/core/devLog.ts` or `src/lib/devLog.ts`
 
 **Analysis:**
+
 - Used across entire app
 - Root level is actually fine for cross-cutting concern
 
@@ -119,12 +133,14 @@ src/utils/
 ## 📋 Utils Inventory
 
 ### Core Utils (4 functions)
+
 - `serializeBigInt()` - Safe BigInt JSON serialization
 - `deserializeBigInt()` - BigInt deserialization
 - `getIPFSDisplayUrl()` - IPFS URL resolution
 - `getMediaDisplayUrl()` - Generic media URL resolution
 
 ### Formatters (10+ functions)
+
 - `formatPrice()` - ETH price formatting
 - `formatPriceRange()` - Price range display
 - `formatTokenId()` - Token ID display
@@ -136,12 +152,14 @@ src/utils/
 - ... (more formatting functions)
 
 ### Validation (5+ functions)
+
 - `validateEthereumAddress()` - Address validation
 - `validateTokenId()` - Token ID validation
 - `sanitizeUserInput()` - Input sanitization
 - ... (more validation)
 
 ### Performance (8+ functions)
+
 - `performanceMonitor` - Performance tracking
 - `measureAsync()` - Async function timing
 - `measureSync()` - Sync function timing
@@ -151,6 +169,7 @@ src/utils/
 - ... (more performance tools)
 
 ### Features (7+ functions)
+
 - `hasAdminAccess()` - Admin access check
 - `isAdminReadOnlyMode()` - Read-only mode check
 - `canPerformAdminActions()` - Action permission check
@@ -159,6 +178,7 @@ src/utils/
 - ... (more feature utilities)
 
 ### API Utilities (12+ functions)
+
 - `createNFTKey()` - NFT unique key generation
 - `createBaseAggregatedNFT()` - NFT aggregation
 - `mergeAggregatedNFT()` - NFT data merging
@@ -169,6 +189,7 @@ src/utils/
 - ... (more API helpers)
 
 ### Marketplace (6+ functions)
+
 - `convertToScrollItems()` - Gallery conversion
 - `convertToFilterableItems()` - Filter conversion
 - `isNFTScrollItem()` - Type guard
@@ -176,7 +197,15 @@ src/utils/
 - `safeConvertToScrollItems()` - Safe conversion
 - ... (more converters)
 
+### NFT (3+ functions)
+
+- `normalizePrice()` - Normalizes price values (string/BSON Long)
+- `mapEnrichedNFTToScrollItem()` - Maps MongoDB items to UI scroll items
+- `mapEnrichedNFTToFilterableItem()` - Maps MongoDB items for filters
+- `mapWalletNFTToScrollItem()` - Maps wallet NFTs for UI display
+
 ### Blockchain (3+ functions)
+
 - `executeContractCallWithFallback()` - Contract calls
 - `executeBatchContractCalls()` - Batch calls
 - ... (RPC management)
@@ -185,16 +214,17 @@ src/utils/
 
 ## 📊 Summary
 
-| Category | Status | Functions | Location |
-|----------|--------|-----------|----------|
-| **Core** | ✅ Optimal | 4 | `utils/core/` |
-| **Formatters** | ✅ Optimal | 10+ | `utils/formatters/` |
-| **Validation** | ✅ Optimal | 5+ | `utils/validation/` |
-| **Performance** | ✅ Optimal | 8+ | `utils/performance/` |
-| **Features** | ✅ Optimal | 7+ | `utils/features/` |
-| **API** | ✅ Optimal | 12+ | `utils/api/` |
-| **Marketplace** | ✅ Optimal | 6+ | `utils/marketplace/` |
-| **Blockchain** | 🟡 Alternative | 3+ | `utils/blockchain/` |
+| Category        | Status         | Functions | Location             |
+| --------------- | -------------- | --------- | -------------------- |
+| **Core**        | ✅ Optimal     | 4         | `utils/core/`        |
+| **Formatters**  | ✅ Optimal     | 10+       | `utils/formatters/`  |
+| **Validation**  | ✅ Optimal     | 5+        | `utils/validation/`  |
+| **Performance** | ✅ Optimal     | 8+        | `utils/performance/` |
+| **Features**    | ✅ Optimal     | 7+        | `utils/features/`    |
+| **API**         | ✅ Optimal     | 12+       | `utils/api/`         |
+| **Marketplace** | ✅ Optimal     | 6+        | `utils/marketplace/` |
+| **NFT**         | ✅ Optimal     | 3+        | `utils/nft/`         |
+| **Blockchain**  | 🟡 Alternative | 3+        | `utils/blockchain/`  |
 
 **Overall Grade:** ✅ **A+ (Excellent Organization)**
 
@@ -203,10 +233,13 @@ src/utils/
 ## 🎯 Recommendations
 
 ### Priority 1: Documentation (10 minutes)
+
 ✅ **COMPLETE** - This audit document created
 
 ### Priority 2: No Major Refactoring Needed
+
 The current utils organization is:
+
 - ✅ Well structured
 - ✅ Easy to navigate
 - ✅ Properly typed
@@ -214,7 +247,9 @@ The current utils organization is:
 - ✅ Logically grouped
 
 ### Priority 3: Future Considerations
+
 When adding new utilities:
+
 1. **Use existing categories** when possible
 2. **Create new category** only if needed
 3. **Update central index.ts** for exports
@@ -226,37 +261,40 @@ When adding new utilities:
 ## 📝 Best Practices (Established)
 
 ### Import Pattern
+
 ```typescript
 // ✅ Good: Import from central index
-import { formatPrice, validateAddress } from '@/utils';
+import { formatPrice, validateAddress } from "@/utils";
 
 // ❌ Avoid: Direct file imports
-import { formatPrice } from '@/utils/formatters/general';
+import { formatPrice } from "@/utils/formatters/general";
 ```
 
 ### Export Pattern
+
 ```typescript
 // ✅ Good: Re-export from category index
 // utils/formatters/index.ts
-export * from './general';
-export * from './nft';
+export * from "./general";
+export * from "./nft";
 
 // Then re-export from main index
 // utils/index.ts
-export * from './formatters';
+export * from "./formatters";
 ```
 
 ### Function Naming
+
 ```typescript
 // ✅ Good: Clear, verb-based names
-formatPrice()
-validateAddress()
-createNFTKey()
+formatPrice();
+validateAddress();
+createNFTKey();
 
 // ❌ Avoid: Vague names
-handleData()
-processStuff()
-doThing()
+handleData();
+processStuff();
+doThing();
 ```
 
 ---
@@ -266,6 +304,7 @@ doThing()
 **Utils consolidation is ALREADY DONE ✅**
 
 The current organization is **production-ready** and follows best practices:
+
 - Clear folder structure
 - Logical grouping
 - Central exports

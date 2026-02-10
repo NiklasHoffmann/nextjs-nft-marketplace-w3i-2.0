@@ -11,7 +11,9 @@
 import { useState, useEffect } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useNotifications } from '@/contexts/notifications';
-import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
+import { IDEATION_MARKET_FACET_ABI } from '@/config/abis/ideation-market-facet';
+import { COLLECTION_WHITELIST_FACET_ABI } from '@/config/abis/collection-whitelist-facet';
+import { BUYER_WHITELIST_FACET_ABI } from '@/config/abis/buyer-whitelist-facet';
 
 export function useMarketplaceAdmin(marketplaceAddress: string) {
   const [isLoading, setIsLoading] = useState(false);
@@ -73,7 +75,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
 
       await writeContract({
         address: marketplaceAddress as `0x${string}`,
-        abi: MARKETPLACE_ABI,
+        abi: IDEATION_MARKET_FACET_ABI,
         functionName: 'setInnovationFee',
         args: [newFeeInBasisPoints],
         gas: BigInt(100000)
@@ -113,7 +115,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
 
       await writeContract({
         address: marketplaceAddress as `0x${string}`,
-        abi: MARKETPLACE_ABI,
+        abi: COLLECTION_WHITELIST_FACET_ABI,
         functionName: 'addWhitelistedCollection',
         args: [collectionAddress as `0x${string}`],
         gas: BigInt(150000), // Increased from 100k
@@ -153,7 +155,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
 
       await writeContract({
         address: marketplaceAddress as `0x${string}`,
-        abi: MARKETPLACE_ABI,
+        abi: COLLECTION_WHITELIST_FACET_ABI,
         functionName: 'removeWhitelistedCollection',
         args: [collectionAddress as `0x${string}`],
         gas: BigInt(150000), // Increased from 100k
@@ -194,7 +196,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
 
       await writeContract({
         address: marketplaceAddress as `0x${string}`,
-        abi: MARKETPLACE_ABI,
+        abi: COLLECTION_WHITELIST_FACET_ABI,
         functionName: 'batchAddWhitelistedCollections',
         args: [collectionAddresses as `0x${string}`[]],
         gas: BigInt(200000)
@@ -235,7 +237,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
 
       await writeContract({
         address: marketplaceAddress as `0x${string}`,
-        abi: MARKETPLACE_ABI,
+        abi: COLLECTION_WHITELIST_FACET_ABI,
         functionName: 'batchRemoveWhitelistedCollections',
         args: [collectionAddresses as `0x${string}`[]],
         gas: BigInt(200000)
@@ -275,7 +277,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
 
       await writeContract({
         address: marketplaceAddress as `0x${string}`,
-        abi: MARKETPLACE_ABI,
+        abi: IDEATION_MARKET_FACET_ABI,
         functionName: 'cleanListing',
         args: [BigInt(listingId)],
         gas: BigInt(150000)
@@ -317,7 +319,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
 
       await writeContract({
         address: marketplaceAddress as `0x${string}`,
-        abi: MARKETPLACE_ABI,
+        abi: BUYER_WHITELIST_FACET_ABI,
         functionName: 'addBuyerWhitelistAddresses',
         args: [BigInt(listingId), buyerAddresses as `0x${string}`[]],
         gas: BigInt(200000)
@@ -358,7 +360,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
 
       await writeContract({
         address: marketplaceAddress as `0x${string}`,
-        abi: MARKETPLACE_ABI,
+        abi: BUYER_WHITELIST_FACET_ABI,
         functionName: 'removeBuyerWhitelistAddresses',
         args: [BigInt(listingId), buyerAddresses as `0x${string}`[]],
         gas: BigInt(200000)

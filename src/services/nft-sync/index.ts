@@ -25,8 +25,15 @@ import { StatsSync } from './stats-sync';
 import { InsightsSync } from './insights-sync';
 import { getMarketplaceEventListener, type MarketplaceEventListenerService } from '../marketplace/event-listener';
 import { routeMarketplaceEvent } from '../marketplace/event-invalidation-bridge';
-import { syncListingToMongoDB, removeListingFromMongoDB, updateListingInMongoDB } from '../marketplace/event-mongodb-sync';
-import type { ProcessedItemListedEvent, ProcessedItemBoughtEvent, ProcessedItemCanceledEvent, ProcessedItemUpdatedEvent } from '@/types/marketplace/contract-events';
+import { syncListingToMongoDB, removeListingFromMongoDB, removeListingByListingId, updateListingInMongoDB } from '../marketplace/event-mongodb-sync';
+import type {
+    ProcessedItemListedEvent,
+    ProcessedItemBoughtEvent,
+    ProcessedItemCanceledEvent,
+    ProcessedItemUpdatedEvent,
+    ProcessedListingCanceledDueToInvalidListingEvent,
+    ProcessedCollectionWhitelistRevokedCancelTriggeredEvent
+} from '@/types/marketplace/contract-events';
 
 export { blockchainStateSync } from './blockchain-state-sync';
 export { ipfsMetadataLazySync } from './ipfs-metadata-lazy-sync';
@@ -62,7 +69,7 @@ export class NFTSyncService {
         try {
             // Get global event listener (if available)
             const marketplaceAddress = process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS as `0x${string}`;
-            const wsUrl = process.env.NEXT_PUBLIC_ALCHEMY_URL_WSS 
+            const wsUrl = process.env.NEXT_PUBLIC_ALCHEMY_URL_WSS
                 || process.env.ALCHEMY_URL_WSS
                 || process.env.NEXT_PUBLIC_INFURA_URL_WSS
                 || process.env.INFURA_URL_WSS;
@@ -72,11 +79,20 @@ export class NFTSyncService {
                 this.eventListener = getMarketplaceEventListener(marketplaceAddress, wsUrl);
 
                 // Subscribe to all marketplace events and route them
-                const eventTypes: Array<'ItemListed' | 'ItemBought' | 'ItemCanceled' | 'ItemUpdated'> = [
+                const eventTypes: Array<
+                    'ItemListed'
+                    | 'ItemBought'
+                    | 'ItemCanceled'
+                    | 'ItemUpdated'
+                    | 'ListingCanceledDueToInvalidListing'
+                    | 'CollectionWhitelistRevokedCancelTriggered'
+                > = [
                     'ItemListed',
                     'ItemBought',
                     'ItemCanceled',
-                    'ItemUpdated'
+                    'ItemUpdated',
+                    'ListingCanceledDueToInvalidListing',
+                    'CollectionWhitelistRevokedCancelTriggered'
                 ];
 
                 eventTypes.forEach(eventName => {
@@ -94,13 +110,27 @@ export class NFTSyncService {
                         } else if (event.eventName === 'ItemBought' || event.eventName === 'ItemCanceled') {
                             const { nftAddress, tokenId, listingId } = event.data;
                             const buyer = event.eventName === 'ItemBought' ? (event as ProcessedItemBoughtEvent).data.buyer : undefined;
-                            
+
                             removeListingFromMongoDB(
                                 nftAddress,
                                 tokenId.toString(),
                                 listingId.toString(),
                                 buyer // Only defined for ItemBought
                             ).catch(error => {
+                                console.error('❌ [Backend] MongoDB removal failed:', error);
+                            });
+                        } else if (event.eventName === 'ListingCanceledDueToInvalidListing') {
+                            const { nftAddress, tokenId, listingId } = (event as ProcessedListingCanceledDueToInvalidListingEvent).data;
+                            removeListingFromMongoDB(
+                                nftAddress,
+                                tokenId.toString(),
+                                listingId.toString()
+                            ).catch(error => {
+                                console.error('❌ [Backend] MongoDB removal failed:', error);
+                            });
+                        } else if (event.eventName === 'CollectionWhitelistRevokedCancelTriggered') {
+                            const { tokenAddress, listingId } = (event as ProcessedCollectionWhitelistRevokedCancelTriggeredEvent).data;
+                            removeListingByListingId(tokenAddress, listingId.toString()).catch(error => {
                                 console.error('❌ [Backend] MongoDB removal failed:', error);
                             });
                         } else if (event.eventName === 'ItemUpdated') {

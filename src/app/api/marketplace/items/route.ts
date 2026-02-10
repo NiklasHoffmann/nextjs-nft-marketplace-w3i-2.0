@@ -78,6 +78,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
     // Marketplace filters
     if (contractAddress) {
         query.contractAddress = contractAddress;
+    } else {
+        query.contractAddress = { $exists: true, $nin: [null, '', 'undefined'] };
     }
     if (seller) query.seller = seller;
 
@@ -93,23 +95,23 @@ export const GET = apiHandler(async (request: NextRequest) => {
     const pipeline: any[] = [
         { $match: query },
 
-        // Price filters using $expr for numeric comparison (price is stored as string)
-        ...(minPrice || maxPrice ? [{
+        // Price filters using string comparison (price stored as string Wei)
+        ...(minPrice ? [{
             $match: {
                 $expr: {
-                    $and: [
-                        ...(minPrice ? [{
-                            $gte: [
-                                { $toLong: { $ifNull: ['$price', '0'] } },
-                                parseFloat(minPrice) * 1e18 // Convert ETH to Wei
-                            ]
-                        }] : []),
-                        ...(maxPrice ? [{
-                            $lte: [
-                                { $toLong: { $ifNull: ['$price', '0'] } },
-                                parseFloat(maxPrice) * 1e18 // Convert ETH to Wei
-                            ]
-                        }] : [])
+                    $gte: [
+                        { $toDecimal: { $ifNull: ['$price', '0'] } },
+                        { $toDecimal: (parseFloat(minPrice) * 1e18).toString() }
+                    ]
+                }
+            }
+        }] : []),
+        ...(maxPrice ? [{
+            $match: {
+                $expr: {
+                    $lte: [
+                        { $toDecimal: { $ifNull: ['$price', '0'] } },
+                        { $toDecimal: (parseFloat(maxPrice) * 1e18).toString() }
                     ]
                 }
             }
@@ -326,7 +328,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
                 // Add sort fields with null handling
                 sortName: { $ifNull: ['$nftData.metadata.name', ''] },
-                sortPrice: { $toLong: { $ifNull: ['$price', '0'] } }, // Convert string Wei to number for sorting
+                sortPrice: { $toDecimal: { $ifNull: ['$price', '0'] } }, // Convert string Wei to decimal for sorting
                 sortCreatedAt: '$createdAt',
                 sortViewCount: { $ifNull: ['$statsData.viewCount', 0] },
                 sortLikeCount: { $ifNull: ['$statsData.likeCount', 0] },

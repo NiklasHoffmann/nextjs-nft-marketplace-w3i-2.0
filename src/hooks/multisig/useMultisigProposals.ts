@@ -14,7 +14,11 @@ import {
     ProposalType,
     ProposalStatus
 } from '@/types';
-import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
+import { IDEATION_MARKET_FACET_ABI } from '@/config/abis/ideation-market-facet';
+import { COLLECTION_WHITELIST_FACET_ABI } from '@/config/abis/collection-whitelist-facet';
+import { BUYER_WHITELIST_FACET_ABI } from '@/config/abis/buyer-whitelist-facet';
+import { PAUSE_FACET_ABI } from '@/config/abis/pause-facet';
+import { OWNERSHIP_FACET_ABI } from '@/config/abis/ownership-facet';
 import { MULTISIG_WALLET_ABI } from '@/config/abis/multisig-wallet';
 import { encodeFunctionData } from 'viem';
 
@@ -31,6 +35,25 @@ export function useMultisigProposals(marketplaceAddress?: string) {
     const [error, setError] = useState<string | null>(null);
     const [stats, setStats] = useState({ total: 0, pending: 0, confirmed: 0, executed: 0 });
     const [mounted, setMounted] = useState(false);
+
+    const getMarketplaceAbiForFunction = (functionName: string) => {
+        const abiMap: Record<string, readonly unknown[]> = {
+            setInnovationFee: IDEATION_MARKET_FACET_ABI,
+            cleanListing: IDEATION_MARKET_FACET_ABI,
+            addWhitelistedCollection: COLLECTION_WHITELIST_FACET_ABI,
+            removeWhitelistedCollection: COLLECTION_WHITELIST_FACET_ABI,
+            batchAddWhitelistedCollections: COLLECTION_WHITELIST_FACET_ABI,
+            batchRemoveWhitelistedCollections: COLLECTION_WHITELIST_FACET_ABI,
+            addBuyerWhitelistAddresses: BUYER_WHITELIST_FACET_ABI,
+            removeBuyerWhitelistAddresses: BUYER_WHITELIST_FACET_ABI,
+            pause: PAUSE_FACET_ABI,
+            unpause: PAUSE_FACET_ABI,
+            transferOwnership: OWNERSHIP_FACET_ABI,
+            acceptOwnership: OWNERSHIP_FACET_ABI,
+        };
+
+        return abiMap[functionName];
+    };
 
     // Client-only mounting
     useEffect(() => {
@@ -208,7 +231,18 @@ export function useMultisigProposals(marketplaceAddress?: string) {
             // If targeting the marketplace, use marketplace ABI
             // Otherwise (e.g., multisig operations), use multisig ABI
             const isMarketplaceOperation = proposal.targetContract.toLowerCase() === marketplaceAddress?.toLowerCase();
-            const contractABI = isMarketplaceOperation ? MARKETPLACE_ABI : MULTISIG_WALLET_ABI;
+            const marketplaceAbi = isMarketplaceOperation
+                ? getMarketplaceAbiForFunction(functionName)
+                : undefined;
+
+            if (isMarketplaceOperation && !marketplaceAbi) {
+                notifications.error('Execution Failed', `Unsupported marketplace function: ${functionName}`);
+                setError(`Unsupported marketplace function: ${functionName}`);
+                setIsLoading(false);
+                return false;
+            }
+
+            const contractABI = isMarketplaceOperation ? marketplaceAbi : MULTISIG_WALLET_ABI;
 
             notifications.info('Executing Proposal', 'Please confirm the transaction in your wallet...');
 

@@ -5,6 +5,9 @@ import crypto from 'crypto';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * Verifiziert und dekodiert ein Token
  */
@@ -58,9 +61,11 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
     if (!token) {
         console.log('❌ No session cookie found');
-        return apiSuccess({
+        const response = apiSuccess({
             isAuthenticated: false
         });
+        response.headers.set('Cache-Control', 'no-store, max-age=0');
+        return response;
     }
 
     const payload = verifyToken(token);
@@ -73,15 +78,19 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
     if (!payload || !payload.isAdmin) {
         console.log('❌ Invalid token or not admin');
-        return apiSuccess({
+        const response = apiSuccess({
             isAuthenticated: false
         });
+        response.headers.set('Cache-Control', 'no-store, max-age=0');
+        return response;
     }
 
     console.log('✅ Session valid for:', payload.address);
-    return apiSuccess({
+    const response = apiSuccess({
         isAuthenticated: true,
         address: payload.address,
         isAdmin: payload.isAdmin
     });
+    response.headers.set('Cache-Control', 'no-store, max-age=0');
+    return response;
 });

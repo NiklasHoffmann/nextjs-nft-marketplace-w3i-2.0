@@ -6,7 +6,6 @@ import { ApolloProvider } from "@apollo/client/react";
 import apolloClient from '@/config/apolloClient';
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { NFTStatsProvider } from "@/contexts/nft-stats/NFTStatsContext";
-import { MarketplaceEventsProvider as EventsContextProvider } from "@/contexts/marketplace-events";
 import { MarketplaceItemsProvider } from "@/contexts/marketplace-items";
 import { WalletNFTsProvider } from "@/contexts/wallet-nfts";
 import { CollectionsProvider } from "@/contexts/collections";
@@ -74,29 +73,26 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         <Web3Provider>
           <ApolloProvider client={apolloClient}>
             <NFTStatsProvider>
-              {/* 🔥 EventsContext wraps all other contexts - single WebSocket connection */}
-              <EventsContextProvider>
+              {/* Real-time WebSocket event listener for marketplace */}
+              <MarketplaceEventsProvider 
+                autoStart={true}
+                debug={isDevelopment}
+              >
                 <MarketplaceItemsProvider>
                   <WalletNFTsProvider>
                     <CollectionsProvider>
                       <CurrencyProvider>
                         <CartProvider>
-                        {/* Real-time WebSocket event listener for marketplace */}
-                        <MarketplaceEventsProvider 
-                          autoStart={true}
-                          debug={isDevelopment}
-                        >
                           <AdminGuard>
                             <LayoutContent>{children}</LayoutContent>
                             <NotificationContainer />
                           </AdminGuard>
-                        </MarketplaceEventsProvider>
-                      </CartProvider>
-                    </CurrencyProvider>
-                  </CollectionsProvider>
-                </WalletNFTsProvider>
-              </MarketplaceItemsProvider>
-            </EventsContextProvider>
+                        </CartProvider>
+                      </CurrencyProvider>
+                    </CollectionsProvider>
+                  </WalletNFTsProvider>
+                </MarketplaceItemsProvider>
+              </MarketplaceEventsProvider>
             </NFTStatsProvider>
           </ApolloProvider>
         </Web3Provider>

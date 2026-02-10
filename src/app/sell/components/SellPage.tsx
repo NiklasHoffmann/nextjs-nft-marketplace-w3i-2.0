@@ -102,13 +102,31 @@ export function SellPage() {
     const [whitelistStatus, setWhitelistStatus] = useState<StepStatus>('not-started');
     const [approvalStatus, setApprovalStatus] = useState<StepStatus>('not-started');
     const [showApprovalDialog, setShowApprovalDialog] = useState(false);
+    const [unapprovedContracts, setUnapprovedContracts] = useState<string[]>([]);
+
+    const approvalNFT = useMemo(() => {
+        if (unapprovedContracts.length > 0) {
+            const contract = unapprovedContracts[0];
+            const match = allNFTs.find(nft => nft.contractAddress === contract);
+            if (match) return match;
+        }
+
+        if (selectedNFT) return selectedNFT;
+        if (batchSelectedNFTs.size === 0) return null;
+        const firstKey = Array.from(batchSelectedNFTs)[0];
+        if (!firstKey) return null;
+        const [contract, tokenId] = firstKey.split('-');
+        return allNFTs.find(
+            nft => nft.contractAddress === contract && nft.tokenId === tokenId
+        ) || null;
+    }, [unapprovedContracts, selectedNFT, batchSelectedNFTs, allNFTs]);
 
     // NFT Approval Hook
     const nftApproval = useNFTApproval({
-        nftContractAddress: (selectedNFT?.contractAddress || '') as `0x${string}`,
-        tokenId: selectedNFT?.tokenId || '0',
+        nftContractAddress: (approvalNFT?.contractAddress || '') as `0x${string}`,
+        tokenId: approvalNFT?.tokenId || '0',
         marketplaceAddress: marketplaceAddress || '0x0000000000000000000000000000000000000000',
-        enabled: !!selectedNFT && !!marketplaceAddress
+        enabled: !!approvalNFT && !!marketplaceAddress
     });
 
     // Sync userNFTs to context
@@ -151,6 +169,7 @@ export function SellPage() {
             setShowApprovalDialog(false);
         }
     }, [whitelistStatus, approvalStatus, selectedNFT, batchSelectedNFTs]);
+
 
     useEffect(() => {
         if (urlContract && urlTokenId && allNFTs.length > 0 && !selectedNFT) {
@@ -223,9 +242,14 @@ export function SellPage() {
 
                 // All contracts must be approved
                 const allApproved = approvalChecks.every(check => check.isApproved);
+                const notApproved = approvalChecks
+                    .filter(check => !check.isApproved)
+                    .map(check => check.contractAddress);
+                setUnapprovedContracts(notApproved);
                 setApprovalStatus(allApproved ? 'done' : 'failed');
             } catch (error) {
                 console.error('Approval check failed:', error);
+                setUnapprovedContracts([]);
                 setApprovalStatus('failed');
             }
         };
@@ -233,6 +257,7 @@ export function SellPage() {
         if (whitelistStatus === 'done' && address && contractsToCheck.length > 0) {
             checkApproval(contractsToCheck, address);
         } else {
+            setUnapprovedContracts([]);
             setApprovalStatus('not-started');
         }
     }, [contractsToCheck, marketplaceAddress, address, whitelistStatus]);
@@ -349,7 +374,12 @@ export function SellPage() {
             .filter(Boolean) as AggregatedNFT[];
 
         handleBatchFormSubmit({
+            mode: 'sale',
             selectedNFTs: selectedNFTsList,
+            selectedNFT: null,
+            tradeType: undefined,
+            targetNFT: null,
+            targetCollection: undefined,
             ...data
         });
     };
@@ -522,8 +552,8 @@ export function SellPage() {
                                                     <span className="text-[10px] font-bold text-blue-600">2</span>
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-medium text-gray-900">Preis festlegen</p>
-                                                    <p className="text-xs text-gray-500">Konfigurieren Sie Ihr Listing.</p>
+                                                    <p className="text-sm font-medium text-gray-900">Listing konfigurieren</p>
+                                                    <p className="text-xs text-gray-500">Preis, Tausch oder Hybrid auswählen.</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
@@ -595,7 +625,7 @@ export function SellPage() {
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-medium text-gray-900">Preise festlegen</p>
-                                                    <p className="text-xs text-gray-500">Lege feste oder flexible Preise fest.</p>
+                                                    <p className="text-xs text-gray-500">Batch-Listings sind nur für Verkauf (Geld).</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-start gap-3 p-3 bg-purple-50 rounded-lg">
@@ -650,9 +680,9 @@ export function SellPage() {
             </section>
 
             {/* Approval Dialog Modal */}
-            {showApprovalDialog && selectedNFT && (
+            {showApprovalDialog && approvalNFT && (
                 <ApprovalDialog
-                    nft={selectedNFT}
+                    nft={approvalNFT}
                     isBatchMode={listingType === 'batch'}
                     onApproveSingle={handleApproveSingle}
                     onApproveAll={handleApproveAll}

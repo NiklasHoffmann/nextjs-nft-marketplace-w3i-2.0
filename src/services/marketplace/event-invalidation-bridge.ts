@@ -27,7 +27,11 @@ import type {
     ProcessedItemListedEvent,
     ProcessedItemBoughtEvent,
     ProcessedItemCanceledEvent,
-    ProcessedItemUpdatedEvent
+    ProcessedItemUpdatedEvent,
+    ProcessedListingCanceledDueToInvalidListingEvent,
+    ProcessedCollectionWhitelistRevokedCancelTriggeredEvent,
+    ProcessedBuyerWhitelistedEvent,
+    ProcessedBuyerRemovedFromWhitelistEvent
 } from '@/types/marketplace/contract-events';
 
 export function handleListingCreated(event: ProcessedItemListedEvent): void {
@@ -143,13 +147,14 @@ export function handleListingCanceled(event: ProcessedItemCanceledEvent): void {
  * Handle ListingCanceledDueToInvalidListing event
  * Same as ListingCanceled - NFT returns to owner
  */
-export function handleListingCanceledDueToInvalid(event: ProcessedItemCanceledEvent): void {
-    const { nftAddress, tokenId, listingId, seller } = event.data;
+export function handleListingCanceledDueToInvalid(event: ProcessedListingCanceledDueToInvalidListingEvent): void {
+    const { nftAddress, tokenId, listingId, seller, triggeredBy } = event.data;
 
     console.log('🔄 [EventBridge] ListingCanceledDueToInvalidListing:', {
         listingId: listingId.toString(),
         nft: `${nftAddress}:${tokenId}`,
         seller,
+        triggeredBy,
         reason: 'Invalid listing (NFT transferred or approval revoked)'
     });
 
@@ -171,6 +176,7 @@ export function handleListingCanceledDueToInvalid(event: ProcessedItemCanceledEv
         timestamp: event.processedAt,
         metadata: {
             seller,
+            triggeredBy,
             reason: 'invalid-listing'
         }
     });
@@ -180,7 +186,7 @@ export function handleListingCanceledDueToInvalid(event: ProcessedItemCanceledEv
  * Handle CollectionWhitelistRevokedCancelTriggered event
  * Collection removed from whitelist - all listings canceled
  */
-export function handleCollectionWhitelistRevoked(event: any): void {
+export function handleCollectionWhitelistRevoked(event: ProcessedCollectionWhitelistRevokedCancelTriggeredEvent): void {
     const { listingId, tokenAddress } = event.data;
 
     console.log('🔄 [EventBridge] CollectionWhitelistRevokedCancelTriggered:', {
@@ -209,6 +215,32 @@ export function handleCollectionWhitelistRevoked(event: any): void {
         metadata: {
             reason: 'collection-whitelist-revoked'
         }
+    });
+}
+
+/**
+ * Handle BuyerWhitelisted event
+ * No cache invalidation required by default
+ */
+export function handleBuyerWhitelisted(event: ProcessedBuyerWhitelistedEvent): void {
+    const { listingId, buyer } = event.data;
+
+    console.log('🔄 [EventBridge] BuyerWhitelisted:', {
+        listingId: listingId.toString(),
+        buyer
+    });
+}
+
+/**
+ * Handle BuyerRemovedFromWhitelist event
+ * No cache invalidation required by default
+ */
+export function handleBuyerRemovedFromWhitelist(event: ProcessedBuyerRemovedFromWhitelistEvent): void {
+    const { listingId, buyer } = event.data;
+
+    console.log('🔄 [EventBridge] BuyerRemovedFromWhitelist:', {
+        listingId: listingId.toString(),
+        buyer
     });
 }
 
@@ -325,11 +357,19 @@ export function routeMarketplaceEvent(event: ProcessedMarketplaceEvent | any): v
                 break;
 
             case 'ListingCanceledDueToInvalidListing':
-                handleListingCanceledDueToInvalid(event as ProcessedItemCanceledEvent);
+                handleListingCanceledDueToInvalid(event as ProcessedListingCanceledDueToInvalidListingEvent);
                 break;
 
             case 'CollectionWhitelistRevokedCancelTriggered':
-                handleCollectionWhitelistRevoked(event);
+                handleCollectionWhitelistRevoked(event as ProcessedCollectionWhitelistRevokedCancelTriggeredEvent);
+                break;
+
+            case 'BuyerWhitelisted':
+                handleBuyerWhitelisted(event as ProcessedBuyerWhitelistedEvent);
+                break;
+
+            case 'BuyerRemovedFromWhitelist':
+                handleBuyerRemovedFromWhitelist(event as ProcessedBuyerRemovedFromWhitelistEvent);
                 break;
 
             default:

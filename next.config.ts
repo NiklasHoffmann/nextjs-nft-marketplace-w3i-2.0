@@ -14,6 +14,11 @@ const nextConfig: import('next').NextConfig = {
   reactStrictMode: true,
   typedRoutes: true,
 
+  // Skip ESLint during builds (deprecated options in Next.js 15.5.9)
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
   // Performance optimizations
   poweredByHeader: false,
   compress: true,
@@ -29,6 +34,15 @@ const nextConfig: import('next').NextConfig = {
   },
 
   webpack: (config, { isServer, dev }) => {
+    // Suppress MetaMask SDK React Native warnings
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings || []),
+      {
+        module: /@metamask\/sdk/,
+        message: /Can't resolve '@react-native-async-storage\/async-storage'/,
+      },
+    ];
+
     // Optimize for production
     if (!isServer) {
       config.resolve.fallback = {

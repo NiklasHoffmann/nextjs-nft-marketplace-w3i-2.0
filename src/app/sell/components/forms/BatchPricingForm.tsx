@@ -28,7 +28,7 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
     const [pricingType, setPricingType] = useState<'fixed' | 'variable'>('fixed');
     const { setProgressStep } = useListingFlow();
     const chainId = useChainId();
-    
+
     // Get marketplace address and dynamic fees
     const { marketplaceAddress } = useMarketplaceContracts();
     const { calculateFees: calculateFeesBase, innovationFeePercentage, royaltyFeePercentage } = useMarketplaceFees({
@@ -40,14 +40,14 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
     // Wrapper function to support priceMode parameter (gross/net)
     const calculateFeesWithMode = (price: string, priceMode: 'gross' | 'net') => {
         const priceNum = parseFloat(price) || 0;
-        
+
         if (priceMode === 'net') {
             // Net mode: Calculate gross price from desired net amount
             const totalFeePercentage = innovationFeePercentage + royaltyFeePercentage;
             const grossPrice = priceNum / (1 - totalFeePercentage);
             const marketplaceFee = grossPrice * innovationFeePercentage;
             const royaltyFee = grossPrice * royaltyFeePercentage;
-            
+
             return {
                 marketplaceFee,
                 royaltyFee,
@@ -61,7 +61,7 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
             const marketplaceFee = priceNum * innovationFeePercentage;
             const royaltyFee = priceNum * royaltyFeePercentage;
             const youReceive = priceNum - marketplaceFee - royaltyFee;
-            
+
             return {
                 marketplaceFee,
                 royaltyFee,
@@ -170,7 +170,7 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
 
             onSubmit({
                 pricingType,
-                fixedPrice: pricingType === 'fixed' 
+                fixedPrice: pricingType === 'fixed'
                     ? (values.priceMode === 'net' ? submissionPrice : values.fixedPrice)
                     : undefined,
                 startPrice: pricingType === 'variable' ? values.startPrice : undefined,
@@ -236,7 +236,7 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
             } else {
                 // Brutto-Modus: Eingegebener Preis = Was Käufer zahlt
                 const grossPrice = inputPrice;
-                const fees = calculateFees(grossPrice);
+                const fees = calculateFeesBase(grossPrice);
                 return { ...fees, grossPrice };
             }
         })()
@@ -256,8 +256,8 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
                         type="button"
                         onClick={() => setPricingType('fixed')}
                         className={`p-4 rounded-xl border-2 transition-all duration-300 ${pricingType === 'fixed'
-                                ? 'border-purple-500 bg-gradient-to-br from-purple-50 to-purple-100 shadow-md'
-                                : 'border-gray-200 hover:border-purple-300 bg-white'
+                            ? 'border-purple-500 bg-gradient-to-br from-purple-50 to-purple-100 shadow-md'
+                            : 'border-gray-200 hover:border-purple-300 bg-white'
                             }`}
                     >
                         <div className="text-center">
@@ -274,8 +274,8 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
                         type="button"
                         onClick={() => setPricingType('variable')}
                         className={`p-4 rounded-xl border-2 transition-all duration-300 ${pricingType === 'variable'
-                                ? 'border-green-500 bg-gradient-to-br from-green-50 to-green-100 shadow-md'
-                                : 'border-gray-200 hover:border-green-300 bg-white'
+                            ? 'border-green-500 bg-gradient-to-br from-green-50 to-green-100 shadow-md'
+                            : 'border-gray-200 hover:border-green-300 bg-white'
                             }`}
                     >
                         <div className="text-center">
@@ -322,8 +322,8 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
                                 type="button"
                                 onClick={() => form.setFieldValue('priceMode', 'gross')}
                                 className={`flex-1 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${form.values.priceMode === 'gross'
-                                        ? 'border-blue-500 bg-blue-50 text-blue-900'
-                                        : 'border-gray-300 bg-white text-gray-700 hover:border-blue-300'
+                                    ? 'border-blue-500 bg-blue-50 text-blue-900'
+                                    : 'border-gray-300 bg-white text-gray-700 hover:border-blue-300'
                                     }`}
                             >
                                 <div className="flex items-center justify-center gap-2">
@@ -338,8 +338,8 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
                                 type="button"
                                 onClick={() => form.setFieldValue('priceMode', 'net')}
                                 className={`flex-1 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${form.values.priceMode === 'net'
-                                        ? 'border-green-500 bg-green-50 text-green-900'
-                                        : 'border-gray-300 bg-white text-gray-700 hover:border-green-300'
+                                    ? 'border-green-500 bg-green-50 text-green-900'
+                                    : 'border-gray-300 bg-white text-gray-700 hover:border-green-300'
                                     }`}
                             >
                                 <div className="flex items-center justify-center gap-2">
@@ -452,8 +452,8 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
                                 type="button"
                                 onClick={() => form.setFieldValue('priceMode', 'gross')}
                                 className={`flex-1 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${form.values.priceMode === 'gross'
-                                        ? 'border-blue-500 bg-blue-50 text-blue-900'
-                                        : 'border-gray-300 bg-white text-gray-700 hover:border-blue-300'
+                                    ? 'border-blue-500 bg-blue-50 text-blue-900'
+                                    : 'border-gray-300 bg-white text-gray-700 hover:border-blue-300'
                                     }`}
                             >
                                 <div className="flex items-center justify-center gap-2">
@@ -468,8 +468,8 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
                                 type="button"
                                 onClick={() => form.setFieldValue('priceMode', 'net')}
                                 className={`flex-1 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${form.values.priceMode === 'net'
-                                        ? 'border-green-500 bg-green-50 text-green-900'
-                                        : 'border-gray-300 bg-white text-gray-700 hover:border-green-300'
+                                    ? 'border-green-500 bg-green-50 text-green-900'
+                                    : 'border-gray-300 bg-white text-gray-700 hover:border-green-300'
                                     }`}
                             >
                                 <div className="flex items-center justify-center gap-2">
@@ -612,12 +612,12 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
                                     <div className="text-right">
                                         <div className="text-base font-bold text-green-600">
                                             {form.values.priceMode === 'gross'
-                                                ? `${(calculateFees(form.values.startPrice, form.values.priceMode).net * selectedNFTs.length).toFixed(4)} - ${(calculateFees(form.values.endPrice, form.values.priceMode).net * selectedNFTs.length).toFixed(4)}`
-                                                : `${(calculateFees(form.values.startPrice, form.values.priceMode).gross * selectedNFTs.length).toFixed(4)} - ${(calculateFees(form.values.endPrice, form.values.priceMode).gross * selectedNFTs.length).toFixed(4)}`
+                                                ? `${(calculateFeesWithMode(form.values.startPrice, form.values.priceMode).net * selectedCount).toFixed(4)} - ${(calculateFeesWithMode(form.values.endPrice, form.values.priceMode).net * selectedCount).toFixed(4)}`
+                                                : `${(calculateFeesWithMode(form.values.startPrice, form.values.priceMode).gross * selectedCount).toFixed(4)} - ${(calculateFeesWithMode(form.values.endPrice, form.values.priceMode).gross * selectedCount).toFixed(4)}`
                                             }
                                         </div>
                                         <div className="text-xs text-gray-500">
-                                            {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')} für {selectedNFTs.length} NFTs
+                                            {form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')} für {selectedCount} NFTs
                                         </div>
                                     </div>
                                 </div>
@@ -661,8 +661,8 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
                 type="submit"
                 disabled={whitelistStatus !== 'done' || approvalStatus === 'checking'}
                 className={`w-full px-6 py-3 rounded-xl text-white font-semibold shadow-lg hover:shadow-2xl transition-all duration-300 transform flex items-center justify-center gap-2 ${whitelistStatus !== 'done' || approvalStatus === 'checking'
-                        ? 'bg-gray-400 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 hover:scale-105'
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 hover:scale-105'
                     }`}
             >
                 {whitelistStatus === 'failed' ? (

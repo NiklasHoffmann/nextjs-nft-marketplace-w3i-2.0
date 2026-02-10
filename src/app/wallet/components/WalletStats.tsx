@@ -2,12 +2,10 @@
 
 import React from 'react';
 import { StatCard } from '@/components/ui/StatCard';
-
 interface WalletStatsProps {
     listedCount: number;
     unlistedCount: number;
-    totalListedValue: number;
-    totalValueUSD: string | null;
+    totalValueDisplay: string;
     ethPriceLoading: boolean;
     isCompact?: boolean;
 }
@@ -15,8 +13,7 @@ interface WalletStatsProps {
 export function WalletStats({
     listedCount,
     unlistedCount,
-    totalListedValue,
-    totalValueUSD,
+    totalValueDisplay,
     ethPriceLoading,
     isCompact = false
 }: WalletStatsProps) {
@@ -64,7 +61,7 @@ export function WalletStats({
                 isCompact={isCompact}
             />
 
-            {/* Total Value */}
+            {/* Total Value - Multi-currency */}
             <StatCard
                 icon={
                     <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -72,7 +69,7 @@ export function WalletStats({
                     </svg>
                 }
                 label="Total Value"
-                value={`${totalListedValue > 0 ? totalListedValue.toFixed(4) : '0.0000'} ETH`}
+                value={ethPriceLoading ? 'Loading...' : totalValueDisplay}
                 hideSecondaryPlaceholder
                 variant="blue"
                 isCompact={isCompact}

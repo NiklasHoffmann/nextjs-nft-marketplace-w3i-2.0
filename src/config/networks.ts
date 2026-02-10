@@ -5,6 +5,7 @@
 
 export interface NetworkContracts {
     NftMarketplace: string[];
+    MultiSigWallet?: string[];
 }
 
 export interface NetworkMapping {
@@ -14,11 +15,18 @@ export interface NetworkMapping {
 export const NETWORK_CONFIG: NetworkMapping = {
     // Hardhat Local Network
     "31337": {
-        NftMarketplace: ["0x5FbDB2315678afecb367f032d93F642f64180aa3"]
+        NftMarketplace: ["0x5FbDB2315678afecb367f032d93F642f64180aa3"],
+        MultiSigWallet: []
     },
     // Sepolia Testnet
     "11155111": {
-        NftMarketplace: ["0x1107Eb26D47A5bF88E9a9F97cbC7EA38c3E1D7EC"]
+        NftMarketplace: ["0x1107Eb26D47A5bF88E9a9F97cbC7EA38c3E1D7EC"],
+        MultiSigWallet: ["0x2180aFbC0156E6fF3156ca57C4dFb0a1AB9152C7"]
+    },
+    // Ethereum Mainnet (placeholder until deployed)
+    "1": {
+        NftMarketplace: ["0x0000000000000000000000000000000000000000"],
+        MultiSigWallet: ["0x66dcc49c47ebc505a4b560fD14Dc143f0098407f"]
     }
 } as const;
 
@@ -28,6 +36,14 @@ export const NETWORK_CONFIG: NetworkMapping = {
 export function getMarketplaceAddress(chainId: number | string): string | undefined {
     const contracts = NETWORK_CONFIG[chainId.toString()];
     return contracts?.NftMarketplace[0];
+}
+
+/**
+ * Get multisig wallet address for a specific chain
+ */
+export function getMultisigAddress(chainId: number | string): string | undefined {
+    const contracts = NETWORK_CONFIG[chainId.toString()];
+    return contracts?.MultiSigWallet?.[0];
 }
 
 /**

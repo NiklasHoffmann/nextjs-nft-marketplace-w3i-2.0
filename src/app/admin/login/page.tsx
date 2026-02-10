@@ -37,7 +37,8 @@ export default function AdminLoginPage() {
             }
 
             const response = await fetch('/api/auth/session', {
-                credentials: 'include'
+                credentials: 'include',
+                cache: 'no-store'
             });
 
             if (response.ok) {
@@ -91,7 +92,9 @@ export default function AdminLoginPage() {
 
             await new Promise(resolve => setTimeout(resolve, 100));
 
-            const challengeRes = await fetch('/api/auth/challenge');
+            const challengeRes = await fetch('/api/auth/challenge', {
+                cache: 'no-store'
+            });
             if (!challengeRes.ok) {
                 throw new Error('Challenge-Generierung fehlgeschlagen');
             }

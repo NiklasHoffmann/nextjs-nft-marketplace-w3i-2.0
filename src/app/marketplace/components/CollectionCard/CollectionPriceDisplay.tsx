@@ -24,14 +24,12 @@ export const CollectionPriceDisplay = React.memo(({
 
     return (
         <div className="space-y-1 min-h-[60px]">
-            <div className="text-sm font-semibold text-gray-900">
-                {totalValueInEth.toFixed(4)} ETH
-            </div>
             {loading ? (
-                <div className="text-xs text-gray-500">Lädt...</div>
+                <div className="text-sm font-semibold text-gray-900">Lädt...</div>
             ) : (
-                <div className="text-xs text-gray-600">≈ {convertedPrice}</div>
+                <div className="text-sm font-semibold text-gray-900">{convertedPrice}</div>
             )}
+            <div className="text-xs text-gray-600">≈ {totalValueInEth.toFixed(4)} ETH</div>
             <div className="text-xs text-blue-600">
                 {floorPriceInEth ? `Floor: ${floorPriceInEth.toFixed(4)} ETH` : 'Floor: —'}
             </div>

@@ -22,7 +22,8 @@
 
 import { createPublicClient, webSocket, decodeEventLog, type Address, type Hash, type Log, type WatchContractEventReturnType } from 'viem';
 import { sepolia } from 'viem/chains';
-import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
+import { IDEATION_MARKET_FACET_ABI } from '@/config/abis/ideation-market-facet';
+import { BUYER_WHITELIST_FACET_ABI } from '@/config/abis/buyer-whitelist-facet';
 import type {
     MarketplaceEventName,
     ProcessedMarketplaceEvent,
@@ -30,6 +31,10 @@ import type {
     ProcessedItemBoughtEvent,
     ProcessedItemCanceledEvent,
     ProcessedItemUpdatedEvent,
+    ProcessedListingCanceledDueToInvalidListingEvent,
+    ProcessedCollectionWhitelistRevokedCancelTriggeredEvent,
+    ProcessedBuyerWhitelistedEvent,
+    ProcessedBuyerRemovedFromWhitelistEvent,
     EventListenerConfig,
     EventListenerState,
     IMarketplaceEventListener,
@@ -37,13 +42,19 @@ import type {
     MarketplaceEventCallback
 } from '@/types/marketplace/contract-events';
 
+const MARKETPLACE_EVENT_ABI = [
+    ...IDEATION_MARKET_FACET_ABI,
+    ...BUYER_WHITELIST_FACET_ABI
+] as const;
+
 // ===== CONFIGURATION =====
 
 const MAX_RECONNECT_ATTEMPTS = 10;
 const INITIAL_RECONNECT_DELAY = 1000; // 1s
 const MAX_RECONNECT_DELAY = 60000; // 60s
 const EVENT_DEDUP_WINDOW = 5000; // 5s - prevent duplicate event processing
-const KEEPALIVE_INTERVAL = 30000; // 30s - send keepalive to prevent WebSocket timeout
+const KEEPALIVE_INTERVAL = 300000; // 5 min - send keepalive to prevent WebSocket timeout
+const KEEPALIVE_MAX_BACKOFF = 900000; // 15 min max backoff
 
 // ===== SERVICE IMPLEMENTATION =====
 
@@ -74,6 +85,8 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
 
     // Keepalive (prevent WebSocket timeout)
     private keepaliveInterval: NodeJS.Timeout | null = null;
+    private keepaliveFailures = 0;
+    private keepaliveBackoffTimeout: NodeJS.Timeout | null = null;
 
     // Event callbacks (for programmatic subscriptions)
     private eventCallbacks = new Map<MarketplaceEventName, Set<MarketplaceEventCallback>>();
@@ -106,6 +119,10 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
         this.eventCallbacks.set('ItemBought', new Set());
         this.eventCallbacks.set('ItemCanceled', new Set());
         this.eventCallbacks.set('ItemUpdated', new Set());
+        this.eventCallbacks.set('ListingCanceledDueToInvalidListing', new Set());
+        this.eventCallbacks.set('CollectionWhitelistRevokedCancelTriggered', new Set());
+        this.eventCallbacks.set('BuyerWhitelisted', new Set());
+        this.eventCallbacks.set('BuyerRemovedFromWhitelist', new Set());
     }
 
     // ===== PUBLIC API =====
@@ -163,6 +180,11 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
         if (this.keepaliveInterval) {
             clearInterval(this.keepaliveInterval);
             this.keepaliveInterval = null;
+        }
+
+        if (this.keepaliveBackoffTimeout) {
+            clearTimeout(this.keepaliveBackoffTimeout);
+            this.keepaliveBackoffTimeout = null;
         }
 
         // Clear reconnect timeout
@@ -244,7 +266,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             console.log(`👀 [EventListener ${environment}] Starting event watcher...`);
             this.unwatch = this.client.watchContractEvent({
                 address: this.marketplaceAddress,
-                abi: MARKETPLACE_ABI,
+                abi: MARKETPLACE_EVENT_ABI,
                 onLogs: (logs) => {
                     console.log(`🔔 [EventListener ${environment}] onLogs callback triggered with ${logs.length} logs`);
                     this.handleLogs(logs);
@@ -262,7 +284,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
 
             console.log(`✅ [EventListener ${environment}] WebSocket connected successfully!`);
             console.log('   Status: CONNECTED');
-            console.log('   Listening for: ItemListed, ItemBought, ItemCanceled, ItemUpdated');
+            console.log('   Listening for: ItemListed, ItemBought, ItemCanceled, ItemUpdated, ListingCanceledDueToInvalidListing, CollectionWhitelistRevokedCancelTriggered, BuyerWhitelisted, BuyerRemovedFromWhitelist');
 
             // Start keepalive to prevent WebSocket timeout
             this.startKeepalive();
@@ -289,6 +311,11 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             this.keepaliveInterval = null;
         }
 
+        if (this.keepaliveBackoffTimeout) {
+            clearTimeout(this.keepaliveBackoffTimeout);
+            this.keepaliveBackoffTimeout = null;
+        }
+
         if (this.unwatch) {
             this.unwatch();
             this.unwatch = null;
@@ -311,6 +338,11 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             clearInterval(this.keepaliveInterval);
         }
 
+        if (this.keepaliveBackoffTimeout) {
+            clearTimeout(this.keepaliveBackoffTimeout);
+            this.keepaliveBackoffTimeout = null;
+        }
+
         const environment = typeof window === 'undefined' ? 'SERVER' : 'CLIENT';
 
         this.keepaliveInterval = setInterval(async () => {
@@ -322,10 +354,25 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                 // Make a lightweight RPC call to keep connection alive
                 await this.client.getBlockNumber();
                 console.log(`💓 [EventListener ${environment}] Keepalive ping successful`);
+                this.keepaliveFailures = 0;
             } catch (error) {
                 console.warn(`⚠️ [EventListener ${environment}] Keepalive ping failed:`, error);
-                // If keepalive fails, trigger reconnection
-                this.handleError(error);
+                this.keepaliveFailures += 1;
+                const backoffDelay = Math.min(
+                    KEEPALIVE_INTERVAL * Math.pow(2, this.keepaliveFailures),
+                    KEEPALIVE_MAX_BACKOFF
+                );
+
+                if (this.keepaliveInterval) {
+                    clearInterval(this.keepaliveInterval);
+                    this.keepaliveInterval = null;
+                }
+
+                this.keepaliveBackoffTimeout = setTimeout(() => {
+                    if (this.isConnected) {
+                        this.startKeepalive();
+                    }
+                }, backoffDelay);
             }
         }, KEEPALIVE_INTERVAL);
 
@@ -423,7 +470,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
 
             try {
                 const decoded = decodeEventLog({
-                    abi: MARKETPLACE_ABI,
+                    abi: MARKETPLACE_EVENT_ABI,
                     data: log.data,
                     topics: log.topics,
                     strict: false // Don't throw on unknown events
@@ -451,7 +498,9 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             'ListingCanceled',
             'ListingUpdated',
             'ListingCanceledDueToInvalidListing',
-            'CollectionWhitelistRevokedCancelTriggered'
+            'CollectionWhitelistRevokedCancelTriggered',
+            'BuyerWhitelisted',
+            'BuyerRemovedFromWhitelist'
         ];
         if (!supportedEvents.includes(log.eventName)) {
             console.log(`⏭️ [decodeLog] Skipping non-marketplace event: ${log.eventName}`);
@@ -560,6 +609,49 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                     } as ProcessedItemUpdatedEvent;
                 }
 
+                case 'ListingCanceledDueToInvalidListing':
+                    return {
+                        eventName: 'ListingCanceledDueToInvalidListing',
+                        ...baseEvent,
+                        data: {
+                            listingId: String(args.listingId),
+                            nftAddress: args.tokenAddress,
+                            tokenId: String(args.tokenId),
+                            seller: args.seller,
+                            triggeredBy: args.triggeredBy
+                        }
+                    } as ProcessedListingCanceledDueToInvalidListingEvent;
+
+                case 'CollectionWhitelistRevokedCancelTriggered':
+                    return {
+                        eventName: 'CollectionWhitelistRevokedCancelTriggered',
+                        ...baseEvent,
+                        data: {
+                            listingId: String(args.listingId),
+                            tokenAddress: args.tokenAddress
+                        }
+                    } as ProcessedCollectionWhitelistRevokedCancelTriggeredEvent;
+
+                case 'BuyerWhitelisted':
+                    return {
+                        eventName: 'BuyerWhitelisted',
+                        ...baseEvent,
+                        data: {
+                            listingId: String(args.listingId),
+                            buyer: args.buyer
+                        }
+                    } as ProcessedBuyerWhitelistedEvent;
+
+                case 'BuyerRemovedFromWhitelist':
+                    return {
+                        eventName: 'BuyerRemovedFromWhitelist',
+                        ...baseEvent,
+                        data: {
+                            listingId: String(args.listingId),
+                            buyer: args.buyer
+                        }
+                    } as ProcessedBuyerRemovedFromWhitelistEvent;
+
                 default:
                     console.warn('⚠️ [EventListener] Unknown event:', log.eventName);
                     return null;
@@ -653,6 +745,14 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             case 'ItemBought': return this.config.onItemBought as MarketplaceEventCallback | undefined;
             case 'ItemCanceled': return this.config.onItemCanceled as MarketplaceEventCallback | undefined;
             case 'ItemUpdated': return this.config.onItemUpdated as MarketplaceEventCallback | undefined;
+            case 'ListingCanceledDueToInvalidListing':
+                return this.config.onListingCanceledDueToInvalidListing as MarketplaceEventCallback | undefined;
+            case 'CollectionWhitelistRevokedCancelTriggered':
+                return this.config.onCollectionWhitelistRevokedCancelTriggered as MarketplaceEventCallback | undefined;
+            case 'BuyerWhitelisted':
+                return this.config.onBuyerWhitelisted as MarketplaceEventCallback | undefined;
+            case 'BuyerRemovedFromWhitelist':
+                return this.config.onBuyerRemovedFromWhitelist as MarketplaceEventCallback | undefined;
             default: return undefined;
         }
     }
@@ -665,9 +765,9 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
         const safeError = error as any;
 
         // Check if error is actually an empty object (common with WebSocket close events)
-        const isEmptyError = error && typeof error === 'object' &&
-            Object.keys(error).length === 0 &&
-            !error.constructor?.name;
+        const isPlainObject = error && typeof error === 'object' &&
+            Object.getPrototypeOf(error) === Object.prototype;
+        const isEmptyError = Boolean(isPlainObject && Object.keys(error as object).length === 0);
 
         // Extract meaningful error info (viem sometimes sends empty objects or close events)
         const errorMessage = safeError?.message || safeError?.reason ||
@@ -776,7 +876,16 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
         }
 
         // Return all if not specified
-        return ['ItemListed', 'ItemBought', 'ItemCanceled', 'ItemUpdated'];
+        return [
+            'ItemListed',
+            'ItemBought',
+            'ItemCanceled',
+            'ItemUpdated',
+            'ListingCanceledDueToInvalidListing',
+            'CollectionWhitelistRevokedCancelTriggered',
+            'BuyerWhitelisted',
+            'BuyerRemovedFromWhitelist'
+        ];
     }
 }
 

@@ -72,7 +72,7 @@ export function CurrencySelector({ value, onChange, disabled = false, className 
             if (!grouped[category]) {
                 grouped[category] = [];
             }
-            grouped[category].push(token);
+            grouped[category]!.push(token);
         });
         
         // Sort categories: NATIVE first, then MOCK_TOKENS, then PRODUCTION

@@ -26,6 +26,7 @@ interface CartItem {
     tokenId: string;
     price: string;
     seller: string;
+    currency?: string | null;
     name?: string;
     imageUrl?: string;
 }

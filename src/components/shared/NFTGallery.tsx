@@ -44,31 +44,41 @@ export function NFTGallery({
     const [canScrollRight, setCanScrollRight] = useState(false)
     const [isGridView, setIsGridView] = useState(defaultGridView)
 
+    const cardContainerClassName = `flex-shrink-0 ${cardWidth} relative`
+
+    const getCardKey = useCallback((item: NFTScrollItem, index: number) => {
+        return item.listingId
+            ? `listing-${item.listingId}`
+            : `${item.contractAddress}-${item.tokenId}-${index}`
+    }, [])
+
+    const buildCardProps = useCallback((item: NFTScrollItem) => ({
+        contractAddress: item.contractAddress,
+        tokenId: item.tokenId,
+        price: item.price as string | undefined,
+        isListed: item.isListed,
+        listingId: item.listingId,
+        seller: item.seller,
+        buyer: item.buyer,
+        desiredContractAddress: item.desiredContractAddress,
+        desiredTokenId: item.desiredTokenId,
+        currency: item.currency,
+        chainId: item.chainId,
+        listingType: item.listingType,
+        enableInsights,
+        showStats,
+        priority,
+        metadata: item.metadata,
+        insights: item.insights,
+        contract: item.contract
+    }), [enableInsights, showStats, priority])
 
 
-    // Render card content - memoized to prevent unnecessary re-renders
-    // MUST be declared before any conditional returns (Rules of Hooks)
-    const renderCard = useCallback((item: NFTScrollItem) => {
-        const cardContent = (
-            <div className={`flex-shrink-0 ${cardWidth} relative`}>
-                <NFTCard
-                    contractAddress={item.contractAddress}
-                    tokenId={item.tokenId}
-                    price={item.price as string | undefined}
-                    isListed={item.isListed}
-                    listingId={item.listingId}
-                    seller={item.seller}
-                    buyer={item.buyer}
-                    desiredContractAddress={item.desiredContractAddress}
-                    desiredTokenId={item.desiredTokenId}
-                    enableInsights={enableInsights}
-                    showStats={showStats}
-                    priority={priority}
-                    // Pass MongoDB-optimized data (prevents API calls!)
-                    metadata={item.metadata}
-                    insights={item.insights}
-                    contract={item.contract}
-                />
+
+    const renderCardShell = useCallback((cardBody: React.ReactNode, item: NFTScrollItem) => {
+        return (
+            <div className={cardContainerClassName}>
+                {cardBody}
 
                 {/* Primary Badge (Top Right) */}
                 {badge && (
@@ -87,8 +97,9 @@ export function NFTGallery({
                 )}
             </div>
         )
+    }, [cardContainerClassName, badge, secondaryBadge])
 
-        // Wrap in Link if enabled
+    const renderCardWrapper = useCallback((cardContent: React.ReactNode, item: NFTScrollItem) => {
         if (enableLinks) {
             return (
                 <Link
@@ -100,7 +111,6 @@ export function NFTGallery({
             )
         }
 
-        // Without link
         return (
             <div
                 onClick={onCardClick ? () => onCardClick(item) : undefined}
@@ -109,15 +119,27 @@ export function NFTGallery({
                 {cardContent}
             </div>
         )
-    }, [cardWidth, enableInsights, showStats, priority, badge, secondaryBadge, enableLinks, linkBuilder, onCardClick])
+    }, [enableLinks, linkBuilder, onCardClick])
+
+    // Render card content - memoized to prevent unnecessary re-renders
+    // MUST be declared before any conditional returns (Rules of Hooks)
+    const renderCard = useCallback((item: NFTScrollItem, cardBody?: React.ReactNode) => {
+        const cardProps = buildCardProps(item)
+        const content = renderCardShell(
+            cardBody || <NFTCard {...cardProps} />,
+            item
+        )
+
+        return renderCardWrapper(content, item)
+    }, [buildCardProps, renderCardShell, renderCardWrapper])
 
     // Scroll functions
-    const updateScrollButtons = () => {
+    const updateScrollButtons = useCallback(() => {
         if (!scrollContainerRef.current) return
         const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current
         setCanScrollLeft(scrollLeft > 0)
         setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10)
-    }
+    }, [])
 
     const scroll = (direction: 'left' | 'right') => {
         if (!scrollContainerRef.current) return
@@ -135,7 +157,7 @@ export function NFTGallery({
     useEffect(() => {
         const timer = setTimeout(updateScrollButtons, 100)
         return () => clearTimeout(timer)
-    }, [items])
+    }, [items, updateScrollButtons])
 
     // Add scroll event listener
     useEffect(() => {
@@ -144,7 +166,7 @@ export function NFTGallery({
 
         container.addEventListener('scroll', updateScrollButtons)
         return () => container.removeEventListener('scroll', updateScrollButtons)
-    }, [items])
+    }, [items, updateScrollButtons])
 
     // Loading state - Match NFTCard dimensions with proper aspect ratio
     if (loading) {
@@ -276,65 +298,16 @@ export function NFTGallery({
                     style={{ paddingBottom: '50px' }} // Space for hover shadows (same as scroll view)
                 >
                     {items.map((item, index) => {
-                        const cardContent = (
-                            <div className={`flex-shrink-0 ${cardWidth} relative`}>
-                                <LazyNFTCard
-                                    contractAddress={item.contractAddress}
-                                    tokenId={item.tokenId}
-                                    price={item.price as string | undefined}
-                                    isListed={item.isListed}
-                                    listingId={item.listingId}
-                                    seller={item.seller}
-                                    buyer={item.buyer}
-                                    desiredContractAddress={item.desiredContractAddress}
-                                    desiredTokenId={item.desiredTokenId}
-                                    enableInsights={enableInsights}
-                                    showStats={showStats}
-                                    priority={priority}
-                                    // Pass MongoDB-optimized data (prevents API calls!)
-                                    metadata={item.metadata}
-                                    insights={item.insights}
-                                    contract={item.contract}
-                                />
-
-                                {/* Primary Badge (Top Right) */}
-                                {badge && (
-                                    <div className="absolute top-2 right-2 z-10">
-                                        <span className={`${badge.color} text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg`}>
-                                            {badge.text}
-                                        </span>
-                                    </div>
-                                )}
-
-                                {/* Secondary Badge (Top Left) */}
-                                {secondaryBadge && (
-                                    <div className="absolute top-2 left-2 z-10">
-                                        {secondaryBadge(item)}
-                                    </div>
-                                )}
-                            </div>
+                        const cardProps = buildCardProps(item)
+                        const cardContent = renderCardShell(
+                            <LazyNFTCard {...cardProps} />,
+                            item
                         )
 
-                        if (enableLinks) {
-                            return (
-                                <Link
-                                    key={item.listingId ? `listing-${item.listingId}` : `${item.contractAddress}-${item.tokenId}-${index}`}
-                                    href={linkBuilder(item) as any}
-                                    onClick={onCardClick ? () => onCardClick(item) : undefined}
-                                >
-                                    {cardContent}
-                                </Link>
-                            )
-                        }
-
                         return (
-                            <div
-                                key={item.listingId ? `listing-${item.listingId}` : `${item.contractAddress}-${item.tokenId}-${index}`}
-                                onClick={onCardClick ? () => onCardClick(item) : undefined}
-                                className={onCardClick ? 'cursor-pointer' : ''}
-                            >
-                                {cardContent}
-                            </div>
+                            <React.Fragment key={getCardKey(item, index)}>
+                                {renderCardWrapper(cardContent, item)}
+                            </React.Fragment>
                         )
                     })}
                 </div>
@@ -361,7 +334,7 @@ export function NFTGallery({
                         }}
                     >
                         {items.map((item, index) => (
-                            <React.Fragment key={item.listingId ? `listing-${item.listingId}` : `${item.contractAddress}-${item.tokenId}-${index}`}>
+                            <React.Fragment key={getCardKey(item, index)}>
                                 {renderCard(item)}
                             </React.Fragment>
                         ))}

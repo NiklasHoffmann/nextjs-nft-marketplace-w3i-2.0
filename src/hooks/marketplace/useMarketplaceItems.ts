@@ -11,6 +11,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useMarketplaceItems as useMarketplaceItemsContext } from '@/contexts/marketplace-items';
 import { useCollections } from '@/contexts/collections';
 import type { EnrichedNFTDocument, MarketplaceItemsResponse } from '@/types/marketplace/enriched-nft';
+import { DB_SYNC_DELAY_MS, MARKETPLACE_INVALIDATION_TYPES } from '@/services/validation';
+import type { InvalidationEventDetail } from '@/services/validation';
 
 interface UseMarketplaceItemsOptions {
   // Pagination
@@ -90,9 +92,6 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
   const loadingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Ref to store latest fetchItems function
-  const fetchItemsRef = useRef<((pageNum: number, append?: boolean) => Promise<void>) | null>(null);
-
   // Track if component is mounted
   const isMountedRef = useRef(true);
 
@@ -167,6 +166,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
         setLoading(false);
         setInitialLoading(false);
         abortControllerRef.current = null;
+        loadingRef.current = false;
         return;
       }
       console.log('❌ [useMarketplaceItems] Cache MISS - fetching from API');
@@ -174,9 +174,14 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
 
     // Clear items AFTER cache check (only if cache miss and not appending)
     // This prevents flickering when cache is available
-    if (!append) {
-      console.log('🗑️ [useMarketplaceItems] Clearing items before fetch');
+    // FIXED: Don't clear items immediately - keep showing old data until new data arrives
+    // Only clear on initial load or when explicitly needed
+    if (!append && items.length === 0) {
+      console.log('🗑️ [useMarketplaceItems] Initial load - clearing items');
       setItems([]);
+    } else if (!append && items.length > 0) {
+      console.log('♻️ [useMarketplaceItems] Keeping old items until new data arrives');
+      // Keep old items displayed - they'll be replaced when new data arrives
     }
 
     loadingRef.current = true;
@@ -309,9 +314,6 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     createFilterKey,
   ]);
 
-  // Store latest fetchItems in ref
-  fetchItemsRef.current = fetchItems;
-
   /**
    * Refetch current page
    */
@@ -398,22 +400,12 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
 
     // Listen for marketplace data invalidation (listing-created, purchased, canceled, etc.)
     const handleInvalidation = (event: Event) => {
-      const customEvent = event as CustomEvent<{
-        type: string;
-        contractAddress?: string;
-        tokenId?: string;
-        timestamp: number;
-      }>;
+      const customEvent = event as CustomEvent<InvalidationEventDetail>;
 
       const eventType = customEvent.detail?.type;
 
       // Auto-reload on marketplace events that affect listings
-      const shouldReload =
-        eventType === 'listing-created' ||
-        eventType === 'listing-canceled' ||
-        eventType === 'nft-purchased' ||
-        eventType === 'graph-update' ||
-        eventType === 'manual-refresh';
+      const shouldReload = !!eventType && MARKETPLACE_INVALIDATION_TYPES.has(eventType);
 
       if (shouldReload) {
         console.log(`🔄 [useMarketplaceItems] ${eventType} event detected, invalidating cache and reloading...`);
@@ -427,16 +419,14 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
         if (isMountedRef.current && !initialLoading) {
           // Increased delay for MongoDB sync + TheGraph → MongoDB propagation
           // Event-bridge syncs immediately, but MongoDB write + index update needs time
-          const delay = 2000; // 2 seconds for reliable DB propagation
-
-          console.log(`⏱️  [useMarketplaceItems] Waiting ${delay}ms for MongoDB sync...`);
+          console.log(`⏱️  [useMarketplaceItems] Waiting ${DB_SYNC_DELAY_MS}ms for MongoDB sync...`);
 
           setTimeout(() => {
             if (isMountedRef.current) {
               console.log(`✅ [useMarketplaceItems] Reloading after ${eventType}`);
               fetchItems(1, false);
             }
-          }, delay);
+          }, DB_SYNC_DELAY_MS);
         }
       }
     };

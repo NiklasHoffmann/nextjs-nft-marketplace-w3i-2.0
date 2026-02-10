@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { useAccount, useChainId } from 'wagmi';
 import { useMarketplaceAdmin } from '@/hooks/marketplace/useMarketplaceAdmin';
 import { useReadContract } from 'wagmi';
-import { MARKETPLACE_ABI } from '@/config/abis/marketplace';
+import { GETTER_FACET_ABI } from '@/config/abis/getter-facet';
 import { NETWORK_CONFIG } from '@/config/networks';
 import { isAddress } from 'viem';
 import { hasAdminAccess } from '@/utils';
 import Link from 'next/link';
 import { AdminModeIndicator } from '@/app/admin/components/shared/AdminModeIndicator';
 import { MigrationBanner } from '@/app/admin/components/shared/MigrationBanner';
+import { AdminPageShell } from '@/app/admin/components/shared/AdminPageShell';
 
 export default function MarketplaceAdminPage() {
   const { address, isConnected } = useAccount();
@@ -53,19 +54,19 @@ export default function MarketplaceAdminPage() {
   // Read current values
   const { data: currentFee } = useReadContract({
     address: MARKETPLACE_ADDRESS as `0x${string}`,
-    abi: MARKETPLACE_ABI,
+    abi: GETTER_FACET_ABI,
     functionName: 'getInnovationFee',
   });
 
   const { data: whitelistedCollections, refetch: refetchCollections } = useReadContract({
     address: MARKETPLACE_ADDRESS as `0x${string}`,
-    abi: MARKETPLACE_ABI,
+    abi: GETTER_FACET_ABI,
     functionName: 'getWhitelistedCollections',
   });
 
   const { data: contractOwner } = useReadContract({
     address: MARKETPLACE_ADDRESS as `0x${string}`,
-    abi: MARKETPLACE_ABI,
+    abi: GETTER_FACET_ABI,
     functionName: 'getContractOwner',
   }) as { data: string | undefined };
 
@@ -263,9 +264,7 @@ export default function MarketplaceAdminPage() {
 
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
+      <AdminPageShell>
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Marketplace Administration</h1>
               <p className="text-gray-600">Manage marketplace fees, whitelisted collections, and listing maintenance</p>
@@ -273,17 +272,13 @@ export default function MarketplaceAdminPage() {
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
               <p className="text-yellow-800">Please connect your wallet to access admin functions.</p>
             </div>
-          </div>
-        </div>
-      </div>
+      </AdminPageShell>
     );
   }
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
+      <AdminPageShell>
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Marketplace Administration</h1>
               <p className="text-gray-600">Manage marketplace fees, whitelisted collections, and listing maintenance</p>
@@ -300,16 +295,12 @@ export default function MarketplaceAdminPage() {
                 </p>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
+      </AdminPageShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto px-4">
-        <div className="max-w-6xl mx-auto">
+    <AdminPageShell>
           {/* Back Button */}
           <div className="mb-6">
             <Link
@@ -652,8 +643,6 @@ export default function MarketplaceAdminPage() {
             </div>
 
           </div>
-        </div>
-      </div>
-    </div>
+    </AdminPageShell>
   );
 }

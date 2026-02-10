@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { AdminPageShell } from '@/app/admin/components/shared/AdminPageShell';
 
 export default function AdminSettings() {
     const [mounted, setMounted] = useState(false);
@@ -11,9 +12,7 @@ export default function AdminSettings() {
     }, []);
 
     return (
-        <div className="min-h-screen bg-gray-50 py-8">
-            <div className="container mx-auto px-4">
-                <div className="max-w-6xl mx-auto">
+        <AdminPageShell>
                     {/* Back Button */}
                     <div className="mb-6">
                         <Link
@@ -146,8 +145,6 @@ export default function AdminSettings() {
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
+        </AdminPageShell>
     );
 }

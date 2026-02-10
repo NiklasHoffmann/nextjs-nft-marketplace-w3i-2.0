@@ -23,7 +23,7 @@ export async function GET() {
             console.log('\n🔧 [Health Check] Auto-starting background services...');
             await syncService.start();
             autoStarted = true;
-            
+
             return NextResponse.json({
                 status: 'started',
                 message: 'Background services auto-started',
@@ -38,9 +38,9 @@ export async function GET() {
     } catch (error) {
         console.error('❌ [Health Check] Error:', error);
         return NextResponse.json(
-            { 
-                status: 'error', 
-                error: error instanceof Error ? error.message : 'Unknown error' 
+            {
+                status: 'error',
+                error: error instanceof Error ? error.message : 'Unknown error'
             },
             { status: 500 }
         );

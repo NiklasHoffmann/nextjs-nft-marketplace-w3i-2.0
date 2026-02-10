@@ -55,6 +55,8 @@ interface LegacyNFTCardProps {
   isListed?: boolean;
   desiredContractAddress?: string;
   desiredTokenId?: string;
+  currency?: string; // Payment token address (ETH = 0x0, WETH/USDC/etc = token address)
+  chainId?: number; // Optional: chain ID for currency symbol lookup
   listingType?: 'PURE_ETH' | 'SWAP_AND_ETH' | 'PURE_SWAP'; // v2 field
   metadata?: {
     name?: string | null;
@@ -106,6 +108,68 @@ function isNewProps(props: NFTCardAllProps): props is NFTCardProps {
   return 'nft' in props;
 }
 
+function buildLegacyAggregatedNFT(props: LegacyNFTCardProps): AggregatedNFT {
+  const contractAddress = props.contractAddress;
+  const tokenId = props.tokenId;
+  const isListed = Boolean(props.isListed);
+  const listingId = props.listingId || undefined;
+  const hasListing = isListed && !!listingId;
+
+  return {
+    key: `${contractAddress}-${tokenId}` as `${string}-${string}`,
+    contractAddress: contractAddress as `0x${string}`,
+    tokenId,
+    listed: hasListing,
+    listing: hasListing ? {
+      listingId,
+      contractAddress: contractAddress as `0x${string}`,
+      tokenId,
+      isListed: true,
+      price: props.price || '0',
+      seller: props.seller as `0x${string}`,
+      buyer: props.buyer as `0x${string}` | null,
+      desiredContractAddress: (props.desiredContractAddress as `0x${string}`) || null,
+      desiredTokenId: props.desiredTokenId || null,
+      currency: (props.currency as `0x${string}`) || null,
+      listingType: props.listingType || null
+    } : undefined,
+    core: {
+      contractAddress: contractAddress as `0x${string}`,
+      tokenId,
+      tokenURI: null,
+      name: props.metadata?.name || null,
+      owner: null,
+      symbol: props.contract?.symbol || props.contract?.contractSymbol || null
+    },
+    meta: props.metadata ? {
+      name: props.metadata.name || undefined,
+      description: props.metadata.description || undefined,
+      image: props.metadata.image || undefined,
+      animationUrl: props.metadata.animationUrl || undefined,
+      externalUrl: props.metadata.externalUrl || undefined,
+      attributes: props.metadata.attributes || []
+    } : undefined,
+    insight: props.insights ? {
+      contractAddress: contractAddress as `0x${string}`,
+      customTitle: props.insights.customTitle || undefined,
+      category: props.insights.category || undefined,
+      tags: props.insights.tags || [],
+      rarity: props.insights.rarity || undefined,
+      cardDescription: props.insights.cardDescriptions || undefined,
+      updatedAt: new Date().toISOString()
+    } : undefined,
+    social: undefined,
+    sources: {
+      blockchain: false,
+      metadata: !!props.metadata,
+      marketplace: isListed,
+      social: false,
+      insights: !!props.insights
+    },
+    lastUpdated: Date.now()
+  };
+}
+
 // ===== HELPER FUNCTIONS =====
 
 /** Get rarity background color class */
@@ -137,74 +201,12 @@ export function NFTCard(props: NFTCardAllProps) {
     enableInsights = true
   } = props;
 
+  const isLegacy = isLegacyProps(props);
+
   // Extract or construct NFT data
-  let nft: AggregatedNFT;
-  let contractAddress: string;
-  let tokenId: string;
-
-  if (isNewProps(props)) {
-    // New simplified interface
-    nft = props.nft;
-    contractAddress = nft.core.contractAddress;
-    tokenId = nft.core.tokenId;
-  } else {
-    // Legacy interface - construct minimal AggregatedNFT
-    contractAddress = props.contractAddress;
-    tokenId = props.tokenId;
-
-    nft = {
-      key: `${contractAddress}-${tokenId}` as `${string}-${string}`,
-      contractAddress: contractAddress as `0x${string}`,
-      tokenId,
-      listed: props.isListed || false,
-      listing: (props.isListed && props.listingId) ? {
-        listingId: props.listingId,
-        contractAddress: contractAddress as `0x${string}`,
-        tokenId,
-        isListed: true,
-        price: props.price || '0',
-        seller: props.seller as `0x${string}`,
-        buyer: props.buyer as `0x${string}` | null,
-        desiredContractAddress: (props.desiredContractAddress as `0x${string}`) || null,
-        desiredTokenId: props.desiredTokenId || null,
-        listingType: props.listingType || null
-      } : undefined,
-      core: {
-        contractAddress: contractAddress as `0x${string}`,
-        tokenId,
-        tokenURI: null,
-        name: props.metadata?.name || null,
-        owner: null,
-        symbol: props.contract?.symbol || props.contract?.contractSymbol || null
-      },
-      meta: props.metadata ? {
-        name: props.metadata.name || undefined,
-        description: props.metadata.description || undefined,
-        image: props.metadata.image || undefined,
-        animationUrl: props.metadata.animationUrl || undefined,
-        externalUrl: props.metadata.externalUrl || undefined,
-        attributes: props.metadata.attributes || []
-      } : undefined,
-      insight: props.insights ? {
-        contractAddress: contractAddress as `0x${string}`,
-        customTitle: props.insights.customTitle || undefined,
-        category: props.insights.category || undefined,
-        tags: props.insights.tags || [],
-        rarity: props.insights.rarity || undefined,
-        cardDescription: props.insights.cardDescriptions || undefined,
-        updatedAt: new Date().toISOString()
-      } : undefined,
-      social: undefined,
-      sources: {
-        blockchain: false,
-        metadata: !!props.metadata,
-        marketplace: !!props.isListed,
-        social: false,
-        insights: !!props.insights
-      },
-      lastUpdated: Date.now()
-    };
-  }
+  const nft: AggregatedNFT = isNewProps(props) ? props.nft : buildLegacyAggregatedNFT(props);
+  const contractAddress = nft.core.contractAddress;
+  const tokenId = nft.core.tokenId;
 
   // Early return if essential props are missing
   if (!contractAddress || !tokenId) {
@@ -231,7 +233,7 @@ export function NFTCard(props: NFTCardAllProps) {
   const customTitle = nft.insight?.customTitle || null;
   const nftName = nft.meta?.name || null;
   const contractSymbol = nft.core.symbol || null;
-  const contractName = isLegacyProps(props) ? (props.contract?.name || props.contract?.contractName) : null;
+  const contractName = isLegacy ? (props.contract?.name || props.contract?.contractName) : null;
   const rarity = nft.insight?.rarity || null;
 
   // Categories and descriptions
@@ -243,21 +245,28 @@ export function NFTCard(props: NFTCardAllProps) {
   }, [nft.insight]);
 
   const descriptions = useMemo(() => {
-    const descs: string[] = [];
-    if (nft.insight?.cardDescription && Array.isArray(nft.insight.cardDescription)) {
-      descs.push(...nft.insight.cardDescription);
-    } else if (isLegacyProps(props) && props.insights?.cardDescriptions) {
-      descs.push(...props.insights.cardDescriptions);
-    }
-    return descs;
-  }, [nft.insight, props]);
+    return Array.isArray(nft.insight?.cardDescription)
+      ? nft.insight.cardDescription
+      : [];
+  }, [nft.insight?.cardDescription]);
 
   // Listing data
-  const isListed = nft.listed || false;
-  const price = nft.listing?.price || null;
-  const desiredContractAddress = nft.listing?.desiredContractAddress || null;
-  const currency = nft.listing?.currency || null;
-  const listingType = nft.listing?.listingType || (isLegacyProps(props) ? props.listingType : undefined) || null;
+  const isListed = isLegacy
+    ? (props.isListed ?? nft.listed ?? false)
+    : (nft.listed || false);
+  const price = isLegacy
+    ? (props.price ?? nft.listing?.price ?? null)
+    : (nft.listing?.price || null);
+  const desiredContractAddress = isLegacy
+    ? (props.desiredContractAddress ?? nft.listing?.desiredContractAddress ?? null)
+    : (nft.listing?.desiredContractAddress || null);
+  const currency = isLegacy
+    ? (props.currency ?? nft.listing?.currency ?? null)
+    : (nft.listing?.currency || null);
+  const listingType = isLegacy
+    ? (props.listingType ?? nft.listing?.listingType ?? null)
+    : (nft.listing?.listingType || null);
+  const chainId = isLegacy ? props.chainId : undefined;
 
   // Social stats
   const likeCount = stats?.likeCount || 0;
@@ -356,6 +365,7 @@ export function NFTCard(props: NFTCardAllProps) {
                 isListed={isListed}
                 desiredContractAddress={desiredContractAddress}
                 currency={currency}
+                chainId={chainId}
                 listingType={listingType}
               />
             </div>

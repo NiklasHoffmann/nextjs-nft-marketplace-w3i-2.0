@@ -35,6 +35,8 @@ export interface WalletNFT extends ExternalNFT {
     listingPrice?: string;
     listingId?: string;
     seller?: string;
+    currency?: string; // Payment token address (ETH = 0x0, WETH/USDC/etc = token address)
+    listingType?: 'PURE_ETH' | 'SWAP_AND_ETH' | 'PURE_SWAP';
     // Contract data from blockchain
     totalSupply?: number | null;
     owner?: string | null;
@@ -82,7 +84,19 @@ export class WalletNFTsService {
                 devLog.success(`Step 1/2 Complete: ${dbResult.data.nfts.length} NFTs from database`);
 
                 // Convert to WalletNFT format
-                const walletNFTs: WalletNFT[] = dbResult.data.nfts.map((nft: any) => {
+                const walletNFTs: WalletNFT[] = dbResult.data.nfts.map((nft: any, index: number) => {
+                    // DEBUG: Log first listed NFT
+                    if (nft.isListed && index === 0) {
+                        console.log('🔍 [WalletNFTsService] First listed NFT from API:', {
+                            tokenId: nft.tokenId,
+                            price: nft.price,
+                            currency: nft.currency,
+                            listingType: nft.listingType,
+                            listingsPriceFromArray: nft.listings?.[0]?.price,
+                            listingsCurrencyFromArray: nft.listings?.[0]?.currency
+                        });
+                    }
+                    
                     return {
                         contractAddress: nft.contractAddress,
                         tokenId: nft.tokenId,
@@ -100,9 +114,12 @@ export class WalletNFTsService {
                         approved: nft.contract?.approved,
                         ownerBalance: nft.contract?.ownerBalance,
                         isListed: nft.isListed || false,
-                        listingPrice: nft.listings?.[0]?.price,
-                        listingId: nft.listings?.[0]?.listingId,
-                        seller: nft.listings?.[0]?.seller,
+                        // Use flattened fields from API (from $addFields), fallback to listings array
+                        listingPrice: nft.price || nft.listings?.[0]?.price,
+                        listingId: nft.listingId || nft.listings?.[0]?.listingId,
+                        seller: nft.seller || nft.listings?.[0]?.seller,
+                        currency: nft.currency || nft.listings?.[0]?.currency,
+                        listingType: nft.listingType || nft.listings?.[0]?.listingType,
                         hasMarketplaceData: !!nft.listings?.length,
                         hasInsightsData: !!nft.insights,
                         insights: nft.insights,
@@ -116,6 +133,17 @@ export class WalletNFTsService {
                         } : undefined
                     };
                 });
+
+                // DEBUG: Log first mapped listed NFT
+                const firstMappedListed = walletNFTs.find(n => n.isListed);
+                if (firstMappedListed) {
+                    console.log('🔍 [WalletNFTsService] First mapped listed NFT:', {
+                        tokenId: firstMappedListed.tokenId,
+                        listingPrice: firstMappedListed.listingPrice,
+                        currency: firstMappedListed.currency,
+                        listingType: firstMappedListed.listingType
+                    });
+                }
 
                 // Step 2: Background sync (verify ownership)
                 devLog.info('🔄 Step 2/2: Background sync starting...');
@@ -264,6 +292,8 @@ export class WalletNFTsService {
                         listingPrice: marketplaceData.marketplace.price?.toString(),
                         listingId: marketplaceData.listingId || undefined,
                         seller: marketplaceData.marketplace.seller || undefined,
+                        currency: marketplaceData.marketplace.currency || undefined,
+                        listingType: marketplaceData.marketplace.listingType || undefined,
                         hasMarketplaceData: true,
                         hasInsightsData: false
                     };

@@ -28,7 +28,9 @@ import { useMarketplaceEvents } from '@/hooks';
 import { routeMarketplaceEvent } from '@/services/marketplace/event-invalidation-bridge';
 import type {
     ProcessedMarketplaceEvent,
-    EventListenerState
+    EventListenerState,
+    MarketplaceEventName,
+    MarketplaceEventCallback
 } from '@/types/marketplace/contract-events';
 
 // ===== CONTEXT =====
@@ -44,6 +46,8 @@ interface MarketplaceEventsContextValue {
     state: EventListenerState;
     /** Latest event (for debugging) */
     latestEvent: ProcessedMarketplaceEvent | null;
+    /** Subscribe to events (supports '*' for all) */
+    subscribe: (eventName: MarketplaceEventName | '*', callback: MarketplaceEventCallback) => () => void;
 }
 
 const MarketplaceEventsContext = createContext<MarketplaceEventsContextValue | undefined>(undefined);
@@ -71,8 +75,13 @@ export function MarketplaceEventsProvider({
     marketplaceAddress,
     wsUrl
 }: MarketplaceEventsProviderProps) {
+    const isDev = process.env.NODE_ENV === 'development';
+    const enableWsEvents = process.env.NEXT_PUBLIC_ENABLE_WS_EVENTS === 'true';
+    const shouldAutoStart = autoStart && (!isDev || enableWsEvents);
+
     console.log('🏪 [MarketplaceEventsProvider] Initializing...');
     console.log('   autoStart:', autoStart);
+    console.log('   shouldAutoStart:', shouldAutoStart);
     console.log('   debug:', debug);
     console.log('   marketplaceAddress:', marketplaceAddress || 'default');
     console.log('   wsUrl:', wsUrl || 'from env');
@@ -80,8 +89,8 @@ export function MarketplaceEventsProvider({
     const [latestEvent, setLatestEvent] = useState<ProcessedMarketplaceEvent | null>(null);
 
     // Setup event listener with auto-invalidation
-    const { isConnected, eventsReceived, lastEventAt, state } = useMarketplaceEvents({
-        autoStart,
+    const { isConnected, eventsReceived, lastEventAt, state, subscribe } = useMarketplaceEvents({
+        autoStart: shouldAutoStart,
         marketplaceAddress,
         wsUrl,
         onEvent: (event) => {
@@ -102,6 +111,14 @@ export function MarketplaceEventsProvider({
             }
         },
         onError: (error) => {
+            const isPlainObject = error && typeof error === 'object' &&
+                Object.getPrototypeOf(error) === Object.prototype;
+            const isEmptyError = Boolean(isPlainObject && Object.keys(error as object).length === 0);
+
+            if (isEmptyError) {
+                return;
+            }
+
             console.error('❌ [MarketplaceEvents] Error:', error);
         }
     });
@@ -125,7 +142,27 @@ export function MarketplaceEventsProvider({
         eventsReceived,
         lastEventAt,
         state,
-        latestEvent
+        latestEvent,
+        subscribe: (eventName, callback) => {
+            if (eventName === '*') {
+                const unsubscribers = ([
+                    'ItemListed',
+                    'ItemBought',
+                    'ItemCanceled',
+                    'ItemUpdated',
+                    'ListingCanceledDueToInvalidListing',
+                    'CollectionWhitelistRevokedCancelTriggered',
+                    'BuyerWhitelisted',
+                    'BuyerRemovedFromWhitelist'
+                ] as MarketplaceEventName[])
+                    .map((name) => subscribe(name, callback));
+                return () => {
+                    unsubscribers.forEach((unsubscribe) => unsubscribe());
+                };
+            }
+
+            return subscribe(eventName, callback);
+        }
     };
 
     return (

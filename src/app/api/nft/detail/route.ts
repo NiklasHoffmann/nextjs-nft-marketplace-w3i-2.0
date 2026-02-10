@@ -21,6 +21,9 @@ import { getCollection } from '@/lib/mongodb';
 import { blockchainStateSync } from '@/services/nft-sync/blockchain-state-sync';
 import { ipfsMetadataLazySync } from '@/services/nft-sync/ipfs-metadata-lazy-sync';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export const GET = apiHandler(async (request: NextRequest) => {
     const startTime = Date.now();
 
@@ -32,9 +35,11 @@ export const GET = apiHandler(async (request: NextRequest) => {
         throw new BadRequestError('Missing contractAddress or tokenId');
     }
 
+    const normalizedAddress = contractAddress.toLowerCase();
+
     // Step 1: Get from nft_metadata
     const nftMetadata = await getCollection('nft_metadata');
-    let nft = await nftMetadata.findOne({ contractAddress, tokenId });
+    let nft = await nftMetadata.findOne({ contractAddress: normalizedAddress, tokenId });
 
     // Step 2: Check if blockchain state is stale or force refresh
     const BLOCKCHAIN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -56,7 +61,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
         );
 
         // Refetch after sync
-        nft = await nftMetadata.findOne({ contractAddress, tokenId });
+        nft = await nftMetadata.findOne({ contractAddress: normalizedAddress, tokenId });
 
         console.log(`   ✅ After sync - approved: ${nft?.blockchain?.approved || 'NULL'}`);
         console.log(`   ✅ After sync - isApprovedForAll: ${nft?.blockchain?.isApprovedForAll || false}`);
@@ -71,36 +76,48 @@ export const GET = apiHandler(async (request: NextRequest) => {
         console.log(`📡 [NFT Detail] IPFS metadata missing, lazy-loading...`);
         await ipfsMetadataLazySync.ensureMetadata(contractAddress, tokenId);
         // Refetch after metadata fetch
-        nft = await nftMetadata.findOne({ contractAddress, tokenId });
+        nft = await nftMetadata.findOne({ contractAddress: normalizedAddress, tokenId });
     }
 
     // Step 4: Join with stats
     const nftStats = await getCollection('nft_stats');
-    const stats = await nftStats.findOne({ contractAddress, tokenId });
+    const stats = await nftStats.findOne({ contractAddress: normalizedAddress, tokenId });
 
     // Step 5: Get insights (item-specific OR collection-wide)
     const insightsCollection = await getCollection('admin_nft_insights');
-    const insights = await insightsCollection.findOne({
-        contractAddress,
-        $or: [
-            { tokenId }, // Item-specific
-            { tokenId: null }, // Collection-wide
-            { tokenId: '' },
-            { tokenId: { $exists: false } }
-        ]
-    });
+    const insightsCandidates = await insightsCollection.aggregate([
+        {
+            $match: {
+                contractAddress: normalizedAddress,
+                $or: [
+                    { tokenId },
+                    { tokenId: null },
+                    { tokenId: '' },
+                    { tokenId: { $exists: false } }
+                ]
+            }
+        },
+        {
+            $addFields: {
+                isItemSpecific: { $cond: [{ $eq: ['$tokenId', tokenId] }, 1, 0] }
+            }
+        },
+        { $sort: { isItemSpecific: -1, updatedAt: -1, createdAt: -1 } },
+        { $limit: 1 }
+    ]).toArray();
+    const insights = insightsCandidates[0] || null;
 
     // Step 6: Get marketplace listing (if any)
     const marketplaceItems = await getCollection('marketplace_items');
     const listing = await marketplaceItems.findOne({
-        contractAddress,
+        contractAddress: normalizedAddress,
         tokenId,
         active: true
     });
 
     // Prepare response
     const response = {
-        contractAddress,
+        contractAddress: normalizedAddress,
         tokenId,
 
         // IPFS metadata (cached forever)
@@ -179,6 +196,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
             tokenStandard: listing.tokenStandard,
             listingType: listing.listingType,
             status: listing.status,
+            currency: listing.currency,
 
             // ERC1155
             erc1155QuantityListed: listing.erc1155QuantityListed,
@@ -200,15 +218,9 @@ export const GET = apiHandler(async (request: NextRequest) => {
         loadTime: Date.now() - startTime
     };
 
-    // Increment view count
-    await nftStats.updateOne(
-        { contractAddress, tokenId },
-        {
-            $inc: { viewCount: 1 },
-            $set: { lastViewedAt: new Date() }
-        },
-        { upsert: true }
-    );
+    // View count is tracked via POST /api/nft/stats to avoid double counting
 
-    return apiSuccess(response);
+    const apiResponse = apiSuccess(response);
+    apiResponse.headers.set('Cache-Control', 'no-store, max-age=0');
+    return apiResponse;
 });

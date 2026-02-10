@@ -15,6 +15,7 @@ export interface Collection {
     contractSymbol?: string;
     itemCount: number;
     floorPrice: number | null;
+    floorPriceCurrency?: string | null;
     totalValue: number;
     averagePrice: number | null;
     imageUrl: string | null;
@@ -59,7 +60,9 @@ export class CollectionsService {
 
         try {
             const startTime = Date.now();
-            const response = await fetch(`/api/collections?includeInsights=${includeInsights}`);
+            const response = await fetch(`/api/collections?includeInsights=${includeInsights}`, {
+                cache: 'no-store'
+            });
 
             if (!response.ok) {
                 throw new Error(`API error: ${response.status} ${response.statusText}`);

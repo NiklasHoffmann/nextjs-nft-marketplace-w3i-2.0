@@ -114,33 +114,34 @@ export const TOKENS: NetworkTokens = {
         // ========================================
         // These tokens can be safely removed for production
         MOCK_ERC20: {
-            address: "0xC740Ee33A12c21Fa7F3cdd426D6051e16EaB456e", // MockERC20_18 (deployed on Sepolia)
+            address: "0xC740Ee33A12c21Fa7F3cdd426D6051e16EaB456e", // MockERC20_18 (deployed on Sepolia) ✅ WHITELISTED
             symbol: "MERC20",
             name: "Mock ERC20 Token",
             decimals: 18,
             isMock: true
         },
-        MOCK_WBTC: {
-            address: "0xB1A8786Fd1bBDB7F56f8cEa78A77897a0Aa9fAb2", // MockWBTC_8 (deployed on Sepolia)
-            symbol: "MWBTC",
-            name: "Mock Wrapped Bitcoin",
-            decimals: 8,
-            isMock: true
-        },
-        MOCK_EURS: {
-            address: "0xe06E78AB6314993FCa9106536aecfE4284aA791a", // MockEURS_2 (deployed on Sepolia)
-            symbol: "MEURS",
-            name: "Mock STASIS EURS",
-            decimals: 2,
-            isMock: true
-        },
-        MOCK_USDT: {
-            address: "0xd11Db19892F8c9C89A03Ba6EFD636795cbBc0d74", // MockUSDTLike_6 (deployed on Sepolia)
-            symbol: "MUSDT",
-            name: "Mock Tether USD",
-            decimals: 6,
-            isMock: true
-        }
+        // ⚠️ DISABLED - Not whitelisted in marketplace contract
+        // MOCK_WBTC: {
+        //     address: "0xB1A8786Fd1bBDB7F56f8cEa78A77897a0Aa9fAb2", // MockWBTC_8 (deployed on Sepolia) ❌ NOT WHITELISTED
+        //     symbol: "MWBTC",
+        //     name: "Mock Wrapped Bitcoin",
+        //     decimals: 8,
+        //     isMock: true
+        // },
+        // MOCK_EURS: {
+        //     address: "0xe06E78AB6314993FCa9106536aecfE4284aA791a", // MockEURS_2 (deployed on Sepolia) ❌ NOT WHITELISTED
+        //     symbol: "MEURS",
+        //     name: "Mock STASIS EURS",
+        //     decimals: 2,
+        //     isMock: true
+        // },
+        // MOCK_USDT: {
+        //     address: "0xd11Db19892F8c9C89A03Ba6EFD636795cbBc0d74", // MockUSDTLike_6 (deployed on Sepolia) ❌ NOT WHITELISTED
+        //     symbol: "MUSDT",
+        //     name: "Mock Tether USD",
+        //     decimals: 6,
+        //     isMock: true
+        // }
         // ======================================== END MOCK TOKENS
     },
     // Ethereum Mainnet
@@ -215,27 +216,67 @@ export function getWETHAddress(chainId: number | string): `0x${string}` | undefi
     return TOKENS[chainId.toString()]?.WETH?.address;
 }
 
+function normalizeAddress(address?: string | null): string {
+    return (address || '').trim().toLowerCase();
+}
+
 /**
  * Get token symbol from address
  */
 export function getTokenSymbolByAddress(chainId: number | string, address: string): string | null {
     const networkTokens = TOKENS[chainId.toString()];
-    if (!networkTokens) return null;
+    if (!networkTokens) {
+        console.log('⚠️ [getTokenSymbolByAddress] No tokens for chainId:', chainId);
+        return null;
+    }
 
-    const addressLower = address.toLowerCase();
+    const addressLower = normalizeAddress(address);
+    if (!addressLower) {
+        return null;
+    }
+    
+    // DEBUG: Log what we're looking up
+    console.log('🔍 [getTokenSymbolByAddress] Lookup:', {
+        chainId,
+        address: addressLower,
+        mockERC20Address: normalizeAddress(networkTokens.MOCK_ERC20?.address),
+        wethAddress: normalizeAddress(networkTokens.WETH?.address),
+        usdcAddress: normalizeAddress(networkTokens.USDC?.address)
+    });
 
     // Standard production tokens
-    if (networkTokens.WETH?.address.toLowerCase() === addressLower) return 'WETH';
-    if (networkTokens.USDC?.address.toLowerCase() === addressLower) return 'USDC';
-    if (networkTokens.DAI?.address.toLowerCase() === addressLower) return 'DAI';
+    if (normalizeAddress(networkTokens.WETH?.address) === addressLower) return 'WETH';
+    if (normalizeAddress(networkTokens.USDC?.address) === addressLower) return 'USDC';
+    if (normalizeAddress(networkTokens.DAI?.address) === addressLower) return 'DAI';
 
     // ======================================== MOCK TOKENS LOOKUP
     // Check mock tokens (easy to remove this entire block)
-    if (networkTokens.MOCK_ERC20?.address.toLowerCase() === addressLower) return 'MERC20';
-    if (networkTokens.MOCK_WBTC?.address.toLowerCase() === addressLower) return 'MWBTC';
-    if (networkTokens.MOCK_EURS?.address.toLowerCase() === addressLower) return 'MEURS';
-    if (networkTokens.MOCK_USDT?.address.toLowerCase() === addressLower) return 'MUSDT';
+    if (normalizeAddress(networkTokens.MOCK_ERC20?.address) === addressLower) return 'MERC20';
+    // DISABLED - Not whitelisted in marketplace:
+    // if (networkTokens.MOCK_WBTC?.address.toLowerCase() === addressLower) return 'MWBTC';
+    // if (networkTokens.MOCK_EURS?.address.toLowerCase() === addressLower) return 'MEURS';
+    // if (networkTokens.MOCK_USDT?.address.toLowerCase() === addressLower) return 'MUSDT';
     // ======================================== END MOCK TOKENS
+
+    return null;
+}
+
+function findTokenSymbolByAddress(address: string): string | null {
+    const addressLower = normalizeAddress(address);
+    if (!addressLower) {
+        return null;
+    }
+
+    for (const chainKey of Object.keys(TOKENS)) {
+        const networkTokens = TOKENS[chainKey];
+        if (!networkTokens) continue;
+
+        for (const token of Object.values(networkTokens)) {
+            if (normalizeAddress(token?.address) === addressLower) {
+                return token.symbol;
+            }
+        }
+    }
 
     return null;
 }
@@ -262,7 +303,48 @@ export function getCurrencySymbolByAddress(chainId: number | string, currency?: 
     }
 
     const symbol = getTokenSymbolByAddress(chainId, currency);
-    return symbol || 'WETH'; // Fallback to WETH for unknown tokens
+    const fallbackSymbol = symbol ? null : findTokenSymbolByAddress(currency);
+    
+    // DEBUG: Log symbol lookup
+    console.log('🔍 [getCurrencySymbolByAddress]', {
+        chainId,
+        currency,
+        symbol,
+        fallbackSymbol,
+        result: symbol || fallbackSymbol || 'WETH'
+    });
+    
+    return symbol || fallbackSymbol || 'WETH'; // Fallback to WETH for unknown tokens
+}
+
+/**
+ * Get token decimals by address with chain context
+ */
+export function getTokenDecimalsByAddress(chainId: number | string, currency?: string | null): number {
+    if (!currency || isNativeETH(currency)) {
+        return 18;
+    }
+
+    const addressLower = normalizeAddress(currency);
+    const networkTokens = TOKENS[chainId.toString()];
+
+    if (networkTokens) {
+        for (const token of Object.values(networkTokens)) {
+            if (token && normalizeAddress(token.address) === addressLower) {
+                return token.decimals;
+            }
+        }
+    }
+
+    for (const chainTokens of Object.values(TOKENS)) {
+        for (const token of Object.values(chainTokens)) {
+            if (token && normalizeAddress(token.address) === addressLower) {
+                return token.decimals;
+            }
+        }
+    }
+
+    return 18;
 }
 
 /**
@@ -270,7 +352,7 @@ export function getCurrencySymbolByAddress(chainId: number | string, currency?: 
  */
 export function isWETH(chainId: number | string, address: string): boolean {
     const wethAddress = getWETHAddress(chainId);
-    return wethAddress?.toLowerCase() === address.toLowerCase();
+    return normalizeAddress(wethAddress) === normalizeAddress(address);
 }
 
 /**
@@ -282,7 +364,7 @@ export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as cons
  * Check if address is native ETH (zero address)
  */
 export function isNativeETH(address: string): boolean {
-    return address.toLowerCase() === ZERO_ADDRESS.toLowerCase();
+    return normalizeAddress(address) === normalizeAddress(ZERO_ADDRESS);
 }
 
 // ========================================

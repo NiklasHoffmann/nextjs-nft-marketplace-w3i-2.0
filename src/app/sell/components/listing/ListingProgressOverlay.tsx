@@ -1,16 +1,17 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
+import Link from 'next/link';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import { NFTCard } from '@/components/nft/NFTCard';
-import { useRouter } from 'next/navigation';
-import { useAccount } from 'wagmi';
+import { useChainId } from 'wagmi';
+import { getCurrencySymbolByAddress, ZERO_ADDRESS } from '@/config/tokens';
 
 interface ListingProgressOverlayProps {
     nft: AggregatedNFT;
     mode: 'sale' | 'trade' | 'hybrid';
     price?: string;
-    currency?: 'ETH' | 'USDC';
+    currency?: string;
     isVisible: boolean;
     currentStep?: 'whitelist' | 'approval' | 'signing' | 'pending' | 'success' | 'error';
     completedSteps?: string[];
@@ -29,33 +30,25 @@ export function ListingProgressOverlay({
     txHash,
     error
 }: ListingProgressOverlayProps) {
-    const { address: account } = useAccount();
+    const chainId = useChainId();
 
     if (!isVisible) return null;
 
     const steps = [
-        { id: 'whitelist', label: 'Whitelist prüfen', icon: '🔍' },
+        { id: 'whitelist', label: 'Whitelist pruefen', icon: '🔍' },
         { id: 'approval', label: 'NFT-Freigabe', icon: '✅' },
         { id: 'signing', label: 'Wallet-Signatur', icon: '✍️' },
-        { id: 'pending', label: 'Blockchain-Bestätigung', icon: '⏳' },
+        { id: 'pending', label: 'Blockchain-Bestaetigung', icon: '⏳' },
         { id: 'success', label: 'Erfolgreich gelistet!', icon: '🎉' }
     ];
 
-    // Get values for success state
     const contractAddress = nft.core?.contractAddress || nft.contractAddress;
     const tokenId = nft.core?.tokenId || nft.tokenId;
 
     const getStepStatus = (stepId: string) => {
-        // If there's an error and this is the current step, show error state
         if (error && stepId === currentStep) return 'error';
-
-        // Check if step is in completed steps array
         if (completedSteps.includes(stepId)) return 'completed';
-
-        // Check if this is the current active step
         if (stepId === currentStep) return 'active';
-
-        // Otherwise, step is pending
         return 'pending';
     };
 
@@ -84,9 +77,12 @@ export function ListingProgressOverlay({
 
     const getModeText = () => {
         switch (mode) {
-            case 'sale': return 'Verkaufs-Listing';
-            case 'trade': return 'Tausch-Angebot';
-            case 'hybrid': return 'Hybrid-Angebot';
+            case 'sale':
+                return 'Verkaufs-Listing';
+            case 'trade':
+                return 'Tausch-Angebot';
+            case 'hybrid':
+                return 'Hybrid-Angebot';
         }
     };
 
@@ -120,12 +116,14 @@ export function ListingProgressOverlay({
     };
 
     const classes = getModeClasses();
+    const currencySymbol = useMemo(
+        () => getCurrencySymbolByAddress(chainId, currency || ZERO_ADDRESS),
+        [chainId, currency]
+    );
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
             <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 animate-in slide-in-from-bottom-4 duration-500">
-
-                {/* Header with Icon - Only show when not success */}
                 {currentStep !== 'success' && (
                     <>
                         <div className="flex flex-col items-center mb-6">
@@ -136,11 +134,10 @@ export function ListingProgressOverlay({
                                 {getModeText()} wird erstellt
                             </h2>
                             <p className="text-sm text-gray-600 text-center">
-                                Bitte bestätigen Sie die Transaktion in Ihrer Wallet
+                                Bitte bestaetigen Sie die Transaktion in Ihrer Wallet
                             </p>
                         </div>
 
-                        {/* NFT Preview Card */}
                         <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-5 border border-gray-200 mb-6">
                             <div className="flex gap-4">
                                 <div className="relative">
@@ -149,22 +146,19 @@ export function ListingProgressOverlay({
                                         alt={nft.core.name || nft.meta?.name || `NFT #${nft.tokenId}`}
                                         className="w-24 h-24 rounded-xl object-cover shadow-lg"
                                     />
-                                    {/* Pulsing Border Effect */}
                                     <div className={`absolute inset-0 rounded-xl border-2 animate-pulse ${classes.pulseBorder}`}></div>
                                 </div>
                                 <div className="flex-1">
                                     <h3 className="font-semibold text-gray-900 text-lg mb-1">
                                         {nft.core.name || nft.meta?.name || `NFT #${nft.tokenId}`}
                                     </h3>
-                                    <p className="text-sm text-gray-600 mb-2">
-                                        Token ID: {nft.tokenId}
-                                    </p>
+                                    <p className="text-sm text-gray-600 mb-2">Token ID: {nft.tokenId}</p>
                                     {price && (
                                         <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-sm ${classes.priceBox}`}>
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                                             </svg>
-                                            {price} {currency}
+                                            {price} {currencySymbol}
                                         </div>
                                     )}
                                 </div>
@@ -173,15 +167,12 @@ export function ListingProgressOverlay({
                     </>
                 )}
 
-                {/* Loading Animation */}
                 <div className="space-y-4">
-                    {/* Progress Steps */}
                     <div className="space-y-3">
                         {steps.map((step) => {
                             const status = getStepStatus(step.id);
                             return (
                                 <div key={step.id} className="flex items-center gap-3">
-                                    {/* Status Indicator */}
                                     {status === 'completed' && (
                                         <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
                                             <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -207,12 +198,16 @@ export function ListingProgressOverlay({
                                         </div>
                                     )}
 
-                                    {/* Step Label */}
-                                    <span className={`text-sm font-medium ${status === 'active' ? 'text-gray-900' :
-                                            status === 'completed' ? 'text-green-600' :
-                                                status === 'error' ? 'text-red-600' :
-                                                    'text-gray-500'
-                                        }`}>
+                                    <span
+                                        className={`text-sm font-medium ${status === 'active'
+                                            ? 'text-gray-900'
+                                            : status === 'completed'
+                                                ? 'text-green-600'
+                                                : status === 'error'
+                                                    ? 'text-red-600'
+                                                    : 'text-gray-500'
+                                            }`}
+                                    >
                                         {step.icon} {step.label}
                                     </span>
                                 </div>
@@ -220,7 +215,6 @@ export function ListingProgressOverlay({
                         })}
                     </div>
 
-                    {/* Transaction Hash - Only show when not success */}
                     {txHash && currentStep !== 'success' && (
                         <div className="mt-4 p-3 bg-gray-100 rounded-lg">
                             <p className="text-xs text-gray-600 mb-1">Transaction Hash:</p>
@@ -235,7 +229,6 @@ export function ListingProgressOverlay({
                         </div>
                     )}
 
-                    {/* Error Message */}
                     {error && (
                         <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
                             <div className="flex gap-3">
@@ -248,7 +241,6 @@ export function ListingProgressOverlay({
                     )}
                 </div>
 
-                {/* Info Box */}
                 {!error && currentStep !== 'success' && (
                     <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                         <div className="flex gap-3">
@@ -257,99 +249,84 @@ export function ListingProgressOverlay({
                             </svg>
                             <p className="text-xs text-blue-700">
                                 {currentStep === 'approval' && 'Bitte genehmigen Sie den Zugriff auf Ihren NFT in Ihrer Wallet.'}
-                                {currentStep === 'signing' && 'Bitte bestätigen Sie die Transaktion in Ihrer Wallet.'}
+                                {currentStep === 'signing' && 'Bitte bestaetigen Sie die Transaktion in Ihrer Wallet.'}
                                 {currentStep === 'pending' && 'Die Transaktion wird auf der Blockchain verarbeitet. Dies kann einige Sekunden dauern.'}
-                                {currentStep === 'whitelist' && 'Prüfe ob die Collection für den Marketplace freigeschaltet ist...'}
+                                {currentStep === 'whitelist' && 'Pruefe ob die Collection fuer den Marketplace freigeschaltet ist...'}
                             </p>
                         </div>
                     </div>
                 )}
 
-                {/* Success Message with NFT Card */}
-                {currentStep === 'success' && (() => {
-                    const router = useRouter();
-
-                    const handleCardClick = () => {
-                        router.push(`/nft/${contractAddress}/${tokenId}`);
-                    };
-
-                    return (
-                        <div className="space-y-4">
-                            {/* Success Header */}
-                            <div className="text-center">
-                                <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-3">
-                                    <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-1">Erfolgreich gelistet!</h3>
+                {currentStep === 'success' && (
+                    <div className="space-y-4">
+                        <div className="text-center">
+                            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-3">
+                                <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
                             </div>
-
-                            {/* NFT Card with Pulse Animation */}
-                            <div
-                                onClick={handleCardClick}
-                                className="cursor-pointer transform transition-all duration-300 hover:scale-[1.02] relative"
-                                style={{
-                                    animation: 'pulse-border 2s ease-in-out infinite'
-                                }}
-                            >
-                                <style jsx>{`
-                                    @keyframes pulse-border {
-                                        0%, 100% {
-                                            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
-                                        }
-                                        50% {
-                                            box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
-                                        }
-                                    }
-                                `}</style>
-                                <div className="relative rounded-xl border-2 border-green-400 overflow-hidden max-w-sm mx-auto">
-                                    <div className="aspect-[3/4]">
-                                        <NFTCard nft={nft} />
-                                    </div>
-
-                                    {/* Click Indicator */}
-                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-green-500/90 to-transparent p-4 text-center pointer-events-none">
-                                        <p className="text-white text-sm font-semibold flex items-center justify-center gap-2">
-                                            <svg className="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
-                                            </svg>
-                                            Karte anklicken für Details
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Success Message */}
-                            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                                <div className="flex gap-3">
-                                    <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <div>
-                                        <p className="text-sm font-medium text-green-900">Listing erfolgreich erstellt!</p>
-                                        <p className="text-xs text-green-700 mt-1">Ihr NFT ist jetzt auf dem Marketplace verfügbar.</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Transaction Hash */}
-                            {txHash && (
-                                <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                                    <p className="text-xs text-gray-600 mb-1 font-medium">Transaction Hash:</p>
-                                    <a
-                                        href={`https://sepolia.etherscan.io/tx/${txHash}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs text-blue-600 hover:text-blue-800 font-mono break-all"
-                                    >
-                                        {txHash}
-                                    </a>
-                                </div>
-                            )}
+                            <h3 className="text-xl font-bold text-gray-900 mb-1">Erfolgreich gelistet!</h3>
                         </div>
-                    );
-                })()}
+
+                        <Link
+                            href={`/nft/${contractAddress}/${tokenId}`}
+                            className="cursor-pointer transform transition-all duration-300 hover:scale-[1.02] relative block"
+                            style={{
+                                animation: 'pulse-border 2s ease-in-out infinite'
+                            }}
+                        >
+                            <style jsx>{`
+                                @keyframes pulse-border {
+                                    0%, 100% {
+                                        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+                                    }
+                                    50% {
+                                        box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+                                    }
+                                }
+                            `}</style>
+                            <div className="relative rounded-xl border-2 border-green-400 overflow-hidden max-w-sm mx-auto">
+                                <div className="aspect-[3/4]">
+                                    <NFTCard nft={nft} />
+                                </div>
+                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-green-500/90 to-transparent p-4 text-center pointer-events-none">
+                                    <p className="text-white text-sm font-semibold flex items-center justify-center gap-2">
+                                        <svg className="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                                        </svg>
+                                        Karte anklicken fuer Details
+                                    </p>
+                                </div>
+                            </div>
+                        </Link>
+
+                        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="flex gap-3">
+                                <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <div>
+                                    <p className="text-sm font-medium text-green-900">Listing erfolgreich erstellt!</p>
+                                    <p className="text-xs text-green-700 mt-1">Ihr NFT ist jetzt auf dem Marketplace verfuegbar.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {txHash && (
+                            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                <p className="text-xs text-gray-600 mb-1 font-medium">Transaction Hash:</p>
+                                <a
+                                    href={`https://sepolia.etherscan.io/tx/${txHash}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-blue-600 hover:text-blue-800 font-mono break-all"
+                                >
+                                    {txHash}
+                                </a>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

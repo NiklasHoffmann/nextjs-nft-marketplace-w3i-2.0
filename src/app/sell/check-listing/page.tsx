@@ -6,7 +6,10 @@ import { useChainId } from 'wagmi';
 import { useListingFlow } from '../contexts/ListingFlowContext';
 import NFTCard from '@/components/nft/NFTCard';
 import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
-import { getCurrencySymbolByAddress } from '@/config/tokens';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
+import { parseUnits } from 'viem';
+import { BatchTransactionPreview } from '../components/preview';
+import { formatTokenDisplay } from '../utils';
 
 export default function CheckListingPage() {
     const router = useRouter();
@@ -20,10 +23,12 @@ export default function CheckListingPage() {
     });
 
     // Convert currency address to symbol
-    const currencySymbol = useMemo(() => 
-        getCurrencySymbolByAddress(chainId, formData.currency),
+    const currencySymbol = useMemo(() =>
+        getCurrencySymbolByAddress(chainId, formData.currency || ZERO_ADDRESS),
         [chainId, formData.currency]
     );
+
+    const isBatch = !!formData.selectedNFTs?.length && !formData.selectedNFT;
 
     // Guard: Redirect if no NFT selected
     useEffect(() => {
@@ -34,6 +39,36 @@ export default function CheckListingPage() {
             setProgressStep('preview');
         }
     }, [formData.selectedNFT, formData.selectedNFTs, router, setProgressStep]);
+
+    const handleConfirm = () => {
+        router.push('/sell/listing');
+    };
+
+    const handleCancel = () => {
+        router.back();
+    };
+
+    if (isBatch) {
+        const batchData = {
+            selectedNFTs: formData.selectedNFTs || [],
+            pricingType: formData.pricingType || 'fixed',
+            fixedPrice: formData.fixedPrice,
+            startPrice: formData.startPrice,
+            endPrice: formData.endPrice,
+            currency: formData.currency || ZERO_ADDRESS,
+            priceMode: formData.priceMode,
+            description: formData.description || ''
+        };
+
+        return (
+            <BatchTransactionPreview
+                data={batchData}
+                onConfirm={handleConfirm}
+                onCancel={handleCancel}
+                isLoading={false}
+            />
+        );
+    }
 
     if (!formData.selectedNFT) {
         return (
@@ -46,21 +81,19 @@ export default function CheckListingPage() {
         );
     }
 
-    const handleConfirm = () => {
-        router.push('/sell/listing');
-    };
+    const rawPrice = formData.price ? parseFloat(formData.price) : 0;
+    const tokenDecimals = getTokenDecimalsByAddress(chainId, formData.currency || ZERO_ADDRESS);
+    const displayPrice = rawPrice > 0
+        ? formatTokenDisplay(rawPrice, tokenDecimals)
+        : '0';
 
-    const handleCancel = () => {
-        router.back();
-    };
-
-    const fees = formData.price && parseFloat(formData.price) > 0
-        ? calculateFees(parseFloat(formData.price))
+    const fees = rawPrice > 0
+        ? calculateFees(rawPrice)
         : { marketplaceFee: 0, royaltyFee: 0, youReceive: 0 };
 
-    // Convert ETH price to Wei for the mock listing
-    const priceInWei = formData.price
-        ? BigInt(Math.floor(parseFloat(formData.price) * 10 ** 18)).toString()
+    // Convert token price to units for the mock listing
+    const priceInWei = rawPrice > 0
+        ? parseUnits(rawPrice.toString(), tokenDecimals).toString()
         : '0';
 
     // Create a mock listed NFT for preview
@@ -155,6 +188,14 @@ export default function CheckListingPage() {
                                     <p className="text-sm text-gray-600 whitespace-pre-wrap">{formData.description}</p>
                                 </div>
                             )}
+                            {formData.buyerWhitelistEnabled && (
+                                <div className="bg-white rounded-xl border border-gray-200 p-6">
+                                    <h3 className="text-sm font-medium text-gray-700 mb-2">Buyer-Whitelist</h3>
+                                    <p className="text-sm text-gray-600">
+                                        Aktiviert ({formData.allowedBuyers?.length || 0} Adresse{(formData.allowedBuyers?.length || 0) === 1 ? '' : 'n'})
+                                    </p>
+                                </div>
+                            )}
                         </div>
                         {formData.price && (
                             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6 mb-4">
@@ -167,13 +208,13 @@ export default function CheckListingPage() {
                                 <div className="flex justify-between items-center mb-3">
                                     <span className="text-sm text-gray-700">Verkaufspreis</span>
                                     <span className="text-2xl font-bold text-blue-600">
-                                        {formData.price} {currencySymbol}
+                                        {displayPrice} {currencySymbol}
                                     </span>
                                 </div>
                                 <div className="bg-white rounded-lg border border-blue-200 p-4 text-xs space-y-2">
                                     <div className="flex justify-between text-gray-600">
                                         <span>Listing-Preis:</span>
-                                        <span>{formData.price} {currencySymbol}</span>
+                                        <span>{displayPrice} {currencySymbol}</span>
                                     </div>
                                     <div className="flex justify-between text-red-600">
                                         <span>Marketplace-Gebühr ({(innovationFeePercentage * 100).toFixed(2)}%):</span>

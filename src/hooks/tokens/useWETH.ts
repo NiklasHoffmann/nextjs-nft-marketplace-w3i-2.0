@@ -52,22 +52,22 @@ export function useWETH({ marketplaceAddress }: UseWETHParams = {}) {
     });
 
     // Write contracts
-    const { 
-        writeContract: wrapETH, 
-        data: wrapHash, 
-        isPending: isWrapping 
+    const {
+        writeContract: wrapETH,
+        data: wrapHash,
+        isPending: isWrapping
     } = useWriteContract();
 
-    const { 
-        writeContract: unwrapWETH, 
-        data: unwrapHash, 
-        isPending: isUnwrapping 
+    const {
+        writeContract: unwrapWETH,
+        data: unwrapHash,
+        isPending: isUnwrapping
     } = useWriteContract();
 
-    const { 
-        writeContract: approveWETH, 
-        data: approveHash, 
-        isPending: isApproving 
+    const {
+        writeContract: approveWETH,
+        data: approveHash,
+        isPending: isApproving
     } = useWriteContract();
 
     // Wait for confirmations
@@ -180,29 +180,29 @@ export function useWETH({ marketplaceAddress }: UseWETHParams = {}) {
     return {
         // Addresses
         wethAddress,
-        
+
         // Balances
         wethBalance: wethBalance ? formatEther(wethBalance as bigint) : '0',
         wethBalanceWei: (wethBalance as bigint) || BigInt(0),
         ethBalance: ethBalance?.value ? formatEther(ethBalance.value) : '0',
         ethBalanceWei: ethBalance?.value || BigInt(0),
-        
+
         // Allowance
         allowance: allowance ? formatEther(allowance as bigint) : '0',
         allowanceWei: (allowance as bigint) || BigInt(0),
         hasEnoughAllowance,
         hasEnoughBalance,
-        
+
         // Actions
         wrap,
         unwrap,
         approve,
-        
+
         // Refetch functions
         refetchBalance,
         refetchEthBalance,
         refetchAllowance,
-        
+
         // State
         isWrapping: isWrapping || isWrapConfirming,
         isUnwrapping: isUnwrapping || isUnwrapConfirming,
@@ -210,12 +210,12 @@ export function useWETH({ marketplaceAddress }: UseWETHParams = {}) {
         isWrapSuccess,
         isUnwrapSuccess,
         isApproveSuccess,
-        
+
         // Transaction hashes
         wrapHash,
         unwrapHash,
         approveHash,
-        
+
         error
     };
 }

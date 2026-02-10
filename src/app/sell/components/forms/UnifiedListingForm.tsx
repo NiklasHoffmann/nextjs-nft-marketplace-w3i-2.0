@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useChainId } from 'wagmi';
+import { getAddress, isAddress } from 'viem';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
 import { useERC20 } from '@/hooks/tokens';
@@ -26,6 +27,8 @@ interface UnifiedListingFormProps {
         targetCollection?: string;
         tradeType?: 'specific' | 'collection' | 'open';
         description: string;
+        buyerWhitelistEnabled?: boolean;
+        allowedBuyers?: string[];
     }) => void;
 }
 
@@ -92,7 +95,9 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
             targetContractAddress: '',
             targetTokenId: '',
             targetCollection: '',
-            description: ''
+            description: '',
+            buyerWhitelistEnabled: false,
+            buyerWhitelistAddresses: ''
         },
         validate: (values) => {
             const errors: Record<string, string> = {};
@@ -115,6 +120,22 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
 
             if (!values.description.trim()) {
                 errors.description = 'Bitte fügen Sie eine Beschreibung hinzu';
+            }
+
+            if (values.buyerWhitelistEnabled) {
+                const addressTokens = values.buyerWhitelistAddresses
+                    .split(/[\s,]+/)
+                    .map((value) => value.trim())
+                    .filter(Boolean);
+
+                if (addressTokens.length === 0) {
+                    errors.buyerWhitelistAddresses = 'Bitte mindestens eine Wallet-Adresse angeben';
+                } else {
+                    const invalid = addressTokens.filter((address) => !isAddress(address));
+                    if (invalid.length > 0) {
+                        errors.buyerWhitelistAddresses = 'Mindestens eine Adresse ist ungueltig';
+                    }
+                }
             }
 
             return errors;
@@ -147,6 +168,14 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                 ? (values.priceMode === 'net' ? fees.grossPrice.toString() : values.price)
                 : undefined;
 
+            const rawAddresses = values.buyerWhitelistAddresses
+                .split(/[\s,]+/)
+                .map((value) => value.trim())
+                .filter(Boolean);
+            const allowedBuyers = values.buyerWhitelistEnabled
+                ? Array.from(new Set(rawAddresses.map((address) => getAddress(address))))
+                : [];
+
             onSubmit({
                 mode,
                 price: submissionPrice,
@@ -154,7 +183,9 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                 targetNFT: (mode === 'trade' || mode === 'hybrid') ? selectedTargetNFT || undefined : undefined,
                 targetCollection: values.targetCollection || undefined,
                 tradeType: (mode === 'trade' || mode === 'hybrid') ? values.tradeType : undefined,
-                description: values.description
+                description: values.description,
+                buyerWhitelistEnabled: values.buyerWhitelistEnabled,
+                allowedBuyers
             });
         }
     });
@@ -657,6 +688,45 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                         />
                         {form.hasError('description') && (
                             <p className="mt-1 text-sm text-red-600">{form.getFieldError('description')}</p>
+                        )}
+                    </div>
+
+                    {/* Buyer Whitelist */}
+                    <div className="rounded-xl border border-gray-200 p-4 bg-gray-50">
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                            <input
+                                type="checkbox"
+                                checked={form.values.buyerWhitelistEnabled}
+                                onChange={(event) => {
+                                    const enabled = event.target.checked;
+                                    form.setFieldValue('buyerWhitelistEnabled', enabled);
+                                    if (!enabled) {
+                                        form.setFieldValue('buyerWhitelistAddresses', '');
+                                    }
+                                }}
+                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            Buyer-Whitelist aktivieren
+                        </label>
+                        <p className="mt-1 text-xs text-gray-500">
+                            Nur die angegebenen Wallets koennen dieses Listing kaufen.
+                        </p>
+
+                        {form.values.buyerWhitelistEnabled && (
+                            <div className="mt-3">
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                    Wallet-Adressen (eine pro Zeile oder getrennt durch Kommas)
+                                </label>
+                                <textarea
+                                    {...form.getFieldProps('buyerWhitelistAddresses')}
+                                    rows={3}
+                                    className={`w-full rounded-lg border ${form.hasError('buyerWhitelistAddresses') ? 'border-red-300' : 'border-gray-300'} px-3 py-2 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                                    placeholder="0xabc...\n0xdef..."
+                                />
+                                {form.hasError('buyerWhitelistAddresses') && (
+                                    <p className="mt-1 text-xs text-red-600">{form.getFieldError('buyerWhitelistAddresses')}</p>
+                                )}
+                            </div>
                         )}
                     </div>
 
