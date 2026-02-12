@@ -109,6 +109,7 @@ export function useWalletNFTsV2({
             abortControllerRef.current.abort();
         }
         abortControllerRef.current = new AbortController();
+        const controller = abortControllerRef.current;
 
         setLoading(true);
         setError(null);
@@ -119,7 +120,7 @@ export function useWalletNFTsV2({
             params.append('walletAddress', walletAddress);
 
             const response = await fetch(`/api/user/nfts?${params.toString()}`, {
-                signal: abortControllerRef.current.signal
+                signal: controller.signal
             });
 
             if (!response.ok) {

@@ -78,7 +78,8 @@ export function useMultisigPendingTransactions(
             setError(null);
 
             const latestBlock = await publicClient.getBlockNumber();
-            const fromBlock = latestBlock > 50000n ? latestBlock - 50000n : 0n;
+            const blockWindow = BigInt(50000);
+            const fromBlock = latestBlock > blockWindow ? latestBlock - blockWindow : BigInt(0);
             setEventFallbackRange(`${fromBlock.toString()}-${latestBlock.toString()}`);
 
             const logs = await publicClient.getLogs({
@@ -149,7 +150,7 @@ export function useMultisigPendingTransactions(
                     const fallbackTx: MultiSigTransaction = {
                         transactionType: Number(args._transactionType ?? 0),
                         isActive: false,
-                        numConfirmations: 0n,
+                        numConfirmations: BigInt(0),
                         owner: String(args.owner || ''),
                         to: String(args.to || ''),
                         value: BigInt(args.value ?? 0),

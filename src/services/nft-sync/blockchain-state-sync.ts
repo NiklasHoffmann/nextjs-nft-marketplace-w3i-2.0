@@ -256,7 +256,7 @@ export class BlockchainStateSync {
         }
         
         // If owner changed, add to ownership history
-        if (ownerChanged) {
+        if (ownerChanged && existingNFT) {
             updateOps.$push = {
                 ownershipHistory: {
                     owner: oldOwner,
