@@ -9,22 +9,36 @@
 import { type PendingMultiSigTx, TRANSACTION_TYPE_LABELS, TRANSACTION_TYPE_COLORS } from '@/types';
 import { getTransactionStatusLabel, getTransactionStatusColor, formatTransactionValue } from '@/services/multisig';
 import { useMultisigWallet } from '@/hooks/multisig/useMultisigWallet';
+import { useAccount } from 'wagmi';
 import { useState } from 'react';
 import { LoadingState } from '@/components/core/Loading/LoadingState';
+import { BaseModal } from '@/components/core/Modal/BaseModal';
+import { AddressWithEns } from '@/app/admin/components/shared/AddressWithEns';
 
 interface MultiSigTransactionCardProps {
     transaction: PendingMultiSigTx;
     onConfirm?: () => void;
     onRevoke?: () => void;
+    onDeactivate?: () => void;
 }
 
 export function MultiSigTransactionCard({
     transaction,
     onConfirm,
     onRevoke,
+    onDeactivate,
 }: MultiSigTransactionCardProps) {
-    const { confirmTransaction, revokeConfirmation, isConfirming, isRevoking } = useMultisigWallet();
+    const { address } = useAccount();
+    const {
+        confirmTransaction,
+        revokeConfirmation,
+        deactivateMyPendingTransaction,
+        isConfirming,
+        isRevoking,
+        isDeactivating,
+    } = useMultisigWallet();
     const [actionLoading, setActionLoading] = useState(false);
+    const [isDeactivateOpen, setIsDeactivateOpen] = useState(false);
 
     const handleConfirm = async () => {
         setActionLoading(true);
@@ -50,12 +64,64 @@ export function MultiSigTransactionCard({
         }
     };
 
+    const handleDeactivate = async () => {
+        setActionLoading(true);
+        try {
+            const result = await deactivateMyPendingTransaction(transaction.txIndex);
+            if (result.success) {
+                if (onDeactivate) {
+                    onDeactivate();
+                } else {
+                    onRevoke?.();
+                }
+                setIsDeactivateOpen(false);
+            }
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const statusColor = getTransactionStatusColor(transaction);
     const statusLabel = getTransactionStatusLabel(transaction);
     const typeColor = TRANSACTION_TYPE_COLORS[transaction.transactionType];
+    const isOwner = Boolean(
+        address
+        && transaction.owner
+        && address.toLowerCase() === transaction.owner.toLowerCase()
+    );
+    const canDeactivate = transaction.isActive && isOwner;
 
     return (
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
+            <BaseModal
+                isOpen={isDeactivateOpen}
+                onClose={() => setIsDeactivateOpen(false)}
+                title="Deactivate transaction?"
+                size="sm"
+                footer={(
+                    <div className="flex flex-wrap justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setIsDeactivateOpen(false)}
+                            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleDeactivate}
+                            disabled={actionLoading || isDeactivating}
+                            className="rounded-md bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                        >
+                            {actionLoading || isDeactivating ? 'Deactivating...' : 'Deactivate'}
+                        </button>
+                    </div>
+                )}
+            >
+                <p className="text-sm text-gray-700">
+                    This deactivates your pending transaction so it can no longer be confirmed or executed.
+                </p>
+            </BaseModal>
             {/* Header */}
             <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -78,7 +144,7 @@ export function MultiSigTransactionCard({
             <div className="mt-4 space-y-2 text-sm">
                 <div className="flex justify-between">
                     <span className="text-gray-600">To:</span>
-                    <span className="font-mono text-gray-900">{transaction.to.slice(0, 10)}...{transaction.to.slice(-8)}</span>
+                    <AddressWithEns address={transaction.to} className="font-mono text-gray-900" showAddress />
                 </div>
                 {transaction.value > BigInt(0) && (
                     <div className="flex justify-between">
@@ -90,7 +156,7 @@ export function MultiSigTransactionCard({
                 )}
                 <div className="flex justify-between">
                     <span className="text-gray-600">Initiated by:</span>
-                    <span className="font-mono text-gray-900">{transaction.owner.slice(0, 10)}...{transaction.owner.slice(-8)}</span>
+                    <AddressWithEns address={transaction.owner} className="font-mono text-gray-900" showAddress />
                 </div>
             </div>
 
@@ -135,14 +201,14 @@ export function MultiSigTransactionCard({
                             className="rounded bg-green-100 px-2 py-1 text-xs font-mono text-green-800"
                             title={addr}
                         >
-                            {addr.slice(0, 6)}...{addr.slice(-4)}
+                            <AddressWithEns address={addr} />
                         </span>
                     ))}
                 </div>
             </div>
 
             {/* Actions */}
-            <div className="mt-6 flex gap-3">
+            <div className="mt-6 flex flex-wrap gap-3">
                 {transaction.canConfirm && (
                     <button
                         onClick={handleConfirm}
@@ -175,6 +241,24 @@ export function MultiSigTransactionCard({
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 Revoke
+                            </>
+                        )}
+                    </button>
+                )}
+                {canDeactivate && (
+                    <button
+                        onClick={() => setIsDeactivateOpen(true)}
+                        disabled={actionLoading || isDeactivating}
+                        className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                    >
+                        {actionLoading || isDeactivating ? (
+                            <LoadingState size="sm" message="Deactivating..." />
+                        ) : (
+                            <>
+                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 12H6" />
+                                </svg>
+                                Deactivate
                             </>
                         )}
                     </button>

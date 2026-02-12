@@ -8,35 +8,42 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAccount, useReadContract, useChainId, usePublicClient } from 'wagmi';
+import { parseAbiItem } from 'viem';
 import { MULTISIG_WALLET_ABI } from '@/config/abis/multisig-wallet';
 import { getMultisigAddress } from '@/config';
 import { MULTISIG_ADDRESSES, type PendingMultiSigTx, type MultiSigTransaction } from '@/types';
 import { enhancePendingTransaction } from '@/services/multisig';
+import { devLog } from '@/utils';
 
-export function useMultisigPendingTransactions(diamondAddress: string) {
+type PendingTransactionsOptions = {
+    includeInactive?: boolean;
+    maxTransactions?: number;
+};
+
+export function useMultisigPendingTransactions(
+    diamondAddress: string,
+    options?: PendingTransactionsOptions
+) {
     const { address } = useAccount();
     const chainId = useChainId();
     const publicClient = usePublicClient();
     const [pendingTxs, setPendingTxs] = useState<PendingMultiSigTx[]>([]);
+    const [recentTxs, setRecentTxs] = useState<PendingMultiSigTx[]>([]);
+    const [eventFallbackCount, setEventFallbackCount] = useState(0);
+    const [eventFallbackError, setEventFallbackError] = useState<string | null>(null);
+    const [eventFallbackRange, setEventFallbackRange] = useState<string>('');
+    const [eventFallbackTotal, setEventFallbackTotal] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const includeInactive = options?.includeInactive ?? false;
+    const maxTransactions = options?.maxTransactions ?? 25;
 
     const multiSigAddress = chainId
         ? (getMultisigAddress(chainId) || (chainId === 1 ? MULTISIG_ADDRESSES.mainnet : MULTISIG_ADDRESSES.sepolia))
         : undefined;
 
-    // Get transaction count
-    const { data: txCount } = useReadContract({
-        address: multiSigAddress ? (multiSigAddress as `0x${string}`) : undefined,
-        abi: MULTISIG_WALLET_ABI,
-        functionName: 'getTransactionCount',
-        query: {
-            enabled: !!multiSigAddress,
-        },
-    });
-
     // Get owner count
-    const { data: ownerCount } = useReadContract({
+    const { data: ownerCount, error: ownerCountError } = useReadContract({
         address: multiSigAddress ? (multiSigAddress as `0x${string}`) : undefined,
         abi: MULTISIG_WALLET_ABI,
         functionName: 'getOwnerCount',
@@ -46,7 +53,7 @@ export function useMultisigPendingTransactions(diamondAddress: string) {
     });
 
     // Get owners
-    const { data: owners } = useReadContract({
+    const { data: owners, error: ownersError } = useReadContract({
         address: multiSigAddress ? (multiSigAddress as `0x${string}`) : undefined,
         abi: MULTISIG_WALLET_ABI,
         functionName: 'getOwners',
@@ -57,7 +64,11 @@ export function useMultisigPendingTransactions(diamondAddress: string) {
 
     // Fetch all pending transactions
     const fetchPendingTransactions = useCallback(async () => {
-        if (!multiSigAddress || !txCount || !ownerCount || !owners || !address || !publicClient) {
+        const hasOwnerCount = ownerCount !== undefined && ownerCount !== null;
+        const hasOwners = Array.isArray(owners);
+        const userAddress = address || '0x0000000000000000000000000000000000000000';
+
+        if (!multiSigAddress || !hasOwnerCount || !hasOwners || !publicClient) {
             setIsLoading(false);
             return;
         }
@@ -66,61 +77,155 @@ export function useMultisigPendingTransactions(diamondAddress: string) {
             setIsLoading(true);
             setError(null);
 
-            const count = Number(txCount);
-            const transactions: PendingMultiSigTx[] = [];
+            const latestBlock = await publicClient.getBlockNumber();
+            const fromBlock = latestBlock > 50000n ? latestBlock - 50000n : 0n;
+            setEventFallbackRange(`${fromBlock.toString()}-${latestBlock.toString()}`);
 
-            // Fetch each transaction
-            for (let i = 0; i < count; i++) {
+            const logs = await publicClient.getLogs({
+                address: multiSigAddress as `0x${string}`,
+                event: parseAbiItem(
+                    'event SubmitTransaction(uint8 indexed _transactionType, uint256 indexed txIndex, address indexed to, uint256 value, address tokenAddress, uint256 amountOrTokenId, address owner, bytes data)'
+                ),
+                fromBlock,
+                toBlock: 'latest'
+            });
+
+            const txIndexSet = new Set<number>();
+            const logByIndex = new Map<number, typeof logs[number]>();
+            for (const log of logs) {
+                const args = log.args as { txIndex?: bigint; };
+                const index = args?.txIndex !== undefined ? Number(args.txIndex) : undefined;
+                if (index === undefined || Number.isNaN(index)) continue;
+                txIndexSet.add(index);
+                logByIndex.set(index, log);
+            }
+
+            const txIndices = Array.from(txIndexSet).sort((a, b) => a - b);
+            setEventFallbackTotal(txIndices.length);
+
+            const recentIndices = txIndices.slice(-maxTransactions);
+            const transactions: PendingMultiSigTx[] = [];
+            const recentTransactions: PendingMultiSigTx[] = [];
+
+            const readTransactionByIndex = async (txIndex: number): Promise<MultiSigTransaction | null> => {
                 try {
-                    const tx = await publicClient.readContract({
+                    const result = await publicClient.readContract({
                         address: multiSigAddress as `0x${string}`,
                         abi: MULTISIG_WALLET_ABI,
-                        functionName: 'getTransaction',
-                        args: [BigInt(i)],
-                    }) as MultiSigTransaction;
+                        functionName: 'transactions',
+                        args: [BigInt(txIndex)],
+                    }) as any;
 
-                    // Only include active transactions
-                    if (!tx.isActive) continue;
+                    return {
+                        transactionType: Number(result.transactionType ?? result[0]),
+                        isActive: Boolean(result.isActive ?? result[1]),
+                        numConfirmations: BigInt(result.numConfirmations ?? result[2]),
+                        owner: String(result.owner ?? result[3]),
+                        to: String(result.to ?? result[4]),
+                        value: BigInt(result.value ?? result[5]),
+                        data: String(result.data ?? result[6]),
+                    } as MultiSigTransaction;
+                } catch (readError) {
+                    devLog.error(`Failed to fetch transaction ${txIndex}:`, readError);
+                    return null;
+                }
+            };
 
-                    // Get confirmations for this transaction
-                    const confirmations: string[] = [];
-                    for (const owner of owners as string[]) {
+            const indicesToLoad = includeInactive ? recentIndices : txIndices;
+            for (const index of indicesToLoad) {
+                const tx = await readTransactionByIndex(index);
+                const log = logByIndex.get(index);
+
+                if (!tx && log) {
+                    const args = log.args as {
+                        _transactionType?: number;
+                        txIndex?: bigint;
+                        to?: `0x${string}`;
+                        value?: bigint;
+                        owner?: `0x${string}`;
+                        data?: `0x${string}`;
+                    };
+
+                    const fallbackTx: MultiSigTransaction = {
+                        transactionType: Number(args._transactionType ?? 0),
+                        isActive: false,
+                        numConfirmations: 0n,
+                        owner: String(args.owner || ''),
+                        to: String(args.to || ''),
+                        value: BigInt(args.value ?? 0),
+                        data: String(args.data || '0x'),
+                    };
+
+                    const enhancedFallback = enhancePendingTransaction(
+                        fallbackTx,
+                        index,
+                        [],
+                        userAddress,
+                        Number(ownerCount),
+                        diamondAddress
+                    );
+
+                    recentTransactions.push(enhancedFallback);
+                    continue;
+                }
+
+                if (!tx) continue;
+
+                // Get confirmations for this transaction
+                const confirmations: string[] = [];
+                for (const owner of owners as string[]) {
+                    try {
                         const isConfirmed = await publicClient.readContract({
                             address: multiSigAddress as `0x${string}`,
                             abi: MULTISIG_WALLET_ABI,
                             functionName: 'isConfirmed',
-                            args: [BigInt(i), owner as `0x${string}`],
+                            args: [BigInt(index), owner as `0x${string}`],
                         });
 
                         if (isConfirmed) {
                             confirmations.push(owner);
                         }
+                    } catch (confirmError) {
+                        devLog.error(`Failed to fetch confirmations for ${index}:`, confirmError);
                     }
+                }
 
-                    // Enhance transaction with metadata
-                    const enhanced = enhancePendingTransaction(
-                        tx,
-                        i,
-                        confirmations,
-                        address,
-                        Number(ownerCount),
-                        diamondAddress
-                    );
+                const enhanced = enhancePendingTransaction(
+                    tx,
+                    index,
+                    confirmations,
+                    userAddress,
+                    Number(ownerCount),
+                    diamondAddress
+                );
 
+                if (tx.isActive) {
                     transactions.push(enhanced);
-                } catch (err) {
-                    console.error(`Failed to fetch transaction ${i}:`, err);
+                }
+
+                if (includeInactive && recentIndices.includes(index)) {
+                    recentTransactions.push(enhanced);
                 }
             }
 
             setPendingTxs(transactions);
+            if (includeInactive) {
+                setRecentTxs(recentTransactions.reverse());
+                setEventFallbackCount(recentIndices.length);
+                setEventFallbackError(null);
+            } else {
+                setEventFallbackCount(0);
+                setEventFallbackError(null);
+                setEventFallbackRange('');
+                setEventFallbackTotal(0);
+            }
         } catch (err) {
-            console.error('Failed to fetch pending transactions:', err);
+            devLog.error('Failed to fetch pending transactions:', err);
             setError(err instanceof Error ? err.message : 'Failed to fetch transactions');
         } finally {
             setIsLoading(false);
         }
-    }, [txCount, ownerCount, owners, address, publicClient, multiSigAddress, diamondAddress]);
+    }, [ownerCount, owners, address, publicClient, multiSigAddress, diamondAddress, includeInactive, maxTransactions]);
 
     // Fetch on mount and when dependencies change
     useEffect(() => {
@@ -129,8 +234,20 @@ export function useMultisigPendingTransactions(diamondAddress: string) {
 
     return {
         pendingTransactions: pendingTxs,
+        recentTransactions: recentTxs,
         isLoading,
         error,
         refetch: fetchPendingTransactions,
+        stats: {
+            multisigAddress: multiSigAddress || '',
+            ownerCount: ownerCount ? Number(ownerCount) : 0,
+            owners: Array.isArray(owners) ? owners : [],
+            eventFallbackCount,
+            eventFallbackError,
+            eventFallbackRange,
+            eventFallbackTotal,
+            ownerCountError: ownerCountError?.message || '',
+            ownersError: ownersError?.message || '',
+        },
     };
 }
