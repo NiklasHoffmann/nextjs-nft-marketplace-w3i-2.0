@@ -28,6 +28,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { AVAILABLE_CHARACTERS } from '../config/gameConstants'
 import type { LoadedCharacters } from '../types/historyTower.types'
+import { devLog } from '@/utils'
 
 /**
  * Load single image as Promise
@@ -69,7 +70,7 @@ async function loadAllCharacters(): Promise<LoadedCharacters> {
             windowImages
         }
     } catch (error) {
-        console.error('Error loading characters:', error)
+        devLog.error('Error loading characters:', error)
         throw error
     }
 }

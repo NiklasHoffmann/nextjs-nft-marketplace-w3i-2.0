@@ -1,10 +1,12 @@
 ﻿"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { devLog } from '@/utils';
 import Link from 'next/link';
 import { useAccount, useChainId } from 'wagmi';
 import { formatEther } from 'viem';
 import { AdminPageShell } from '@/app/admin/components/shared/AdminPageShell';
+import { AddressWithEns } from '@/app/admin/components/shared/AddressWithEns';
 
 interface DashboardStats {
     totalNFTs: number;
@@ -52,15 +54,50 @@ interface SystemHealth {
     };
 }
 
+interface SystemMetrics {
+    process: {
+        uptimeSeconds: number;
+        memoryRssMb: number;
+    };
+    database: {
+        marketplaceItems: number;
+        nftMetadata: number;
+        nftStats: number;
+    };
+    syncService: {
+        status: string;
+        recentUpdates: number;
+    };
+}
+
 export default function AdminDashboard() {
     const [mounted, setMounted] = useState(false);
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [health, setHealth] = useState<SystemHealth | null>(null);
+    const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
     const [loading, setLoading] = useState(true);
     const [healthLoading, setHealthLoading] = useState(true);
+    const [metricsLoading, setMetricsLoading] = useState(false);
+    const [metricsUpdatedAt, setMetricsUpdatedAt] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
     const { address, isConnected } = useAccount();
     const chainId = useChainId();
+
+    const fetchMetrics = useCallback(async () => {
+        try {
+            setMetricsLoading(true);
+            const response = await fetch('/api/admin/system/metrics', { cache: 'no-store' });
+            const data = await response.json();
+            if (response.ok) {
+                setMetrics(data.data);
+                setMetricsUpdatedAt(Date.now());
+            }
+        } catch (err) {
+            devLog.error('[Dashboard] Failed to fetch metrics', err);
+        } finally {
+            setMetricsLoading(false);
+        }
+    }, []);
 
     useEffect(() => {
         setMounted(true);
@@ -72,22 +109,22 @@ export default function AdminDashboard() {
             try {
                 setLoading(true);
                 setError(null);
-                console.log('[Dashboard] Fetching stats from /api/admin/dashboard/stats');
+                devLog.info('[Dashboard] Fetching stats from /api/admin/dashboard/stats');
                 const response = await fetch('/api/admin/dashboard/stats');
                 const data = await response.json();
 
-                console.log('[Dashboard] Response status:', response.status);
-                console.log('[Dashboard] Response data:', data);
+                devLog.info('[Dashboard] Response status:', response.status);
+                devLog.info('[Dashboard] Response data:', data);
 
                 if (!response.ok) {
-                    console.error('[Dashboard] API Error:', data);
+                    devLog.error('[Dashboard] API Error:', data);
                     throw new Error(data.error?.message || data.message || 'Failed to fetch stats');
                 }
 
-                console.log('[Dashboard] Stats loaded successfully:', data.data);
+                devLog.info('[Dashboard] Stats loaded successfully:', data.data);
                 setStats(data.data);
             } catch (err) {
-                console.error('[Dashboard] Failed to fetch stats:', err);
+                devLog.error('[Dashboard] Failed to fetch stats:', err);
                 setError(err instanceof Error ? err.message : 'Failed to load dashboard');
             } finally {
                 setLoading(false);
@@ -111,7 +148,7 @@ export default function AdminDashboard() {
                     setHealth(data.data);
                 }
             } catch (err) {
-                console.error('[Dashboard] Failed to fetch health:', err);
+                devLog.error('[Dashboard] Failed to fetch health', err);
             } finally {
                 setHealthLoading(false);
             }
@@ -125,9 +162,10 @@ export default function AdminDashboard() {
         return () => clearInterval(interval);
     }, [mounted]);
 
-    const formatAddress = (addr: string) => {
-        return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-    };
+    useEffect(() => {
+        if (!mounted) return;
+        fetchMetrics();
+    }, [mounted, fetchMetrics]);
 
     const formatVolume = (volumeWei: number | string) => {
         const formatted = formatEther(BigInt(volumeWei));
@@ -165,6 +203,14 @@ export default function AdminDashboard() {
         if (minutes < 60) return `${minutes} min ago`;
         const hours = Math.floor(minutes / 60);
         return `${hours}h ago`;
+    };
+
+    const formatUptime = (seconds: number) => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        if (hours <= 0) return `${minutes} min`;
+        if (minutes === 0) return `${hours} h`;
+        return `${hours} h ${minutes} min`;
     };
 
     return (
@@ -276,7 +322,7 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Quick Actions */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* System Status */}
                         <div className="bg-white border border-gray-200 rounded-lg p-6">
                             <h2 className="text-lg font-semibold text-gray-900 mb-4">System Status</h2>
@@ -330,7 +376,10 @@ export default function AdminDashboard() {
                                         <div className="flex items-center justify-between py-1.5">
                                             <span className="text-sm text-gray-600">Contract Ownership</span>
                                             <div className="flex items-center gap-2">
-                                                <span className="text-xs text-gray-400">{formatAddress(health.contract.currentOwner)}</span>
+                                                <AddressWithEns
+                                                    address={health.contract.currentOwner}
+                                                    className="text-xs text-gray-400"
+                                                />
                                                 <span className={`px-2 py-1 text-xs font-medium rounded ${address?.toLowerCase() === health.contract.currentOwner.toLowerCase() ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
                                                     {address?.toLowerCase() === health.contract.currentOwner.toLowerCase() ? 'Owner' : 'Transferred'}
                                                 </span>
@@ -389,6 +438,71 @@ export default function AdminDashboard() {
                             </div>
                         </div>
 
+                        {/* System Metrics */}
+                        <div className="bg-white border border-gray-200 rounded-lg p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-semibold text-gray-900">System Metrics</h2>
+                                <button
+                                    type="button"
+                                    onClick={fetchMetrics}
+                                    disabled={metricsLoading}
+                                    className="text-xs font-medium px-2.5 py-1 rounded border border-gray-200 text-gray-600 hover:text-gray-800 hover:border-gray-300 disabled:opacity-60"
+                                >
+                                    {metricsLoading ? 'Lade...' : 'Refresh'}
+                                </button>
+                            </div>
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-gray-600">Uptime</span>
+                                    <span className="font-medium text-gray-900">
+                                        {metrics ? formatUptime(metrics.process.uptimeSeconds) : '—'}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-gray-600">Memory (RSS)</span>
+                                    <span className="font-medium text-gray-900">
+                                        {metrics ? `${metrics.process.memoryRssMb} MB` : '—'}
+                                    </span>
+                                </div>
+                                <div className="pt-2 border-t border-gray-100 space-y-2">
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-gray-600">Marketplace Items</span>
+                                        <span className="font-medium text-gray-900">
+                                            {metrics ? metrics.database.marketplaceItems.toLocaleString() : '—'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-gray-600">NFT Metadata</span>
+                                        <span className="font-medium text-gray-900">
+                                            {metrics ? metrics.database.nftMetadata.toLocaleString() : '—'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-gray-600">NFT Stats</span>
+                                        <span className="font-medium text-gray-900">
+                                            {metrics ? metrics.database.nftStats.toLocaleString() : '—'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="pt-2 border-t border-gray-100 text-xs text-gray-500 flex items-center justify-between">
+                                    <span>Sync: {metrics?.syncService?.status || '—'}</span>
+                                    <span>
+                                        {metricsUpdatedAt
+                                            ? new Date(metricsUpdatedAt).toLocaleTimeString('de-DE')
+                                            : '—'}
+                                    </span>
+                                </div>
+                                <div className="pt-2">
+                                    <Link
+                                        href="/admin/system"
+                                        className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                                    >
+                                        Details ansehen
+                                    </Link>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Recent Sales */}
                         <div className="bg-white border border-gray-200 rounded-lg p-6">
                             <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Sales</h2>
@@ -407,7 +521,7 @@ export default function AdminDashboard() {
                                                     Token #{sale.tokenId}
                                                 </div>
                                                 <div className="text-xs text-gray-500">
-                                                    {formatAddress(sale.buyer)}
+                                                    <AddressWithEns address={sale.buyer} className="text-xs text-gray-500" />
                                                 </div>
                                             </div>
                                             <div className="text-right ml-4">

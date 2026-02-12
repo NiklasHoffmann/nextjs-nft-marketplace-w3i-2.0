@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useState, useEffect } from 'react';
+import { devLog } from '@/utils';
 import type { GameScoreSubmission, ScoreSubmitResponse } from '@/types';
 
 interface HighscoreDialogProps {
@@ -78,7 +79,7 @@ export default function HighscoreDialog({
 
         } catch (err) {
             setError('Network error. Please try again.');
-            console.error('Score submission error:', err);
+            devLog.error('Score submission error:', err);
         } finally {
             setIsSubmitting(false);
         }

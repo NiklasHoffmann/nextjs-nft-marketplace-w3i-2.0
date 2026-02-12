@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 import { useWETH } from '@/hooks/tokens';
 import { useMarketplaceContracts } from '@/hooks/marketplace';
 import { LoadingState, ButtonSpinner } from '@/components/core/Loading';
+import { devLog } from '@/utils';
 
 export function WETHConverter() {
     const { marketplaceAddress } = useMarketplaceContracts();
@@ -52,7 +53,7 @@ export function WETHConverter() {
         try {
             await wrap(amount);
         } catch (err) {
-            console.error('Wrap failed:', err);
+            devLog.error('Wrap failed:', err);
         }
     };
 
@@ -62,7 +63,7 @@ export function WETHConverter() {
         try {
             await unwrap(amount);
         } catch (err) {
-            console.error('Unwrap failed:', err);
+            devLog.error('Unwrap failed:', err);
         }
     };
 
@@ -71,7 +72,7 @@ export function WETHConverter() {
         try {
             await approve(unlimitedApproval ? undefined : amount);
         } catch (err) {
-            console.error('Approve failed:', err);
+            devLog.error('Approve failed:', err);
         }
     };
 

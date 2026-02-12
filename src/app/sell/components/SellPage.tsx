@@ -24,6 +24,7 @@ import { useNFTApproval } from '@/hooks/nfts';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
 import { walletNFTToAggregatedNFT, sortNFTs, filterNFTs } from '../utils';
 import type { StepStatus, ListingType, NFTFilterOptions } from '../types';
+import { devLog } from '@/utils';
 
 // UI Components
 import {
@@ -83,6 +84,7 @@ export function SellPage() {
 
     const [listingType, setListingType] = useState<ListingType>('single');
     const [batchSelectedNFTs, setBatchSelectedNFTs] = useState<Set<string>>(new Set());
+    const [erc1155Quantities, setErc1155Quantities] = useState<Record<string, string>>({});
     
     // Clean up batchSelectedNFTs: remove keys that are no longer in filteredNFTs
     useEffect(() => {
@@ -126,6 +128,7 @@ export function SellPage() {
         nftContractAddress: (approvalNFT?.contractAddress || '') as `0x${string}`,
         tokenId: approvalNFT?.tokenId || '0',
         marketplaceAddress: marketplaceAddress || '0x0000000000000000000000000000000000000000',
+        tokenStandard: approvalNFT?.tokenStandard || 'ERC721',
         enabled: !!approvalNFT && !!marketplaceAddress
     });
 
@@ -151,6 +154,31 @@ export function SellPage() {
             setFormData({ selectedNFTs: undefined, selectedNFT });
         }
     }, [batchSelectedNFTs, allNFTs, setFormData, listingType, selectedNFT]);
+
+    useEffect(() => {
+        if (listingType !== 'batch') return;
+
+        setErc1155Quantities(prev => {
+            const next = { ...prev };
+            const selectedKeys = new Set(batchSelectedNFTs);
+            Object.keys(next).forEach((key) => {
+                if (!selectedKeys.has(key)) {
+                    delete next[key];
+                }
+            });
+
+            selectedKeys.forEach((key) => {
+                if (next[key]) return;
+                const [contract, tokenId] = key.split('-');
+                const nft = allNFTs.find(item => item.contractAddress === contract && item.tokenId === tokenId);
+                if (nft?.tokenStandard === 'ERC1155') {
+                    next[key] = nft.balance || '1';
+                }
+            });
+
+            return next;
+        });
+    }, [batchSelectedNFTs, allNFTs, listingType]);
 
     // Sync status to context
     useEffect(() => {
@@ -248,7 +276,7 @@ export function SellPage() {
                 setUnapprovedContracts(notApproved);
                 setApprovalStatus(allApproved ? 'done' : 'failed');
             } catch (error) {
-                console.error('Approval check failed:', error);
+                devLog.error('Approval check failed:', error);
                 setUnapprovedContracts([]);
                 setApprovalStatus('failed');
             }
@@ -319,7 +347,7 @@ export function SellPage() {
                             });
                             return { contractAddress, isWhitelisted };
                         } catch (error) {
-                            console.error(`Whitelist check failed for ${contractAddress}:`, error);
+                            devLog.error(`Whitelist check failed for ${contractAddress}:`, error);
                             return { contractAddress, isWhitelisted: false };
                         }
                     })
@@ -332,12 +360,12 @@ export function SellPage() {
                     .map(check => check.contractAddress);
 
                 if (notWhitelistedContracts.length > 0) {
-                    console.warn('Not whitelisted collections:', notWhitelistedContracts);
+                    devLog.warn('Not whitelisted collections:', notWhitelistedContracts);
                 }
 
                 setWhitelistStatus(allWhitelisted ? 'done' : 'failed');
             } catch (error) {
-                console.error('Whitelist check failed:', error);
+                devLog.error('Whitelist check failed:', error);
                 setWhitelistStatus('failed');
             }
         };
@@ -380,9 +408,26 @@ export function SellPage() {
             tradeType: undefined,
             targetNFT: null,
             targetCollection: undefined,
+            erc1155Quantities,
             ...data
         });
     };
+
+    const handleBatchQuantityChange = (key: string, quantity: string) => {
+        setErc1155Quantities(prev => ({
+            ...prev,
+            [key]: quantity
+        }));
+    };
+
+    const hasErc1155InBatch = useMemo(() => {
+        if (listingType !== 'batch' || batchSelectedNFTs.size === 0) return false;
+        return Array.from(batchSelectedNFTs).some((key) => {
+            const [contract, tokenId] = key.split('-');
+            const nft = allNFTs.find(item => item.contractAddress === contract && item.tokenId === tokenId);
+            return nft?.tokenStandard === 'ERC1155';
+        });
+    }, [listingType, batchSelectedNFTs, allNFTs]);
 
     // Approval Dialog Handlers
     const handleApproveSingle = async () => {
@@ -391,7 +436,7 @@ export function SellPage() {
             await nftApproval.approveSingle();
             // Status wird automatisch durch useEffect aktualisiert
         } catch (error) {
-            console.error('Approval failed:', error);
+            devLog.error('Approval failed:', error);
             setApprovalStatus('failed');
             setShowApprovalDialog(false);
         }
@@ -403,7 +448,7 @@ export function SellPage() {
             await nftApproval.approveAll();
             // Status wird automatisch durch useEffect aktualisiert
         } catch (error) {
-            console.error('Approval failed:', error);
+            devLog.error('Approval failed:', error);
             setApprovalStatus('failed');
             setShowApprovalDialog(false);
         }
@@ -518,6 +563,8 @@ export function SellPage() {
                                     userNFTs={filteredNFTs}
                                     selectedNFTs={batchSelectedNFTs}
                                     onSelectionChange={setBatchSelectedNFTs}
+                                    erc1155Quantities={erc1155Quantities}
+                                    onQuantityChange={handleBatchQuantityChange}
                                     isLoading={walletNFTsContext.loading}
                                 />
                             )}
@@ -668,6 +715,7 @@ export function SellPage() {
                                 ) : (
                                     <BatchPricingForm
                                         selectedCount={batchSelectedNFTs.size}
+                                        hasErc1155Selected={hasErc1155InBatch}
                                         whitelistStatus={whitelistStatus}
                                         approvalStatus={approvalStatus}
                                         onSubmit={handleBatchPricingSubmit}

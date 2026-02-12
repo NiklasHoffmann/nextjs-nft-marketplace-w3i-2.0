@@ -5,6 +5,7 @@ import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 import { useForm } from '@/hooks';
 import { useMarketplaceData } from '@/hooks/marketplace';
+import { devLog } from '@/utils';
 
 interface BatchListingFormProps {
     userNFTs: AggregatedNFT[];
@@ -159,7 +160,7 @@ export function BatchListingForm({
             .map(key => userNFTs.find(nft => nft.key === key))
             .filter(Boolean) as AggregatedNFT[];
 
-        console.log('🔍 Checking whitelist for selected NFTs:', selectedNFTsList.length);
+        devLog.info('🔍 Checking whitelist for selected NFTs:', selectedNFTsList.length);
 
         // Get unique collections
         const uniqueCollections = new Map<string, string | undefined>();
@@ -167,7 +168,7 @@ export function BatchListingForm({
             uniqueCollections.set(nft.contractAddress, nft.core.contractName || undefined);
         });
 
-        console.log('📋 Unique collections to check:', Array.from(uniqueCollections.keys()));
+        devLog.info('📋 Unique collections to check:', Array.from(uniqueCollections.keys()));
 
         // Check each collection using hook (note: for multiple collections, we'd ideally use useReadContracts)
         // For now, we'll check on-demand. In production, consider batching with useReadContracts
@@ -177,7 +178,7 @@ export function BatchListingForm({
         const checkCollections = async () => {
             for (const [address, name] of uniqueCollections) {
                 try {
-                    console.log('🔎 Checking collection:', address, name);
+                    devLog.info('🔎 Checking collection:', address, name);
 
                     // Direct contract read using public client (alternative to hook in loop)
                     const { createPublicClient, http } = await import('viem');
@@ -196,28 +197,28 @@ export function BatchListingForm({
                         args: [address as `0x${string}`]
                     });
 
-                    console.log('✅ Whitelist result for', address, ':', isWhitelisted);
+                    devLog.info('✅ Whitelist result for', address, ':', isWhitelisted);
 
                     if (!isWhitelisted) {
-                        console.log('❌ Adding to notWhitelisted:', address);
+                        devLog.info('❌ Adding to notWhitelisted:', address);
                         notWhitelisted.push({ address, name });
                     } else {
-                        console.log('✅ Collection IS whitelisted, skipping:', address);
+                        devLog.info('✅ Collection IS whitelisted, skipping:', address);
                     }
                 } catch (error) {
-                    console.warn('⚠️ Whitelist check error (assuming whitelisted for development):', error);
+                    devLog.warn('⚠️ Whitelist check error (assuming whitelisted for development):', error);
                 }
             }
 
-            console.log('⚠️ Not whitelisted collections:', notWhitelisted);
+            devLog.info('⚠️ Not whitelisted collections:', notWhitelisted);
             setNotWhitelistedCollections(notWhitelisted);
         };
 
         if (selectedNFTs.size > 0) {
-            console.log('🚀 Starting whitelist check for', selectedNFTs.size, 'NFTs');
+            devLog.info('🚀 Starting whitelist check for', selectedNFTs.size, 'NFTs');
             checkCollections();
         } else {
-            console.log('🚀 No NFTs selected, clearing whitelist warnings');
+            devLog.info('🚀 No NFTs selected, clearing whitelist warnings');
             setNotWhitelistedCollections([]);
         }
     }, [selectedNFTs, userNFTs, marketplaceAddress]);

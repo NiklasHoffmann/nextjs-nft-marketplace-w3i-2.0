@@ -1,7 +1,7 @@
 ﻿'use client'
 import '@rainbow-me/rainbowkit/styles.css'
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
-import { WagmiProvider } from 'wagmi'
+import { WagmiProvider, useAccount } from 'wagmi'
 import { wagmiConfig } from '@/config/wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
@@ -51,18 +51,27 @@ export default function Web3Provider({ children }: { children: ReactNode }) {
         <WagmiProvider config={wagmiConfig}>
             <QueryClientProvider client={queryClient}>
                 <ApolloProvider client={apolloClient}>
-                    <RainbowKitProvider
-                        theme={darkTheme()}
-                        modalSize="compact"
-                        showRecentTransactions={true}
-                        initialChain={wagmiConfig.chains[0]} // Setzt Sepolia als Standard
-                    >
-                        {children}
-                    </RainbowKitProvider>
+                    <WalletAwareRainbowKit>{children}</WalletAwareRainbowKit>
                 </ApolloProvider>
                 {/* React Query Devtools only in development */}
                 {process.env.NODE_ENV !== "production" && <ReactQueryDevtools initialIsOpen={false} />}
             </QueryClientProvider>
         </WagmiProvider>
     )
+}
+
+function WalletAwareRainbowKit({ children }: { children: ReactNode }) {
+    const { isConnected } = useAccount();
+    const initialChain = isConnected ? undefined : wagmiConfig.chains[0];
+
+    return (
+        <RainbowKitProvider
+            theme={darkTheme()}
+            modalSize="compact"
+            showRecentTransactions={true}
+            initialChain={initialChain}
+        >
+            {children}
+        </RainbowKitProvider>
+    );
 }

@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useState, useEffect } from 'react';
+import { devLog } from '@/utils';
 import type { GameScore, TopScoresResponse } from '@/types';
 
 interface HighscoreTableProps {
@@ -56,7 +57,7 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
         } catch (err) {
             setError('Network error');
             setScores([]);
-            console.error('Error fetching scores:', err);
+            devLog.error('Error fetching scores:', err);
         } finally {
             setLoading(false);
             setIsRefreshing(false);

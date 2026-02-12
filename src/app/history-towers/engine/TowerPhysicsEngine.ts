@@ -65,9 +65,9 @@ export class TowerPhysicsEngine {
      * @example
      * ```typescript
      * const difficulty = physics.getDifficulty(75); // Level 2 (platforms 50-99)
-     * console.log(difficulty.level); // 2
-     * console.log(difficulty.platformFallSpeed); // > 0 (vertical movement active)
-     * console.log(difficulty.horizontalSpeed); // 0 (horizontal movement not yet active)
+    * devLog.info(difficulty.level); // 2
+    * devLog.info(difficulty.platformFallSpeed); // > 0 (vertical movement active)
+    * devLog.info(difficulty.horizontalSpeed); // 0 (horizontal movement not yet active)
      * ```
      */
     getDifficulty(platformsClimbed: number): Difficulty {

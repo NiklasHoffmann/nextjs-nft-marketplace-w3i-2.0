@@ -3,8 +3,7 @@
 /**
  * Shopping Cart Page
  * 
- * Allows users to review and purchase multiple NFTs in a single batch transaction
- * to save on gas fees.
+ * Allows users to review and purchase multiple NFTs sequentially in one flow.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -16,7 +15,9 @@ import Link from 'next/link';
 import { ButtonSpinner } from '@/components/core/Loading';
 import { EmptyState } from '@/components/core/Empty';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
-import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
+import { useTransactionService } from '@/services/blockchain';
+import { devLog } from '@/utils';
 
 interface EnrichedCartItem {
     listingId: string;
@@ -34,6 +35,7 @@ export function CartPage() {
     const { address, isConnected } = useAccount();
     const chainId = useChainId();
     const { items, itemCount, totalPrice, totalPriceByToken, totalPriceDisplay, removeFromCart, clearCart, updateCartItem } = useCart();
+    const txService = useTransactionService();
     const [isProcessing, setIsProcessing] = useState(false);
     const [enrichedItems, setEnrichedItems] = useState<EnrichedCartItem[]>([]);
 
@@ -47,16 +49,16 @@ export function CartPage() {
                 items.map(async (item) => {
                     // If already has metadata, use it
                     if (item.imageUrl) {
-                        console.log('📦 Cart item already has metadata:', item.name, item.imageUrl);
+                        devLog.info('cart', 'Cart item already has metadata:', item.name, item.imageUrl);
                         return item;
                     }
 
                     // Fetch metadata from API
                     try {
-                        console.log('🔄 Fetching metadata for:', item.contractAddress, item.tokenId);
+                        devLog.info('cart', 'Fetching metadata for:', item.contractAddress, item.tokenId);
                         const response = await fetch(`/api/nft/detail?contractAddress=${item.contractAddress}&tokenId=${item.tokenId}`);
                         const data = await response.json();
-                        console.log('📡 API Response:', data);
+                        devLog.info('cart', 'Metadata response:', data);
 
                         const name = data.metadata?.name || data.name || item.name;
                         const imageUrl = data.metadata?.image || data.image || item.imageUrl;
@@ -70,16 +72,16 @@ export function CartPage() {
                             imageUrl
                         };
 
-                        console.log('✅ Enriched item:', enrichedItem.name, enrichedItem.imageUrl);
+                        devLog.info('cart', 'Enriched item:', enrichedItem.name, enrichedItem.imageUrl);
                         return enrichedItem;
                     } catch (error) {
-                        console.error('❌ Failed to enrich cart item:', error);
+                        devLog.error('cart', 'Failed to enrich cart item:', error);
                         return item;
                     }
                 })
             );
 
-            console.log('🎯 Final enriched items:', enriched);
+            devLog.info('cart', 'Final enriched items:', enriched);
             setEnrichedItems(enriched);
         };
 
@@ -106,26 +108,37 @@ export function CartPage() {
 
         setIsProcessing(true);
         try {
-            // TODO: Implement batch purchase contract call
-            console.log('🛒 Batch Purchase:', {
-                items: items.map(item => ({
+            for (const item of items) {
+                if (!item.listingId || !item.contractAddress || !item.tokenId || !item.price || !item.seller) {
+                    devLog.warn('cart', 'Skipping item with missing listing data:', item);
+                    continue;
+                }
+
+                const tokenDecimals = getTokenDecimalsByAddress(chainId, item.currency || ZERO_ADDRESS);
+                const expectedPrice = formatUnits(BigInt(item.price), tokenDecimals);
+
+                const result = await txService.purchaseNFT({
                     listingId: item.listingId,
+                    price: expectedPrice,
+                    currency: item.currency || ZERO_ADDRESS,
+                    seller: item.seller,
+                    buyer: address,
                     contractAddress: item.contractAddress,
-                    tokenId: item.tokenId,
-                    price: item.price
-                })),
-                totalPrice: totalPrice.toString()
-            });
+                    tokenId: item.tokenId
+                });
 
-            // Simulate transaction
-            await new Promise(resolve => setTimeout(resolve, 2000));
+                if (!result.success) {
+                    throw new Error(result.error || 'Purchase failed');
+                }
 
-            alert('Batch purchase successful! (Mock)');
+                removeFromCart(item.listingId);
+            }
+
             clearCart();
             router.push('/wallet');
 
         } catch (error) {
-            console.error('Batch purchase failed:', error);
+            devLog.error('cart', 'Batch purchase failed:', error);
             alert('Batch purchase failed. Please try again.');
         } finally {
             setIsProcessing(false);

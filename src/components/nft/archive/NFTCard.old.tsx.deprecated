@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
 import { useETHPrice } from "@/contexts/CurrencyContext";
 import { formatEther } from "@/utils";
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 import type { NFTStatsUpdateEvent } from '@/types';
 import OptimizedNFTImage from './OptimizedNFTImage';
 import { BaseCard } from '@/components/core/Card/BaseCard';
@@ -537,7 +537,7 @@ export function NFTCard(props: NFTCardAllProps) {
 
     // Prevent navigation if contractAddress is missing
     if (!currentContractAddress || currentContractAddress === 'undefined' || !currentTokenId) {
-      console.error('NFTCard: Cannot navigate - invalid parameters', {
+      devLog.error('NFTCard: Cannot navigate - invalid parameters', {
         contractAddress: currentContractAddress,
         tokenId: currentTokenId
       });
@@ -545,7 +545,7 @@ export function NFTCard(props: NFTCardAllProps) {
     }
 
     const targetUrl = `/nft/${currentContractAddress}/${currentTokenId}`;
-    console.log('NFTCard: Navigating to', targetUrl);
+    devLog.info('NFTCard: Navigating to', targetUrl);
 
     // Use window.location instead of router.push to bypass Next.js routing issues
     window.location.href = targetUrl;

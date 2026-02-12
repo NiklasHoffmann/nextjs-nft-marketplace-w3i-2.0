@@ -1,5 +1,7 @@
 ﻿"use client";
 
+import { AddressWithEns } from '@/app/admin/components/shared/AddressWithEns';
+
 /**
  * NFT Selector Component
  * 
@@ -141,8 +143,16 @@ export default function NFTSelector({
                         <div className="flex-1">
                             <span className="text-sm font-medium text-blue-800">
                                 {tokenId && isValidTokenId(tokenId)
-                                    ? `🎯 NFT-spezifisch: ${(contractAddress || '').slice(0, 6)}...${(contractAddress || '').slice(-4)} #${tokenId}`
-                                    : `🌐 Collection-weit: ${(contractAddress || '').slice(0, 6)}...${(contractAddress || '').slice(-4)}`
+                                    ? (
+                                        <>
+                                            🎯 NFT-spezifisch: <AddressWithEns address={contractAddress} /> #{tokenId}
+                                        </>
+                                    )
+                                    : (
+                                        <>
+                                            🌐 Collection-weit: <AddressWithEns address={contractAddress} />
+                                        </>
+                                    )
                                 }
                             </span>
                             <div className="text-xs text-gray-600 mt-1">

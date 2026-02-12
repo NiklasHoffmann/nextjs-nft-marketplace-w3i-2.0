@@ -1,7 +1,10 @@
 'use client';
 
-import { ReactNode, use, useMemo, useState, useCallback } from 'react';
+import { ReactNode, use, useMemo, useState, useCallback, useEffect } from 'react';
 import { useMarketplaceItemDetail } from '@/hooks';
+import { useUserInteractions } from '@/hooks/user/useUserInteractions';
+import { useAccount } from 'wagmi';
+import { devLog } from '@/utils';
 import NFTDetailHeader from './components/DetailHeader';
 
 export default function NFTDetailLayout({
@@ -29,12 +32,34 @@ export default function NFTDetailLayout({
         return publicInsights?.customTitle || metadata?.name || `Token #${tokenId}`;
     }, [publicInsights?.customTitle, metadata?.name, tokenId]);
 
-    const [isFavorited, setIsFavorited] = useState(false);
+    const { address } = useAccount();
+    const { isFavorited, toggleFavorite } = useUserInteractions({
+        contractAddress,
+        tokenId,
+        userWalletAddress: address,
+        autoFetch: true
+    });
+    const [localFavorited, setLocalFavorited] = useState(false);
 
-    const handleToggleFavorite = useCallback(() => {
-        setIsFavorited(prev => !prev);
-        // TODO: Implement favorite persistence (API call)
-    }, []);
+    useEffect(() => {
+        if (!address) {
+            setLocalFavorited(false);
+        }
+    }, [address]);
+
+    const handleToggleFavorite = useCallback(async () => {
+        if (!address) {
+            setLocalFavorited(prev => !prev);
+            devLog.warn('[NFT Detail] Favorite requires wallet connection');
+            return;
+        }
+
+        try {
+            await toggleFavorite();
+        } catch (error) {
+            devLog.error('[NFT Detail] Failed to toggle favorite:', error);
+        }
+    }, [address, toggleFavorite]);
 
     const handleShare = useCallback(() => {
         const url = `${window.location.origin}/nft/${contractAddress}/${tokenId}`;
@@ -57,7 +82,7 @@ export default function NFTDetailLayout({
                         contractSymbol={contractInfo?.symbol || null}
                         contractAddress={contractAddress}
                         imageUrl={metadata?.image || undefined}
-                        isFavorited={isFavorited}
+                        isFavorited={address ? isFavorited : localFavorited}
                         onToggleFavorite={handleToggleFavorite}
                         onShare={handleShare}
                     />

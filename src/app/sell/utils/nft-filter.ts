@@ -3,6 +3,7 @@
  */
 
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
+import { devLog } from '@/utils';
 
 interface FilterOptions {
     searchTerm?: string;
@@ -41,7 +42,7 @@ export function filterNFTs(
     if (showOnlyUnlisted) {
         const listedCount = nfts.filter(n => n.listed).length;
         if (listedCount > 0) {
-            console.log(`🔍 Filtered out ${listedCount} already listed NFTs`);
+            devLog.info(`🔍 Filtered out ${listedCount} already listed NFTs`);
         }
     }
 

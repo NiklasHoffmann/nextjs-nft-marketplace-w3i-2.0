@@ -7,6 +7,7 @@ import { useNFTPriceData, useMarketplaceItemDetail } from '@/hooks';
 import { useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
 import { isValidContractAddress, isValidNFTTokenId, createShareableNFTUrl } from '@/utils';
 import { TabType } from '@/types';
+import { devLog } from '@/utils';
 import {
     CategoryPills,
     NFTMediaSection,
@@ -55,7 +56,7 @@ function NFTDetailPage() {
         tokenId,
         autoFetch: isValidParams
     });
-    console.log('NFTDetailPage:', { contractAddress, tokenId, isValidParams, nftData, dataError });
+    devLog.info('NFTDetailPage:', { contractAddress, tokenId, isValidParams, nftData, dataError });
     const { address: userAddress } = useAccount();
     const router = useRouter();
 
@@ -134,7 +135,7 @@ function NFTDetailPage() {
             desiredErc1155Quantity: nftData.marketplace?.desiredErc1155Quantity,
 
             // v2 Fields
-            tokenStandard: nftData.marketplace?.tokenStandard || 'ERC721',
+            tokenStandard: nftData.marketplace?.tokenStandard || nftData.contract?.contractType || 'ERC721',
             listingType: nftData.marketplace?.listingType,
             status: nftData.marketplace?.status,
             currency: nftData.marketplace?.currency,
@@ -233,15 +234,22 @@ function NFTDetailPage() {
         nftImage: finalImageUrl || undefined,
         desiredContractAddress: nftDetails?.desiredContractAddress,
         desiredTokenId: nftDetails?.desiredTokenId,
+        desiredErc1155Quantity: nftDetails?.desiredErc1155Quantity,
         currency: nftDetails?.currency,
         // v2 fields
         status: nftDetails?.status,
         listingType: nftDetails?.listingType,
-        tokenStandard: nftDetails?.tokenStandard
+        tokenStandard: nftDetails?.tokenStandard,
+        erc1155QuantityListed: nftDetails?.erc1155QuantityListed,
+        remainingQuantity: nftDetails?.remainingQuantity,
+        unitPrice: nftDetails?.unitPrice,
+        partialBuyEnabled: nftDetails?.partialBuyEnabled
     }), [
         nftDetails?.price, nftDetails?.isListed, nftDetails?.seller,
         nftDetails?.desiredContractAddress, nftDetails?.desiredTokenId, nftDetails?.listingId,
         nftDetails?.currency, nftDetails?.status, nftDetails?.listingType, nftDetails?.tokenStandard,
+        nftDetails?.desiredErc1155Quantity, nftDetails?.erc1155QuantityListed, nftDetails?.remainingQuantity,
+        nftDetails?.unitPrice, nftDetails?.partialBuyEnabled,
         priceData.convertedPrice, priceData.priceLoading, priceData.selectedCurrencySymbol,
         contractAddress, tokenId, nftData?.contract?.owner, userAddress, finalName, finalImageUrl
     ]);
@@ -321,7 +329,7 @@ function NFTDetailPage() {
         price: nftDetails?.price || "0"
     }), [contractInfo?.name, contractAddress, tokenId, finalName, nftDetails?.price]);
 
-    console.log('NFTDetailPage Render Complete:', { "blockchain.approved:": nftData?.blockchain?.approved, "blockchain.isApprovedForAll:": nftData?.blockchain?.isApprovedForAll });
+    devLog.info('NFTDetailPage Render Complete:', { "blockchain.approved:": nftData?.blockchain?.approved, "blockchain.isApprovedForAll:": nftData?.blockchain?.isApprovedForAll });
     // Early returns for loading and error states
     if (isLoading && !nftData) {
         return <LoadingSpinner />;

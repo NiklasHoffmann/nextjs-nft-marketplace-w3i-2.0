@@ -22,7 +22,7 @@
 import React, { useMemo, memo, useCallback } from 'react';
 import { useRouter } from "next/navigation";
 import { useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 import type { AggregatedNFT } from '@/types/core/core-nft-modern';
 import OptimizedNFTImage from './OptimizedNFTImage';
 import { BaseCard } from '@/components/core/Card/BaseCard';

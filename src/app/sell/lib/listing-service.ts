@@ -9,6 +9,7 @@
  */
 
 import { TransactionData, BatchTransactionData } from '../types';
+import { devLog } from '@/utils';
 
 /**
  * Service class for marketplace operations
@@ -48,8 +49,8 @@ export class ListingService {
      * Creates a single NFT listing for sale
      */
     async listNFTForSale(data: TransactionData): Promise<void> {
-        console.log('🔵 [ListingService] Starting listNFTForSale');
-        console.log('📦 NFT Data:', {
+        devLog.info('🔵 [ListingService] Starting listNFTForSale');
+        devLog.info('📦 NFT Data:', {
             contractAddress: data.selectedNFT?.contractAddress,
             tokenId: data.selectedNFT?.tokenId,
             price: data.price,
@@ -57,16 +58,16 @@ export class ListingService {
         });
 
         if (!data.selectedNFT || !data.price) {
-            console.error('❌ Missing required data');
+            devLog.error('❌ Missing required data');
             throw new Error('Missing required data for sale listing');
         }
 
         try {
             // 1. Check collection whitelist
             this.reportProgress('whitelist');
-            console.log('🔍 [Step 1] Checking whitelist for:', data.selectedNFT.contractAddress);
+            devLog.info('🔍 [Step 1] Checking whitelist for:', data.selectedNFT.contractAddress);
             const isWhitelisted = await this.checkWhitelistFn(data.selectedNFT.contractAddress);
-            console.log('✓ Whitelist status:', isWhitelisted);
+            devLog.info('✓ Whitelist status:', isWhitelisted);
             if (!isWhitelisted) {
                 this.reportProgress('error');
                 throw new Error('Collection Not Whitelisted');
@@ -74,29 +75,29 @@ export class ListingService {
 
             // 2. Ensure approval (smart - only if needed)
             this.reportProgress('approval');
-            console.log('🔍 [Step 2] Checking/Ensuring NFT approval');
-            console.log('📋 Approval params:', {
+            devLog.info('🔍 [Step 2] Checking/Ensuring NFT approval');
+            devLog.info('📋 Approval params:', {
                 nftContract: data.selectedNFT.contractAddress,
                 tokenId: data.selectedNFT.tokenId,
                 marketplace: this.marketplaceAddress
             });
 
             if (!this.ensureApprovalFn) {
-                console.error('❌ ensureApprovalFn is not defined!');
+                devLog.error('❌ ensureApprovalFn is not defined!');
                 throw new Error('Approval function not available');
             }
 
             const approved = await this.ensureApprovalFn();
-            console.log('✓ Approval status:', approved);
+            devLog.info('✓ Approval status:', approved);
             if (!approved) {
-                console.warn('⚠️ User cancelled approval');
+                devLog.warn('⚠️ User cancelled approval');
                 this.reportProgress('error');
                 throw new Error('Approval Cancelled');
             }
 
             // 3. Create listing
             this.reportProgress('signing');
-            console.log('🔍 [Step 3] Creating listing with params:', {
+            devLog.info('🔍 [Step 3] Creating listing with params:', {
                 tokenAddress: data.selectedNFT.contractAddress,
                 tokenId: data.selectedNFT.tokenId,
                 price: data.price,
@@ -114,10 +115,10 @@ export class ListingService {
                 allowedBuyers: data.allowedBuyers || []
             });
 
-            console.log('✅ [Step 3] Listing transaction sent to wallet');
+            devLog.info('✅ [Step 3] Listing transaction sent to wallet');
         } catch (error: any) {
             this.reportProgress('error');
-            console.error('❌ [ListingService] Error during listing:', error.message);
+            devLog.error('❌ [ListingService] Error during listing:', error.message);
             throw error;
         }
     }
@@ -244,11 +245,11 @@ export class ListingService {
                     results.success++;
                 } catch (err) {
                     results.failed++;
-                    console.error(`Failed to list NFT ${nft.tokenId}:`, err);
+                    devLog.error(`Failed to list NFT ${nft.tokenId}:`, err);
                 }
             }
 
-            console.log(`Batch listing complete: ${results.success} success, ${results.failed} failed`);
+            devLog.info(`Batch listing complete: ${results.success} success, ${results.failed} failed`);
         } catch (error: any) {
             throw error;
         }

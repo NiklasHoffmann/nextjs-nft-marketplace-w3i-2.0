@@ -9,6 +9,7 @@ import { OptimizedNFTImage } from '@/components/nft';
 import { LoadingState } from '@/components/core/Loading';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
 import { useChainId } from 'wagmi';
+import { devLog } from '@/utils';
 
 interface CollectionNFT {
     contractAddress: string;
@@ -56,7 +57,7 @@ export default function CollectionItemsList({
                     setCollectionItems(filtered);
                 }
             } catch (error) {
-                console.error('Error fetching collection items:', error);
+                devLog.error('Error fetching collection items:', error);
                 setCollectionItems([]);
             } finally {
                 setLoading(false);

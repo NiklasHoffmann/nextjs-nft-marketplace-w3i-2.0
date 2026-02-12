@@ -10,6 +10,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import CurrencySelector from '../ui/CurrencySelector';
 import { hasAdminAccess } from '@/utils';
 import { useCart } from '@/contexts';
+import { devLog } from '@/utils';
 
 export default function Navbar() {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -378,7 +379,7 @@ export default function Navbar() {
                     ref={mobileMenuButtonRef}
                     onClick={(e) => {
                         e.stopPropagation();
-                        console.log('Lightbulb clicked, current state:', isMobileMenuOpen);
+                        devLog.log('Lightbulb clicked, current state:', isMobileMenuOpen);
                         setIsMobileMenuOpen(!isMobileMenuOpen);
                     }}
                     className="md:hidden flex-shrink-0 h-10 flex items-center relative z-[61] pointer-events-auto"

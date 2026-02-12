@@ -10,6 +10,7 @@ import { LoadingState } from '@/components/core/Loading/LoadingState';
 import { useBalance, useChainId, useReadContracts } from 'wagmi';
 import { getAvailableTokens, type TokenConfig } from '@/config/tokens';
 import { WETH_ABI } from '@/config/abis/weth';
+import { AddressWithEns } from '@/app/admin/components/shared/AddressWithEns';
 
 interface WalletOperationBuilderProps {
     onSuccess?: () => void;
@@ -614,7 +615,7 @@ export function WalletOperationBuilder({ onSuccess }: WalletOperationBuilderProp
                                         onClick={() => handleOwnerSelect(owner as string)}
                                         className="rounded-full border border-gray-200 bg-gray-100 px-3 py-1 text-xs font-mono text-gray-700 hover:bg-gray-200"
                                     >
-                                        {(owner as string).slice(0, 6)}...{(owner as string).slice(-4)}
+                                        <AddressWithEns address={owner as string} />
                                     </button>
                                 ))}
                             </div>

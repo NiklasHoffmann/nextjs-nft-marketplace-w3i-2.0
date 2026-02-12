@@ -18,6 +18,7 @@ export { default as AdminNavbar } from './AdminNavbar';
 // Shared Components (used across features)
 export { AdminModeIndicator } from './shared/AdminModeIndicator';
 export { MigrationBanner } from './shared/MigrationBanner';
+export { AddressWithEns } from './shared/AddressWithEns';
 
 // MultiSig Feature Components
 export { ProposalCard } from './multisig/ProposalCard';

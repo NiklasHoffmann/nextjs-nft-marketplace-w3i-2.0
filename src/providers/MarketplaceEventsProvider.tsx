@@ -26,6 +26,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useMarketplaceEvents } from '@/hooks';
 import { routeMarketplaceEvent } from '@/services/marketplace/event-invalidation-bridge';
+import { devLog } from '@/utils';
 import type {
     ProcessedMarketplaceEvent,
     EventListenerState,
@@ -79,12 +80,12 @@ export function MarketplaceEventsProvider({
     const enableWsEvents = process.env.NEXT_PUBLIC_ENABLE_WS_EVENTS === 'true';
     const shouldAutoStart = autoStart && (!isDev || enableWsEvents);
 
-    console.log('🏪 [MarketplaceEventsProvider] Initializing...');
-    console.log('   autoStart:', autoStart);
-    console.log('   shouldAutoStart:', shouldAutoStart);
-    console.log('   debug:', debug);
-    console.log('   marketplaceAddress:', marketplaceAddress || 'default');
-    console.log('   wsUrl:', wsUrl || 'from env');
+    devLog.info('🏪 [MarketplaceEventsProvider] Initializing...');
+    devLog.info('   autoStart:', autoStart);
+    devLog.info('   shouldAutoStart:', shouldAutoStart);
+    devLog.info('   debug:', debug);
+    devLog.info('   marketplaceAddress:', marketplaceAddress || 'default');
+    devLog.info('   wsUrl:', wsUrl || 'from env');
 
     const [latestEvent, setLatestEvent] = useState<ProcessedMarketplaceEvent | null>(null);
 
@@ -95,7 +96,7 @@ export function MarketplaceEventsProvider({
         wsUrl,
         onEvent: (event) => {
             if (debug) {
-                console.log('📡 [MarketplaceEvents] Event received:', event);
+                devLog.debug('📡 [MarketplaceEvents] Event received:', event);
             }
 
             // Store latest event
@@ -105,9 +106,9 @@ export function MarketplaceEventsProvider({
             routeMarketplaceEvent(event);
         },
         onConnectionChange: (connected) => {
-            console.log(`🔌 [MarketplaceEvents] Connection status changed: ${connected ? '✅ CONNECTED' : '❌ DISCONNECTED'}`);
+            devLog.info(`🔌 [MarketplaceEvents] Connection status changed: ${connected ? '✅ CONNECTED' : '❌ DISCONNECTED'}`);
             if (debug) {
-                console.log(`🔌 [MarketplaceEvents] Connection ${connected ? 'established' : 'lost'}`);
+                devLog.debug(`🔌 [MarketplaceEvents] Connection ${connected ? 'established' : 'lost'}`);
             }
         },
         onError: (error) => {
@@ -119,11 +120,11 @@ export function MarketplaceEventsProvider({
                 return;
             }
 
-            console.error('❌ [MarketplaceEvents] Error:', error);
+            devLog.error('❌ [MarketplaceEvents] Error:', error);
         }
     });
 
-    console.log('📊 [MarketplaceEventsProvider] Current state:', {
+    devLog.info('📊 [MarketplaceEventsProvider] Current state:', {
         isConnected,
         eventsReceived,
         lastEventAt,
@@ -133,7 +134,7 @@ export function MarketplaceEventsProvider({
     // Log connection status changes
     useEffect(() => {
         if (debug) {
-            console.log('🔄 [MarketplaceEvents] State:', state);
+            devLog.debug('🔄 [MarketplaceEvents] State:', state);
         }
     }, [state, debug]);
 

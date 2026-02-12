@@ -15,6 +15,7 @@ import { BaseModal } from '@/components/core/Modal';
 import { useTransactionService } from '@/services/blockchain';
 import { useMarketplaceItems } from '@/contexts/marketplace-items';
 import { useForm } from '@/hooks';
+import { devLog } from '@/utils';
 
 interface UpdateListingModalProps {
     isOpen: boolean;
@@ -116,7 +117,7 @@ function UpdateListingModal({
         setErrorMessage(null);
 
         try {
-            console.log('📝 Updating listing:', {
+            devLog.info('📝 Updating listing:', {
                 listingId,
                 listingType,
                 newPrice: listingType === 'sale' ? form.values.newPrice : form.values.swapPrice,
@@ -132,29 +133,29 @@ function UpdateListingModal({
                 newDesiredContractAddress: listingType === 'swap' ? form.values.desiredContractAddress : undefined,
                 newDesiredTokenId: listingType === 'swap' ? form.values.desiredTokenId : undefined,
                 onProgress: (step) => {
-                    console.log('🔄 Update step:', step);
+                    devLog.info('🔄 Update step:', step);
                 },
                 onError: (error) => {
-                    console.error('❌ Update error:', error);
+                    devLog.error('❌ Update error:', error);
                     setErrorMessage(error);
                 },
                 onSuccess: (result) => {
-                    console.log('✅ Listing updated! TX:', result.txHash);
+                    devLog.info('✅ Listing updated! TX:', result.txHash);
                     setUpdateStep('success');
                     // Modal will auto-close after 2s (see useEffect)
                 },
                 onPostTransaction: async () => {
                     // Force immediate sync from TheGraph via API
-                    console.log('🔄 Triggering immediate marketplace sync...');
+                    devLog.info('🔄 Triggering immediate marketplace sync...');
                     try {
                         await fetch('/api/marketplace/sync', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ action: 'force' })
                         });
-                        console.log('✅ Marketplace sync triggered');
+                        devLog.info('✅ Marketplace sync triggered');
                     } catch (error) {
-                        console.error('❌ Failed to trigger sync:', error);
+                        devLog.error('❌ Failed to trigger sync:', error);
                     }
 
                     // Refresh marketplace to show updated price/swap details
@@ -166,7 +167,7 @@ function UpdateListingModal({
                 throw new Error(result.error);
             }
         } catch (error) {
-            console.error('Failed to update listing:', error);
+            devLog.error('Failed to update listing:', error);
             setErrorMessage(error instanceof Error ? error.message : 'Failed to update listing. Please try again.');
             setUpdateStep('error');
         } finally {

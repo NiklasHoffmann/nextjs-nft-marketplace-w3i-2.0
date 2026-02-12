@@ -14,6 +14,8 @@ export function walletNFTToAggregatedNFT(nft: WalletNFT): AggregatedNFT {
         contractAddress: nft.contractAddress as `0x${string}`,
         tokenId: nft.tokenId,
         listed: nft.isListed || false,
+        tokenStandard: nft.tokenType || 'ERC721',
+        balance: nft.balance,
         listing: nft.isListed ? {
             listingId: nft.listingId || '',
             contractAddress: nft.contractAddress as `0x${string}`,

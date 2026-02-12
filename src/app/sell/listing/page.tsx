@@ -10,6 +10,7 @@ import NFTCard from '@/components/nft/NFTCard';
 import Link from 'next/link';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
 import { formatTokenDisplay } from '../utils';
+import { devLog } from '@/utils';
 
 export default function ListingPage() {
     const router = useRouter();
@@ -68,12 +69,12 @@ export default function ListingPage() {
 
             try {
                 // Step 1: Check whitelist (already done on /sell page)
-                console.log('🔍 Step 1: Whitelist already verified');
+                devLog.info('🔍 Step 1: Whitelist already verified');
 
                 setCompletedSteps(['whitelist', 'approval', 'approved']);
 
                 // Create listing via TransactionService
-                console.log('🔍 Creating listing transaction');
+                devLog.info('🔍 Creating listing transaction');
 
                 if (!formData.selectedNFT) {
                     setError('Kein NFT ausgewählt');
@@ -89,6 +90,9 @@ export default function ListingPage() {
                     currency: formData.mode === 'sale' || formData.mode === 'hybrid'
                         ? formData.currency
                         : ZERO_ADDRESS,
+                    tokenStandard: formData.selectedNFT.tokenStandard,
+                    erc1155Quantity: formData.erc1155Quantity,
+                    partialBuyEnabled: formData.partialBuyEnabled,
                     desiredContractAddress: formData.mode === 'trade' || formData.mode === 'hybrid'
                         ? formData.targetNFT?.core?.contractAddress
                         : undefined,
@@ -98,68 +102,68 @@ export default function ListingPage() {
                     buyerWhitelistEnabled: formData.buyerWhitelistEnabled || false,
                     allowedBuyers: formData.allowedBuyers || [],
                     onProgress: (step: string) => {
-                        console.log('📊 Listing progress:', step);
+                        devLog.info('📊 Listing progress:', step);
 
                         if (step === 'signing') {
-                            console.log('🖊️ User is signing transaction...');
+                            devLog.info('🖊️ User is signing transaction...');
                             setProgressStep('listing', 'signing');
                         } else if (step === 'pending') {
-                            console.log('⏳ Transaction pending on blockchain...');
+                            devLog.info('⏳ Transaction pending on blockchain...');
                             setProgressStep('listing', 'pending');
                         } else if (step === 'success') {
-                            console.log('✅ Transaction confirmed successful!');
+                            devLog.info('✅ Transaction confirmed successful!');
                             // Listing erfolgreich - wechsle zum success Step
                             setProgressStep('success', 'success');
                             setCompletedSteps(['select', 'whitelist', 'approval', 'form', 'preview', 'listing']);
                         } else if (step === 'error') {
-                            console.error('❌ Transaction error!');
+                            devLog.error('❌ Transaction error!');
                             setProgressStep('listing', 'error');
                         }
                     },
                     onError: (error: string) => {
-                        console.error('❌ Listing error:', error);
+                        devLog.error('❌ Listing error:', error);
                         setProgressError(error);
                         setError(error);
                         setProgressStep('listing', 'error');
                     },
                     onSuccess: (result: { txHash?: string }) => {
-                        console.log('🎉 onSuccess callback triggered!', result);
-                        console.log('✅ Listing successful! TxHash:', result.txHash);
+                        devLog.info('🎉 onSuccess callback triggered!', result);
+                        devLog.info('✅ Listing successful! TxHash:', result.txHash);
                         if (result.txHash) {
-                            console.log('💾 Saving txHash to context...');
+                            devLog.info('💾 Saving txHash to context...');
                             setProgressTxHash(result.txHash);
                             setTxHash(result.txHash);
-                            console.log('🚀 Navigating to success page in 1.5s...');
+                            devLog.info('🚀 Navigating to success page in 1.5s...');
                             // Navigate to success page
                             setTimeout(() => {
                                 const successUrl = `/sell/success?tx=${result.txHash}`;
-                                console.log('🔗 Navigating to:', successUrl);
+                                devLog.info('🔗 Navigating to:', successUrl);
                                 router.push(successUrl as any);
                             }, 1500);
                         } else {
-                            console.warn('⚠️ No txHash in success result!');
+                            devLog.warn('⚠️ No txHash in success result!');
                         }
                     }
                 };
 
-                console.log('🔍 [LISTING PAGE] Listing params being sent to TransactionService:');
-                console.log('   contractAddress:', listingParams.contractAddress);
-                console.log('   tokenId:', listingParams.tokenId);
-                console.log('   price:', listingParams.price);
-                console.log('   currency:', listingParams.currency);
-                console.log('   desiredContractAddress:', listingParams.desiredContractAddress);
-                console.log('   desiredTokenId:', listingParams.desiredTokenId);
-                console.log('   buyerWhitelistEnabled:', listingParams.buyerWhitelistEnabled);
-                console.log('   allowedBuyers:', listingParams.allowedBuyers);
-                console.log('   formData.currency from context:', formData.currency);
+                devLog.info('🔍 [LISTING PAGE] Listing params being sent to TransactionService:');
+                devLog.info('   contractAddress:', listingParams.contractAddress);
+                devLog.info('   tokenId:', listingParams.tokenId);
+                devLog.info('   price:', listingParams.price);
+                devLog.info('   currency:', listingParams.currency);
+                devLog.info('   desiredContractAddress:', listingParams.desiredContractAddress);
+                devLog.info('   desiredTokenId:', listingParams.desiredTokenId);
+                devLog.info('   buyerWhitelistEnabled:', listingParams.buyerWhitelistEnabled);
+                devLog.info('   allowedBuyers:', listingParams.allowedBuyers);
+                devLog.info('   formData.currency from context:', formData.currency);
 
                 await txService.createListing(listingParams);
             } catch (error: any) {
-                console.error('Transaction failed:', error);
+                devLog.error('Transaction failed:', error);
 
                 // Special handling for ALREADY_LISTED error
                 if (error.code === 'ALREADY_LISTED' || error.message === 'ALREADY_LISTED') {
-                    console.log('ℹ️ NFT already listed - redirecting to detail page...');
+                    devLog.info('ℹ️ NFT already listed - redirecting to detail page...');
                     // Redirect to NFT detail page instead of showing error
                     if (formData.selectedNFT) {
                         const detailUrl = `/nft/${formData.selectedNFT.core.contractAddress}/${formData.selectedNFT.core.tokenId}`;
@@ -197,6 +201,9 @@ export default function ListingPage() {
                         tokenId: nft.core.tokenId,
                         price,
                         currency: formData.currency || ZERO_ADDRESS,
+                        tokenStandard: nft.tokenStandard,
+                        erc1155Quantity: formData.erc1155Quantities?.[nft.key] || nft.balance,
+                        partialBuyEnabled: formData.partialBuyEnabled,
                         desiredContractAddress: ZERO_ADDRESS,
                         desiredTokenId: '0',
                         onProgress: (step: string) => {

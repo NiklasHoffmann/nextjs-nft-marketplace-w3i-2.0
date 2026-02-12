@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
+import { devLog } from '@/utils';
 
 /**
  * Sell Flow Error Boundary
@@ -16,7 +17,7 @@ export default function SellError({
     reset: () => void;
 }) {
     useEffect(() => {
-        console.error('Sell flow error:', error);
+        devLog.error('Sell flow error:', error);
     }, [error]);
 
     return (

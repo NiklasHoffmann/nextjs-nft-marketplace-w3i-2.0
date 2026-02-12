@@ -12,6 +12,7 @@
 
 import { useChainId } from 'wagmi';
 import { getMarketplaceAddress } from '@/services/blockchain/contracts';
+import { devLog } from '@/utils';
 
 interface ContractInfoSectionProps {
     contract: {
@@ -47,8 +48,8 @@ export function ContractInfoSection({ contract, isApprovedForAll }: ContractInfo
 
     // Get marketplace address from network.mapping.json for current chain
     const marketplaceAddress = getMarketplaceAddress(chainId);
-    console.log('🏷️ ContractInfoSection - contract:', contract);
-    console.log('🏷️ ContractInfoSection - isApprovedForAll:', isApprovedForAll);
+    devLog.log('🏷️ ContractInfoSection - contract:', contract);
+    devLog.log('🏷️ ContractInfoSection - isApprovedForAll:', isApprovedForAll);
 
     // Check Token-Level Approval (getApproved)
     const hasTokenApproval = contract.approved && marketplaceAddress

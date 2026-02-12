@@ -6,6 +6,8 @@ import { formatUnits } from 'viem';
 import { useMultisigWallet } from '@/hooks/multisig/useMultisigWallet';
 import { getAvailableTokens, type TokenConfig } from '@/config/tokens';
 import { WETH_ABI } from '@/config/abis/weth';
+import { devLog } from '@/utils';
+import { AddressWithEns } from '@/app/admin/components/shared/AddressWithEns';
 
 function getNetworkLabel(id?: number): string {
     if (!id) return 'Unknown';
@@ -69,7 +71,7 @@ export function MultisigWalletSidebar() {
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
         } catch (err) {
-            console.error('Failed to copy multisig address', err);
+            devLog.warn('[Multisig] Failed to copy multisig address', err);
         }
     };
 
@@ -80,9 +82,13 @@ export function MultisigWalletSidebar() {
                 <div className="mt-2 text-xs text-gray-500">Network</div>
                 <div className="text-sm font-semibold text-gray-900">{getNetworkLabel(chainId)}</div>
                 <div className="mt-3 text-xs text-gray-500">Wallet Address</div>
-                <div className="break-all text-xs font-mono text-gray-900">
-                    {multiSigAddress || 'No multisig address configured'}
-                </div>
+                {multiSigAddress ? (
+                    <div className="space-y-1">
+                        <AddressWithEns address={multiSigAddress} className="text-xs text-gray-600" debug />
+                    </div>
+                ) : (
+                    <div className="break-all text-xs font-mono text-gray-900">No multisig address configured</div>
+                )}
                 <button
                     type="button"
                     onClick={handleCopyAddress}
@@ -106,7 +112,7 @@ export function MultisigWalletSidebar() {
                     </div>
                     <div className="flex items-center justify-between">
                         <span>Total Transactions</span>
-                        <span className="font-semibold text-gray-900">{transactionCount}</span>
+                        <span className="font-semibold text-gray-900">{transactionCount ?? '-'}</span>
                     </div>
                     <div className="flex items-center justify-between">
                         <span>ETH Balance</span>
@@ -126,7 +132,7 @@ export function MultisigWalletSidebar() {
                                 key={owner as string}
                                 className="rounded-full bg-gray-100 px-3 py-1 text-xs font-mono text-gray-700"
                             >
-                                {(owner as string).slice(0, 6)}...{(owner as string).slice(-4)}
+                                <AddressWithEns address={owner as string} />
                             </span>
                         ))}
                     </div>

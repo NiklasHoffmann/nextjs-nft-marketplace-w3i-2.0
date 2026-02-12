@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
+import { devLog } from '@/utils'
 import { useAccount } from 'wagmi'
 import HighscoreDialog from './HighscoreDialog'
 import type { ScoreSubmitResponse } from '@/types'
@@ -416,7 +417,7 @@ export default function HistoryJumperV2({ onGameStateChange, onLeaderboardRefres
                     updateBest(0)
                 }
             } catch (error) {
-                console.error('Error fetching personal best:', error)
+                devLog.error('Error fetching personal best:', error)
                 // Bei Fehler auf 0 setzen
                 updateBest(0)
             }

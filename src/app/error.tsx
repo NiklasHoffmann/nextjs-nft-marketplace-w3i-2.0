@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
+import { devLog } from '@/utils';
 
 /**
  * Global Error Boundary
@@ -20,7 +21,7 @@ export default function Error({
 }) {
     useEffect(() => {
         // Log error to console in development
-        console.error('Error boundary caught:', error);
+        devLog.error('Error boundary caught:', error);
     }, [error]);
 
     return (

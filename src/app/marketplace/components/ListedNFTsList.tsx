@@ -26,6 +26,7 @@ import type {
     NFTScrollItem
 } from '@/types/marketplace';
 import { mapEnrichedNFTToScrollItem } from '@/utils/nft/scrollItem';
+import { devLog } from '@/utils';
 
 const AVAILABLE_CATEGORIES = [
     'Art', 'Collectibles', 'Gaming', 'Membership', 'Music', 'Sports'
@@ -146,28 +147,30 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
     // Convert MongoDB items to NFTScrollItem format
     // Re-memoize when items change to ensure fresh data after reload
     const scrollItems: NFTScrollItem[] = useMemo(() => {
-        return items
+        const safeItems = items ?? [];
+        return safeItems
             .filter(item => item.contractAddress && item.contractAddress !== 'undefined' && item.contractAddress.trim() !== '')
             .map((item) => mapEnrichedNFTToScrollItem(item));
     }, [items]);
 
     // Preload images
     const imageUrls = useMemo(() => {
-        return items.map(item => item.metadata?.image).filter((url): url is string => !!url);
+        const safeItems = items ?? [];
+        return safeItems.map(item => item.metadata?.image).filter((url): url is string => !!url);
     }, [items]);
 
     const gallerySubtitle = useMemo(() => {
-        if (items.length > 0) {
+        if ((items ?? []).length > 0) {
             return (
                 <>
-                    Showing {items.length} of {pagination?.total || 0} Utilities
+                    Showing {(items ?? []).length} of {pagination?.total || 0} Utilities
                     {pagination?.hasMore && <span className="text-gray-400 ml-1">(scroll for more)</span>}
                 </>
             );
         }
 
         return `${pagination?.total || 0} Utilities listed`;
-    }, [items.length, pagination?.total, pagination?.hasMore]);
+    }, [items, pagination?.total, pagination?.hasMore]);
 
     // Cache items to prevent empty state flash during refetch
     useEffect(() => {
@@ -194,10 +197,10 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
     // Track when first items arrive to hide initial loading state
     useEffect(() => {
         // Only set to false when we actually have items loaded successfully
-        if (items.length > 0 && !loading) {
+        if ((items ?? []).length > 0 && !loading) {
             setIsInitialLoad(false);
         }
-    }, [items.length, loading]);
+    }, [items, loading]);
 
     // Update layout context with total/filtered counts
     useEffect(() => {
@@ -244,7 +247,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
                 // If page was hidden for more than 5 seconds, auto-reload
                 // (Likely user went to /sell, listed NFT, came back)
                 if (timeHidden > 5000) {
-                    console.log(`🔄 [Marketplace] Page visible again after ${Math.round(timeHidden / 1000)}s - auto-reloading...`);
+                    devLog.info(`🔄 [Marketplace] Page visible again after ${Math.round(timeHidden / 1000)}s - auto-reloading...`);
                     refetch();
                 }
             } else {

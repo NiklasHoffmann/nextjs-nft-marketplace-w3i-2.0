@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ApolloError } from '@apollo/client';
+import { devLog } from '@/utils';
 
 interface ErrorBoundaryState {
     hasError: boolean;
@@ -66,10 +67,10 @@ export class ApolloErrorBoundary extends React.Component<ErrorBoundaryProps, Err
         const isApolloError = 'networkError' in error || 'graphQLErrors' in error;
 
         if (isApolloError) {
-            console.warn('ðŸ”¥ Apollo Error caught by boundary:', error);
-            console.info('ðŸ’¡ Application will continue with fallback data');
+            devLog.warn('Apollo error caught by boundary:', error);
+            devLog.info('Application will continue with fallback data');
         } else {
-            console.error('ðŸ’¥ Application Error caught by boundary:', error, errorInfo);
+            devLog.error('Application error caught by boundary:', error, errorInfo);
         }
     }
 

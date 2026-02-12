@@ -10,7 +10,7 @@
  * ✅ WETH support with approval check
  */
 'use client';
-import { memo, useState, useCallback, useMemo } from 'react';
+import { memo, useState, useCallback, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatUnits } from 'viem';
 import { useMarketplaceFees, useMarketplaceContracts } from '@/hooks/marketplace';
@@ -23,6 +23,7 @@ import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, getWETHAddress, 
 import { BaseModal } from '@/components/core/Modal';
 import { LoadingState } from '@/components/core/Loading';
 import { useChainId } from 'wagmi';
+import { devLog } from '@/utils';
 
 interface BuyNowModalProps {
     isOpen: boolean;
@@ -38,6 +39,12 @@ interface BuyNowModalProps {
     buyer?: string; // connected wallet address
     desiredContractAddress?: string;
     desiredTokenId?: string;
+    desiredErc1155Quantity?: string | null;
+    tokenStandard?: 'ERC721' | 'ERC1155' | null;
+    erc1155QuantityListed?: string | null;
+    remainingQuantity?: string | null;
+    unitPrice?: string | null;
+    partialBuyEnabled?: boolean;
 }
 
 function BuyNowModal({
@@ -53,12 +60,19 @@ function BuyNowModal({
     seller,
     buyer,
     desiredContractAddress,
-    desiredTokenId
+    desiredTokenId,
+    desiredErc1155Quantity,
+    tokenStandard,
+    erc1155QuantityListed,
+    remainingQuantity,
+    unitPrice,
+    partialBuyEnabled
 }: BuyNowModalProps) {
     const [isPurchasing, setIsPurchasing] = useState(false);
     const [purchaseStep, setPurchaseStep] = useState<'review' | 'processing' | 'success' | 'error'>('review');
     const [transactionStep, setTransactionStep] = useState<'preparing' | 'approving' | 'signing' | 'pending' | 'confirming' | 'success' | 'error'>('preparing');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [purchaseQuantity, setPurchaseQuantity] = useState('1');
 
     // Hooks
     const router = useRouter();
@@ -83,7 +97,29 @@ function BuyNowModal({
 
     const tokenDecimals = useMemo(() => getTokenDecimalsByAddress(chainId, currency), [chainId, currency]);
     const currencySymbol = useMemo(() => getCurrencySymbolByAddress(chainId, currency), [chainId, currency]);
-    const priceAmount = useMemo(() => formatUnits(BigInt(price), tokenDecimals), [price, tokenDecimals]);
+    const isErc1155 = tokenStandard === 'ERC1155';
+    const maxQuantity = useMemo(() => {
+        const raw = remainingQuantity || erc1155QuantityListed || '0';
+        const parsed = parseInt(raw, 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    }, [remainingQuantity, erc1155QuantityListed]);
+    const quantityNumber = useMemo(() => {
+        const parsed = parseInt(purchaseQuantity || '0', 10);
+        return Number.isFinite(parsed) ? parsed : 0;
+    }, [purchaseQuantity]);
+    const isQuantityInvalid = useMemo(() => {
+        if (!isErc1155) return false;
+        if (quantityNumber <= 0) return true;
+        if (maxQuantity > 0 && quantityNumber > maxQuantity) return true;
+        return false;
+    }, [isErc1155, quantityNumber, maxQuantity]);
+    const basePriceWei = useMemo(() => {
+        if (isErc1155 && unitPrice) {
+            return BigInt(unitPrice) * BigInt(quantityNumber || 0);
+        }
+        return BigInt(price);
+    }, [isErc1155, unitPrice, quantityNumber, price]);
+    const priceAmount = useMemo(() => formatUnits(basePriceWei, tokenDecimals), [basePriceWei, tokenDecimals]);
     const priceAmountNum = useMemo(() => parseFloat(priceAmount), [priceAmount]);
 
     const {
@@ -109,7 +145,7 @@ function BuyNowModal({
     const calculations = useMemo(() => {
         const fees = calculateFees(priceAmountNum);
         const gasFee = 0.003; // Estimated gas fee in ETH
-        const total = priceAmountNum + fees.marketplaceFee + fees.royaltyFee + gasFee;
+        const total = priceAmountNum + fees.marketplaceFee + fees.royaltyFee + (isNative ? gasFee : 0);
 
         return {
             price: priceAmountNum,
@@ -118,9 +154,10 @@ function BuyNowModal({
             gasFee,
             total,
             platformFeePercentage: innovationFeePercentage,
-            royaltyFeePercentage
+            royaltyFeePercentage,
+            includesGas: isNative
         };
-    }, [priceAmountNum, calculateFees, innovationFeePercentage, royaltyFeePercentage]);
+    }, [priceAmountNum, calculateFees, innovationFeePercentage, royaltyFeePercentage, isNative]);
 
     // Check if user needs to wrap ETH to WETH
     const needsWrapping = useMemo(() => {
@@ -145,11 +182,18 @@ function BuyNowModal({
         return isWETH ? isApproving : isApprovingToken;
     }, [isNative, isWETH, isApproving, isApprovingToken]);
 
+    useEffect(() => {
+        if (!isErc1155) return;
+        if (!isOpen) return;
+        const defaultQuantity = partialBuyEnabled ? '1' : (maxQuantity > 0 ? String(maxQuantity) : '1');
+        setPurchaseQuantity(defaultQuantity);
+    }, [isErc1155, isOpen, maxQuantity, partialBuyEnabled]);
+
     const handleWrap = useCallback(async () => {
         try {
             await wrap(priceAmount);
         } catch (error) {
-            console.error('❌ ETH wrapping failed:', error);
+            devLog.error('❌ ETH wrapping failed:', error);
             setErrorMessage('Failed to wrap ETH. Please try again.');
         }
     }, [priceAmount, wrap]);
@@ -163,7 +207,7 @@ function BuyNowModal({
 
             await approveToken(priceAmount);
         } catch (error) {
-            console.error('❌ WETH approval failed:', error);
+            devLog.error('❌ WETH approval failed:', error);
             setErrorMessage('Token approval failed. Please try again.');
         }
     }, [approve, approveToken, isWETH, priceAmount]);
@@ -174,7 +218,7 @@ function BuyNowModal({
         setErrorMessage(null);
 
         try {
-            console.log('🛒 Purchasing NFT:', {
+            devLog.info('🛒 Purchasing NFT:', {
                 listingId,
                 contractAddress,
                 tokenId,
@@ -193,8 +237,11 @@ function BuyNowModal({
                 tokenId,
                 desiredContractAddress,
                 desiredTokenId,
+                expectedErc1155Quantity: isErc1155 ? (remainingQuantity || erc1155QuantityListed || '0') : undefined,
+                erc1155PurchaseQuantity: isErc1155 ? String(quantityNumber || 0) : undefined,
+                desiredErc1155Quantity: desiredErc1155Quantity || undefined,
                 onProgress: (step) => {
-                    console.log('🔄 Transaction step:', step);
+                    devLog.info('🔄 Transaction step:', step);
                     if (step !== 'idle') {
                         setTransactionStep(step);
                     }
@@ -212,7 +259,7 @@ function BuyNowModal({
                     }
                 },
                 onError: (error) => {
-                    console.error('❌ Transaction error:', error);
+                    devLog.error('❌ Transaction error:', error);
                     setErrorMessage(error);
                     setTransactionStep('error');
                 },
@@ -222,20 +269,20 @@ function BuyNowModal({
                 },
                 onPostTransaction: async () => {
                     // Force immediate sync from TheGraph via API
-                    console.log('🔄 Triggering immediate marketplace sync...');
+                    devLog.info('🔄 Triggering immediate marketplace sync...');
                     try {
                         await fetch('/api/marketplace/sync', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ action: 'force' })
                         });
-                        console.log('✅ Marketplace sync triggered');
+                        devLog.info('✅ Marketplace sync triggered');
                     } catch (error) {
-                        console.error('❌ Failed to trigger sync:', error);
+                        devLog.error('❌ Failed to trigger sync:', error);
                     }
 
                     // Update NFT ownership in nft_metadata collection (fetch from blockchain)
-                    console.log('🔄 Updating NFT ownership from blockchain...');
+                    devLog.info('🔄 Updating NFT ownership from blockchain...');
                     try {
                         await fetch('/api/nft/update-owner', {
                             method: 'POST',
@@ -245,9 +292,9 @@ function BuyNowModal({
                                 tokenId
                             })
                         });
-                        console.log('✅ Ownership updated from blockchain');
+                        devLog.info('✅ Ownership updated from blockchain');
                     } catch (error) {
-                        console.error('❌ Failed to update ownership:', error);
+                        devLog.error('❌ Failed to update ownership:', error);
                     }
 
                     // Remove NFT from marketplace cache
@@ -260,7 +307,7 @@ function BuyNowModal({
 
             if (result.success) {
                 setPurchaseStep('success');
-                console.log('✅ Purchase successful! TX:', result.txHash);
+                devLog.info('✅ Purchase successful! TX:', result.txHash);
 
                 // Modal will auto-close and redirect via onSuccess callback
                 // Keep modal open for 2s to show success message
@@ -268,13 +315,13 @@ function BuyNowModal({
                 throw new Error(result.error || 'Transaction failed');
             }
         } catch (error) {
-            console.error('❌ Purchase failed:', error);
+            devLog.error('❌ Purchase failed:', error);
             setErrorMessage(error instanceof Error ? error.message : 'Purchase failed. Please try again.');
             setPurchaseStep('error');
         } finally {
             setIsPurchasing(false);
         }
-    }, [listingId, contractAddress, tokenId, priceAmount, seller, desiredContractAddress, desiredTokenId, buyer, calculations.total, txService, router, removeNFT, refreshWallet, currency, currencySymbol]);
+    }, [listingId, contractAddress, tokenId, priceAmount, seller, desiredContractAddress, desiredTokenId, desiredErc1155Quantity, buyer, calculations.total, txService, router, removeNFT, refreshWallet, currency, currencySymbol, isErc1155, remainingQuantity, erc1155QuantityListed, quantityNumber]);
 
     const handleClose = useCallback(() => {
         if (!isPurchasing) {
@@ -341,6 +388,32 @@ function BuyNowModal({
                             </p>
                         </div>
 
+                        {isErc1155 && (
+                            <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-sm text-purple-900 font-medium">ERC1155 Quantity</p>
+                                    {maxQuantity > 0 && (
+                                        <span className="text-xs text-purple-700">Max {maxQuantity}</span>
+                                    )}
+                                </div>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    step={1}
+                                    value={purchaseQuantity}
+                                    onChange={(event) => setPurchaseQuantity(event.target.value)}
+                                    disabled={!partialBuyEnabled}
+                                    className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none ${isQuantityInvalid ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : 'border-purple-300 focus:border-purple-500 focus:ring-purple-200'} ${!partialBuyEnabled ? 'bg-purple-100 text-purple-800' : 'bg-white'}`}
+                                />
+                                {!partialBuyEnabled && (
+                                    <p className="text-xs text-purple-700 mt-1">Teilkauf deaktiviert, volle Menge erforderlich.</p>
+                                )}
+                                {isQuantityInvalid && (
+                                    <p className="text-xs text-red-600 mt-1">Bitte eine gueltige Menge eingeben.</p>
+                                )}
+                            </div>
+                        )}
+
                         {/* Price Breakdown */}
                         <div className="mb-6 space-y-3">
                             <h3 className="font-semibold text-gray-900 mb-3">Price Breakdown</h3>
@@ -367,7 +440,7 @@ function BuyNowModal({
                             </div>
 
                             <div className="flex justify-between items-center">
-                                <span className="text-gray-600 text-sm">Estimated Gas Fee</span>
+                                <span className="text-gray-600 text-sm">Estimated Gas Fee (ETH)</span>
                                 <span className="text-gray-700 text-sm">
                                     ~{calculations.gasFee.toFixed(4)} ETH
                                 </span>
@@ -375,11 +448,16 @@ function BuyNowModal({
 
                             <div className="pt-3 border-t border-gray-200">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-lg font-bold text-gray-900">Total</span>
+                                    <span className="text-lg font-bold text-gray-900">
+                                        {calculations.includesGas ? 'Total' : 'Total (token)'}
+                                    </span>
                                     <span className="text-2xl font-bold text-blue-600">
                                         {calculations.total.toFixed(4)} {currencySymbol}
                                     </span>
                                 </div>
+                                {!calculations.includesGas && (
+                                    <p className="text-xs text-gray-500 mt-1">Gas wird in ETH bezahlt und ist nicht enthalten.</p>
+                                )}
                             </div>
                         </div>
 
@@ -452,7 +530,7 @@ function BuyNowModal({
                                 <button
                                     type="button"
                                     onClick={handleWrap}
-                                    disabled={isWrapping}
+                                    disabled={isWrapping || isQuantityInvalid}
                                     className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isWrapping ? 'Wrapping...' : 'Wrap ETH'}
@@ -461,7 +539,7 @@ function BuyNowModal({
                                 <button
                                     type="button"
                                     onClick={handleApprove}
-                                    disabled={isApprovingAny}
+                                    disabled={isApprovingAny || isQuantityInvalid}
                                     className="flex-1 px-6 py-3 bg-orange-600 text-white rounded-xl font-semibold hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isApprovingAny ? 'Approving...' : `Approve ${currencySymbol}`}
@@ -470,7 +548,7 @@ function BuyNowModal({
                                 <button
                                     type="button"
                                     onClick={handlePurchase}
-                                    disabled={isPurchasing}
+                                    disabled={isPurchasing || isQuantityInvalid}
                                     className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Confirm Purchase

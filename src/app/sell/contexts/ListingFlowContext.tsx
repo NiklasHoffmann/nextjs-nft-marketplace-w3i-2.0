@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
+import { devLog } from '@/utils';
 import type {
     ListingMode,
     StepStatus,
@@ -29,6 +30,9 @@ export interface ListingFormData {
     priceMode?: 'gross' | 'net';
     currency?: Currency;
     description?: string;
+    erc1155Quantity?: string;
+    erc1155Quantities?: Record<string, string>;
+    partialBuyEnabled?: boolean;
     buyerWhitelistEnabled?: boolean;
     allowedBuyers?: string[];
     duration?: string;
@@ -99,7 +103,7 @@ export function ListingFlowProvider({ children }: { children: ReactNode }) {
                 if (storedForm) setFormDataState(storedForm);
                 if (storedProgress) setProgressDataState(storedProgress);
             } catch (error) {
-                console.error('Failed to load listing flow data:', error);
+                devLog.error('Failed to load listing flow data:', error);
             }
         }
     }, []);

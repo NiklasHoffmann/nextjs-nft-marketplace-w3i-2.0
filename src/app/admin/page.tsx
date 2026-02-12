@@ -55,6 +55,45 @@ function AdminContent() {
                         </div>
                     </div>
 
+                    {/* 1b. System Diagnostics */}
+                    <div className="bg-white border border-slate-200 rounded-lg p-6 hover:shadow-lg transition-shadow flex flex-col">
+                        <div className="flex items-center mb-4">
+                            <div className="p-3 bg-slate-100 rounded-lg">
+                                <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6m14 0V9a2 2 0 012-2h2a2 2 0 012 2v8m-8 0V5a2 2 0 012-2h2a2 2 0 012 2v12m-10 0a2 2 0 100 4 2 2 0 000-4z" />
+                                </svg>
+                            </div>
+                            <div className="ml-3">
+                                <h3 className="text-lg font-semibold text-gray-900">System Diagnostics</h3>
+                                <span className="text-xs text-slate-600 font-medium">Health & Metrics</span>
+                            </div>
+                        </div>
+                        <p className="text-gray-600 text-sm mb-4">
+                            Detailierte Health-Checks, Metrics und Rohdaten fuer Debugging.
+                        </p>
+                        <div className="flex-grow"></div>
+                        <Link
+                            href="/admin/system"
+                            className="block w-full px-4 py-2.5 bg-slate-600 text-white text-sm font-medium rounded-lg hover:bg-slate-700 transition-colors text-center"
+                        >
+                            Diagnostics oeffnen
+                        </Link>
+                        <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500 space-y-1">
+                            <div className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 bg-slate-500 rounded-full"></span>
+                                <span>Health-Status</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 bg-slate-500 rounded-full"></span>
+                                <span>System-Metrics</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 bg-slate-500 rounded-full"></span>
+                                <span>Raw JSON</span>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* 2. NFT Insights */}
                     <div className="bg-white border border-teal-200 rounded-lg p-6 hover:shadow-lg transition-shadow flex flex-col">
                         <div className="flex items-center mb-4">

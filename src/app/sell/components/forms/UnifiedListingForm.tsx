@@ -10,6 +10,7 @@ import { useForm } from '@/hooks';
 import { ExtendedCurrencySelector } from '@/components/marketplace';
 import { ZERO_ADDRESS, getTokenConfig, isNativeETH } from '@/config/tokens';
 import { useListingFlow } from '../../contexts/ListingFlowContext';
+import { devLog } from '@/utils';
 
 export type ListingMode = 'sale' | 'trade' | 'hybrid';
 
@@ -27,6 +28,8 @@ interface UnifiedListingFormProps {
         targetCollection?: string;
         tradeType?: 'specific' | 'collection' | 'open';
         description: string;
+        erc1155Quantity?: string;
+        partialBuyEnabled?: boolean;
         buyerWhitelistEnabled?: boolean;
         allowedBuyers?: string[];
     }) => void;
@@ -38,6 +41,8 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
     const [isSearching, setIsSearching] = useState(false);
     const chainId = useChainId();
     const { setProgressStep } = useListingFlow();
+    const isErc1155 = selectedNFT?.tokenStandard === 'ERC1155';
+    const availableQuantity = selectedNFT?.balance ? parseInt(selectedNFT.balance, 10) : undefined;
 
     // Sync progressStep with whitelist/approval status
     useEffect(() => {
@@ -96,6 +101,8 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
             targetTokenId: '',
             targetCollection: '',
             description: '',
+            erc1155Quantity: '1',
+            partialBuyEnabled: false,
             buyerWhitelistEnabled: false,
             buyerWhitelistAddresses: ''
         },
@@ -120,6 +127,16 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
 
             if (!values.description.trim()) {
                 errors.description = 'Bitte fügen Sie eine Beschreibung hinzu';
+            }
+
+            if (isErc1155) {
+                const qty = parseInt(values.erc1155Quantity || '0', 10);
+                if (!qty || qty <= 0) {
+                    errors.erc1155Quantity = 'Bitte geben Sie eine gueltige Menge ein';
+                }
+                if (availableQuantity !== undefined && qty > availableQuantity) {
+                    errors.erc1155Quantity = `Maximal verfuegbar: ${availableQuantity}`;
+                }
             }
 
             if (values.buyerWhitelistEnabled) {
@@ -156,7 +173,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                         // Wait a bit for approval to be confirmed
                         await new Promise(resolve => setTimeout(resolve, 2000));
                     } catch (error) {
-                        console.error('Token approval failed:', error);
+                        devLog.error('Token approval failed:', error);
                         alert('Token approval failed. Please try again.');
                         return;
                     }
@@ -184,6 +201,8 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                 targetCollection: values.targetCollection || undefined,
                 tradeType: (mode === 'trade' || mode === 'hybrid') ? values.tradeType : undefined,
                 description: values.description,
+                erc1155Quantity: isErc1155 ? values.erc1155Quantity : undefined,
+                partialBuyEnabled: isErc1155 && (mode === 'sale' || mode === 'hybrid') ? values.partialBuyEnabled : false,
                 buyerWhitelistEnabled: values.buyerWhitelistEnabled,
                 allowedBuyers
             });
@@ -255,7 +274,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
 
             setSelectedTargetNFT(mockResult);
         } catch (error) {
-            console.error('Error searching NFT:', error);
+            devLog.error('Error searching NFT:', error);
         } finally {
             setIsSearching(false);
         }
@@ -532,6 +551,47 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                                     </div>
                                 )}
                             </div>
+                        </div>
+                    )}
+
+                    {isErc1155 && (
+                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h3 className="text-sm font-semibold text-purple-900 mb-3 flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                                ERC1155 Menge
+                            </h3>
+                            <div className="mb-3">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Menge zum Listen *
+                                </label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    step={1}
+                                    {...form.getFieldProps('erc1155Quantity')}
+                                    className={`w-full rounded-lg border ${form.hasError('erc1155Quantity') ? 'border-red-300' : 'border-gray-300'} px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500`}
+                                    placeholder={availableQuantity ? `Max ${availableQuantity}` : '1'}
+                                />
+                                {availableQuantity !== undefined && (
+                                    <p className="mt-1 text-xs text-gray-600">Verfuegbar: {availableQuantity}</p>
+                                )}
+                                {form.hasError('erc1155Quantity') && (
+                                    <p className="mt-1 text-sm text-red-600">{form.getFieldError('erc1155Quantity')}</p>
+                                )}
+                            </div>
+                            {(mode === 'sale' || mode === 'hybrid') && (
+                                <label className="flex items-center gap-3 text-sm font-medium text-purple-900">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.values.partialBuyEnabled}
+                                        onChange={(event) => form.setFieldValue('partialBuyEnabled', event.target.checked)}
+                                        className="h-4 w-4 text-purple-600 border-purple-300 focus:ring-purple-500"
+                                    />
+                                    Teilkauf fuer ERC1155 erlauben
+                                </label>
+                            )}
                         </div>
                     )}
 

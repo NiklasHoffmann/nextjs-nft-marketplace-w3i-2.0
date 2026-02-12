@@ -12,6 +12,8 @@ import Link from 'next/link';
 import { AdminModeIndicator } from '@/app/admin/components/shared/AdminModeIndicator';
 import { MigrationBanner } from '@/app/admin/components/shared/MigrationBanner';
 import { AdminPageShell } from '@/app/admin/components/shared/AdminPageShell';
+import { devLog } from '@/utils';
+import { AddressWithEns } from '@/app/admin/components/shared/AddressWithEns';
 
 export default function MarketplaceAdminPage() {
   const { address, isConnected } = useAccount();
@@ -92,40 +94,40 @@ export default function MarketplaceAdminPage() {
     try {
       await setInnovationFee(parseInt(newFee));
     } catch (err) {
-      console.error('Failed to set fee:', err);
+      devLog.error('Failed to set fee:', err);
     }
   };
 
   const handleAddCollection = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAddress(singleCollection)) {
-      console.error('❌ [Admin Page] Invalid collection address:', singleCollection);
+      devLog.error('❌ [Admin Page] Invalid collection address:', singleCollection);
       alert('Invalid address');
       return;
     }
-    console.log('📄 [Admin Page] Initiating single collection add:', {
+    devLog.info('📄 [Admin Page] Initiating single collection add:', {
       collection: singleCollection,
       marketplace: MARKETPLACE_ADDRESS
     });
     try {
       await addWhitelistedCollection(singleCollection);
-      console.log('✅ [Admin Page] Collection add initiated successfully');
+      devLog.info('✅ [Admin Page] Collection add initiated successfully');
       setSingleCollection('');
     } catch (err) {
-      console.error('❌ [Admin Page] Failed to add collection:', err);
+      devLog.error('❌ [Admin Page] Failed to add collection:', err);
     }
   };
 
   const handleRemoveCollection = async (collectionAddress: string) => {
-    console.log('🗑️ [Admin Page] Initiating collection removal:', {
+    devLog.info('🗑️ [Admin Page] Initiating collection removal:', {
       collection: collectionAddress,
       marketplace: MARKETPLACE_ADDRESS
     });
     try {
       await removeWhitelistedCollection(collectionAddress);
-      console.log('✅ [Admin Page] Collection removal initiated successfully');
+      devLog.info('✅ [Admin Page] Collection removal initiated successfully');
     } catch (err) {
-      console.error('❌ [Admin Page] Failed to remove collection:', err);
+      devLog.error('❌ [Admin Page] Failed to remove collection:', err);
     }
   };
 
@@ -136,25 +138,25 @@ export default function MarketplaceAdminPage() {
       .map(addr => addr.trim())
       .filter(addr => addr && isAddress(addr));
 
-    console.log('📦 [Admin Page] Processing batch add request:', {
+    devLog.info('📦 [Admin Page] Processing batch add request:', {
       totalLines: batchCollections.split('\n').length,
       validAddresses: addresses.length,
       addresses
     });
 
     if (addresses.length === 0) {
-      console.error('❌ [Admin Page] No valid addresses found in batch');
+      devLog.error('❌ [Admin Page] No valid addresses found in batch');
       alert('No valid addresses found');
       return;
     }
 
-    console.log('🚀 [Admin Page] Initiating batch add for', addresses.length, 'collections');
+    devLog.info('🚀 [Admin Page] Initiating batch add for', addresses.length, 'collections');
     try {
       await batchAddWhitelistedCollections(addresses);
-      console.log('✅ [Admin Page] Batch add initiated successfully');
+      devLog.info('✅ [Admin Page] Batch add initiated successfully');
       setBatchCollections('');
     } catch (err) {
-      console.error('❌ [Admin Page] Failed to batch add collections:', err);
+      devLog.error('❌ [Admin Page] Failed to batch add collections:', err);
     }
   };
 
@@ -165,40 +167,40 @@ export default function MarketplaceAdminPage() {
       .map(addr => addr.trim())
       .filter(addr => addr && isAddress(addr));
 
-    console.log('📦 [Admin Page] Processing batch remove request:', {
+    devLog.info('📦 [Admin Page] Processing batch remove request:', {
       totalLines: batchCollections.split('\n').length,
       validAddresses: addresses.length,
       addresses
     });
 
     if (addresses.length === 0) {
-      console.error('❌ [Admin Page] No valid addresses found in batch');
+      devLog.error('❌ [Admin Page] No valid addresses found in batch');
       alert('No valid addresses found');
       return;
     }
 
-    console.log('🚀 [Admin Page] Initiating batch remove for', addresses.length, 'collections');
+    devLog.info('🚀 [Admin Page] Initiating batch remove for', addresses.length, 'collections');
     try {
       await batchRemoveWhitelistedCollections(addresses);
-      console.log('✅ [Admin Page] Batch remove initiated successfully');
+      devLog.info('✅ [Admin Page] Batch remove initiated successfully');
       setBatchCollections('');
     } catch (err) {
-      console.error('❌ [Admin Page] Failed to batch remove collections:', err);
+      devLog.error('❌ [Admin Page] Failed to batch remove collections:', err);
     }
   };
 
   const handleCleanListing = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('🧹 [Admin Page] Initiating listing cleanup:', {
+    devLog.info('🧹 [Admin Page] Initiating listing cleanup:', {
       listingId: listingIdToClean,
       marketplace: MARKETPLACE_ADDRESS
     });
     try {
       await cleanListing(listingIdToClean);
-      console.log('✅ [Admin Page] Clean listing initiated successfully');
+      devLog.info('✅ [Admin Page] Clean listing initiated successfully');
       setListingIdToClean('');
     } catch (err) {
-      console.error('❌ [Admin Page] Failed to clean listing:', err);
+      devLog.error('❌ [Admin Page] Failed to clean listing:', err);
     }
   };
 
@@ -209,7 +211,7 @@ export default function MarketplaceAdminPage() {
       .map(addr => addr.trim())
       .filter(addr => addr && isAddress(addr));
 
-    console.log('👥 [Admin Page] Processing buyer whitelist add:', {
+    devLog.info('👥 [Admin Page] Processing buyer whitelist add:', {
       listingId: buyerWhitelistListingId,
       totalLines: buyerAddresses.split('\n').length,
       validAddresses: addresses.length,
@@ -217,18 +219,18 @@ export default function MarketplaceAdminPage() {
     });
 
     if (addresses.length === 0) {
-      console.error('❌ [Admin Page] No valid buyer addresses found');
+      devLog.error('❌ [Admin Page] No valid buyer addresses found');
       alert('No valid addresses found');
       return;
     }
 
-    console.log('🚀 [Admin Page] Initiating buyer whitelist add for listing', buyerWhitelistListingId);
+    devLog.info('🚀 [Admin Page] Initiating buyer whitelist add for listing', buyerWhitelistListingId);
     try {
       await addBuyerWhitelistAddresses(buyerWhitelistListingId, addresses);
-      console.log('✅ [Admin Page] Buyer whitelist add initiated successfully');
+      devLog.info('✅ [Admin Page] Buyer whitelist add initiated successfully');
       setBuyerAddresses('');
     } catch (err) {
-      console.error('❌ [Admin Page] Failed to add buyer whitelist:', err);
+      devLog.error('❌ [Admin Page] Failed to add buyer whitelist:', err);
     }
   };
 
@@ -239,7 +241,7 @@ export default function MarketplaceAdminPage() {
       .map(addr => addr.trim())
       .filter(addr => addr && isAddress(addr));
 
-    console.log('👥 [Admin Page] Processing buyer whitelist removal:', {
+    devLog.info('👥 [Admin Page] Processing buyer whitelist removal:', {
       listingId: buyerWhitelistListingId,
       totalLines: buyerAddresses.split('\n').length,
       validAddresses: addresses.length,
@@ -247,18 +249,18 @@ export default function MarketplaceAdminPage() {
     });
 
     if (addresses.length === 0) {
-      console.error('❌ [Admin Page] No valid buyer addresses found');
+      devLog.error('❌ [Admin Page] No valid buyer addresses found');
       alert('No valid addresses found');
       return;
     }
 
-    console.log('🚀 [Admin Page] Initiating buyer whitelist removal for listing', buyerWhitelistListingId);
+    devLog.info('🚀 [Admin Page] Initiating buyer whitelist removal for listing', buyerWhitelistListingId);
     try {
       await removeBuyerWhitelistAddresses(buyerWhitelistListingId, addresses);
-      console.log('✅ [Admin Page] Buyer whitelist removal initiated successfully');
+      devLog.info('✅ [Admin Page] Buyer whitelist removal initiated successfully');
       setBuyerAddresses('');
     } catch (err) {
-      console.error('❌ [Admin Page] Failed to remove buyer whitelist:', err);
+      devLog.error('❌ [Admin Page] Failed to remove buyer whitelist:', err);
     }
   };
 
@@ -351,7 +353,7 @@ export default function MarketplaceAdminPage() {
                 <div>
                   <p className="text-sm text-amber-800 font-medium">You are not the contract owner</p>
                   <p className="text-xs text-amber-600 mt-1">
-                    Owner: <span className="font-mono">{contractOwner || 'Loading...'}</span><br />
+                    Owner: <AddressWithEns address={contractOwner || undefined} className="font-mono" showAddress /><br />
                     You can test the UI, but blockchain transactions will fail unless you are the owner.
                   </p>
                 </div>
@@ -627,7 +629,7 @@ export default function MarketplaceAdminPage() {
                         key={index}
                         className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
                       >
-                        <span className="font-mono text-sm truncate flex-1">{collection}</span>
+                        <AddressWithEns address={collection} className="font-mono text-sm truncate flex-1" showAddress />
                         <button
                           onClick={() => handleRemoveCollection(collection)}
                           disabled={isLoading}

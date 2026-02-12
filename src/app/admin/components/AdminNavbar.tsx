@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAccount, useBalance } from 'wagmi';
 import { Web3ConnectButton } from '@/components/layout/Web3ConnectButton';
 import { hasAdminAccess } from '@/utils';
@@ -11,10 +11,15 @@ import { hasAdminAccess } from '@/utils';
 export default function AdminNavbar() {
     const [mounted, setMounted] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [sessionStatus, setSessionStatus] = useState<'unknown' | 'active' | 'inactive'>('unknown');
+    const [sessionExpiresAt, setSessionExpiresAt] = useState<number | null>(null);
+    const [isSessionChecking, setIsSessionChecking] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const { address, isConnected } = useAccount();
     const { data: balance } = useBalance({ address });
     const pathname = usePathname();
+    const router = useRouter();
 
     useEffect(() => {
         setMounted(true);
@@ -61,6 +66,90 @@ export default function AdminNavbar() {
         return value.toFixed(4);
     };
 
+    const formatSessionExpiry = (expiresAt: number | null) => {
+        if (!expiresAt) return null;
+        try {
+            const remainingMs = expiresAt - Date.now();
+            if (remainingMs <= 0) return 'abgelaufen';
+            const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
+            const hours = Math.floor(remainingMinutes / 60);
+            const minutes = remainingMinutes % 60;
+            if (hours <= 0) return `${minutes} min`;
+            if (minutes === 0) return `${hours} h`;
+            return `${hours} h ${minutes} min`;
+        } catch {
+            return null;
+        }
+    };
+
+    useEffect(() => {
+        const fetchSession = async () => {
+            if (!mounted || !isConnected || !address) {
+                setSessionStatus('inactive');
+                setSessionExpiresAt(null);
+                return;
+            }
+
+            try {
+                setIsSessionChecking(true);
+                const response = await fetch('/api/auth/session', {
+                    credentials: 'include',
+                    cache: 'no-store'
+                });
+
+                if (!response.ok) {
+                    setSessionStatus('inactive');
+                    setSessionExpiresAt(null);
+                    return;
+                }
+
+                const data = await response.json();
+                if (data.success && data.data?.isAuthenticated) {
+                    const sessionAddress = data.data?.address?.toLowerCase();
+                    const expiresAt = typeof data.data?.expiresAt === 'number' ? data.data.expiresAt : null;
+                    if (sessionAddress === address.toLowerCase()) {
+                        if (expiresAt && expiresAt <= Date.now()) {
+                            setSessionStatus('inactive');
+                            setSessionExpiresAt(null);
+                            return;
+                        }
+                        setSessionStatus('active');
+                        setSessionExpiresAt(expiresAt);
+                        return;
+                    }
+                }
+
+                setSessionStatus('inactive');
+                setSessionExpiresAt(null);
+            } catch {
+                setSessionStatus('inactive');
+                setSessionExpiresAt(null);
+            } finally {
+                setIsSessionChecking(false);
+            }
+        };
+
+        fetchSession();
+        const interval = window.setInterval(fetchSession, 60_000);
+
+        return () => window.clearInterval(interval);
+    }, [address, isConnected, mounted]);
+
+    const handleLogout = async () => {
+        setIsLoggingOut(true);
+        try {
+            await fetch('/api/auth/logout', {
+                method: 'POST',
+                credentials: 'include',
+                cache: 'no-store'
+            });
+        } finally {
+            setIsLoggingOut(false);
+            setIsDropdownOpen(false);
+            router.replace('/admin/login');
+        }
+    };
+
     const adminMenuItems = [
         {
             href: '/admin',
@@ -78,6 +167,16 @@ export default function AdminNavbar() {
             icon: (
                 <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+            ),
+            badge: undefined as string | undefined
+        },
+        {
+            href: '/admin/system',
+            label: 'System Diagnostics',
+            icon: (
+                <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6m14 0V9a2 2 0 012-2h2a2 2 0 012 2v8m-8 0V5a2 2 0 012-2h2a2 2 0 012 2v12m-10 0a2 2 0 100 4 2 2 0 000-4z" />
                 </svg>
             ),
             badge: undefined as string | undefined
@@ -166,6 +265,18 @@ export default function AdminNavbar() {
                             </svg>
                             ADMIN
                         </span>
+                        {mounted && isConnected && (
+                            <span className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full border ${sessionStatus === 'active'
+                                    ? 'bg-green-50 text-green-700 border-green-200'
+                                    : sessionStatus === 'inactive'
+                                        ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                        : 'bg-gray-50 text-gray-600 border-gray-200'
+                                }`}>
+                                {isSessionChecking ? 'Session pruefen' : sessionStatus === 'active' ? (
+                                    <>Session aktiv{formatSessionExpiry(sessionExpiresAt) ? ` (${formatSessionExpiry(sessionExpiresAt)})` : ''}</>
+                                ) : sessionStatus === 'inactive' ? 'Session fehlt' : 'Session pruefen'}
+                            </span>
+                        )}
                     </Link>
 
                     {/* Right Side: Wallet Dropdown */}
@@ -319,6 +430,14 @@ export default function AdminNavbar() {
 
                                             {/* Disconnect Button */}
                                             <Web3ConnectButton />
+
+                                            <button
+                                                onClick={handleLogout}
+                                                disabled={isLoggingOut}
+                                                className="mt-3 w-full px-3 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                                            >
+                                                {isLoggingOut ? 'Abmelden...' : 'Admin-Session abmelden'}
+                                            </button>
                                         </div>
                                     </div>
                                 )}

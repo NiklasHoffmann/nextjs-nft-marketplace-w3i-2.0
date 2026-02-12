@@ -4,6 +4,7 @@ import { useAccount } from 'wagmi';
 import { useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
 import { CombinedUserInteractionData } from '@/types';
 import { EmptyState } from '@/components/core/Empty';
+import { devLog } from '@/utils';
 
 interface PersonalTabProps {
     contractAddress: string;
@@ -127,7 +128,7 @@ export default function PersonalTab({
             });
             setLastSavedNotes(trimmedNotes);
         } catch (error) {
-            console.error('Error updating notes:', error);
+            devLog.error('Error updating notes:', error);
             setPersonalNotes(lastSavedNotes);
         } finally {
             setIsUpdatingNotes(false);
@@ -159,7 +160,7 @@ export default function PersonalTab({
                 });
             }
         } catch (error) {
-            console.error('Error toggling favorite:', error);
+            devLog.error('Error toggling favorite:', error);
         }
     };
 
@@ -178,7 +179,7 @@ export default function PersonalTab({
                 });
             }
         } catch (error) {
-            console.error('Error toggling watchlist:', error);
+            devLog.error('Error toggling watchlist:', error);
         }
     };
 
@@ -198,7 +199,7 @@ export default function PersonalTab({
                 });
             }
         } catch (error) {
-            console.error('Error setting rating:', error);
+            devLog.error('Error setting rating:', error);
             // Revert local state on error
             const currentRating = userInteractions?.userRating ?? (legacyUserInteractions as any)?.rating ?? 0;
             setLocalRating(currentRating);

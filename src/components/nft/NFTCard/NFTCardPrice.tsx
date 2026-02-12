@@ -11,14 +11,8 @@ import { formatUnits } from 'viem';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
 import type { ListingType } from '@/types/marketplace/listing-v2';
 import { isSwapListing } from '@/types/marketplace/listing-v2';
-
-const formatTokenDisplay = (amount: string, maxDecimals: number) => {
-    if (!amount.includes('.')) return amount;
-
-    const [whole, fraction] = amount.split('.');
-    const trimmedFraction = (fraction || '').slice(0, maxDecimals).replace(/0+$/, '');
-    return trimmedFraction ? `${whole}.${trimmedFraction}` : whole;
-};
+import { formatTokenDisplay } from '@/utils';
+import { devLog } from '@/utils';
 
 interface NFTCardPriceProps {
     price: string | null;
@@ -58,7 +52,7 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
     // DEBUG: Log incoming props for listed NFTs
     useEffect(() => {
         if (isListed && price) {
-            console.log('🔍 [NFTCardPrice] Listed NFT:', {
+            devLog.info('[NFTCardPrice] Listed NFT:', {
                 price,
                 currency,
                 listingType,
@@ -73,7 +67,7 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
     );
 
     const displayAmount = useMemo(() =>
-        formatTokenDisplay(tokenAmount, Math.min(4, tokenDecimals)),
+        formatTokenDisplay(tokenAmount, tokenDecimals, 4),
         [tokenAmount, tokenDecimals]
     );
 
@@ -100,7 +94,7 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
                     setUsdPrice(''); // No USD rate available
                 }
             } catch (error) {
-                console.error('Error converting token to USD:', error);
+                devLog.error('Error converting token to USD:', error);
                 setUsdPrice('');
             } finally {
                 setLoading(false);

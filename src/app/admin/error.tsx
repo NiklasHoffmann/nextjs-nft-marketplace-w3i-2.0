@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
+import { devLog } from '@/utils';
 
 /**
  * Admin Error Boundary
@@ -16,7 +17,7 @@ export default function AdminError({
     reset: () => void;
 }) {
     useEffect(() => {
-        console.error('Admin error:', error);
+        devLog.error('Admin error:', error);
     }, [error]);
 
     return (

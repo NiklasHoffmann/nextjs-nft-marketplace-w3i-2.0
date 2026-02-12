@@ -12,6 +12,8 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
+import { devLog } from '@/utils';
+import { AddressWithEns } from '@/app/admin/components/shared/AddressWithEns';
 
 interface NFT {
     contractAddress: string;
@@ -40,31 +42,31 @@ export default function NFTDatabaseSelector({
     useEffect(() => {
         async function loadNFTs() {
             try {
-                console.log('🔍 Loading NFTs from database...');
+                devLog.info('Loading NFTs from database');
                 const res = await fetch('/api/admin/nfts/list', {
                     credentials: 'include' // Include session cookie
                 });
 
-                console.log('📡 API Response status:', res.status, res.ok);
+                devLog.info('NFT list API response status', { status: res.status, ok: res.ok });
 
                 if (!res.ok) {
                     const errorText = await res.text();
-                    console.error('❌ API Error:', res.status, errorText);
+                    devLog.warn('NFT list API error', { status: res.status, errorText });
                     return;
                 }
 
                 const result = await res.json();
-                console.log('📦 NFT List API Response:', result);
+                devLog.info('NFT list API response', result);
 
                 if (result.success && result.data?.nfts) {
-                    console.log(`✅ Loaded ${result.data.nfts.length} NFTs from database`);
+                    devLog.info('Loaded NFTs from database', { count: result.data.nfts.length });
                     setNfts(result.data.nfts);
                 } else {
-                    console.warn('⚠️ Unexpected response structure:', result);
+                    devLog.warn('Unexpected NFT list response structure', result);
                     setNfts([]);
                 }
             } catch (e) {
-                console.error('❌ Error loading NFTs:', e);
+                devLog.error('Error loading NFTs', e);
                 setNfts([]);
             } finally {
                 setLoading(false);
@@ -132,7 +134,7 @@ export default function NFTDatabaseSelector({
                                     {selectedNFT.name || `NFT #${selectedNFT.tokenId}`}
                                 </p>
                                 <p className="text-sm text-gray-600">
-                                    {selectedNFT.contractAddress.slice(0, 8)}...{selectedNFT.contractAddress.slice(-6)} #{selectedNFT.tokenId}
+                                    <AddressWithEns address={selectedNFT.contractAddress} /> #{selectedNFT.tokenId}
                                 </p>
                             </div>
                         </div>
@@ -184,7 +186,7 @@ export default function NFTDatabaseSelector({
                                         {nft.name || `NFT #${nft.tokenId}`}
                                     </p>
                                     <p className="text-sm text-gray-600 truncate">
-                                        {nft.contractAddress.slice(0, 8)}...{nft.contractAddress.slice(-6)} #{nft.tokenId}
+                                        <AddressWithEns address={nft.contractAddress} /> #{nft.tokenId}
                                     </p>
                                 </div>
                             </button>

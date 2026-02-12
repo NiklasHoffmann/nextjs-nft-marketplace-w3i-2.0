@@ -30,7 +30,12 @@ function NFTPriceCard({
     currency,
     status,
     listingType,
-    tokenStandard
+    tokenStandard,
+    desiredErc1155Quantity,
+    erc1155QuantityListed,
+    remainingQuantity,
+    unitPrice,
+    partialBuyEnabled
 }: NFTPriceCardProps) {
     // Modal states
     const [showBuyModal, setShowBuyModal] = useState(false);
@@ -50,17 +55,36 @@ function NFTPriceCard({
         return match?.decimals ?? 18;
     }, [chainId, currency]);
 
+    const isErc1155 = tokenStandard === 'ERC1155';
+    const displayPriceWei = useMemo(() => {
+        if (isErc1155 && unitPrice) {
+            return unitPrice;
+        }
+        return price;
+    }, [isErc1155, unitPrice, price]);
+
     const formattedPrice = useMemo(() => {
-        if (!price) {
+        if (!displayPriceWei) {
             return '0';
         }
 
         try {
-            return formatUnits(BigInt(price), currencyDecimals);
+            return formatUnits(BigInt(displayPriceWei), currencyDecimals);
         } catch {
             return '0';
         }
-    }, [price, currencyDecimals]);
+    }, [displayPriceWei, currencyDecimals]);
+
+    const formattedTotalPrice = useMemo(() => {
+        if (!isErc1155 || !unitPrice) return null;
+        if (!price) return null;
+
+        try {
+            return formatUnits(BigInt(price), currencyDecimals);
+        } catch {
+            return null;
+        }
+    }, [isErc1155, unitPrice, price, currencyDecimals]);
 
     const currencySymbol = useMemo(() =>
         getCurrencySymbolByAddress(chainId, currency),
@@ -183,9 +207,17 @@ function NFTPriceCard({
                         {formattedPrice} {currencySymbol}
                     </span>
                 </div>
-                {!priceLoading && (
+                {!priceLoading && (!isErc1155 || !unitPrice) && (
                     <p className="text-xl text-gray-600">
                         ≈ {convertedPrice}
+                    </p>
+                )}
+                {isErc1155 && unitPrice && (
+                    <p className="text-sm text-gray-600">
+                        Price per unit
+                        {formattedTotalPrice && (
+                            <span className="ml-2 text-gray-500">Full qty: {formattedTotalPrice} {currencySymbol}</span>
+                        )}
                     </p>
                 )}
             </div>
@@ -261,6 +293,14 @@ function NFTPriceCard({
                         currency={currency}
                         seller={seller || ''}
                         buyer={connectedAddress}
+                        desiredContractAddress={desiredContractAddress}
+                        desiredTokenId={desiredTokenId}
+                        desiredErc1155Quantity={desiredErc1155Quantity}
+                        tokenStandard={tokenStandard || undefined}
+                        erc1155QuantityListed={erc1155QuantityListed}
+                        remainingQuantity={remainingQuantity}
+                        unitPrice={unitPrice}
+                        partialBuyEnabled={partialBuyEnabled}
                     />
                     <UpdateListingModal
                         isOpen={showUpdateModal}

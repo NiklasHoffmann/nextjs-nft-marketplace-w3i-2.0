@@ -1,11 +1,13 @@
 "use client";
 
 import { useAccount } from 'wagmi';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { isAdminAddress } from '@/config/admin';
 import { Web3ConnectButton } from '@/components/layout/Web3ConnectButton';
 import { LoadingState } from '@/components/core/Loading';
+import { devLog } from '@/utils';
+import { useNotifications } from '@/contexts/notifications';
 
 /**
  * AdminAuthGuard - Schützt Admin-Bereiche mit Session-basierter Authentifizierung
@@ -20,10 +22,15 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
     const { address, isConnected } = useAccount();
     const router = useRouter();
     const pathname = usePathname();
+    const notifications = useNotifications();
 
     const [isChecking, setIsChecking] = useState(true);
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [showRetry, setShowRetry] = useState(false);
+    const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
+    const redirectTimeoutRef = useRef<number | null>(null);
+    const redirectIntervalRef = useRef<number | null>(null);
 
     // Skip auth check for login page
     const isLoginPage = pathname === '/admin/login';
@@ -47,12 +54,24 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [address, isConnected, isLoginPage]); // Remove pathname to prevent redirect loops
 
+    useEffect(() => {
+        return () => {
+            if (redirectTimeoutRef.current) {
+                window.clearTimeout(redirectTimeoutRef.current);
+            }
+            if (redirectIntervalRef.current) {
+                window.clearInterval(redirectIntervalRef.current);
+            }
+        };
+    }, []);
+
     /**
      * Prüft ob User authorisiert ist (Admin-Wallet + gültige Session)
      */
     const checkAuthorization = async () => {
         setIsChecking(true);
         setErrorMessage(null);
+        setShowRetry(false);
 
         try {
             // 1. Prüfe ob Wallet verbunden
@@ -77,7 +96,7 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
                 cache: 'no-store'
             });
 
-            console.log('🔍 AdminAuthGuard session check:', {
+            devLog.info('🔍 AdminAuthGuard session check:', {
                 ok: response.ok,
                 status: response.status,
                 currentAddress: address?.toLowerCase()
@@ -85,7 +104,7 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
 
             if (response.ok) {
                 const data = await response.json();
-                console.log('📋 Session data:', {
+                devLog.info('📋 Session data:', {
                     success: data.success,
                     isAuthenticated: data.data?.isAuthenticated,
                     sessionAddress: data.data?.address?.toLowerCase(),
@@ -94,18 +113,47 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
                 });
 
                 // apiHandler wrappt Response in { success: true, data: {...} }
-                if (data.success && data.data?.isAuthenticated && data.data?.address?.toLowerCase() === address.toLowerCase()) {
-                    // Session gültig
-                    console.log('✅ Session valid, authorizing...');
-                    setIsAuthorized(true);
-                    setIsChecking(false);
+                if (data.success && data.data?.isAuthenticated) {
+                    const sessionAddress = data.data?.address?.toLowerCase();
+                    if (sessionAddress === address.toLowerCase()) {
+                        devLog.info('✅ Session valid, authorizing...');
+                        setIsAuthorized(true);
+                        setIsChecking(false);
+                        return;
+                    }
+
+                    devLog.warn('⚠️ Session belongs to a different wallet:', {
+                        sessionAddress,
+                        currentAddress: address.toLowerCase()
+                    });
+
+                    await clearSession();
+                    setIsAuthorized(false);
+                    setErrorMessage('Session gehört zu einer anderen Wallet. Bitte neu anmelden.');
+                    notifications.warning('Session-Wechsel erkannt', 'Die Session gehört zu einer anderen Wallet. Bitte neu anmelden.');
+                    redirectToLogin();
                     return;
-                } else {
-                    console.warn('⚠️ Session check failed:', {
+                }
+
+                if (data.success && data.data?.isAuthenticated === false) {
+                    devLog.info('ℹ️ No active admin session');
+                    await clearSession();
+                    setIsAuthorized(false);
+                    setErrorMessage('Session abgelaufen. Bitte neu anmelden.');
+                    notifications.info('Session abgelaufen', 'Bitte melde dich erneut an.');
+                    redirectToLogin();
+                    return;
+                } else if (!data.success) {
+                    devLog.warn('⚠️ Session check failed:', {
                         hasSuccess: data.success,
                         isAuth: data.data?.isAuthenticated,
                         addressMatch: data.data?.address?.toLowerCase() === address.toLowerCase()
                     });
+                    setIsAuthorized(false);
+                    setErrorMessage('Session-Prüfung fehlgeschlagen. Bitte neu anmelden.');
+                    notifications.error('Session-Pruefung fehlgeschlagen', 'Bitte melde dich erneut an.');
+                    redirectToLogin();
+                    return;
                 }
             }
 
@@ -115,16 +163,30 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
             redirectToLogin();
 
         } catch (error) {
-            console.error('Authorization check error:', error);
+            devLog.error('Authorization check error:', error);
             setIsAuthorized(false);
-            setErrorMessage('Fehler bei der Authentifizierung.');
-            redirectToLogin();
+            setErrorMessage('Netzwerkfehler bei der Authentifizierung.');
+            setShowRetry(true);
+            setIsChecking(false);
+            notifications.error('Netzwerkfehler', 'Authentifizierung konnte nicht geprueft werden.');
         }
     };
 
     /**
      * Leitet zu Login-Seite weiter (mit Redirect-URL)
      */
+    const clearSession = async () => {
+        try {
+            await fetch('/api/auth/logout', {
+                method: 'POST',
+                credentials: 'include',
+                cache: 'no-store'
+            });
+        } catch (error) {
+            devLog.warn('Failed to clear session:', error);
+        }
+    };
+
     const redirectToLogin = () => {
         setIsChecking(false);
 
@@ -136,8 +198,29 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
         // Encode current path for redirect after login
         const redirectUrl = encodeURIComponent(pathname || '/admin');
 
-        // Immediate redirect (no setTimeout to prevent multiple checks)
-        router.push(`/admin/login?redirect=${redirectUrl}` as any);
+        if (redirectTimeoutRef.current) {
+            window.clearTimeout(redirectTimeoutRef.current);
+        }
+        if (redirectIntervalRef.current) {
+            window.clearInterval(redirectIntervalRef.current);
+        }
+
+        const delaySeconds = 3;
+        setRedirectCountdown(delaySeconds);
+
+        redirectIntervalRef.current = window.setInterval(() => {
+            setRedirectCountdown(prev => {
+                if (!prev || prev <= 1) return null;
+                return prev - 1;
+            });
+        }, 1000);
+
+        redirectTimeoutRef.current = window.setTimeout(() => {
+            if (redirectIntervalRef.current) {
+                window.clearInterval(redirectIntervalRef.current);
+            }
+            router.replace(`/admin/login?redirect=${redirectUrl}` as any);
+        }, delaySeconds * 1000);
     };
 
     // Login-Seite immer durchlassen
@@ -221,12 +304,27 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
                             ) : (
                                 <>
                                     <p className="text-sm text-gray-600 mb-4">
-                                        Du wirst zur Login-Seite weitergeleitet...
+                                        {redirectCountdown ? `Weiterleitung in ${redirectCountdown}s...` : 'Du wirst zur Login-Seite weitergeleitet...'}
                                     </p>
                                     <div className="inline-flex items-center justify-center">
                                         <LoadingState size="sm" variant="inline" />
                                     </div>
+                                    <button
+                                        onClick={() => router.push('/admin/login')}
+                                        className="w-full mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                                    >
+                                        Zum Admin-Login
+                                    </button>
                                 </>
+                            )}
+
+                            {showRetry && (
+                                <button
+                                    onClick={checkAuthorization}
+                                    className="w-full px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                                >
+                                    Erneut versuchen
+                                </button>
                             )}
                         </div>
                     </div>

@@ -7,6 +7,7 @@
 import { MultisigProposal, ProposalType } from '@/types';
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
+import { AddressWithEns } from '@/app/admin/components/shared/AddressWithEns';
 
 interface ProposalCardProps {
     proposal: MultisigProposal;
@@ -171,7 +172,7 @@ export function ProposalCard({
                     <div className="flex flex-wrap gap-2">
                         {proposal.confirmations.map((conf, idx) => (
                             <div key={idx} className="px-2 py-1 bg-green-50 border border-green-200 rounded text-xs font-mono">
-                                {conf.address.slice(0, 6)}...{conf.address.slice(-4)}
+                                <AddressWithEns address={conf.address} />
                             </div>
                         ))}
                     </div>

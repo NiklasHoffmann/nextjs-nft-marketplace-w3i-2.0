@@ -12,6 +12,7 @@ import { useTransactionService } from '@/services/blockchain';
 import { useMarketplaceItems } from '@/contexts/marketplace-items';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
 import { useAccount } from 'wagmi';
+import { devLog } from '@/utils';
 
 interface CancelListingModalProps {
     isOpen: boolean;
@@ -70,36 +71,36 @@ function CancelListingModal({
         setErrorMessage(null);
 
         try {
-            console.log('🚫 Cancelling listing:', { listingId, contractAddress, tokenId });
+            devLog.info('🚫 Cancelling listing:', { listingId, contractAddress, tokenId });
 
             const result = await txService.cancelListing({
                 listingId,
                 contractAddress,
                 tokenId,
                 onProgress: (step) => {
-                    console.log('🔄 Cancel step:', step);
+                    devLog.info('🔄 Cancel step:', step);
                 },
                 onError: (error) => {
-                    console.error('❌ Cancel error:', error);
+                    devLog.error('❌ Cancel error:', error);
                     setErrorMessage(error);
                 },
                 onSuccess: (result) => {
-                    console.log('✅ Listing cancelled! TX:', result.txHash);
+                    devLog.info('✅ Listing cancelled! TX:', result.txHash);
                     setCancelStep('success');
                     // Modal will auto-close after 2s (see useEffect)
                 },
                 onPostTransaction: async () => {
                     // Force immediate sync from TheGraph via API
-                    console.log('🔄 Triggering immediate marketplace sync...');
+                    devLog.info('🔄 Triggering immediate marketplace sync...');
                     try {
                         await fetch('/api/marketplace/sync', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ action: 'force' })
                         });
-                        console.log('✅ Marketplace sync triggered');
+                        devLog.info('✅ Marketplace sync triggered');
                     } catch (error) {
-                        console.error('❌ Failed to trigger sync:', error);
+                        devLog.error('❌ Failed to trigger sync:', error);
                     }
 
                     // Remove NFT from marketplace cache
@@ -114,7 +115,7 @@ function CancelListingModal({
                 throw new Error(result.error);
             }
         } catch (error) {
-            console.error('Failed to cancel listing:', error);
+            devLog.error('Failed to cancel listing:', error);
             setErrorMessage(error instanceof Error ? error.message : 'Failed to cancel listing. Please try again.');
             setCancelStep('error');
         } finally {

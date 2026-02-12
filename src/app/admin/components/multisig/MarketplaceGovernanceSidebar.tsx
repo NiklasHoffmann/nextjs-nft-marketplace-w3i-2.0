@@ -5,6 +5,7 @@ import { useChainId, useReadContract } from 'wagmi';
 import { GETTER_FACET_ABI } from '@/config/abis/getter-facet';
 import { getMarketplaceAddress } from '@/config';
 import { getAvailableTokens, getCurrencySymbolByAddress } from '@/config/tokens';
+import { devLog } from '@/utils';
 
 function getNetworkLabel(id?: number): string {
     if (!id) return 'Unknown';
@@ -105,7 +106,7 @@ export function MarketplaceGovernanceSidebar({ diamondAddress }: MarketplaceGove
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
         } catch (err) {
-            console.error('Failed to copy diamond address', err);
+            devLog.warn('[Multisig] Failed to copy diamond address', err);
         }
     };
 

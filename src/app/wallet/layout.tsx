@@ -7,6 +7,7 @@ import { WalletHeader } from './components';
 import { useWalletNFTsV2 } from '@/hooks/wallet/useWalletNFTsV2';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
+import { devLog } from '@/utils';
 
 export default function WalletLayout({ children }: { children: ReactNode }) {
     const { address, isConnected, chain } = useAccount();
@@ -35,7 +36,7 @@ export default function WalletLayout({ children }: { children: ReactNode }) {
                 existing.total += priceInToken;
                 listedPricesByToken.set(tokenKey, existing);
             } catch (error) {
-                console.error('Error parsing price:', error);
+                devLog.error('Error parsing price:', error);
             }
         });
 
@@ -64,7 +65,7 @@ export default function WalletLayout({ children }: { children: ReactNode }) {
                     const usdValue = await convertTokenToUSD(total, symbol, address, chain?.id || 11155111);
                     totalUSD += usdValue;
                 } catch (error) {
-                    console.error(`Error converting ${symbol} to USD:`, error);
+                    devLog.error(`Error converting ${symbol} to USD:`, error);
                 }
             }
 
@@ -74,7 +75,7 @@ export default function WalletLayout({ children }: { children: ReactNode }) {
                     const convertedAmount = await convertFromUSD(totalUSD);
                     setTotalValueDisplay(formatPrice(convertedAmount));
                 } catch (error) {
-                    console.error('Error converting total value:', error);
+                    devLog.error('Error converting total value:', error);
                     setTotalValueDisplay(formatPrice(totalUSD));
                 }
                 setEthPriceLoading(false);

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { isAdminAddress, APP_LOCK_ENABLED } from '@/config/admin';
 import { Web3ConnectButton } from '@/components/layout/Web3ConnectButton';
 import { LoadingState, ButtonSpinner } from '@/components/core/Loading';
+import { devLog } from '@/utils';
 
 interface AdminGuardProps {
     children: React.ReactNode;
@@ -72,12 +73,13 @@ export function AdminGuard({
             // Prüfe ob Session-Cookie existiert (wird vom Server gesetzt)
             // Dies ist eine zusätzliche Sicherheitsebene - der Cookie ist httpOnly
             const response = await fetch('/api/auth/session', {
-                credentials: 'include'
+                credentials: 'include',
+                cache: 'no-store'
             });
 
             if (response.ok) {
                 const data = await response.json();
-                if (data.isAuthenticated && data.address?.toLowerCase() === address.toLowerCase()) {
+                if (data.success && data.data?.isAuthenticated && data.data?.address?.toLowerCase() === address.toLowerCase()) {
                     setIsAuthorized(true);
                     setIsChecking(false);
                     return;
@@ -89,7 +91,7 @@ export function AdminGuard({
             setIsChecking(false);
 
         } catch (error) {
-            console.error('Session check error:', error);
+            devLog.error('Session check error:', error);
             setIsAuthorized(false);
             setIsChecking(false);
         }
@@ -106,11 +108,17 @@ export function AdminGuard({
 
         try {
             // 1. Hole Challenge vom Server
-            const challengeRes = await fetch('/api/auth/challenge');
+            const challengeRes = await fetch('/api/auth/challenge', {
+                cache: 'no-store'
+            });
             if (!challengeRes.ok) {
                 throw new Error('Failed to get challenge');
             }
-            const { message, nonce, timestamp } = await challengeRes.json();
+            const challengeData = await challengeRes.json();
+            if (!challengeData.success || !challengeData.data) {
+                throw new Error('Invalid challenge response');
+            }
+            const { message, nonce, timestamp } = challengeData.data;
 
             // 2. Lasse User die Nachricht signieren
             const signature = await signMessageAsync({ message });
@@ -130,8 +138,13 @@ export function AdminGuard({
             });
 
             if (!verifyRes.ok) {
-                const error = await verifyRes.json();
-                throw new Error(error.error || 'Verification failed');
+                const error = await verifyRes.json().catch(() => ({}));
+                throw new Error(error.error || error.message || 'Verification failed');
+            }
+
+            const verifyData = await verifyRes.json();
+            if (!verifyData.success) {
+                throw new Error(verifyData.error || 'Verification failed');
             }
 
             // 4. Erfolg - Session ist jetzt aktiv
@@ -139,7 +152,7 @@ export function AdminGuard({
             setError(null);
 
         } catch (error: any) {
-            console.error('Authentication error:', error);
+            devLog.error('Authentication error:', error);
             setError(error.message || 'Authentication failed');
             setIsAuthorized(false);
         } finally {

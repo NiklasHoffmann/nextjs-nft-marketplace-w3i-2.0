@@ -27,6 +27,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
+import { devLog } from '@/utils'
 
 export interface GameInputState {
     left: boolean
@@ -169,7 +170,7 @@ export function useGameInput(): UseGameInputReturn {
                     }))
                 }
             } catch (error) {
-                console.error('Error requesting motion permission:', error)
+                devLog.error('Error requesting motion permission:', error)
                 setMotionControl(prev => ({
                     ...prev,
                     permission: 'denied',

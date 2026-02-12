@@ -102,6 +102,8 @@ export interface TransactionData {
     price?: string;
     currency?: Currency;
     description?: string;
+    erc1155Quantity?: string;
+    partialBuyEnabled?: boolean;
     buyerWhitelistEnabled?: boolean;
     allowedBuyers?: string[];
     targetNFT?: AggregatedNFT | null;
@@ -122,6 +124,8 @@ export interface BatchTransactionData {
     currency: Currency;
     priceMode?: 'gross' | 'net';
     description: string;
+    erc1155Quantities?: Record<string, string>;
+    partialBuyEnabled?: boolean;
 }
 
 // ==================== Component Props Types ====================

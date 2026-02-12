@@ -7,15 +7,22 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useReadContract } from 'wagmi';
-import { DiamondOperation, DIAMOND_OPERATION_TEMPLATES } from '@/types';
+import { useReadContract, usePublicClient } from 'wagmi';
+import { DiamondOperation, DIAMOND_OPERATION_TEMPLATES, MULTISIG_ADDRESSES } from '@/types';
 import { useMultisigWallet } from '@/hooks/multisig/useMultisigWallet';
 import { createDiamondTransactionRequest, validateOperationArgs } from '@/services/multisig';
 import { LoadingState } from '@/components/core/Loading/LoadingState';
 import { useRouter } from 'next/navigation';
 import { GETTER_FACET_ABI } from '@/config/abis/getter-facet';
+import { IDEATION_MARKET_FACET_ABI } from '@/config/abis/ideation-market-facet';
+import { COLLECTION_WHITELIST_FACET_ABI } from '@/config/abis/collection-whitelist-facet';
+import { BUYER_WHITELIST_FACET_ABI } from '@/config/abis/buyer-whitelist-facet';
+import { PAUSE_FACET_ABI } from '@/config/abis/pause-facet';
+import { OWNERSHIP_FACET_ABI } from '@/config/abis/ownership-facet';
+import { DIAMOND_CUT_ABI } from '@/config/abis/diamond-cut';
 import { getAvailableTokens, getCurrencySymbolByAddress } from '@/config/tokens';
 import { useChainId } from 'wagmi';
+import { getMultisigAddress } from '@/config';
 
 interface TransactionBuilderProps {
     diamondAddress: string;
@@ -26,6 +33,7 @@ export function TransactionBuilder({ diamondAddress, onSuccess }: TransactionBui
     const router = useRouter();
     const { submitTransaction, isSubmitting } = useMultisigWallet();
     const chainId = useChainId();
+    const publicClient = usePublicClient();
     const hasAddress = Boolean(diamondAddress);
     const [selectedOperation, setSelectedOperation] = useState<DiamondOperation>(DiamondOperation.PAUSE);
     const [args, setArgs] = useState<string[]>([]);
@@ -33,6 +41,11 @@ export function TransactionBuilder({ diamondAddress, onSuccess }: TransactionBui
     const [success, setSuccess] = useState(false);
     const [selectedWhitelistCollection, setSelectedWhitelistCollection] = useState<string>('');
     const [selectedAllowedCurrency, setSelectedAllowedCurrency] = useState<string>('');
+
+    const multisigAddress = useMemo(() => {
+        if (!chainId) return undefined;
+        return getMultisigAddress(chainId) || (chainId === 1 ? MULTISIG_ADDRESSES.mainnet : MULTISIG_ADDRESSES.sepolia);
+    }, [chainId]);
 
     const template = DIAMOND_OPERATION_TEMPLATES[selectedOperation];
 
@@ -54,6 +67,13 @@ export function TransactionBuilder({ diamondAddress, onSuccess }: TransactionBui
         address: diamondAddress as `0x${string}`,
         abi: GETTER_FACET_ABI,
         functionName: 'getAllowedCurrencies',
+        query: { enabled: hasAddress },
+    });
+
+    const { data: contractOwner } = useReadContract({
+        address: diamondAddress as `0x${string}`,
+        abi: GETTER_FACET_ABI,
+        functionName: 'getContractOwner',
         query: { enabled: hasAddress },
     });
 
@@ -128,6 +148,122 @@ export function TransactionBuilder({ diamondAddress, onSuccess }: TransactionBui
         return value;
     };
 
+    const preflightWhitelistCheck = async (operation: DiamondOperation, parsedArgs: any[]) => {
+        if (!publicClient) return;
+
+        if (operation === DiamondOperation.ADD_WHITELISTED_COLLECTION) {
+            const collection = parsedArgs[0] as string;
+            const isWhitelisted = await publicClient.readContract({
+                address: diamondAddress as `0x${string}`,
+                abi: GETTER_FACET_ABI,
+                functionName: 'isCollectionWhitelisted',
+                args: [collection as `0x${string}`]
+            });
+
+            if (isWhitelisted) {
+                throw new Error('Collection is already whitelisted.');
+            }
+        }
+
+        if (operation === DiamondOperation.REMOVE_WHITELISTED_COLLECTION) {
+            const collection = parsedArgs[0] as string;
+            const isWhitelisted = await publicClient.readContract({
+                address: diamondAddress as `0x${string}`,
+                abi: GETTER_FACET_ABI,
+                functionName: 'isCollectionWhitelisted',
+                args: [collection as `0x${string}`]
+            });
+
+            if (!isWhitelisted) {
+                throw new Error('Collection is not whitelisted.');
+            }
+        }
+
+        if (operation === DiamondOperation.BATCH_ADD_COLLECTIONS) {
+            const collections = (parsedArgs[0] as string[]) || [];
+            const results = await Promise.all(collections.map((collection) =>
+                publicClient.readContract({
+                    address: diamondAddress as `0x${string}`,
+                    abi: GETTER_FACET_ABI,
+                    functionName: 'isCollectionWhitelisted',
+                    args: [collection as `0x${string}`]
+                }).then((value) => ({ collection, value }))
+            ));
+
+            const alreadyWhitelisted = results.filter((result) => result.value).map((result) => result.collection);
+            if (alreadyWhitelisted.length > 0) {
+                throw new Error(`Already whitelisted: ${alreadyWhitelisted.join(', ')}`);
+            }
+        }
+
+        if (operation === DiamondOperation.BATCH_REMOVE_COLLECTIONS) {
+            const collections = (parsedArgs[0] as string[]) || [];
+            const results = await Promise.all(collections.map((collection) =>
+                publicClient.readContract({
+                    address: diamondAddress as `0x${string}`,
+                    abi: GETTER_FACET_ABI,
+                    functionName: 'isCollectionWhitelisted',
+                    args: [collection as `0x${string}`]
+                }).then((value) => ({ collection, value }))
+            ));
+
+            const notWhitelisted = results.filter((result) => !result.value).map((result) => result.collection);
+            if (notWhitelisted.length > 0) {
+                throw new Error(`Not whitelisted: ${notWhitelisted.join(', ')}`);
+            }
+        }
+    };
+
+    const getOperationAbi = (operation: DiamondOperation) => {
+        switch (operation) {
+            case DiamondOperation.SET_INNOVATION_FEE:
+            case DiamondOperation.CLEAN_LISTING:
+                return IDEATION_MARKET_FACET_ABI;
+            case DiamondOperation.ADD_WHITELISTED_COLLECTION:
+            case DiamondOperation.REMOVE_WHITELISTED_COLLECTION:
+            case DiamondOperation.BATCH_ADD_COLLECTIONS:
+            case DiamondOperation.BATCH_REMOVE_COLLECTIONS:
+                return COLLECTION_WHITELIST_FACET_ABI;
+            case DiamondOperation.ADD_BUYER_WHITELIST_ADDRESSES:
+            case DiamondOperation.REMOVE_BUYER_WHITELIST_ADDRESSES:
+                return BUYER_WHITELIST_FACET_ABI;
+            case DiamondOperation.PAUSE:
+            case DiamondOperation.UNPAUSE:
+                return PAUSE_FACET_ABI;
+            case DiamondOperation.TRANSFER_OWNERSHIP:
+            case DiamondOperation.ACCEPT_OWNERSHIP:
+                return OWNERSHIP_FACET_ABI;
+            case DiamondOperation.DIAMOND_CUT:
+                return DIAMOND_CUT_ABI;
+            default:
+                return undefined;
+        }
+    };
+
+    const preflightDiamondOperation = async (operation: DiamondOperation, parsedArgs: any[]) => {
+        if (!publicClient || !multisigAddress) return;
+
+        const abi = getOperationAbi(operation);
+        if (!abi) return;
+
+        const functionName = DIAMOND_OPERATION_TEMPLATES[operation].functionSignature.split('(')[0];
+
+        try {
+            await publicClient.simulateContract({
+                address: diamondAddress as `0x${string}`,
+                abi,
+                functionName: functionName as any,
+                args: parsedArgs as any,
+                account: multisigAddress as `0x${string}`
+            });
+        } catch (simulationError: any) {
+            const reason = simulationError?.shortMessage
+                || simulationError?.message
+                || 'Diamond simulation failed';
+            throw new Error(`Diamond call would revert for MultiSig: ${reason}`);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
@@ -149,6 +285,17 @@ export function TransactionBuilder({ diamondAddress, onSuccess }: TransactionBui
                 return;
             }
 
+            if (multisigAddress && contractOwner) {
+                const ownerLower = String(contractOwner).toLowerCase();
+                const multisigLower = multisigAddress.toLowerCase();
+                if (ownerLower !== multisigLower) {
+                    throw new Error('Marketplace owner is not the MultiSig wallet. Transfer ownership to MultiSig first.');
+                }
+            }
+
+            await preflightWhitelistCheck(selectedOperation, parsedArgs);
+            await preflightDiamondOperation(selectedOperation, parsedArgs);
+
             // Create transaction request
             const request = createDiamondTransactionRequest(
                 diamondAddress,
@@ -167,7 +314,7 @@ export function TransactionBuilder({ diamondAddress, onSuccess }: TransactionBui
             setSuccess(true);
             setTimeout(() => {
                 onSuccess?.();
-                router.push('/admin/multisig-wallet');
+                router.push('/admin/marketplace-governance');
             }, 2000);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to submit transaction');
@@ -371,6 +518,15 @@ export function TransactionBuilder({ diamondAddress, onSuccess }: TransactionBui
                     <p className="text-sm text-green-800">
                         ✓ Transaction submitted successfully! Redirecting to pending transactions...
                     </p>
+                    <div className="mt-3">
+                        <button
+                            type="button"
+                            onClick={() => router.push('/admin/marketplace-governance')}
+                            className="rounded-md border border-green-200 bg-white px-3 py-1.5 text-xs font-medium text-green-800 hover:bg-green-100"
+                        >
+                            View pending in Governance
+                        </button>
+                    </div>
                 </div>
             )}
 

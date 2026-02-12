@@ -2,6 +2,7 @@
 
 import { createContext, useContext } from 'react';
 import type { NFTFilters, NFTSortOptions } from '@/types/marketplace';
+import { devLog } from '@/utils';
 
 export interface MarketplaceLayoutContext {
     filters: NFTFilters;
@@ -19,7 +20,7 @@ export function useMarketplaceLayout() {
     const context = useContext(MarketplaceLayoutContext);
     if (!context) {
         // Return default values instead of throwing during SSR/hydration
-        console.warn('useMarketplaceLayout: Context not available, returning defaults');
+        devLog.warn('useMarketplaceLayout: Context not available, returning defaults');
         return {
             filters: { categories: [], rarities: [], searchTerm: '' },
             sort: { field: 'price' as const, direction: 'desc' as const },

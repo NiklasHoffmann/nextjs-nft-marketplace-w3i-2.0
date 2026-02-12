@@ -1,10 +1,24 @@
 import { expect, afterEach, vi } from 'vitest'
+import { TextDecoder, TextEncoder } from 'util'
 import { cleanup } from '@testing-library/react'
 
 // Cleanup after each test case
 afterEach(() => {
     cleanup()
+    vi.clearAllMocks()
 })
+
+if (!globalThis.TextEncoder) {
+    globalThis.TextEncoder = TextEncoder as unknown as typeof globalThis.TextEncoder
+}
+
+if (!globalThis.TextDecoder) {
+    globalThis.TextDecoder = TextDecoder as unknown as typeof globalThis.TextDecoder
+}
+
+if (!globalThis.fetch) {
+    globalThis.fetch = vi.fn(() => Promise.reject(new Error('fetch not mocked'))) as unknown as typeof fetch
+}
 
 // Mock HTMLCanvasElement if needed
 global.HTMLCanvasElement.prototype.getContext = vi.fn(() => ({

@@ -12,6 +12,7 @@ import type { AggregatedNFT } from '@/types/core/core-nft-modern';
 import { invalidateAfterListing } from '@/services/validation';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
 import { useChainId } from 'wagmi';
+import { devLog } from '@/utils';
 
 export default function SuccessPage() {
     const router = useRouter();
@@ -47,7 +48,7 @@ export default function SuccessPage() {
             setNftDataLoaded(false);
 
             try {
-                console.log('🔄 Invalidating caches after successful listing...');
+                devLog.info('🔄 Invalidating caches after successful listing...');
 
                 // Invalidate marketplace cache (will reload on next visit to /marketplace)
                 invalidateCache();
@@ -56,7 +57,7 @@ export default function SuccessPage() {
                 if (formData.selectedNFT) {
                     const contractAddr = formData.selectedNFT.core?.contractAddress || formData.selectedNFT.contractAddress;
                     const tokenIdStr = formData.selectedNFT.core?.tokenId || formData.selectedNFT.tokenId;
-                    console.log('🔄 Emitting invalidation event for:', contractAddr, tokenIdStr);
+                    devLog.info('🔄 Emitting invalidation event for:', contractAddr, tokenIdStr);
                     invalidateAfterListing(
                         contractAddr,
                         tokenIdStr
@@ -64,15 +65,15 @@ export default function SuccessPage() {
 
                     // Manual refresh with minimal delay to ensure stats are updated
                     // (WalletNFTsContext will also auto-refresh via event listener)
-                    console.log('⏱️ Scheduling refresh in 1s for stats update...');
+                    devLog.info('⏱️ Scheduling refresh in 1s for stats update...');
                     await new Promise(resolve => setTimeout(resolve, 1000));
 
-                    console.log('🔄 Manual refresh for stats update...');
+                    devLog.info('🔄 Manual refresh for stats update...');
                     await refreshWalletNFTs();
-                    console.log('✅ Stats should be updated now');
+                    devLog.info('✅ Stats should be updated now');
                 }
 
-                console.log('📡 Querying TheGraph for fresh listing data...');
+                devLog.info('📡 Querying TheGraph for fresh listing data...');
 
                 // Query TheGraph directly for this specific listing
                 const graphUrl = process.env.NEXT_PUBLIC_SUBGRAPH_URL || 'http://localhost:8000/subgraphs/name/nft-marketplace';
@@ -120,12 +121,12 @@ export default function SuccessPage() {
                     const graphResult = await graphResponse.json();
                     if (graphResult.data?.items?.length > 0) {
                         listingData = graphResult.data.items[0];
-                        console.log('✅ Found listing in TheGraph:', listingData);
+                        devLog.info('✅ Found listing in TheGraph:', listingData);
                     } else {
-                        console.warn('⚠️ No listing found in TheGraph yet (sync pending)');
+                        devLog.warn('⚠️ No listing found in TheGraph yet (sync pending)');
                     }
                 } else {
-                    console.warn('⚠️ TheGraph query failed');
+                    devLog.warn('⚠️ TheGraph query failed');
                 }
 
                 // Fetch NFT metadata from DB (might not have listing data yet)
@@ -136,7 +137,7 @@ export default function SuccessPage() {
                 let baseNFT = formData.selectedNFT;
                 if (nftResponse.ok) {
                     const nftData = await nftResponse.json();
-                    console.log('✅ Loaded NFT metadata from DB');
+                    devLog.info('✅ Loaded NFT metadata from DB');
                     baseNFT = nftData;
                 }
 
@@ -161,7 +162,7 @@ export default function SuccessPage() {
                     setListedNFT(enrichedNFT);
                 } else {
                     // Fallback: Use formData for optimistic display
-                    console.log('⚡ Using optimistic listing data from form');
+                    devLog.info('⚡ Using optimistic listing data from form');
                     const enrichedNFT: AggregatedNFT = {
                         ...baseNFT,
                         listed: true,
@@ -180,7 +181,7 @@ export default function SuccessPage() {
                     setListedNFT(enrichedNFT);
                 }
             } catch (error) {
-                console.error('❌ Error loading listed NFT:', error);
+                devLog.error('❌ Error loading listed NFT:', error);
                 // Fallback to form data with optimistic listing
                 if (formData.selectedNFT) {
                     const enrichedNFT: AggregatedNFT = {

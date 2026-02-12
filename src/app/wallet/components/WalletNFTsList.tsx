@@ -9,6 +9,7 @@ import type { WalletNFT } from '@/contexts/wallet-nfts/WalletNFTsService';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
 import { mapWalletNFTToScrollItem } from '@/utils/nft/scrollItem';
+import { devLog } from '@/utils';
 
 export interface WalletNFTsListProps {
     /** NFTs to display (pre-filtered from server) */
@@ -98,7 +99,7 @@ export function WalletNFTsList({
                     existing.total += priceInToken;
                     pricesByToken.set(tokenKey, existing);
                 } catch (e) {
-                    console.error('Error parsing price:', e);
+                    devLog.error('Error parsing price:', e);
                 }
             }
         });
@@ -133,7 +134,7 @@ export function WalletNFTsList({
                     const usdValue = await convertTokenToUSD(total, symbol, address, chainId);
                     totalUSD += usdValue;
                 } catch (error) {
-                    console.error(`Error converting ${symbol} to USD:`, error);
+                    devLog.error(`Error converting ${symbol} to USD:`, error);
                 }
             }
 

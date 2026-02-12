@@ -113,6 +113,8 @@ export default function CheckListingPage() {
             buyer: null,
             createdAt: Date.now(),
             updatedAt: Date.now(),
+            erc1155QuantityListed: formData.erc1155Quantity,
+            partialBuyEnabled: formData.partialBuyEnabled,
             desiredContractAddress: formData.targetNFT?.contractAddress || '0x0000000000000000000000000000000000000000',
             desiredTokenId: formData.targetNFT?.tokenId || null
         }
@@ -229,6 +231,24 @@ export default function CheckListingPage() {
                                         <span>Sie erhalten:</span>
                                         <span>{fees.youReceive.toFixed(4)} {currencySymbol}</span>
                                     </div>
+                                </div>
+                            </div>
+                        )}
+                        {formData.erc1155Quantity && (
+                            <div className="bg-gradient-to-br from-purple-50 to-fuchsia-50 rounded-xl border border-purple-200 p-6 mb-4">
+                                <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                    </svg>
+                                    ERC1155 Details
+                                </h3>
+                                <div className="flex justify-between text-sm text-gray-700">
+                                    <span>Menge gelistet</span>
+                                    <span className="font-semibold text-purple-700">{formData.erc1155Quantity}</span>
+                                </div>
+                                <div className="flex justify-between text-sm text-gray-700 mt-2">
+                                    <span>Teilkauf</span>
+                                    <span className="font-semibold text-purple-700">{formData.partialBuyEnabled ? 'Aktiviert' : 'Deaktiviert'}</span>
                                 </div>
                             </div>
                         )}

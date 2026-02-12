@@ -7,6 +7,8 @@
 import { useState } from 'react';
 import { ProposalType } from '@/types';
 import { BaseModal } from '@/components/core/Modal/BaseModal';
+import { devLog } from '@/utils';
+import { AddressWithEns } from '@/app/admin/components/shared/AddressWithEns';
 
 interface CreateProposalModalProps {
     isOpen: boolean;
@@ -182,7 +184,7 @@ export function CreateProposalModal({ isOpen, onClose, onSubmit, marketplaceAddr
             setArgsInput('');
             onClose();
         } catch (error) {
-            console.error('Failed to create proposal:', error);
+            devLog.error('[Multisig] Failed to create proposal', error);
         } finally {
             setIsSubmitting(false);
         }
@@ -267,7 +269,7 @@ export function CreateProposalModal({ isOpen, onClose, onSubmit, marketplaceAddr
                         {template.functionName}({argsInput || '...'})
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                        Target: {marketplaceAddress}
+                        Target: <AddressWithEns address={marketplaceAddress} showAddress className="font-mono" />
                     </div>
                 </div>
 

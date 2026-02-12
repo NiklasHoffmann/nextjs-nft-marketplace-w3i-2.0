@@ -1,15 +1,19 @@
 "use client";
 
-import { useAccount, useSignMessage, useConnectorClient } from 'wagmi';
+import { useAccount, useSignMessage, useConnectorClient, useDisconnect } from 'wagmi';
 import { useEffect, useState, useCallback } from 'react';
+import { devLog } from '@/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { isAdminAddress } from '@/config/admin';
 import { Web3ConnectButton } from '@/components/layout/Web3ConnectButton';
 import { LoadingState, ButtonSpinner } from '@/components/core/Loading';
+import { useNotifications } from '@/contexts/notifications';
 
 export default function AdminLoginPage() {
     const { address, isConnected, connector } = useAccount();
     const { data: connectorClient } = useConnectorClient();
+    const { disconnect } = useDisconnect();
+    const notifications = useNotifications();
     const router = useRouter();
     const searchParams = useSearchParams();
     const { signMessageAsync } = useSignMessage();
@@ -18,8 +22,22 @@ export default function AdminLoginPage() {
     const [isSigning, setIsSigning] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [isSwitchingWallet, setIsSwitchingWallet] = useState(false);
 
-    const redirectTo = searchParams?.get('redirect') || '/admin';
+    const rawRedirect = searchParams?.get('redirect');
+    const redirectTo = rawRedirect?.startsWith('/admin') ? rawRedirect : '/admin';
+
+    const clearSession = useCallback(async () => {
+        try {
+            await fetch('/api/auth/logout', {
+                method: 'POST',
+                credentials: 'include',
+                cache: 'no-store'
+            });
+        } catch (error) {
+            devLog.warn('Failed to clear session:', error);
+        }
+    }, []);
 
     const checkExistingSession = useCallback(async () => {
         setIsChecking(true);
@@ -43,21 +61,42 @@ export default function AdminLoginPage() {
 
             if (response.ok) {
                 const data = await response.json();
-                if (data.success && data.data?.isAuthenticated && data.data?.address?.toLowerCase() === address.toLowerCase()) {
-                    setShowSuccess(true);
-                    setTimeout(() => {
-                        router.push(redirectTo as any);
-                    }, 1000);
-                    return;
+                if (data.success && data.data?.isAuthenticated) {
+                    const sessionAddress = data.data?.address?.toLowerCase();
+                    if (sessionAddress === address.toLowerCase()) {
+                        setShowSuccess(true);
+                        setTimeout(() => {
+                            router.push(redirectTo as any);
+                        }, 1000);
+                        return;
+                    }
+
+                    await clearSession();
+                    setError('Session gehört zu einer anderen Wallet. Bitte neu anmelden.');
+                    notifications.warning('Session-Wechsel erkannt', 'Bitte melde dich mit der aktuellen Wallet neu an.');
                 }
             }
 
             setIsChecking(false);
         } catch (error) {
-            console.error('Session check error:', error);
+            devLog.error('Session check error:', error);
             setIsChecking(false);
         }
-    }, [address, isConnected, redirectTo, router]);
+    }, [address, clearSession, isConnected, redirectTo, router]);
+
+    const handleSwitchWallet = async () => {
+        setIsSwitchingWallet(true);
+        setError(null);
+        try {
+            await clearSession();
+            disconnect();
+            notifications.info('Session zurueckgesetzt', 'Bitte verbinde eine andere Wallet.');
+        } catch (error) {
+            devLog.error('Switch wallet error:', error);
+        } finally {
+            setIsSwitchingWallet(false);
+        }
+    };
 
     useEffect(() => {
         checkExistingSession();
@@ -139,15 +178,10 @@ export default function AdminLoginPage() {
                 })
             });
 
-            if (!verifyRes.ok) {
-                const errorData = await verifyRes.json();
-                throw new Error(errorData.error || 'Verifikation fehlgeschlagen');
-            }
+            const verifyData = await verifyRes.json().catch(() => ({}));
 
-            const verifyData = await verifyRes.json();
-
-            if (!verifyData.success) {
-                throw new Error(verifyData.error || 'Verifikation fehlgeschlagen');
+            if (!verifyRes.ok || !verifyData.success) {
+                throw new Error(verifyData.error || verifyData.message || 'Verifikation fehlgeschlagen');
             }
 
             setShowSuccess(true);
@@ -220,6 +254,13 @@ export default function AdminLoginPage() {
                                                 <span className="text-xs font-medium">Admin-Rechte bestätigt</span>
                                             </div>
                                         )}
+                                        <button
+                                            onClick={handleSwitchWallet}
+                                            disabled={isSwitchingWallet}
+                                            className="mt-3 w-full px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                                        >
+                                            {isSwitchingWallet ? 'Wallet wird getrennt...' : 'Mit anderer Wallet anmelden'}
+                                        </button>
                                     </div>
                                 )}
                             </div>

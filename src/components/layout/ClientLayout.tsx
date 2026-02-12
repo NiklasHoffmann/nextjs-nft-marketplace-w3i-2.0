@@ -17,13 +17,13 @@ import Navbar from './Navbar';
 import AdminNavbar from '@/app/admin/components/AdminNavbar';
 import Web3Provider from './Web3Provider';
 import { usePathname } from 'next/navigation';
+import { devLog } from '@/utils';
+import * as Sentry from '@sentry/nextjs';
 
 // --- Simple global fallback UI for render errors ---
 function GlobalErrorFallback({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {
-  // TODO: hier an Sentry/Log-Backend senden
-  if (process.env.NODE_ENV !== "production") {
-    console.error("[GlobalErrorFallback]", error);
-  }
+  devLog.error('[GlobalErrorFallback]', error);
+  Sentry.captureException(error);
   return (
     <div className="p-4 m-4 rounded-xl border border-red-300 bg-red-50 text-red-900">
       <h2 className="font-semibold mb-2">Uups, da ist etwas schiefgelaufen.</h2>
@@ -63,10 +63,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     <ErrorBoundary
       FallbackComponent={GlobalErrorFallback}
       onError={(error: Error, info: ErrorInfo) => {
-        if (process.env.NODE_ENV !== "production") {
-          console.error("[React ErrorBoundary]", { error, info });
-        }
-        // TODO: Sentry.captureException(error)
+        devLog.error('[React ErrorBoundary]', { error, info });
+        Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
       }}
     >
       <NotificationProvider>

@@ -5,14 +5,7 @@ import { formatUnits } from 'viem';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
 import { useChainId } from 'wagmi';
 import { useCurrency } from '@/contexts/CurrencyContext';
-
-const formatTokenDisplay = (amount: string, maxDecimals: number) => {
-    if (!amount.includes('.')) return amount;
-
-    const [whole, fraction] = amount.split('.');
-    const trimmedFraction = (fraction || '').slice(0, maxDecimals).replace(/0+$/, '');
-    return trimmedFraction ? `${whole}.${trimmedFraction}` : whole;
-};
+import { formatTokenDisplay } from '@/utils';
 
 interface CollectionHeaderProps {
     contractAddress: string;
@@ -64,7 +57,8 @@ function CollectionStats({
     const formattedFloorPrice = floorPrice !== null && floorPrice !== undefined
         ? formatTokenDisplay(
             formatUnits(BigInt(floorPrice.toString()), tokenDecimals),
-            Math.min(4, tokenDecimals)
+            tokenDecimals,
+            4
         )
         : null;
 
@@ -96,7 +90,7 @@ function CollectionStats({
                     return;
                 }
 
-                const formatted = formatTokenDisplay(ethAmount.toFixed(4), 4);
+                const formatted = formatTokenDisplay(ethAmount.toFixed(4), 4, 4);
                 if (isMounted) setConvertedFloorEth(formatted);
             } catch {
                 if (isMounted) setConvertedFloorEth(null);

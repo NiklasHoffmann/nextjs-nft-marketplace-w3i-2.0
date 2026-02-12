@@ -8,6 +8,7 @@
 
 import { useAdminMode } from '@/hooks';
 import { AdminMode } from '@/types';
+import { AddressWithEns } from './AddressWithEns';
 
 interface AdminModeIndicatorProps {
     diamondAddress: string;
@@ -41,7 +42,12 @@ export function AdminModeIndicator({ diamondAddress, className = '' }: AdminMode
                         </svg>
                     ),
                     title: 'Ownership Transfer Pending',
-                    description: `Pending owner: ${modeInfo.pendingOwner?.slice(0, 10)}...`,
+                    description: modeInfo.pendingOwner ? (
+                        <span className="inline-flex items-center gap-1">
+                            Pending owner:
+                            <AddressWithEns address={modeInfo.pendingOwner} className="font-mono" />
+                        </span>
+                    ) : 'Ownership transfer pending',
                     bgColor: 'bg-yellow-50',
                     borderColor: 'border-yellow-200',
                     titleColor: 'text-yellow-900',

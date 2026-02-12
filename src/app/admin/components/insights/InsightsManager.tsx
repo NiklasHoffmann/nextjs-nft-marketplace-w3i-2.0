@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useAdminNFTInsights, useNFTInsightsLegacy } from "@/hooks";
+import { useAdminNFTInsights, useNFTInsightsLegacy, useAdminStatus } from "@/hooks";
 import { LoadingState, ButtonSpinner } from '@/components/core/Loading';
 import {
     NFTSelector,
@@ -103,6 +103,7 @@ export default function InsightsManager() {
     const [currentCardInput, setCurrentCardInput] = useState<string>('');
 
     const { create, update } = useAdminNFTInsights();
+    const { address: adminAddress } = useAdminStatus();
 
     // Get URL parameters directly (not from formData)
     const contractAddressParam = searchParams.get('contractAddress') || '';
@@ -285,7 +286,7 @@ export default function InsightsManager() {
                 projectDiscord: formData.projectDiscord,
                 partnerships: formData.partnerships,
                 partnershipDetails: formData.partnershipDetails,
-                createdBy: '0x0000000000000000000000000000000000000000' // TODO: Replace with actual admin address
+                createdBy: adminAddress || '0x0000000000000000000000000000000000000000'
             };
 
             // Build final card descriptions including current input
@@ -316,7 +317,7 @@ export default function InsightsManager() {
         } finally {
             setLoading(false);
         }
-    }, [formData, create, update, isEditMode, existingInsights]);
+    }, [formData, create, update, isEditMode, existingInsights, adminAddress]);
 
     const updateFormData = useCallback((updates: Partial<NFTInsightFormData>) => {
 

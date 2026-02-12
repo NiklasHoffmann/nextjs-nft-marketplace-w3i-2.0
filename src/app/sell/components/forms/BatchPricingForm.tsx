@@ -8,9 +8,11 @@ import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace
 import { useERC20 } from '@/hooks/tokens';
 import { ExtendedCurrencySelector } from '@/components/marketplace';
 import { ZERO_ADDRESS, getTokenConfig, isNativeETH } from '@/config/tokens';
+import { devLog } from '@/utils';
 
 interface BatchPricingFormProps {
     selectedCount: number;
+    hasErc1155Selected?: boolean;
     whitelistStatus?: 'not-started' | 'checking' | 'done' | 'failed';
     approvalStatus?: 'not-started' | 'checking' | 'done' | 'failed';
     onSubmit: (data: {
@@ -21,10 +23,11 @@ interface BatchPricingFormProps {
         currency: string; // Changed to string (address)
         priceMode: 'gross' | 'net';
         description: string;
+        partialBuyEnabled?: boolean;
     }) => void;
 }
 
-export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started', approvalStatus = 'not-started', onSubmit }: BatchPricingFormProps) {
+export function BatchPricingForm({ selectedCount, hasErc1155Selected = false, whitelistStatus = 'not-started', approvalStatus = 'not-started', onSubmit }: BatchPricingFormProps) {
     const [pricingType, setPricingType] = useState<'fixed' | 'variable'>('fixed');
     const { setProgressStep } = useListingFlow();
     const chainId = useChainId();
@@ -118,7 +121,8 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
             endPrice: '',
             currency: ZERO_ADDRESS as string, // Default: ETH (zero address)
             priceMode: 'gross' as 'gross' | 'net', // gross = Brutto (Käufer zahlt), net = Netto (Seller erhält)
-            description: ''
+            description: '',
+            partialBuyEnabled: false
         },
         validate: (values) => {
             const errors: Record<string, string> = {};
@@ -156,7 +160,7 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
                         // Wait a bit for approval to be confirmed
                         await new Promise(resolve => setTimeout(resolve, 2000));
                     } catch (error) {
-                        console.error('Token approval failed:', error);
+                        devLog.error('Token approval failed:', error);
                         alert('Token approval failed. Please try again.');
                         return;
                     }
@@ -177,7 +181,8 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
                 endPrice: pricingType === 'variable' ? values.endPrice : undefined,
                 currency: values.currency,
                 priceMode: values.priceMode,
-                description: values.description
+                description: values.description,
+                partialBuyEnabled: hasErc1155Selected ? values.partialBuyEnabled : false
             });
         }
     });
@@ -289,6 +294,23 @@ export function BatchPricingForm({ selectedCount, whitelistStatus = 'not-started
                     </button>
                 </div>
             </div>
+
+            {hasErc1155Selected && (
+                <div className="mb-6 rounded-xl border border-purple-200 bg-purple-50 p-4">
+                    <label className="flex items-center gap-3 text-sm font-medium text-purple-900">
+                        <input
+                            type="checkbox"
+                            checked={form.values.partialBuyEnabled}
+                            onChange={(event) => form.setFieldValue('partialBuyEnabled', event.target.checked)}
+                            className="h-4 w-4 text-purple-600 border-purple-300 focus:ring-purple-500"
+                        />
+                        Teilkauf fuer ERC1155 erlauben
+                    </label>
+                    <p className="text-xs text-purple-700 mt-1">
+                        Ermöglicht Käufern, eine Teilmenge der gelisteten ERC1155-Menge zu kaufen.
+                    </p>
+                </div>
+            )}
 
             {/* Fixed Price */}
             {pricingType === 'fixed' && (

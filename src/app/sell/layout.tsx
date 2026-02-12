@@ -16,7 +16,7 @@ import { ListingFlowProvider, useListingFlow } from './contexts/ListingFlowConte
 import { SellHeader, FlowSidebar } from './components';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
 import type { ListingType } from './types';
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 
 function SellLayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();

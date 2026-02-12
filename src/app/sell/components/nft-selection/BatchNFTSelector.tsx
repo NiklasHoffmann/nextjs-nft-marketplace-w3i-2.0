@@ -8,10 +8,12 @@ interface BatchNFTSelectorProps {
     userNFTs: AggregatedNFT[];
     selectedNFTs: Set<string>;
     onSelectionChange: (nfts: Set<string>) => void;
+    erc1155Quantities: Record<string, string>;
+    onQuantityChange: (key: string, quantity: string) => void;
     isLoading: boolean;
 }
 
-export function BatchNFTSelector({ userNFTs, selectedNFTs, onSelectionChange, isLoading }: BatchNFTSelectorProps) {
+export function BatchNFTSelector({ userNFTs, selectedNFTs, onSelectionChange, erc1155Quantities, onQuantityChange, isLoading }: BatchNFTSelectorProps) {
     // Group NFTs by collection
     const nftsByCollection = useMemo(() => {
         const groups = new Map<string, AggregatedNFT[]>();
@@ -138,6 +140,22 @@ export function BatchNFTSelector({ userNFTs, selectedNFTs, onSelectionChange, is
                                             width={80}
                                             height={80}
                                         />
+                                        {selectedNFTs.has(nft.key) && nft.tokenStandard === 'ERC1155' && (
+                                            <div
+                                                className="absolute top-1 left-1 right-1"
+                                                onClick={(event) => event.stopPropagation()}
+                                            >
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    step={1}
+                                                    value={erc1155Quantities[nft.key] || ''}
+                                                    onChange={(event) => onQuantityChange(nft.key, event.target.value)}
+                                                    placeholder={nft.balance ? `Max ${nft.balance}` : 'Qty'}
+                                                    className="w-full rounded-md border border-white/80 bg-white/90 px-1 py-0.5 text-[10px] font-semibold text-gray-800 shadow-sm focus:border-purple-400 focus:outline-none"
+                                                />
+                                            </div>
+                                        )}
                                         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1 rounded-b-lg">
                                             <p className="text-[10px] text-white font-medium truncate">
                                                 #{nft.tokenId}
