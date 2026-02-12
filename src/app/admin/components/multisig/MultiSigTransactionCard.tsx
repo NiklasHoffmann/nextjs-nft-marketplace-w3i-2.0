@@ -84,12 +84,38 @@ export function MultiSigTransactionCard({
     const statusColor = getTransactionStatusColor(transaction);
     const statusLabel = getTransactionStatusLabel(transaction);
     const typeColor = TRANSACTION_TYPE_COLORS[transaction.transactionType];
+    const statusBadgeClasses: Record<typeof statusColor, string> = {
+        gray: 'bg-gray-100 text-gray-800',
+        yellow: 'bg-yellow-100 text-yellow-800',
+        green: 'bg-green-100 text-green-800',
+        red: 'bg-red-100 text-red-800',
+    };
+    const statusBarClasses: Record<typeof statusColor, string> = {
+        gray: 'bg-gray-500',
+        yellow: 'bg-yellow-500',
+        green: 'bg-green-500',
+        red: 'bg-red-500',
+    };
+    const typeBadgeClasses: Record<string, string> = {
+        blue: 'bg-blue-100 text-blue-800',
+        green: 'bg-green-100 text-green-800',
+        purple: 'bg-purple-100 text-purple-800',
+        indigo: 'bg-indigo-100 text-indigo-800',
+        red: 'bg-red-100 text-red-800',
+        yellow: 'bg-yellow-100 text-yellow-800',
+        gray: 'bg-gray-100 text-gray-800',
+    };
     const isOwner = Boolean(
         address
         && transaction.owner
         && address.toLowerCase() === transaction.owner.toLowerCase()
     );
     const canDeactivate = transaction.isActive && isOwner;
+    const requiredConfirmations = Number(transaction.requiredConfirmations || 0);
+    const confirmationProgress = requiredConfirmations > 0
+        ? Number(transaction.numConfirmations) / requiredConfirmations
+        : 0;
+    const confirmationPercent = Math.min(100, Math.max(0, confirmationProgress * 100));
 
     return (
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
@@ -126,7 +152,7 @@ export function MultiSigTransactionCard({
             <div className="flex items-start justify-between">
                 <div className="flex-1">
                     <div className="flex items-center gap-2">
-                        <span className={`rounded-full bg-${typeColor}-100 px-3 py-1 text-xs font-medium text-${typeColor}-800`}>
+                        <span className={`rounded-full px-3 py-1 text-xs font-medium ${typeBadgeClasses[typeColor] || 'bg-gray-100 text-gray-800'}`}>
                             {TRANSACTION_TYPE_LABELS[transaction.transactionType]}
                         </span>
                         <span className="text-sm text-gray-500">#{transaction.txIndex}</span>
@@ -135,7 +161,7 @@ export function MultiSigTransactionCard({
                         {transaction.decodedCall?.description || TRANSACTION_TYPE_LABELS[transaction.transactionType]}
                     </h3>
                 </div>
-                <span className={`rounded-full bg-${statusColor}-100 px-3 py-1 text-xs font-medium text-${statusColor}-800`}>
+                <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClasses[statusColor]}`}>
                     {statusLabel}
                 </span>
             </div>
@@ -188,9 +214,9 @@ export function MultiSigTransactionCard({
                 </div>
                 <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-200">
                     <div
-                        className={`h-full bg-${statusColor}-500 transition-all`}
+                        className={`h-full transition-all ${statusBarClasses[statusColor]}`}
                         style={{
-                            width: `${(Number(transaction.numConfirmations) / transaction.requiredConfirmations) * 100}%`,
+                            width: `${confirmationPercent}%`,
                         }}
                     />
                 </div>
