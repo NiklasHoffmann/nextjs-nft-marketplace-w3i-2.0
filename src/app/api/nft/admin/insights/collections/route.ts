@@ -3,7 +3,7 @@
  * 
  * Uses new standardized API infrastructure:
  * - apiHandler wrapper for error handling
- * - withAdmin middleware for authentication ✅
+ * - admin option for authentication ✅
  * - Zod validation
  * - Type-safe responses
  * 
@@ -17,9 +17,8 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
-import { apiHandler } from '@/lib/api/handler';
-import { withAdmin } from '@/lib/middleware';
-import { apiBadRequest, apiNotFound, apiSuccess } from '@/lib/api/responses';
+import { apiHandler } from '@/lib/api';
+import { apiBadRequest, apiNotFound, apiSuccess } from '@/lib/api';
 import { ConflictError } from '@/lib/api/errors';
 import type { NFTProjectDescriptions } from '@/types/features/nft-insights';
 
@@ -82,11 +81,7 @@ const deleteCollectionInsightSchema = z.object({
  * Create collection insight (ADMIN ONLY - Auto-authenticated)
  */
 export const POST = apiHandler(async (req: NextRequest) => {
-  // Apply admin middleware for authentication
-  await withAdmin(req);
-
   // Get authenticated admin address
-  // @ts-ignore - added by withAdmin middleware
   const adminAddress = req.userAddress as string;
 
   // Parse and validate request body
@@ -135,16 +130,13 @@ export const POST = apiHandler(async (req: NextRequest) => {
   const created = await collection.findOne({ _id: result.insertedId });
 
   return apiSuccess(created);
-});
+}, { admin: true });
 
 /**
  * PUT /api/nft/admin/insights/collections
  * Update collection insight (ADMIN ONLY - Auto-authenticated)
  */
 export const PUT = apiHandler(async (req: NextRequest) => {
-  // Apply admin middleware for authentication
-  await withAdmin(req);
-
   // Parse and validate request body
   const body = await req.json();
   const parseResult = updateCollectionInsightSchema.safeParse(body);
@@ -186,16 +178,13 @@ export const PUT = apiHandler(async (req: NextRequest) => {
   });
 
   return apiSuccess(updated);
-});
+}, { admin: true });
 
 /**
  * DELETE /api/nft/admin/insights/collections
  * Delete collection insight (ADMIN ONLY - Auto-authenticated)
  */
 export const DELETE = apiHandler(async (req: NextRequest) => {
-  // Apply admin middleware for authentication
-  await withAdmin(req);
-
   // Parse query parameters
   const { searchParams } = new URL(req.url);
   const contractAddress = searchParams.get('contractAddress');
@@ -221,4 +210,4 @@ export const DELETE = apiHandler(async (req: NextRequest) => {
   }
 
   return apiSuccess({ deleted: true });
-});
+}, { admin: true });

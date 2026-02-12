@@ -10,13 +10,16 @@ import { UnauthorizedError, ForbiddenError } from '../api/errors';
 import { isAdminAddress } from '@/config/admin';
 import crypto from 'crypto';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
  * Verify JWT token from cookie
  */
 function verifyToken(token: string): { address: string; isAdmin: boolean } | null {
     try {
+        if (!JWT_SECRET) {
+            return null;
+        }
         const [header, payload, signature] = token.split('.');
 
         // Verify signature
@@ -38,6 +41,10 @@ function verifyToken(token: string): { address: string; isAdmin: boolean } | nul
             return null;
         }
 
+        if (!data.address || typeof data.address !== 'string') {
+            return null;
+        }
+
         return {
             address: data.address,
             isAdmin: data.isAdmin || false
@@ -47,26 +54,32 @@ function verifyToken(token: string): { address: string; isAdmin: boolean } | nul
     }
 }
 
+function parseCookies(header: string | null): Record<string, string> {
+    if (!header) return {};
+    return Object.fromEntries(
+        header.split('; ').map(c => {
+            const [key, ...v] = c.split('=');
+            return [key, v.join('=')];
+        })
+    );
+}
+
+function getAdminSessionToken(req: NextRequest): string | null {
+    const cookieHeader = req.headers.get('cookie');
+    const cookies = parseCookies(cookieHeader);
+    return cookies['admin-session'] || null;
+}
+
 /**
  * Extract wallet address from request (session cookie or header)
  */
 function extractWalletAddress(req: NextRequest): string | null {
     // 1. Check session cookie (preferred for admin routes)
-    const cookieHeader = req.headers.get('cookie');
-    if (cookieHeader) {
-        const cookies = Object.fromEntries(
-            cookieHeader.split('; ').map(c => {
-                const [key, ...v] = c.split('=');
-                return [key, v.join('=')];
-            })
-        );
-
-        const authToken = cookies['admin-session'];
-        if (authToken) {
-            const verified = verifyToken(authToken);
-            if (verified) {
-                return verified.address.toLowerCase();
-            }
+    const authToken = getAdminSessionToken(req);
+    if (authToken) {
+        const verified = verifyToken(authToken);
+        if (verified) {
+            return verified.address.toLowerCase();
         }
     }
 
@@ -108,7 +121,6 @@ export async function withAuth(req: NextRequest): Promise<void> {
     }
 
     // Store address in request for later use
-    // @ts-ignore - extending request object
     req.userAddress = address;
 }
 
@@ -116,30 +128,22 @@ export async function withAuth(req: NextRequest): Promise<void> {
  * Middleware: Require admin user with verified session
  */
 export async function withAdmin(req: NextRequest): Promise<void> {
-    // Extract address from session cookie or header
-    const address = extractWalletAddress(req);
-
-    if (!address) {
-        throw new UnauthorizedError('Authentication required. Please sign in with your admin wallet.');
-    }
-
-    // Check if address has admin privileges
-    if (!isAdmin(address)) {
-        throw new ForbiddenError('Admin access required. This wallet does not have admin privileges.');
-    }
-
-    // Check for valid session (cookie-based)
-    const cookieHeader = req.headers.get('cookie');
-    const hasValidSession = cookieHeader?.includes('admin-session');
-
-    if (!hasValidSession) {
+    const token = getAdminSessionToken(req);
+    if (!token) {
         throw new UnauthorizedError('Valid admin session required. Please sign in at /admin/login');
     }
 
-    // Store address in request for later use
-    // @ts-ignore - extending request object
+    const verified = verifyToken(token);
+    if (!verified) {
+        throw new UnauthorizedError('Invalid or expired admin session. Please sign in again.');
+    }
+
+    const address = verified.address.toLowerCase();
+    if (!verified.isAdmin || !isAdmin(address)) {
+        throw new ForbiddenError('Admin access required. This wallet does not have admin privileges.');
+    }
+
     req.userAddress = address;
-    // @ts-ignore
     req.isAdmin = true;
 }
 
@@ -150,7 +154,6 @@ export async function withOptionalAuth(req: NextRequest): Promise<void> {
     const address = extractWalletAddress(req);
 
     if (address) {
-        // @ts-ignore
         req.userAddress = address;
     }
 }
@@ -159,7 +162,6 @@ export async function withOptionalAuth(req: NextRequest): Promise<void> {
  * Helper: Get authenticated user address from request
  */
 export function getAuthenticatedAddress(req: NextRequest): string {
-    // @ts-ignore
     const address = req.userAddress;
     if (!address) {
         throw new UnauthorizedError('No authenticated user found');

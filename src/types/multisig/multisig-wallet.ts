@@ -30,8 +30,8 @@ export enum TransactionType {
     ERC721 = 3,
     AddOwner = 4,
     RemoveOwner = 5,
-    BatchTransaction = 6,
-    Other = 7, // Custom contract calls (used for Diamond operations)
+    Other = 6, // Custom contract calls (used for Diamond operations)
+    BatchTransaction = 7,
 }
 
 /**

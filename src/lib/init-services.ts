@@ -6,6 +6,7 @@
  */
 
 import { getNFTSyncService } from '@/services/nft-sync';
+import { devLog } from '@/utils';
 
 // Flag to ensure we only initialize once
 let isInitialized = false;
@@ -18,11 +19,11 @@ export async function initializeBackgroundServices() {
 
     // Only initialize once
     if (isInitialized) {
-        console.log('⚠️ Background services already initialized');
+        devLog.warn('⚠️ Background services already initialized');
         return;
     }
 
-    console.log('🚀 Initializing background services...');
+    devLog.info('🚀 Initializing background services...');
     isInitialized = true;
 
     try {
@@ -30,14 +31,14 @@ export async function initializeBackgroundServices() {
         const syncService = getNFTSyncService();
         await syncService.start();
 
-        console.log('✅ Background services initialized successfully');
+        devLog.info('✅ Background services initialized successfully');
     } catch (error) {
-        console.error('❌ Failed to initialize background services:', error);
+        devLog.error('❌ Failed to initialize background services:', error);
         // Don't throw - allow app to continue even if background services fail
     }
 }
 
 // Auto-initialize on module load (server-side only)
 if (typeof window === 'undefined') {
-    initializeBackgroundServices().catch(console.error);
+    initializeBackgroundServices().catch((error) => devLog.error('❌ Background service init failed:', error));
 }

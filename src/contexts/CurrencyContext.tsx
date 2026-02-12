@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useMemo } from 'react';
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 
 export interface Currency {
     code: string;
@@ -95,7 +95,7 @@ class ExchangeRateCache {
 
         // Check cache first
         const cached = this.cache.get(cacheKey);
-        if (this.isCacheValid(cached)) {
+        if (cached && this.isCacheValid(cached)) {
             return cached.rate;
         }
 
@@ -145,7 +145,7 @@ class ExchangeRateCache {
 
         // Check cache first
         const cached = this.cache.get(cacheKey);
-        if (this.isCacheValid(cached)) {
+        if (cached && this.isCacheValid(cached)) {
             return cached.rate;
         }
 
@@ -306,7 +306,7 @@ class ExchangeRateCache {
         const cacheKey = `TOKENADDR_${chainId}_${addressLower}_USD`;
 
         const cached = this.cache.get(cacheKey);
-        if (this.isCacheValid(cached)) {
+        if (cached && this.isCacheValid(cached)) {
             return cached.rate;
         }
 

@@ -32,8 +32,9 @@
 'use client';
 
 import { useEffect } from 'react';
+import { devLog } from '@/utils';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { erc721Abi } from 'viem';
+import { erc721Abi, erc1155Abi } from 'viem';
 
 export interface UseNFTApprovalParams {
     /** NFT contract address to approve */
@@ -42,6 +43,8 @@ export interface UseNFTApprovalParams {
     tokenId: string;
     /** Marketplace address to approve for */
     marketplaceAddress: `0x${string}`;
+    /** Token standard (ERC721 or ERC1155) */
+    tokenStandard?: 'ERC721' | 'ERC1155';
     /** Enable/disable hook execution */
     enabled?: boolean;
 }
@@ -78,9 +81,11 @@ export function useNFTApproval({
     nftContractAddress,
     tokenId,
     marketplaceAddress,
+    tokenStandard = 'ERC721',
     enabled = true
 }: UseNFTApprovalParams): UseNFTApprovalReturn {
     const { address: userAddress } = useAccount();
+    const isErc1155 = tokenStandard === 'ERC1155';
 
     // Check approval for specific token
     const { data: approvedAddress, refetch: refetchApproved } = useReadContract({
@@ -89,14 +94,14 @@ export function useNFTApproval({
         functionName: 'getApproved',
         args: [BigInt(tokenId)],
         query: {
-            enabled: enabled && !!tokenId && tokenId !== '0'
+            enabled: enabled && !isErc1155 && !!tokenId && tokenId !== '0'
         }
     });
 
     // Check approval for all tokens
     const { data: isApprovedForAll, refetch: refetchApprovedForAll } = useReadContract({
         address: nftContractAddress,
-        abi: erc721Abi,
+        abi: isErc1155 ? erc1155Abi : erc721Abi,
         functionName: 'isApprovedForAll',
         args: userAddress && marketplaceAddress ? [userAddress, marketplaceAddress] : undefined,
         query: {
@@ -111,7 +116,7 @@ export function useNFTApproval({
     });
 
     // Computed approval status
-    const isSingleApproved = approvedAddress === marketplaceAddress;
+    const isSingleApproved = !isErc1155 && approvedAddress === marketplaceAddress;
     const isFullyApproved = isSingleApproved || (isApprovedForAll as boolean);
 
     /**
@@ -123,6 +128,16 @@ export function useNFTApproval({
         }
 
         try {
+            if (isErc1155) {
+                await writeContract({
+                    address: nftContractAddress,
+                    abi: erc1155Abi,
+                    functionName: 'setApprovalForAll',
+                    args: [marketplaceAddress, true]
+                });
+                return;
+            }
+
             await writeContract({
                 address: nftContractAddress,
                 abi: erc721Abi,
@@ -130,7 +145,7 @@ export function useNFTApproval({
                 args: [marketplaceAddress, BigInt(tokenId)]
             });
         } catch (err: any) {
-            console.error('❌ Single approval failed:', err);
+            devLog.error('❌ Single approval failed:', err);
             throw err;
         }
     };
@@ -146,12 +161,12 @@ export function useNFTApproval({
         try {
             await writeContract({
                 address: nftContractAddress,
-                abi: erc721Abi,
+                abi: isErc1155 ? erc1155Abi : erc721Abi,
                 functionName: 'setApprovalForAll',
                 args: [marketplaceAddress, true]
             });
         } catch (err: any) {
-            console.error('❌ ApproveAll failed:', err);
+            devLog.error('❌ ApproveAll failed:', err);
             throw err;
         }
     };
@@ -174,7 +189,7 @@ export function useNFTApproval({
             }
             return true;
         } catch (err) {
-            console.error('❌ ensureApproval failed:', err);
+            devLog.error('❌ ensureApproval failed:', err);
             return false;
         }
     };

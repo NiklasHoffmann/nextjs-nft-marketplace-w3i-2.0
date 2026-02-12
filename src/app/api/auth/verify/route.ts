@@ -1,11 +1,12 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
-import { apiHandler, apiSuccess, parseJsonBody, BadRequestError, UnauthorizedError } from '@/lib/api';
+import { apiHandler, apiSuccess, parseJsonBody, BadRequestError, UnauthorizedError, InternalError } from '@/lib/api';
 import { verifyMessage } from 'viem';
 import { isAdminAddress } from '@/config/admin';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
+import { devLog } from '@/utils';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -14,6 +15,9 @@ export const revalidate = 0;
  * Einfache JWT-Alternative mit HMAC
  */
 function createToken(payload: any): string {
+    if (!JWT_SECRET) {
+        throw new InternalError('JWT_SECRET is not configured');
+    }
     const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
     const body = Buffer.from(JSON.stringify({
         ...payload,
@@ -42,11 +46,19 @@ export const POST = apiHandler(async (request: NextRequest) => {
         timestamp: number;
     }>(request);
 
+    if (!JWT_SECRET) {
+        throw new InternalError('JWT_SECRET is not configured');
+    }
+
     const { address, signature, message, nonce, timestamp } = body;
 
     // Validierung
     if (!address || !signature || !message || !nonce || !timestamp) {
         throw new BadRequestError('Missing required fields');
+    }
+
+    if (typeof timestamp !== 'number') {
+        throw new BadRequestError('Invalid timestamp');
     }
 
     // Prüfe ob Timestamp nicht zu alt ist (max 5 Minuten)
@@ -57,8 +69,18 @@ export const POST = apiHandler(async (request: NextRequest) => {
     }
 
     // Verifiziere Signatur
+    const normalizedAddress = address.toLowerCase();
+    if (!/^0x[a-fA-F0-9]{40}$/.test(normalizedAddress)) {
+        throw new BadRequestError('Invalid wallet address');
+    }
+
+    const expectedMessage = `Sign this message to authenticate as admin.\n\nNonce: ${nonce}\nTimestamp: ${timestamp}`;
+    if (message !== expectedMessage) {
+        throw new BadRequestError('Invalid challenge message');
+    }
+
     const isValid = await verifyMessage({
-        address: address as `0x${string}`,
+        address: normalizedAddress as `0x${string}`,
         message,
         signature: signature as `0x${string}`
     });
@@ -68,7 +90,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
     }
 
     // Prüfe ob Admin-Adresse
-    const isAdmin = isAdminAddress(address);
+    const isAdmin = isAdminAddress(normalizedAddress);
 
     if (!isAdmin) {
         throw new UnauthorizedError('Not an admin address');
@@ -76,29 +98,31 @@ export const POST = apiHandler(async (request: NextRequest) => {
 
     // Erstelle Token
     const token = createToken({
-        address: address.toLowerCase(),
+        address: normalizedAddress,
         isAdmin: true,
         nonce
     });
 
     // Setze Session-Cookie
     const cookieStore = await cookies();
-    cookieStore.set('admin-session', token, {
+    const cookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax', // 'lax' statt 'strict' für bessere Kompatibilität mit Redirects
         maxAge: 60 * 60 * 24, // 24 Stunden
-        path: '/'
-    });
+        path: '/',
+    } as const;
 
-    console.log('✅ Admin session created:', {
-        address: address.toLowerCase(),
+    cookieStore.set('admin-session', token, cookieOptions);
+
+    devLog.info('✅ Admin session created:', {
+        address: normalizedAddress,
         cookieName: 'admin-session',
         expiresIn: '24h'
     });
 
     const response = apiSuccess({
-        address: address.toLowerCase(),
+        address: normalizedAddress,
         isAdmin: true
     });
     response.headers.set('Cache-Control', 'no-store, max-age=0');

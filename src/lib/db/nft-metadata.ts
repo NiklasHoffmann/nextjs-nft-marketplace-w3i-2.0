@@ -6,6 +6,7 @@
  */
 
 import { getCollection } from '@/lib/mongodb';
+import { devLog } from '@/utils';
 import type { NFTMetadata, EnrichedNFTMetadata } from '@/types';
 import type { Document } from 'mongodb';
 
@@ -310,5 +311,5 @@ export async function createNFTMetadataIndexes() {
         }
     ]);
 
-    console.log('✅ NFT Metadata indexes created');
+    devLog.info('✅ NFT Metadata indexes created');
 }

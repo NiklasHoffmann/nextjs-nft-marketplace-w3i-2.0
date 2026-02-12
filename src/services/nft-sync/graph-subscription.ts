@@ -14,6 +14,7 @@ import type { ListingV2 } from '@/types/marketplace/listing-v2';
 import { blockchainStateSync } from './blockchain-state-sync';
 import { IPFSMetadataLazySync } from './ipfs-metadata-lazy-sync';
 import { getCurrencyFixSync } from './currency-fix-sync';
+import { devLog } from '@/utils';
 
 export class GraphQLSync {
     private client: ApolloClient<any> | null = null;
@@ -31,21 +32,21 @@ export class GraphQLSync {
      */
     async start() {
         if (this.isActive) {
-            console.log('⚠️ Subgraph v2 sync already active');
+            devLog.warn('⚠️ Subgraph v2 sync already active');
             return;
         }
 
         const subgraphUrl = process.env.NEXT_PUBLIC_SUBGRAPH_V2_URL;
 
         if (!subgraphUrl) {
-            console.warn('⚠️ NEXT_PUBLIC_SUBGRAPH_V2_URL not configured, skipping v2 sync');
+            devLog.warn('⚠️ NEXT_PUBLIC_SUBGRAPH_V2_URL not configured, skipping v2 sync');
             return;
         }
 
-        console.log('\n🚀 [V2 Sync] Starting Subgraph v2 sync (Ideation Market)...');
-        console.log('🔗 [V2 Sync] Endpoint:', subgraphUrl);
-        console.log('📊 [V2 Sync] Polling interval: 5 minutes (FALLBACK - WebSocket is primary)');
-        console.log('📦 [V2 Sync] Target collection: marketplace_items');
+        devLog.info('\n🚀 [V2 Sync] Starting Subgraph v2 sync (Ideation Market)...');
+        devLog.info('🔗 [V2 Sync] Endpoint:', subgraphUrl);
+        devLog.info('📊 [V2 Sync] Polling interval: 5 minutes (FALLBACK - WebSocket is primary)');
+        devLog.info('📦 [V2 Sync] Target collection: marketplace_items');
 
         // Create Apollo Client
         this.client = new ApolloClient({
@@ -55,7 +56,7 @@ export class GraphQLSync {
             cache: new InMemoryCache(),
         });
 
-        console.log('✅ [V2 Sync] Apollo Client initialized');
+        devLog.debug('✅ [V2 Sync] Apollo Client initialized');
 
         // Start polling (30 second intervals)
         await this.startPolling();
@@ -65,7 +66,7 @@ export class GraphQLSync {
      * Start polling for updates
      */
     private async startPolling() {
-        console.log('🔄 Starting adaptive polling mode for v2 subgraph (120s base interval with exponential backoff)');
+        devLog.debug('🔄 Starting adaptive polling mode for v2 subgraph (120s base interval with exponential backoff)');
         this.isActive = true;
 
         // Initial sync
@@ -98,10 +99,10 @@ export class GraphQLSync {
         if (!this.client) return;
 
         try {
-            console.log('\n📡 [V2 Subgraph] Fetching active listings...');
-            console.log('   Query: GET_ACTIVE_LISTINGS');
-            console.log('   Variables: { first: 100, skip: 0 }');
-            console.log(`   Current interval: ${this.currentInterval / 1000}s`);
+            devLog.debug('\n📡 [V2 Subgraph] Fetching active listings...');
+            devLog.debug('   Query: GET_ACTIVE_LISTINGS');
+            devLog.debug('   Variables: { first: 100, skip: 0 }');
+            devLog.debug(`   Current interval: ${this.currentInterval / 1000}s`);
 
             const result = await this.client.query({
                 query: GET_ACTIVE_LISTINGS,
@@ -116,24 +117,24 @@ export class GraphQLSync {
             this.consecutiveErrors = 0;
             this.currentInterval = this.MIN_INTERVAL;
 
-            console.log('📥 [V2 Subgraph] Response received:');
-            console.log(`   Total listings: ${result.data?.listings?.length || 0}`);
+            devLog.debug('📥 [V2 Subgraph] Response received:');
+            devLog.debug(`   Total listings: ${result.data?.listings?.length || 0}`);
 
             if (result.data?.listings && result.data.listings.length > 0) {
-                console.log('\n📋 [V2 Subgraph] Listings details:');
+                devLog.debug('\n📋 [V2 Subgraph] Listings details:');
                 result.data.listings.forEach((listing: any, index: number) => {
-                    console.log(`   ${index + 1}. ListingID: ${listing.listingId}`);
-                    console.log(`      NFT: ${listing.tokenAddress}/${listing.tokenId}`);
-                    console.log(`      Price: ${listing.priceTotal} wei`);
-                    console.log(`      Seller: ${listing.seller}`);
-                    console.log(`      Status: ${listing.active ? '✅ Active' : '❌ Inactive'}`);
+                    devLog.debug(`   ${index + 1}. ListingID: ${listing.listingId}`);
+                    devLog.debug(`      NFT: ${listing.tokenAddress}/${listing.tokenId}`);
+                    devLog.debug(`      Price: ${listing.priceTotal} wei`);
+                    devLog.debug(`      Seller: ${listing.seller}`);
+                    devLog.debug(`      Status: ${listing.active ? '✅ Active' : '❌ Inactive'}`);
                 });
 
                 await this.syncListingsToMongoDB(result.data.listings);
                 this.lastUpdate = new Date();
-                console.log(`\n✅ [V2 Subgraph] Synced ${result.data.listings.length} listings at ${this.lastUpdate.toISOString()}`);
+                devLog.info(`\n✅ [V2 Subgraph] Synced ${result.data.listings.length} listings at ${this.lastUpdate.toISOString()}`);
             } else {
-                console.log('   ℹ️  No active listings found');
+                devLog.debug('   ℹ️  No active listings found');
             }
         } catch (error: any) {
             // Check if it's a rate limit error (429)
@@ -149,10 +150,10 @@ export class GraphQLSync {
                     this.MAX_INTERVAL
                 );
 
-                console.error(`\n⚠️ [V2 Subgraph] Rate limit hit (429)`);
-                console.error(`   Consecutive errors: ${this.consecutiveErrors}`);
-                console.error(`   Backing off to ${this.currentInterval / 1000}s interval`);
-                console.error(`   Next retry in ${this.currentInterval / 1000} seconds`);
+                devLog.error(`\n⚠️ [V2 Subgraph] Rate limit hit (429)`);
+                devLog.error(`   Consecutive errors: ${this.consecutiveErrors}`);
+                devLog.error(`   Backing off to ${this.currentInterval / 1000}s interval`);
+                devLog.error(`   Next retry in ${this.currentInterval / 1000} seconds`);
             } else {
                 // Other errors - moderate backoff
                 this.consecutiveErrors++;
@@ -161,12 +162,12 @@ export class GraphQLSync {
                     this.MAX_INTERVAL
                 );
 
-                console.error('❌ [V2 Subgraph] Polling error:', error);
+                devLog.error('❌ [V2 Subgraph] Polling error:', error);
                 if (error instanceof Error) {
-                    console.error('   Error message:', error.message);
-                    console.error('   Error stack:', error.stack);
+                    devLog.error('   Error message:', error.message);
+                    devLog.error('   Error stack:', error.stack);
                 }
-                console.error(`   Next retry in ${this.currentInterval / 1000} seconds`);
+                devLog.error(`   Next retry in ${this.currentInterval / 1000} seconds`);
             }
         }
     }
@@ -176,9 +177,9 @@ export class GraphQLSync {
      */
     private async syncListingsToMongoDB(listings: ListingV2[]) {
         try {
-            console.log('\n💾 [V2 MongoDB] Syncing to database...');
-            console.log(`   Collection: marketplace_items`);
-            console.log(`   Items from TheGraph: ${listings.length}`);
+            devLog.info('\n💾 [V2 MongoDB] Syncing to database...');
+            devLog.info(`   Collection: marketplace_items`);
+            devLog.info(`   Items from TheGraph: ${listings.length}`);
 
             const db = await getDatabase();
             const collection = db.collection('marketplace_items');
@@ -206,9 +207,9 @@ export class GraphQLSync {
                 // Marketplace is empty - DELETE all listings
                 if (existingListings.length > 0) {
                     await collection.deleteMany({ chainId });
-                    console.log(`   🗑️  Deleted ${existingListings.length} inactive listings`);
+                    devLog.info(`   🗑️  Deleted ${existingListings.length} inactive listings`);
                 }
-                console.log('   ✅ Marketplace is empty (no active listings)');
+                devLog.info('   ✅ Marketplace is empty (no active listings)');
                 return;
             }
 
@@ -283,20 +284,20 @@ export class GraphQLSync {
                 // Operations completed successfully
                 this.itemsProcessed += upsertedCount;
 
-                console.log(`✅ [V2 MongoDB] Database updated:`);
-                console.log(`   ✅ Upserted: ${upsertedCount} listings`);
-                console.log(`   �️ Deleted: ${deletedCount} old listings`);
+                devLog.info(`✅ [V2 MongoDB] Database updated:`);
+                devLog.info(`   ✅ Upserted: ${upsertedCount} listings`);
+                devLog.info(`   �️ Deleted: ${deletedCount} old listings`);
                 // STEP 5: Fix currency fields from blockchain (SubGraph may not capture correctly)
                 if (upsertedCount > 0) {
                     try {
-                        console.log('🔧 [Currency Fix] Correcting currency from blockchain...');
+                        devLog.info('🔧 [Currency Fix] Correcting currency from blockchain...');
                         const currencyFix = getCurrencyFixSync();
                         const result = await currencyFix.fixAllListings();
                         if (result.fixed > 0) {
-                            console.log(`✅ [Currency Fix] Fixed ${result.fixed} listings`);
+                            devLog.info(`✅ [Currency Fix] Fixed ${result.fixed} listings`);
                         }
                     } catch (error) {
-                        console.error('❌ [Currency Fix] Error:', error);
+                        devLog.error('❌ [Currency Fix] Error:', error);
                         // Don't fail the whole sync, currency fix is optional
                     }
                 }
@@ -305,7 +306,7 @@ export class GraphQLSync {
 
                 // 🔥 OPTIMIZED: Trigger blockchain state sync for new/updated listings
                 if (upsertedCount > 0) {
-                    console.log(`\n🔄 [Blockchain Sync] Triggering on-demand sync for ${upsertedCount} listings...`);
+                    devLog.info(`\n🔄 [Blockchain Sync] Triggering on-demand sync for ${upsertedCount} listings...`);
 
                     const nftsToSync = listings.map(l => ({
                         contractAddress: l.tokenAddress,
@@ -317,24 +318,24 @@ export class GraphQLSync {
                         nftsToSync,
                         process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS
                     ).catch(error => {
-                        console.error('❌ [Blockchain Sync] Error syncing listings:', error);
+                        devLog.error('❌ [Blockchain Sync] Error syncing listings:', error);
                     });
 
                     // 🎨 CRITICAL: Also trigger metadata sync for ALL listings
                     // This ensures images and names are loaded for display
-                    console.log(`\n🎨 [Metadata Sync] Triggering IPFS metadata enrichment for ${listings.length} listings...`);
+                    devLog.info(`\n🎨 [Metadata Sync] Triggering IPFS metadata enrichment for ${listings.length} listings...`);
                     const metadataSync = new IPFSMetadataLazySync();
                     metadataSync.ensureBatch(nftsToSync).catch(error => {
-                        console.error('❌ [Metadata Sync] Error enriching metadata:', error);
+                        devLog.error('❌ [Metadata Sync] Error enriching metadata:', error);
                     });
                 }
             } catch (syncError) {
-                console.error('❌ [V2 MongoDB] Sync operation error:', syncError);
+                devLog.error('❌ [V2 MongoDB] Sync operation error:', syncError);
             }
         } catch (error) {
-            console.error('❌ [V2 MongoDB] Sync error:', error);
+            devLog.error('❌ [V2 MongoDB] Sync error:', error);
             if (error instanceof Error) {
-                console.error('   Error message:', error.message);
+                devLog.error('   Error message:', error.message);
             }
         }
     }
@@ -343,7 +344,7 @@ export class GraphQLSync {
      * Stop syncing
      */
     async stop() {
-        console.log('🛑 Stopping Subgraph v2 sync...');
+        devLog.info('🛑 Stopping Subgraph v2 sync...');
 
         if (this.pollingInterval) {
             clearTimeout(this.pollingInterval);
@@ -352,7 +353,7 @@ export class GraphQLSync {
 
         this.isActive = false;
 
-        console.log(`📊 v2: Total items processed: ${this.itemsProcessed}`);
+        devLog.info(`📊 v2: Total items processed: ${this.itemsProcessed}`);
     }
 
     /**
@@ -375,7 +376,7 @@ export class GraphQLSync {
      * Force sync now
      */
     async forceSync() {
-        console.log('🔄 v2: Force sync triggered');
+        devLog.info('🔄 v2: Force sync triggered');
         await this.pollListings();
     }
 
@@ -388,7 +389,7 @@ export class GraphQLSync {
         if (!this.client) {
             const subgraphUrl = process.env.NEXT_PUBLIC_SUBGRAPH_V2_URL;
             if (!subgraphUrl) {
-                console.warn('⚠️ Cannot sync: NEXT_PUBLIC_SUBGRAPH_V2_URL not configured');
+                devLog.warn('⚠️ Cannot sync: NEXT_PUBLIC_SUBGRAPH_V2_URL not configured');
                 return;
             }
 

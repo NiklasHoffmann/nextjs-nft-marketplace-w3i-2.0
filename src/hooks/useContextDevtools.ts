@@ -20,6 +20,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { devLog } from '@/utils';
 
 interface ContextDevtools {
     [contextName: string]: {
@@ -56,21 +57,21 @@ export function useContextDevtools(contextName: string, state: any): void {
                 // Helper function to log context state
                 window.__logContext = (name?: string) => {
                     if (name) {
-                        console.log(`[${name}]`, window.__CONTEXTS__![name]);
+                        devLog.log(`[${name}]`, window.__CONTEXTS__![name]);
                     } else {
-                        console.log('All Contexts:', window.__CONTEXTS__);
+                        devLog.log('All Contexts:', window.__CONTEXTS__);
                     }
                 };
 
                 // Helper function to clear contexts
                 window.__clearContexts = () => {
                     window.__CONTEXTS__ = {};
-                    console.log('✅ Contexts cleared');
+                    devLog.log('✅ Contexts cleared');
                 };
 
-                console.log('🔧 Context DevTools enabled');
-                console.log('📊 Use window.__logContext("ContextName") to inspect state');
-                console.log('🗑️ Use window.__clearContexts() to clear');
+                devLog.log('🔧 Context DevTools enabled');
+                devLog.log('📊 Use window.__logContext("ContextName") to inspect state');
+                devLog.log('🗑️ Use window.__clearContexts() to clear');
             }
 
             // Track render time
@@ -108,7 +109,7 @@ export function useContextDevtools(contextName: string, state: any): void {
 
             // Log slow renders (> 16ms = below 60fps)
             if (renderTime > 16 && renderCountRef.current > 1) {
-                console.warn(
+                devLog.warn(
                     `⚠️ Slow render in ${contextName}: ${renderTime.toFixed(2)}ms`,
                     { renders: renderCountRef.current, state }
                 );

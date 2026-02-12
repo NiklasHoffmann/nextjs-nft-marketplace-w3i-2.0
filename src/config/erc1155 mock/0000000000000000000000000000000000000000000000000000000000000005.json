@@ -1,0 +1,12 @@
+[
+  {
+    "name": "My Happy Tent – Workation Pass (7 Nights)",
+    "description": "Workation Mode: 7 Nächte (fiktiv) + Fokus-Feeling (Demo/Testnet).",
+    "image": "workation-pass.png",
+    "attributes": [
+      { "trait_type": "Nights", "value": "7" },
+      { "trait_type": "Tier", "value": "Workation" },
+      { "trait_type": "Perk", "value": "Quiet Hours" }
+    ]
+  }
+]

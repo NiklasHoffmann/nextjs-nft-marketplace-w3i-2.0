@@ -2,8 +2,8 @@ import { NextRequest } from 'next/server';
 import { createPublicClient, http } from 'viem';
 import { sepolia } from 'viem/chains';
 import { DIAMOND_LOUPE_FACET_ABI } from '@/config/abis/diamond-loupe-facet';
-import { apiHandler } from '@/lib/api/handler';
-import { apiSuccess } from '@/lib/api/responses';
+import { apiHandler } from '@/lib/api';
+import { apiSuccess } from '@/lib/api';
 
 const MARKETPLACE_ADDRESS = '0x1107Eb26D47A5bF88E9a9F97cbC7EA38c3E1D7EC' as `0x${string}`;
 

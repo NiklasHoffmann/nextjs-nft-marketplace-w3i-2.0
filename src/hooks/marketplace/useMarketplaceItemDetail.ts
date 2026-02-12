@@ -21,6 +21,7 @@ import { useWalletNFTs } from '@/contexts/wallet-nfts';
 import { onDataInvalidation, type InvalidationEventDetail } from '@/services/validation';
 import { useServerEvents } from '@/hooks/marketplace/useServerEvents';
 import type { EnrichedNFTDocument } from '@/types/marketplace/enriched-nft';
+import { devLog } from '@/utils';
 
 interface UseMarketplaceItemDetailOptions {
     contractAddress: string;
@@ -129,6 +130,7 @@ export function useMarketplaceItemDetail(options: UseMarketplaceItemDetailOption
                                 name: walletNFT.contractName || null,
                                 symbol: walletNFT.contractSymbol || null,
                                 totalSupply: null,
+                                contractType: walletNFT.tokenType || null,
                                 ownerBalance: walletNFT.balance ? parseInt(walletNFT.balance) : null,
                                 approvedAddress: null,
                                 approved: null,
@@ -230,6 +232,7 @@ export function useMarketplaceItemDetail(options: UseMarketplaceItemDetailOption
                     symbol: nftData.contract?.symbol || null,
                     totalSupply: nftData.contract?.totalSupply || null,
                     ownerBalance: nftData.contract?.ownerBalance || null,
+                    contractType: nftData.contract?.contractType || null,
                     approvedAddress: null, // Deprecated - use blockchain.approved
                     approved: null, // Deprecated - use blockchain.approved
                 },
@@ -283,7 +286,9 @@ export function useMarketplaceItemDetail(options: UseMarketplaceItemDetailOption
                     totalPages: 1,
                     hasMore: false
                 },
-                filters: undefined
+                filters: undefined,
+                timestamp: Date.now(),
+                cached: true
             });
 
         } catch (err) {
@@ -317,7 +322,7 @@ export function useMarketplaceItemDetail(options: UseMarketplaceItemDetailOption
                     detail.tokenId === tokenId);
 
             if (isAffected) {
-                console.log(`🔄 [useMarketplaceItemDetail] Auto-refreshing after ${detail.type}`);
+                devLog.info(`🔄 [useMarketplaceItemDetail] Auto-refreshing after ${detail.type}`);
                 // Clear cache and refetch
                 const cacheKey = createCacheKey();
                 cache.invalidateCache(cacheKey);
@@ -335,20 +340,20 @@ export function useMarketplaceItemDetail(options: UseMarketplaceItemDetailOption
     useServerEvents({
         enabled: false, // ⚠️ Disabled - rely on dataInvalidation events
         onEvent: (event) => {
-            console.log(`📡 [useMarketplaceItemDetail SSE] Received event:`, event.eventName);
+            devLog.info('📡 [useMarketplaceItemDetail SSE] Received event:', event.eventName);
             
             // Check if this event affects our NFT
             const eventData = event.data as any;
             if (eventData?.nftAddress?.toLowerCase() === contractAddress.toLowerCase() &&
                 eventData?.tokenId?.toString() === tokenId) {
-                console.log(`🔄 [useMarketplaceItemDetail SSE] Refreshing NFT after ${event.eventName}`);
+                devLog.info(`🔄 [useMarketplaceItemDetail SSE] Refreshing NFT after ${event.eventName}`);
                 const cacheKey = createCacheKey();
                 cache.invalidateCache(cacheKey);
                 fetchNFT();
             }
         },
         onConnectionChange: (connected) => {
-            console.log(`🔌 [useMarketplaceItemDetail SSE] Connection ${connected ? 'established' : 'lost'}`);
+            devLog.info(`🔌 [useMarketplaceItemDetail SSE] Connection ${connected ? 'established' : 'lost'}`);
         }
     });
 

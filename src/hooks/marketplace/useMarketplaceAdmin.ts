@@ -14,6 +14,7 @@ import { useNotifications } from '@/contexts/notifications';
 import { IDEATION_MARKET_FACET_ABI } from '@/config/abis/ideation-market-facet';
 import { COLLECTION_WHITELIST_FACET_ABI } from '@/config/abis/collection-whitelist-facet';
 import { BUYER_WHITELIST_FACET_ABI } from '@/config/abis/buyer-whitelist-facet';
+import { devLog } from '@/utils';
 
 export function useMarketplaceAdmin(marketplaceAddress: string) {
   const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +34,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
   // Handle success
   useEffect(() => {
     if (isSuccess && txHash && currentOperation && loadingNotifId) {
-      console.log('? [Admin] Transaction confirmed:', {
+      devLog.log('? [Admin] Transaction confirmed:', {
         operation: currentOperation,
         txHash,
       });
@@ -56,7 +57,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
 
   // Set marketplace innovation fee (admin only)
   const setInnovationFee = async (newFeeInBasisPoints: number) => {
-    console.log('?? [Admin] Setting innovation fee:', {
+    devLog.log('?? [Admin] Setting innovation fee:', {
       marketplace: marketplaceAddress,
       newFee: newFeeInBasisPoints,
       percentage: newFeeInBasisPoints / 100
@@ -81,9 +82,9 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         gas: BigInt(100000)
       });
 
-      console.log('?? [Admin] Innovation fee transaction sent to wallet');
+      devLog.log('?? [Admin] Innovation fee transaction sent to wallet');
     } catch (err: any) {
-      console.error('? [Admin] Failed to set innovation fee:', err);
+      devLog.error('? [Admin] Failed to set innovation fee:', err);
       notifications.clearAll();
       notifications.error('Transaction Failed', err.message || 'Failed to set innovation fee');
       setError(err.message || 'Failed to set innovation fee');
@@ -97,7 +98,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
 
   // Add collection to whitelist (admin only)
   const addWhitelistedCollection = async (collectionAddress: string) => {
-    console.log('? [Admin] Adding collection to whitelist:', {
+    devLog.log('? [Admin] Adding collection to whitelist:', {
       marketplace: marketplaceAddress,
       collection: collectionAddress
     });
@@ -121,9 +122,9 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         gas: BigInt(150000), // Increased from 100k
       });
 
-      console.log('?? [Admin] Add collection transaction sent to wallet');
+      devLog.log('?? [Admin] Add collection transaction sent to wallet');
     } catch (err: any) {
-      console.error('? [Admin] Failed to add collection:', err);
+      devLog.error('? [Admin] Failed to add collection:', err);
       notifications.clearAll();
       notifications.error('Transaction Failed', err.message || 'Failed to add collection to whitelist');
       setError(err.message || 'Failed to add whitelisted collection');
@@ -137,7 +138,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
 
   // Remove collection from whitelist (admin only)
   const removeWhitelistedCollection = async (collectionAddress: string) => {
-    console.log('? [Admin] Removing collection from whitelist:', {
+    devLog.log('? [Admin] Removing collection from whitelist:', {
       marketplace: marketplaceAddress,
       collection: collectionAddress
     });
@@ -161,9 +162,9 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         gas: BigInt(150000), // Increased from 100k
       });
 
-      console.log('?? [Admin] Remove collection transaction sent to wallet');
+      devLog.log('?? [Admin] Remove collection transaction sent to wallet');
     } catch (err: any) {
-      console.error('? [Admin] Failed to remove collection:', err);
+      devLog.error('? [Admin] Failed to remove collection:', err);
       notifications.clearAll();
       notifications.error('Transaction Failed', err.message || 'Failed to remove collection from whitelist');
       setError(err.message || 'Failed to remove whitelisted collection');
@@ -177,7 +178,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
 
   // Batch add collections to whitelist (admin only)
   const batchAddWhitelistedCollections = async (collectionAddresses: string[]) => {
-    console.log('?? [Admin] Batch adding collections to whitelist:', {
+    devLog.log('?? [Admin] Batch adding collections to whitelist:', {
       marketplace: marketplaceAddress,
       count: collectionAddresses.length,
       collections: collectionAddresses
@@ -202,9 +203,9 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         gas: BigInt(200000)
       });
 
-      console.log('?? [Admin] Batch add transaction sent to wallet');
+      devLog.log('?? [Admin] Batch add transaction sent to wallet');
     } catch (err: any) {
-      console.error('? [Admin] Failed to batch add collections:', err);
+      devLog.error('? [Admin] Failed to batch add collections:', err);
       notifications.clearAll();
       notifications.error('Transaction Failed', err.message || 'Failed to batch add collections');
       setError(err.message || 'Failed to batch add whitelisted collections');
@@ -218,7 +219,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
 
   // Batch remove collections from whitelist (admin only)
   const batchRemoveWhitelistedCollections = async (collectionAddresses: string[]) => {
-    console.log('?? [Admin] Batch removing collections from whitelist:', {
+    devLog.log('?? [Admin] Batch removing collections from whitelist:', {
       marketplace: marketplaceAddress,
       count: collectionAddresses.length,
       collections: collectionAddresses
@@ -243,9 +244,9 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         gas: BigInt(200000)
       });
 
-      console.log('?? [Admin] Batch remove transaction sent to wallet');
+      devLog.log('?? [Admin] Batch remove transaction sent to wallet');
     } catch (err: any) {
-      console.error('? [Admin] Failed to batch remove collections:', err);
+      devLog.error('? [Admin] Failed to batch remove collections:', err);
       notifications.clearAll();
       notifications.error('Transaction Failed', err.message || 'Failed to batch remove collections');
       setError(err.message || 'Failed to batch remove whitelisted collections');
@@ -259,7 +260,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
 
   // Clean invalid listing (admin/anyone can call)
   const cleanListing = async (listingId: string) => {
-    console.log('?? [Admin] Cleaning listing:', {
+    devLog.log('?? [Admin] Cleaning listing:', {
       marketplace: marketplaceAddress,
       listingId
     });
@@ -283,9 +284,9 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         gas: BigInt(150000)
       });
 
-      console.log('?? [Admin] Clean listing transaction sent to wallet');
+      devLog.log('?? [Admin] Clean listing transaction sent to wallet');
     } catch (err: any) {
-      console.error('? [Admin] Failed to clean listing:', err);
+      devLog.error('? [Admin] Failed to clean listing:', err);
       notifications.clearAll();
       notifications.error('Transaction Failed', err.message || 'Failed to clean listing');
       setError(err.message || 'Failed to clean listing');
@@ -299,7 +300,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
 
   // Manage buyer whitelist for specific listing
   const addBuyerWhitelistAddresses = async (listingId: string, buyerAddresses: string[]) => {
-    console.log('?? [Admin] Adding buyers to listing whitelist:', {
+    devLog.log('?? [Admin] Adding buyers to listing whitelist:', {
       marketplace: marketplaceAddress,
       listingId,
       count: buyerAddresses.length,
@@ -325,9 +326,9 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         gas: BigInt(200000)
       });
 
-      console.log('?? [Admin] Add buyer whitelist transaction sent to wallet');
+      devLog.log('?? [Admin] Add buyer whitelist transaction sent to wallet');
     } catch (err: any) {
-      console.error('? [Admin] Failed to add buyer whitelist:', err);
+      devLog.error('? [Admin] Failed to add buyer whitelist:', err);
       notifications.clearAll();
       notifications.error('Transaction Failed', err.message || 'Failed to add buyer whitelist');
       setError(err.message || 'Failed to add buyer whitelist addresses');
@@ -340,7 +341,7 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
   };
 
   const removeBuyerWhitelistAddresses = async (listingId: string, buyerAddresses: string[]) => {
-    console.log('?? [Admin] Removing buyers from listing whitelist:', {
+    devLog.log('?? [Admin] Removing buyers from listing whitelist:', {
       marketplace: marketplaceAddress,
       listingId,
       count: buyerAddresses.length,
@@ -366,9 +367,9 @@ export function useMarketplaceAdmin(marketplaceAddress: string) {
         gas: BigInt(200000)
       });
 
-      console.log('?? [Admin] Remove buyer whitelist transaction sent to wallet');
+      devLog.log('?? [Admin] Remove buyer whitelist transaction sent to wallet');
     } catch (err: any) {
-      console.error('? [Admin] Failed to remove buyer whitelist:', err);
+      devLog.error('? [Admin] Failed to remove buyer whitelist:', err);
       notifications.clearAll();
       notifications.error('Transaction Failed', err.message || 'Failed to remove buyer whitelist');
       setError(err.message || 'Failed to remove buyer whitelist addresses');

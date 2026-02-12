@@ -11,6 +11,7 @@ import { createPublicClient, http, type Address } from 'viem';
 import { sepolia } from 'viem/chains';
 import { getDatabase } from '@/lib/mongodb';
 import { GETTER_FACET_ABI } from '@/config/abis/getter-facet';
+import { devLog } from '@/utils';
 
 interface ListingFromContract {
     listingId: bigint;
@@ -53,11 +54,11 @@ export class CurrencyFixSync {
      */
     async fixAllListings(): Promise<{ fixed: number; errors: number }> {
         if (!this.client) {
-            console.error('❌ [Currency Fix] Client not initialized');
+            devLog.error('❌ [Currency Fix] Client not initialized');
             return { fixed: 0, errors: 0 };
         }
 
-        console.log('\n🔧 [Currency Fix] Starting currency correction...');
+        devLog.info('\n🔧 [Currency Fix] Starting currency correction...');
 
         const db = await getDatabase();
         const collection = db.collection('marketplace_items');
@@ -73,7 +74,7 @@ export class CurrencyFixSync {
             ]
         }).toArray();
 
-        console.log(`📊 [Currency Fix] Found ${listings.length} listings to check`);
+        devLog.debug(`📊 [Currency Fix] Found ${listings.length} listings to check`);
 
         let fixed = 0;
         let errors = 0;
@@ -88,18 +89,18 @@ export class CurrencyFixSync {
                     args: [BigInt(listing.listingId)]
                 }) as ListingFromContract;
 
-                console.log(`🔍 [Currency Fix] Listing ${listing.listingId} from contract:`, contractListing);
+                devLog.debug(`🔍 [Currency Fix] Listing ${listing.listingId} from contract:`, contractListing);
                 
                 // Skip if no currency available from contract
                 if (!contractListing || typeof contractListing !== 'object') {
-                    console.warn(`⚠️ [Currency Fix] Invalid contract data for listing ${listing.listingId}`);
+                    devLog.warn(`⚠️ [Currency Fix] Invalid contract data for listing ${listing.listingId}`);
                     errors++;
                     continue;
                 }
 
                 const contractCurrency = contractListing.currency?.toLowerCase();
                 if (!contractCurrency) {
-                    console.warn(`⚠️ [Currency Fix] Missing currency in contract data for listing ${listing.listingId}`);
+                    devLog.warn(`⚠️ [Currency Fix] Missing currency in contract data for listing ${listing.listingId}`);
                     errors++;
                     continue;
                 }
@@ -110,16 +111,16 @@ export class CurrencyFixSync {
                         { _id: listing._id },
                         { $set: { currency: contractCurrency } }
                     );
-                    console.log(`✅ [Currency Fix] Updated listing ${listing.listingId} currency to ${contractCurrency}`);
+                    devLog.info(`✅ [Currency Fix] Updated listing ${listing.listingId} currency to ${contractCurrency}`);
                     fixed++;
                 }
             } catch (error) {
-                console.error(`❌ [Currency Fix] Error fixing listing ${listing.listingId}:`, error);
+                devLog.error(`❌ [Currency Fix] Error fixing listing ${listing.listingId}:`, error);
                 errors++;
             }
         }
 
-        console.log(`✅ [Currency Fix] Completed: ${fixed} fixed, ${errors} errors`);
+        devLog.info(`✅ [Currency Fix] Completed: ${fixed} fixed, ${errors} errors`);
         return { fixed, errors };
     }
 
@@ -128,12 +129,12 @@ export class CurrencyFixSync {
      */
     async fixListing(listingId: string): Promise<boolean> {
         if (!this.client) {
-            console.error('❌ [Currency Fix] Client not initialized');
+            devLog.error('❌ [Currency Fix] Client not initialized');
             return false;
         }
 
         try {
-            console.log(`🔧 [Currency Fix] Fixing listing ${listingId}...`);
+            devLog.debug(`🔧 [Currency Fix] Fixing listing ${listingId}...`);
 
             // Read from contract
             const contractListing = await this.client.readContract({
@@ -143,11 +144,11 @@ export class CurrencyFixSync {
                 args: [BigInt(listingId)]
             }) as ListingFromContract;
 
-            console.log(`🔍 [Currency Fix] Contract data:`, contractListing);
+            devLog.debug(`🔍 [Currency Fix] Contract data:`, contractListing);
 
             const contractCurrency = contractListing.currency?.toLowerCase();
             if (!contractCurrency) {
-                console.warn(`⚠️ [Currency Fix] Missing currency in contract data for listing ${listingId}`);
+                devLog.warn(`⚠️ [Currency Fix] Missing currency in contract data for listing ${listingId}`);
                 return false;
             }
 
@@ -157,10 +158,10 @@ export class CurrencyFixSync {
                 { listingId },
                 { $set: { currency: contractCurrency } }
             );
-            console.log(`✅ [Currency Fix] Updated listing ${listingId} currency to ${contractCurrency}`);
+            devLog.info(`✅ [Currency Fix] Updated listing ${listingId} currency to ${contractCurrency}`);
             return true;
         } catch (error) {
-            console.error(`❌ [Currency Fix] Error fixing listing ${listingId}:`, error);
+            devLog.error(`❌ [Currency Fix] Error fixing listing ${listingId}:`, error);
             return false;
         }
     }

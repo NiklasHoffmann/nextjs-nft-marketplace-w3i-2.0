@@ -1,0 +1,12 @@
+[
+  {
+    "name": "My Happy Tent – Weekend Pass (2 Nights)",
+    "description": "Ideal für einen Wochenendtrip. 2 Nächte im fiktiven Netzwerk (Demo/Testnet).",
+    "image": "weekend-pass.png",
+    "attributes": [
+      { "trait_type": "Nights", "value": "2" },
+      { "trait_type": "Tier", "value": "Plus" },
+      { "trait_type": "Best for", "value": "Weekend" }
+    ]
+  }
+]

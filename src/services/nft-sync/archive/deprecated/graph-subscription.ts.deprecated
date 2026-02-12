@@ -16,6 +16,7 @@ import { createClient } from 'graphql-ws';
 import { LISTINGS_UPDATED_SUBSCRIPTION } from '@/config/subgraph/queries';
 import { getEnrichedNFTsCollection } from '@/lib/mongodb';
 import type { EnrichedNFTDocument } from '@/types/marketplace/enriched-nft';
+import { devLog } from '@/utils';
 
 export class GraphQLSubscriptionManager {
     private subscription: any = null;
@@ -32,16 +33,16 @@ export class GraphQLSubscriptionManager {
      */
     async start() {
         if (this.isActive) {
-            console.log('⚠️ GraphQL subscription already active');
+            devLog.warn('⚠️ GraphQL subscription already active');
             return;
         }
 
-        console.log('📡 Starting The Graph subscription...');
+        devLog.info('📡 Starting The Graph subscription...');
 
         try {
             await this.startWebSocketSubscription();
         } catch (error) {
-            console.warn('⚠️ WebSocket subscription failed, falling back to polling:', error);
+            devLog.warn('⚠️ WebSocket subscription failed, falling back to polling:', error);
             await this.startPolling();
         }
     }
@@ -99,7 +100,7 @@ export class GraphQLSubscriptionManager {
                     if (!hasConnected) {
                         reject(error);
                     } else {
-                        console.error('❌ GraphQL subscription error:', error);
+                        devLog.error('❌ GraphQL subscription error:', error);
                         // Switch to polling on connection loss
                         this.startPolling();
                     }
@@ -117,7 +118,7 @@ export class GraphQLSubscriptionManager {
         await subscriptionPromise;
         this.isActive = true;
         this.usingPolling = false;
-        console.log('✅ The Graph WebSocket subscription active');
+        devLog.info('✅ The Graph WebSocket subscription active');
     }
 
     /**
@@ -128,7 +129,7 @@ export class GraphQLSubscriptionManager {
             return; // Already polling
         }
 
-        console.log('🔄 Starting polling mode (30s interval)...');
+        devLog.info('🔄 Starting polling mode (30s interval)...');
 
         const graphUrl = process.env.NEXT_PUBLIC_SUBGRAPH_URL || 'http://localhost:8000/subgraphs/name/nft-marketplace';
 
@@ -175,12 +176,12 @@ export class GraphQLSubscriptionManager {
                 if (result.data?.items) {
                     await this.handleItemsUpdate(result.data.items);
                 } else if (result.errors) {
-                    console.error('❌ GraphQL errors:', result.errors);
+                    devLog.error('❌ GraphQL errors:', result.errors);
                 } else {
-                    console.error('❌ Unexpected response:', result);
+                    devLog.error('❌ Unexpected response:', result);
                 }
             } catch (error) {
-                console.error('❌ Polling error:', error);
+                devLog.error('❌ Polling error:', error);
             }
         };
 
@@ -192,7 +193,7 @@ export class GraphQLSubscriptionManager {
 
         this.isActive = true;
         this.usingPolling = true;
-        console.log('✅ Polling mode active (checking every 30s)');
+        devLog.info('✅ Polling mode active (checking every 30s)');
     }
 
     /**
@@ -211,7 +212,7 @@ export class GraphQLSubscriptionManager {
 
         this.isActive = false;
         this.usingPolling = false;
-        console.log('🛑 The Graph subscription stopped');
+        devLog.info('🛑 The Graph subscription stopped');
     }
 
     /**
@@ -220,7 +221,7 @@ export class GraphQLSubscriptionManager {
     private async handleItemsUpdate(items: any[]) {
         if (!items || items.length === 0) return;
 
-        console.log(`📦 Received ${items.length} items from The Graph`);
+        devLog.info(`📦 Received ${items.length} items from The Graph`);
 
         try {
             const collection = await getEnrichedNFTsCollection();
@@ -232,14 +233,14 @@ export class GraphQLSubscriptionManager {
                 } catch (error) {
                     // Use nftAddress for logging since that's what TheGraph returns
                     const addr = item.contractAddress || item.nftAddress;
-                    console.error(`❌ Error updating NFT ${addr}-${item.tokenId}:`, error);
+                    devLog.error(`❌ Error updating NFT ${addr}-${item.tokenId}:`, error);
                 }
             }
 
             this.lastUpdate = new Date();
-            console.log(`✅ Processed ${items.length} items. Total: ${this.itemsProcessed}`);
+            devLog.info(`✅ Processed ${items.length} items. Total: ${this.itemsProcessed}`);
         } catch (error) {
-            console.error('❌ Error in handleItemsUpdate:', error);
+            devLog.error('❌ Error in handleItemsUpdate:', error);
         }
     }
 
@@ -289,7 +290,7 @@ export class GraphQLSubscriptionManager {
         // marketplace_items now only contains TheGraph data (listing info)
         if (result.upsertedCount > 0) {
             const addr = item.contractAddress || item.nftAddress;
-            console.log(`🆕 New marketplace listing: ${addr}-${item.tokenId} (listingId: ${item.listingId})`);
+            devLog.info(`🆕 New marketplace listing: ${addr}-${item.tokenId} (listingId: ${item.listingId})`);
         }
     }
 

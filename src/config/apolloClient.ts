@@ -15,6 +15,7 @@ import { getMainDefinition } from "@apollo/client/utilities";
 import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { createClient } from "graphql-ws";
 import { persistCache, LocalStorageWrapper } from "apollo3-cache-persist";
+import { devLog } from "@/utils";
 
 // ---- Env defensiv lesen (Next 15: Turbopack) ----
 const HTTP_URL = process.env.NEXT_PUBLIC_SUBGRAPH_URL;
@@ -40,14 +41,14 @@ const errorLink = new ErrorLink((errorResponse) => {
     };
     if (graphQLErrors?.length) {
         for (const err of graphQLErrors) {
-            console.warn(
+            devLog.warn(
                 `[GraphQL error] op=${operation.operationName ?? "unknown"} message=${err.message}`,
                 { path: err.path, extensions: err.extensions }
             );
         }
     }
     if (networkError) {
-        console.warn(`[Network error] op=${operation.operationName ?? "unknown"}:`, networkError);
+        devLog.warn(`[Network error] op=${operation.operationName ?? "unknown"}:`, networkError);
     }
 });
 
@@ -122,7 +123,7 @@ if (isBrowser) {
     persistCache({
         cache,
         storage: new LocalStorageWrapper(window.localStorage),
-    }).catch((err: Error) => console.warn("Cache-Persistenz fehlgeschlagen:", err));
+    }).catch((err: Error) => devLog.warn("Cache-Persistenz fehlgeschlagen:", err));
 }
 
 const defaultOptions: DefaultOptions = {
@@ -143,7 +144,7 @@ const defaultOptions: DefaultOptions = {
 // ---- Factory (nützlich für Tests/SSR-Instanzen) ----
 export function makeApolloClient() {
     if (!HTTP_URL) {
-        console.warn("NEXT_PUBLIC_SUBGRAPH_URL ist nicht gesetzt — Apollo arbeitet ohne Ziel-URL.");
+        devLog.warn("NEXT_PUBLIC_SUBGRAPH_URL ist nicht gesetzt — Apollo arbeitet ohne Ziel-URL.");
     }
     return new ApolloClient({
         link,

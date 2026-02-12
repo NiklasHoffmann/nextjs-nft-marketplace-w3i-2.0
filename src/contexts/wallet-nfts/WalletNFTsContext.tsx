@@ -21,7 +21,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAccount } from 'wagmi';
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 import { WalletNFTsService, type WalletNFT } from './WalletNFTsService';
 import {
     onDataInvalidation,

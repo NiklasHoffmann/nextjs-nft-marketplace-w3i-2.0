@@ -2,8 +2,9 @@
  * Utility functions for formatting data
  */
 
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 import { FormattedPrice } from '@/types';
+import { formatEther as viemFormatEther } from 'viem';
 
 /**
  * Format Wei value to Ether with proper decimals
@@ -13,28 +14,53 @@ export const formatEther = (weiValue: string | bigint): string => {
     try {
         // Convert Wei to ETH (1 ETH = 10^18 Wei)
         const wei = typeof weiValue === 'bigint' ? weiValue : BigInt(weiValue);
+        const formatted = viemFormatEther(wei);
 
-        // Use higher precision calculation
-        const ethValue = Number(wei) / (10 ** 18);
+        const [whole = formatted] = formatted.split('.');
+        if (whole.length > 15) {
+            return formatted;
+        }
+
+        const ethValue = Number(formatted);
 
         // Format with appropriate decimal places
         if (ethValue === 0) {
             return '0';
         } else if (ethValue < 0.0001) {
-            // For very small values, use scientific notation or more decimals
+            // For very small values, use more decimals
             return ethValue.toFixed(8).replace(/\.?0+$/, '');
         } else if (ethValue < 1) {
             // For values less than 1 ETH, show up to 6 decimals
             return ethValue.toFixed(6).replace(/\.?0+$/, '');
-        } else {
-            // For values >= 1 ETH, show up to 4 decimals
-            return ethValue.toFixed(4).replace(/\.?0+$/, '');
         }
+
+        // For values >= 1 ETH, show up to 4 decimals
+        return ethValue.toFixed(4).replace(/\.?0+$/, '');
     } catch (error) {
         devLog.error('formatters', 'Error formatting ether:', error);
         // Return original value as string if conversion fails
         return String(weiValue);
     }
+};
+
+/**
+ * Trim token amounts to a max number of decimals without rounding up.
+ */
+export const formatTokenDisplay = (
+    amount: string | number,
+    decimals: number,
+    maxDecimals: number = 4
+): string => {
+    const safeDecimals = Math.max(0, Math.min(maxDecimals, decimals));
+    const normalized = typeof amount === 'number'
+        ? amount.toFixed(Math.min(6, decimals))
+        : amount;
+
+    if (!normalized.includes('.')) return normalized;
+
+    const [whole = normalized, fraction = ''] = normalized.split('.');
+    const trimmedFraction = fraction.slice(0, safeDecimals).replace(/0+$/, '');
+    return trimmedFraction ? `${whole}.${trimmedFraction}` : whole;
 };
 
 /**

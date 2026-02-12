@@ -90,6 +90,7 @@ export interface EnrichedNFTDocument {
         name: string | null;
         symbol: string | null;
         totalSupply: number | null;
+        contractType?: 'ERC721' | 'ERC1155' | null;
         ownerBalance: number | null;
         approvedAddress: string | null;
         approved?: string | null; // Alias for approvedAddress (API compatibility)
@@ -223,9 +224,9 @@ export interface MarketplaceItemsResponse {
             availableRarities: string[];
             priceRange: { min: string; max: string };
         };
+        timestamp: number;
+        cached: boolean;
     };
-    timestamp: number;
-    cached: boolean;
     error?: string;
 }
 

@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { ProcessedMarketplaceEvent } from '@/types/marketplace/contract-events';
+import { devLog } from '@/utils';
 
 export interface SSEConfig {
     /** Enable SSE connection? (default: true) */
@@ -40,7 +41,7 @@ export function useServerEvents(config: SSEConfig = {}) {
 
     useEffect(() => {
         if (!enabled) {
-            console.log('⏸️ [SSE] Connection disabled');
+            devLog.info('⏸️ [SSE] Connection disabled');
             return;
         }
         
@@ -49,13 +50,13 @@ export function useServerEvents(config: SSEConfig = {}) {
         const connect = () => {
             if (!mounted) return;
             
-            console.log('🔌 [SSE] Connecting to server events...');
+            devLog.info('🔌 [SSE] Connecting to server events...');
             
             const eventSource = new EventSource('/api/events/subscribe');
             eventSourceRef.current = eventSource;
 
             eventSource.onopen = () => {
-                console.log('✅ [SSE] Connected');
+                devLog.info('✅ [SSE] Connected');
                 setIsConnected(true);
                 stableOnConnectionChange(true);
             };
@@ -66,20 +67,20 @@ export function useServerEvents(config: SSEConfig = {}) {
                     
                     // Skip connection confirmation
                     if (data.type === 'connected') {
-                        console.log('🔌 [SSE] Connection confirmed');
+                        devLog.info('🔌 [SSE] Connection confirmed');
                         return;
                     }
 
-                    console.log('📨 [SSE] Event received:', data.eventName);
+                    devLog.info('📨 [SSE] Event received:', data.eventName);
                     setEventsReceived(prev => prev + 1);
                     stableOnEvent(data);
                 } catch (error) {
-                    console.error('❌ [SSE] Failed to parse event:', error);
+                    devLog.error('❌ [SSE] Failed to parse event:', error);
                 }
             };
 
             eventSource.onerror = () => {
-                console.error('❌ [SSE] Connection error');
+                devLog.error('❌ [SSE] Connection error');
                 setIsConnected(false);
                 stableOnConnectionChange(false);
                 eventSource.close();
@@ -87,7 +88,7 @@ export function useServerEvents(config: SSEConfig = {}) {
 
                 // Auto-reconnect after 5s
                 if (autoReconnect && mounted) {
-                    console.log('🔄 [SSE] Reconnecting in 5s...');
+                    devLog.info('🔄 [SSE] Reconnecting in 5s...');
                     reconnectTimeoutRef.current = setTimeout(connect, 5000);
                 }
             };
@@ -98,7 +99,7 @@ export function useServerEvents(config: SSEConfig = {}) {
         return () => {
             mounted = false;
             if (eventSourceRef.current) {
-                console.log('🔌 [SSE] Disconnecting...');
+                devLog.info('🔌 [SSE] Disconnecting...');
                 eventSourceRef.current.close();
                 eventSourceRef.current = null;
             }

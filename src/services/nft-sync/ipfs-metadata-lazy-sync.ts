@@ -10,6 +10,7 @@
  */
 
 import { getCollection } from '@/lib/mongodb';
+import { devLog } from '@/utils';
 
 export interface IPFSMetadata {
     name?: string;
@@ -19,6 +20,11 @@ export interface IPFSMetadata {
     external_url?: string;
     animation_url?: string;
     background_color?: string;
+}
+
+function normalizeErc1155TokenUri(tokenUri: string, tokenId: bigint): string {
+    const hexTokenId = tokenId.toString(16).padStart(64, '0');
+    return tokenUri.replace(/\{id\}/gi, hexTokenId);
 }
 
 export class IPFSMetadataLazySync {
@@ -37,17 +43,18 @@ export class IPFSMetadataLazySync {
             });
 
             if (existing?.metadata) {
-                console.log(`  ✅ Metadata already cached for ${contractAddress}/${tokenId}`);
+                devLog.info(`  ✅ Metadata already cached for ${contractAddress}/${tokenId}`);
                 return existing.metadata as IPFSMetadata;
             }
 
-            console.log(`  📡 Fetching IPFS metadata for ${contractAddress}/${tokenId}...`);
+            devLog.info(`  📡 Fetching IPFS metadata for ${contractAddress}/${tokenId}...`);
 
             // Get tokenURI from blockchain
-            const tokenURI = await this.getTokenURI(contractAddress, tokenId);
+            const tokenUriResult = await this.getTokenURI(contractAddress, tokenId);
+            const tokenURI = tokenUriResult?.tokenURI || null;
 
             if (!tokenURI) {
-                console.warn(`  ⚠️ No tokenURI for ${contractAddress}/${tokenId}`);
+                devLog.warn(`  ⚠️ No tokenURI for ${contractAddress}/${tokenId}`);
                 return null;
             }
 
@@ -55,7 +62,7 @@ export class IPFSMetadataLazySync {
             const metadata = await this.fetchIPFSMetadata(tokenURI);
 
             if (!metadata) {
-                console.warn(`  ⚠️ Could not fetch metadata from ${tokenURI}`);
+                devLog.warn(`  ⚠️ Could not fetch metadata from ${tokenURI}`);
                 return null;
             }
 
@@ -70,6 +77,7 @@ export class IPFSMetadataLazySync {
                         metadata,
                         metadataFetchedAt: new Date(),
                         'contract.tokenURI': tokenURI,
+                        'contract.contractType': tokenUriResult?.tokenStandard || null,
                         updatedAt: new Date()
                     },
                     $setOnInsert: {
@@ -79,12 +87,12 @@ export class IPFSMetadataLazySync {
                 { upsert: true }
             );
 
-            console.log(`  ✅ Metadata stored: ${metadata.name || 'Unnamed NFT'}`);
+            devLog.info(`  ✅ Metadata stored: ${metadata.name || 'Unnamed NFT'}`);
 
             return metadata;
 
         } catch (error) {
-            console.error(`❌ Error fetching metadata for ${contractAddress}/${tokenId}:`, error);
+            devLog.error(`❌ Error fetching metadata for ${contractAddress}/${tokenId}:`, error);
             return null;
         }
     }
@@ -93,7 +101,7 @@ export class IPFSMetadataLazySync {
      * Batch ensure metadata for multiple NFTs
      */
     async ensureBatch(nfts: Array<{ contractAddress: string; tokenId: string }>) {
-        console.log(`🔄 [IPFS Sync] Ensuring metadata for ${nfts.length} NFTs`);
+        devLog.info(`🔄 [IPFS Sync] Ensuring metadata for ${nfts.length} NFTs`);
 
         const BATCH_SIZE = 3; // Process 3 at once (IPFS can be slow)
         const results: Array<{ success: boolean; nft: any; metadata?: IPFSMetadata }> = [];
@@ -120,7 +128,7 @@ export class IPFSMetadataLazySync {
         }
 
         const successCount = results.filter(r => r.success).length;
-        console.log(`✅ [IPFS Sync] Batch complete: ${successCount}/${nfts.length} successful`);
+        devLog.info(`✅ [IPFS Sync] Batch complete: ${successCount}/${nfts.length} successful`);
 
         return results;
     }
@@ -128,7 +136,10 @@ export class IPFSMetadataLazySync {
     /**
      * Get tokenURI from blockchain
      */
-    private async getTokenURI(contractAddress: string, tokenId: string): Promise<string | null> {
+    private async getTokenURI(
+        contractAddress: string,
+        tokenId: string
+    ): Promise<{ tokenURI: string; tokenStandard: 'ERC721' | 'ERC1155' } | null> {
         try {
             const { createPublicClient, http } = await import('viem');
             const { sepolia } = await import('viem/chains');
@@ -148,17 +159,43 @@ export class IPFSMetadataLazySync {
                 }
             ] as const;
 
-            const tokenURI = await client.readContract({
-                address: contractAddress as `0x${string}`,
-                abi: ERC721_ABI,
-                functionName: 'tokenURI',
-                args: [BigInt(tokenId)]
-            });
+            const ERC1155_ABI = [
+                {
+                    name: 'uri',
+                    type: 'function',
+                    stateMutability: 'view',
+                    inputs: [{ name: 'tokenId', type: 'uint256' }],
+                    outputs: [{ name: '', type: 'string' }],
+                }
+            ] as const;
 
-            return tokenURI as string;
+            const tokenIdBigInt = BigInt(tokenId);
+
+            try {
+                const tokenURI = await client.readContract({
+                    address: contractAddress as `0x${string}`,
+                    abi: ERC721_ABI,
+                    functionName: 'tokenURI',
+                    args: [tokenIdBigInt]
+                });
+
+                return { tokenURI: tokenURI as string, tokenStandard: 'ERC721' };
+            } catch (error) {
+                const tokenURI = await client.readContract({
+                    address: contractAddress as `0x${string}`,
+                    abi: ERC1155_ABI,
+                    functionName: 'uri',
+                    args: [tokenIdBigInt]
+                });
+
+                return {
+                    tokenURI: normalizeErc1155TokenUri(tokenURI as string, tokenIdBigInt),
+                    tokenStandard: 'ERC1155'
+                };
+            }
 
         } catch (error) {
-            console.error(`  ❌ Error getting tokenURI:`, error);
+            devLog.error(`  ❌ Error getting tokenURI:`, error);
             return null;
         }
     }
@@ -202,7 +239,7 @@ export class IPFSMetadataLazySync {
             return metadata;
 
         } catch (error) {
-            console.error(`  ❌ Error fetching IPFS metadata from ${tokenURI}:`, error);
+            devLog.error(`  ❌ Error fetching IPFS metadata from ${tokenURI}:`, error);
             return null;
         }
     }

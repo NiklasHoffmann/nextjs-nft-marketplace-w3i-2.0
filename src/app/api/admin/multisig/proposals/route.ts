@@ -7,7 +7,6 @@
 
 import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, parseJsonBody, BadRequestError } from '@/lib/api';
-import { withAdmin } from '@/lib/middleware';
 import clientPromise from '@/lib/mongodb';
 import { MultisigProposal, CreateProposalRequest, ProposalStatus } from '@/types';
 import { randomUUID } from 'crypto';
@@ -17,8 +16,6 @@ import { randomUUID } from 'crypto';
  * Create a new MultiSig proposal
  */
 export const POST = apiHandler(async (request: NextRequest) => {
-    await withAdmin(request);
-
     const body = await parseJsonBody<CreateProposalRequest>(request);
     const {
         type,
@@ -40,7 +37,6 @@ export const POST = apiHandler(async (request: NextRequest) => {
         throw new BadRequestError('requiredConfirmations must be between 1 and 10');
     }
 
-    // @ts-ignore - Injected by withAdmin middleware
     const initiatorAddress = request.userAddress as string;
 
     const now = Date.now();
@@ -76,15 +72,13 @@ export const POST = apiHandler(async (request: NextRequest) => {
         proposal: { ...proposal, _id: result.insertedId.toString() },
         message: 'Proposal created successfully'
     }, 201);
-});
+}, { admin: true });
 
 /**
  * GET /api/admin/multisig/proposals
  * List all proposals with optional filters
  */
 export const GET = apiHandler(async (request: NextRequest) => {
-    await withAdmin(request);
-
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') as ProposalStatus | null;
     const type = searchParams.get('type');
@@ -121,4 +115,4 @@ export const GET = apiHandler(async (request: NextRequest) => {
         confirmed,
         executed
     });
-});
+}, { admin: true });

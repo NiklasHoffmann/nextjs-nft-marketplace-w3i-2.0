@@ -13,6 +13,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
+import { devLog } from '@/utils';
 
 // ===== TYPES =====
 export interface NFTStats {
@@ -208,7 +209,7 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
                     notifyListeners(statsKey);
                 } else {
                     // Bei Error: Setze Default-Werte damit NFT trotzdem angezeigt wird
-                    console.warn(`Stats API error ${res.status} for ${contractAddress}:${tokenId}`);
+                    devLog.warn(`Stats API error ${res.status} for ${contractAddress}:${tokenId}`);
                     const defaultStats: NFTStats = {
                         viewCount: 0,
                         likeCount: 0,
@@ -222,7 +223,7 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
                 }
             } catch (e) {
                 // Bei Netzwerk-Error: Setze Default-Werte damit NFT trotzdem angezeigt wird
-                console.error('Error loading stats:', e);
+                devLog.error('Error loading stats:', e);
                 const defaultStats: NFTStats = {
                     viewCount: 0,
                     likeCount: 0,
@@ -273,7 +274,7 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
                     notifyListeners(interactionsKey);
                 } else {
                     // Bei Error: Setze Default-Werte
-                    console.warn(`Interactions API error ${res.status} for ${contractAddress}:${tokenId}`);
+                    devLog.warn(`Interactions API error ${res.status} for ${contractAddress}:${tokenId}`);
                     const defaultInteractions: UserInteractionState = {
                         isFavorited: false,
                         isWatchlisted: false,
@@ -285,7 +286,7 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
                 }
             } catch (e) {
                 // Bei Netzwerk-Error: Setze Default-Werte
-                console.error('Error loading user interactions:', e);
+                devLog.error('Error loading user interactions:', e);
                 const defaultInteractions: UserInteractionState = {
                     isFavorited: false,
                     isWatchlisted: false,
@@ -334,7 +335,7 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
     // ===== ACTIONS - Jede Action updated den GLOBALEN Cache =====
 
     const updateStatsCache = useCallback((newStats: NFTStats) => {
-        console.log('[NFTStatsContext] updateStatsCache:', { statsKey, newStats });
+        devLog.info('[NFTStatsContext] updateStatsCache:', { statsKey, newStats });
         statsCache.set(statsKey, newStats);
         statsCacheTimestamps.set(statsKey, Date.now()); // Cache-Timestamp aktualisieren
         notifyListeners(statsKey);
@@ -342,7 +343,7 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
 
     const updateInteractionsCache = useCallback((newInteractions: UserInteractionState) => {
         if (interactionsKey) {
-            console.log('[NFTStatsContext] updateInteractionsCache:', { interactionsKey, newInteractions });
+            devLog.info('[NFTStatsContext] updateInteractionsCache:', { interactionsKey, newInteractions });
             interactionsCache.set(interactionsKey, newInteractions);
             interactionsCacheTimestamps.set(interactionsKey, Date.now()); // Cache-Timestamp aktualisieren
             notifyListeners(interactionsKey);
@@ -351,7 +352,7 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
 
     const toggleFavorite = useCallback(async () => {
         if (!userAddress) return;
-        console.log('[NFTStatsContext] toggleFavorite called for:', { contractAddress, tokenId, userAddress });
+        devLog.info('[NFTStatsContext] toggleFavorite called for:', { contractAddress, tokenId, userAddress });
 
         try {
             const res = await fetch('/api/user/interactions', {
@@ -366,17 +367,17 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
             if (!res.ok) {
                 const errorData = await res.json().catch(() => null);
                 const errorMessage = errorData?.error || `Server error: ${res.status} ${res.statusText}`;
-                console.error('❌ toggleFavorite API error:', errorMessage);
+                devLog.error('❌ toggleFavorite API error:', errorMessage);
 
                 // Show user-friendly error
                 if (res.status === 500) {
-                    console.error('💡 Mögliche Ursache: MongoDB Verbindungsproblem. Siehe Server-Logs.');
+                    devLog.error('💡 Mögliche Ursache: MongoDB Verbindungsproblem. Siehe Server-Logs.');
                 }
                 throw new Error(errorMessage);
             }
 
             const result = await res.json();
-            console.log('[NFTStatsContext] toggleFavorite API response:', result);
+            devLog.info('[NFTStatsContext] toggleFavorite API response:', result);
 
             // Stats aktualisieren (API gibt result.data.stats zurück)
             if (result.data?.stats) {
@@ -400,11 +401,11 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
             }
         } catch (e: any) {
             const errorMsg = e?.message || 'Unknown error';
-            console.error('❌ toggleFavorite error:', errorMsg);
+            devLog.error('❌ toggleFavorite error:', errorMsg);
 
             // Network error (server not reachable)
             if (e?.message === 'Failed to fetch' || !navigator.onLine) {
-                console.error('🌐 Netzwerkfehler: Server nicht erreichbar oder offline');
+                devLog.error('🌐 Netzwerkfehler: Server nicht erreichbar oder offline');
             }
 
             // Re-throw to allow UI to handle error
@@ -428,11 +429,11 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
             if (!res.ok) {
                 const errorData = await res.json().catch(() => null);
                 const errorMessage = errorData?.error || `Server error: ${res.status} ${res.statusText}`;
-                console.error('❌ toggleWatchlist API error:', errorMessage);
+                devLog.error('❌ toggleWatchlist API error:', errorMessage);
 
                 // Show user-friendly error
                 if (res.status === 500) {
-                    console.error('💡 Mögliche Ursache: MongoDB Verbindungsproblem. Siehe Server-Logs.');
+                    devLog.error('💡 Mögliche Ursache: MongoDB Verbindungsproblem. Siehe Server-Logs.');
                 }
                 throw new Error(errorMessage);
             }
@@ -464,11 +465,11 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
             }
         } catch (e: any) {
             const errorMsg = e?.message || 'Unknown error';
-            console.error('❌ toggleWatchlist error:', errorMsg);
+            devLog.error('❌ toggleWatchlist error:', errorMsg);
 
             // Network error (server not reachable)
             if (e?.message === 'Failed to fetch' || !navigator.onLine) {
-                console.error('🌐 Netzwerkfehler: Server nicht erreichbar oder offline');
+                devLog.error('🌐 Netzwerkfehler: Server nicht erreichbar oder offline');
             }
 
             // Re-throw to allow UI to handle error
@@ -492,10 +493,10 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
             if (!res.ok) {
                 const errorData = await res.json().catch(() => null);
                 const errorMessage = errorData?.error || `Server error: ${res.status} ${res.statusText}`;
-                console.error('❌ setRating API error:', errorMessage);
+                devLog.error('❌ setRating API error:', errorMessage);
 
                 if (res.status === 500) {
-                    console.error('💡 Mögliche Ursache: MongoDB Verbindungsproblem. Siehe Server-Logs.');
+                    devLog.error('💡 Mögliche Ursache: MongoDB Verbindungsproblem. Siehe Server-Logs.');
                 }
                 throw new Error(errorMessage);
             }
@@ -524,10 +525,10 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
             }
         } catch (e: any) {
             const errorMsg = e?.message || 'Unknown error';
-            console.error('❌ setRating error:', errorMsg);
+            devLog.error('❌ setRating error:', errorMsg);
 
             if (e?.message === 'Failed to fetch' || !navigator.onLine) {
-                console.error('🌐 Netzwerkfehler: Server nicht erreichbar oder offline');
+                devLog.error('🌐 Netzwerkfehler: Server nicht erreichbar oder offline');
             }
 
             throw e;
@@ -550,10 +551,10 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
             if (!res.ok) {
                 const errorData = await res.json().catch(() => null);
                 const errorMessage = errorData?.error || `Server error: ${res.status} ${res.statusText}`;
-                console.error('❌ incrementViews API error:', errorMessage);
+                devLog.error('❌ incrementViews API error:', errorMessage);
 
                 if (res.status === 500) {
-                    console.error('💡 Mögliche Ursache: MongoDB Verbindungsproblem. Siehe Server-Logs.');
+                    devLog.error('💡 Mögliche Ursache: MongoDB Verbindungsproblem. Siehe Server-Logs.');
                 }
                 // Don't throw for view increments - not critical
                 return;
@@ -572,10 +573,10 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
             }
         } catch (e: any) {
             const errorMsg = e?.message || 'Unknown error';
-            console.error('❌ incrementViews error:', errorMsg);
+            devLog.error('❌ incrementViews error:', errorMsg);
 
             if (e?.message === 'Failed to fetch' || !navigator.onLine) {
-                console.error('🌐 Netzwerkfehler: Server nicht erreichbar oder offline');
+                devLog.error('🌐 Netzwerkfehler: Server nicht erreichbar oder offline');
             }
             // Don't throw for view increments - not critical
         }
@@ -596,7 +597,7 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
                 });
             }
         } catch (e) {
-            console.error('refresh error:', e);
+            devLog.error('refresh error:', e);
         }
     }, [contractAddress, tokenId, updateStatsCache]);
 

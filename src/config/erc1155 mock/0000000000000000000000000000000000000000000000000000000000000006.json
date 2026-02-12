@@ -1,0 +1,12 @@
+[
+  {
+    "name": "My Happy Tent – Season Pass (10 Nights)",
+    "description": "Best Value Bundle: 10 Nächte (fiktiv) für Vielcamper (Demo/Testnet).",
+    "image": "season-pass.png",
+    "attributes": [
+      { "trait_type": "Nights", "value": "10" },
+      { "trait_type": "Tier", "value": "Season" },
+      { "trait_type": "Value", "value": "Best" }
+    ]
+  }
+]

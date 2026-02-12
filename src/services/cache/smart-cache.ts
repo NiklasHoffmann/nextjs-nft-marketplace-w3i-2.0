@@ -70,6 +70,7 @@ export interface TokenMetadata {
     contractAddress: string;
     tokenId: string;
     tokenURI?: string;
+    tokenStandard?: 'ERC721' | 'ERC1155';
     metadata?: any;
     imageUrl?: string;
     cached: boolean;

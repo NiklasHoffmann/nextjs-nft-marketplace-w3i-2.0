@@ -3,7 +3,7 @@
  * 
  * Uses new standardized API infrastructure:
  * - apiHandler wrapper for error handling
- * - withAdmin middleware for authentication ✅
+ * - admin option for authentication ✅
  * - Custom error classes
  * - Type-safe responses
  * 
@@ -17,10 +17,13 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
-import { apiHandler } from '@/lib/api/handler';
-import { withAdmin } from '@/lib/middleware';
-import { apiBadRequest, apiNotFound, apiSuccess } from '@/lib/api/responses';
-import type { NFTProjectDescriptions, NFTFunctionalitiesDescriptions } from '@/types/features/nft-insights';
+import { apiHandler } from '@/lib/api';
+import { apiBadRequest, apiNotFound, apiSuccess } from '@/lib/api';
+import type {
+  NFTProjectDescriptions,
+  NFTFunctionalitiesDescriptions,
+  TitleDescriptionPair
+} from '@/types/features/nft-insights';
 
 // ===== TYPES =====
 
@@ -49,7 +52,54 @@ interface AdminNFTInsight {
   updatedAt: string;
 }
 
+type RawTitleDescriptionPair = Omit<TitleDescriptionPair, 'createdAt' | 'updatedAt'> & {
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+};
+
+type RawProjectDescriptions = Omit<NFTProjectDescriptions, 'titleDescriptionPairs'> & {
+  titleDescriptionPairs: RawTitleDescriptionPair[];
+};
+
+type RawFunctionalitiesDescriptions = Omit<NFTFunctionalitiesDescriptions, 'titleDescriptionPairs'> & {
+  titleDescriptionPairs: RawTitleDescriptionPair[];
+};
+
+function normalizeDescriptions(value?: RawProjectDescriptions): NFTProjectDescriptions | undefined;
+function normalizeDescriptions(value?: RawFunctionalitiesDescriptions): NFTFunctionalitiesDescriptions | undefined;
+function normalizeDescriptions(
+  value?: RawProjectDescriptions | RawFunctionalitiesDescriptions
+): NFTProjectDescriptions | NFTFunctionalitiesDescriptions | undefined {
+  if (!value) return value;
+
+  return {
+    ...value,
+    titleDescriptionPairs: value.titleDescriptionPairs.map((pair) => ({
+      ...pair,
+      createdAt: typeof pair.createdAt === 'string' ? new Date(pair.createdAt) : pair.createdAt,
+      updatedAt: typeof pair.updatedAt === 'string' ? new Date(pair.updatedAt) : pair.updatedAt
+    }))
+  };
+}
+
 // ===== VALIDATION SCHEMAS =====
+
+const titleDescriptionPairSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().optional().default(''),
+  descriptions: z.array(z.string()).optional().default([]),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+
+const projectDescriptionsSchema = z.object({
+  titleDescriptionPairs: z.array(titleDescriptionPairSchema).default([]),
+  legacyDescriptions: z.array(z.string()).optional(),
+});
+
+const functionalitiesDescriptionsSchema = z.object({
+  titleDescriptionPairs: z.array(titleDescriptionPairSchema).optional().default([]),
+});
 
 const createInsightSchema = z.object({
   contractAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid contract address'),
@@ -58,9 +108,9 @@ const createInsightSchema = z.object({
   title: z.string().optional(),
   description: z.string().optional(),
   descriptions: z.array(z.string()).optional(),
-  projectDescriptions: z.any().optional(), // TODO: Add proper schema
-  functionalitiesDescriptions: z.any().optional(),
-  specificDescriptions: z.any().optional(),
+  projectDescriptions: projectDescriptionsSchema.optional(),
+  functionalitiesDescriptions: functionalitiesDescriptionsSchema.optional(),
+  specificDescriptions: projectDescriptionsSchema.optional(),
   cardDescriptions: z.array(z.string()).optional(),
   category: z.string().optional(),
   tags: z.array(z.string()).optional(),
@@ -88,11 +138,7 @@ const deleteInsightSchema = z.object({
  * Create new NFT insight (ADMIN ONLY - Auto-authenticated)
  */
 export const POST = apiHandler(async (req: NextRequest) => {
-  // Apply admin middleware for authentication
-  await withAdmin(req);
-
   // Get authenticated admin address
-  // @ts-ignore - added by withAdmin middleware
   const adminAddress = req.userAddress as string;
 
   // Parse and validate request body
@@ -105,6 +151,9 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
   const data = parseResult.data;
   const collection = await getCollection('admin_nft_insights');
+  const projectDescriptions = normalizeDescriptions(data.projectDescriptions);
+  const functionalitiesDescriptions = normalizeDescriptions(data.functionalitiesDescriptions);
+  const specificDescriptions = normalizeDescriptions(data.specificDescriptions || data.projectDescriptions);
 
   const insight: Omit<AdminNFTInsight, '_id'> = {
     contractAddress: data.contractAddress.toLowerCase(),
@@ -113,9 +162,9 @@ export const POST = apiHandler(async (req: NextRequest) => {
     title: data.title || data.customTitle || '',
     description: data.description,
     descriptions: data.descriptions || [],
-    projectDescriptions: data.projectDescriptions,
-    functionalitiesDescriptions: data.functionalitiesDescriptions,
-    specificDescriptions: data.specificDescriptions || data.projectDescriptions,
+    projectDescriptions,
+    functionalitiesDescriptions,
+    specificDescriptions,
     cardDescriptions: data.cardDescriptions || [],
     category: data.category,
     tags: data.tags || [],
@@ -146,16 +195,13 @@ export const POST = apiHandler(async (req: NextRequest) => {
     _id: result.insertedId.toString(),
     ...insight,
   });
-});
+}, { admin: true });
 
 /**
  * PUT /api/nft/admin/insights
  * Update existing NFT insight (ADMIN ONLY - Auto-authenticated)
  */
 export const PUT = apiHandler(async (req: NextRequest) => {
-  // Apply admin middleware for authentication
-  await withAdmin(req);
-
   // Parse and validate request body
   const body = await req.json();
   const parseResult = updateInsightSchema.safeParse(body);
@@ -166,6 +212,9 @@ export const PUT = apiHandler(async (req: NextRequest) => {
 
   const data = parseResult.data;
   const collection = await getCollection('admin_nft_insights');
+  const projectDescriptions = normalizeDescriptions(data.projectDescriptions);
+  const functionalitiesDescriptions = normalizeDescriptions(data.functionalitiesDescriptions);
+  const specificDescriptions = normalizeDescriptions(data.specificDescriptions || data.projectDescriptions);
 
   const { _id, ...updateData } = data;
 
@@ -178,6 +227,9 @@ export const PUT = apiHandler(async (req: NextRequest) => {
   // Prepare update
   const update: Partial<AdminNFTInsight> = {
     ...updateData,
+    projectDescriptions,
+    functionalitiesDescriptions,
+    specificDescriptions,
     updatedAt: new Date().toISOString(),
   };
 
@@ -205,16 +257,13 @@ export const PUT = apiHandler(async (req: NextRequest) => {
   }
 
   return apiSuccess(result);
-});
+}, { admin: true });
 
 /**
  * DELETE /api/nft/admin/insights
  * Delete NFT insight (ADMIN ONLY - Auto-authenticated)
  */
 export const DELETE = apiHandler(async (req: NextRequest) => {
-  // Apply admin middleware for authentication
-  await withAdmin(req);
-
   // Parse query parameters for DELETE
   const { searchParams } = new URL(req.url);
   const contractAddress = searchParams.get('contractAddress');
@@ -242,4 +291,4 @@ export const DELETE = apiHandler(async (req: NextRequest) => {
   }
 
   return apiSuccess({ deleted: true });
-});
+}, { admin: true });

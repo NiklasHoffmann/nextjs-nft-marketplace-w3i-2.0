@@ -1,4 +1,4 @@
-﻿import { devLog } from '@/utils/devLog';
+﻿import { devLog } from '@/utils';
 import type {
     AggregatedNFT,
     NFTIdentifier,

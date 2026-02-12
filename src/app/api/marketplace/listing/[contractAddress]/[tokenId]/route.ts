@@ -9,6 +9,7 @@ import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, BadRequestError } from '@/lib/api';
 import { ApolloClient, InMemoryCache } from '@apollo/client';
 import { GET_LISTINGS_BY_NFT } from '@/config/subgraph/queries';
+import { devLog } from '@/utils';
 
 interface RouteParams {
   params: Promise<{
@@ -59,7 +60,7 @@ export async function GET(
     });
 
     if (error) {
-      console.error('❌ TheGraph query error:', error);
+      devLog.error('❌ TheGraph query error:', error);
       throw new Error(`Failed to fetch marketplace data: ${error.message}`);
     }
 

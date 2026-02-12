@@ -12,6 +12,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { useMarketplaceEvents } from '@/hooks';
+import { devLog } from '@/utils';
 import type {
     ProcessedItemListedEvent,
     ProcessedItemBoughtEvent,
@@ -59,42 +60,42 @@ export function MarketplaceEventsProvider({ children }: { children: React.ReactN
     const { isConnected, eventsReceived, lastEventAt } = useMarketplaceEvents({
         autoStart: true,
         onItemListed: (event) => {
-            console.log('📡 [EventContext] ItemListed:', event.data.listingId);
+            devLog.info('📡 [EventContext] ItemListed:', event.data.listingId);
             setLastEvent(event);
             notifySubscribers('ItemListed', event);
         },
         onItemBought: (event) => {
-            console.log('📡 [EventContext] ItemBought:', event.data.listingId);
+            devLog.info('📡 [EventContext] ItemBought:', event.data.listingId);
             setLastEvent(event);
             notifySubscribers('ItemBought', event);
         },
         onItemCanceled: (event) => {
-            console.log('📡 [EventContext] ItemCanceled:', event.data.listingId);
+            devLog.info('📡 [EventContext] ItemCanceled:', event.data.listingId);
             setLastEvent(event);
             notifySubscribers('ItemCanceled', event);
         },
         onItemUpdated: (event) => {
-            console.log('📡 [EventContext] ItemUpdated:', event.data.listingId);
+            devLog.info('📡 [EventContext] ItemUpdated:', event.data.listingId);
             setLastEvent(event);
             notifySubscribers('ItemUpdated', event);
         },
         onListingCanceledDueToInvalidListing: (event) => {
-            console.log('📡 [EventContext] ListingCanceledDueToInvalidListing:', event.data.listingId);
+            devLog.info('📡 [EventContext] ListingCanceledDueToInvalidListing:', event.data.listingId);
             setLastEvent(event);
             notifySubscribers('ListingCanceledDueToInvalidListing', event);
         },
         onCollectionWhitelistRevokedCancelTriggered: (event) => {
-            console.log('📡 [EventContext] CollectionWhitelistRevokedCancelTriggered:', event.data.listingId);
+            devLog.info('📡 [EventContext] CollectionWhitelistRevokedCancelTriggered:', event.data.listingId);
             setLastEvent(event);
             notifySubscribers('CollectionWhitelistRevokedCancelTriggered', event);
         },
         onBuyerWhitelisted: (event) => {
-            console.log('📡 [EventContext] BuyerWhitelisted:', event.data.listingId);
+            devLog.info('📡 [EventContext] BuyerWhitelisted:', event.data.listingId);
             setLastEvent(event);
             notifySubscribers('BuyerWhitelisted', event);
         },
         onBuyerRemovedFromWhitelist: (event) => {
-            console.log('📡 [EventContext] BuyerRemovedFromWhitelist:', event.data.listingId);
+            devLog.info('📡 [EventContext] BuyerRemovedFromWhitelist:', event.data.listingId);
             setLastEvent(event);
             notifySubscribers('BuyerRemovedFromWhitelist', event);
         }

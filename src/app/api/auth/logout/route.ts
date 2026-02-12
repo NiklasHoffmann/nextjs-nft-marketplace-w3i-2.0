@@ -8,7 +8,13 @@ import { cookies } from 'next/headers';
  */
 export const POST = apiHandler(async (request: NextRequest) => {
     const cookieStore = await cookies();
-    cookieStore.delete('admin-session');
+    cookieStore.set('admin-session', '', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 0,
+        path: '/',
+    });
 
     return apiSuccess({
         message: 'Logged out successfully'

@@ -21,8 +21,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { ApiError } from './errors';
-import { createErrorResponse } from './responses';
+import { ApiError, RateLimitError } from './errors';
+import { apiTooManyRequests, createErrorResponse } from './responses';
+import { logger } from '../logger';
+import { rateLimit, RATE_LIMIT_CONFIG, type RateLimitConfig } from '../middleware/rateLimit';
 
 export type ApiHandler<T = any> = (req: NextRequest) => Promise<NextResponse<T> | NextResponse>;
 
@@ -43,6 +45,11 @@ export interface ApiHandlerOptions {
      * Require admin authentication (adds withAdmin middleware)
      */
     admin?: boolean;
+
+    /**
+     * Rate limit configuration (default: lenient). Set to false to disable.
+     */
+    rateLimit?: RateLimitConfig | false;
 
     /**
      * Enable CORS for this route
@@ -72,6 +79,7 @@ export function apiHandler<T = any>(
         admin = false,
         cors = false,
         logging = process.env.NODE_ENV === 'development',
+        rateLimit: rateLimitConfig = RATE_LIMIT_CONFIG.LENIENT,
     } = options;
 
     return async (req: NextRequest): Promise<NextResponse<T>> => {
@@ -80,20 +88,31 @@ export function apiHandler<T = any>(
         try {
             // Logging
             if (logging) {
-                console.log(`[API] ${req.method} ${req.nextUrl.pathname}`);
+                logger.info({
+                    method: req.method,
+                    path: req.nextUrl.pathname,
+                }, 'api request');
             }
 
             // Build middleware chain
-            const middlewareChain = [...middleware];
+            const middlewareChain: Middleware[] = [];
 
             // Auto-add auth/admin middleware
             if (admin) {
                 const { withAdmin } = await import('../middleware/auth');
-                middlewareChain.unshift(withAdmin);
+                middlewareChain.push(withAdmin);
             } else if (auth) {
                 const { withAuth } = await import('../middleware/auth');
-                middlewareChain.unshift(withAuth);
+                middlewareChain.push(withAuth);
             }
+
+            if (rateLimitConfig !== false) {
+                middlewareChain.push(async (request) => {
+                    await rateLimit(request, rateLimitConfig);
+                });
+            }
+
+            middlewareChain.push(...middleware);
 
             // Run middleware
             for (const mw of middlewareChain) {
@@ -115,7 +134,12 @@ export function apiHandler<T = any>(
             // Log success
             if (logging) {
                 const duration = Date.now() - startTime;
-                console.log(`[API] ${req.method} ${req.nextUrl.pathname} - ${response.status} (${duration}ms)`);
+                logger.info({
+                    method: req.method,
+                    path: req.nextUrl.pathname,
+                    status: response.status,
+                    durationMs: duration,
+                }, 'api response');
             }
 
             return response as any;
@@ -123,7 +147,17 @@ export function apiHandler<T = any>(
             // Log error
             if (logging) {
                 const duration = Date.now() - startTime;
-                console.error(`[API] ${req.method} ${req.nextUrl.pathname} - Error (${duration}ms):`, error);
+                logger.error({
+                    method: req.method,
+                    path: req.nextUrl.pathname,
+                    durationMs: duration,
+                    error,
+                }, 'api error');
+            }
+
+            // Handle RateLimitError explicitly for Retry-After header
+            if (error instanceof RateLimitError) {
+                return apiTooManyRequests(error.message, error.retryAfter) as any;
             }
 
             // Handle ApiError instances
@@ -132,7 +166,7 @@ export function apiHandler<T = any>(
             }
 
             // Handle unknown errors
-            console.error('Unexpected API error:', error);
+            logger.error({ error }, 'unexpected api error');
             return createErrorResponse(
                 'An unexpected error occurred',
                 500,

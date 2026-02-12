@@ -54,11 +54,12 @@ export const RATE_LIMITS = {
  * Standard key generator: IP + User-Agent
  */
 function getDefaultKey(request: NextRequest): string {
-    const ip = request.headers.get('x-forwarded-for') ||
-        request.headers.get('x-real-ip') ||
+    const headers = request.headers;
+    const ip = headers?.get('x-forwarded-for') ||
+        headers?.get('x-real-ip') ||
         'unknown';
 
-    const userAgent = request.headers.get('user-agent') || 'unknown';
+    const userAgent = headers?.get('user-agent') || 'unknown';
     return `${ip}-${userAgent}`;
 }
 
@@ -97,7 +98,8 @@ export async function rateLimit(
     if (entry.count > config.maxRequests) {
         const resetIn = Math.ceil((entry.resetTime - now) / 1000);
         throw new RateLimitError(
-            `Rate limit exceeded. Try again in ${resetIn} seconds.`
+            `Rate limit exceeded. Try again in ${resetIn} seconds.`,
+            resetIn
         );
     }
 }

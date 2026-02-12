@@ -13,7 +13,7 @@
  * - After The Graph update: invalidateAll()
  */
 
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 
 // Event types for cross-context communication
 export type InvalidationType =

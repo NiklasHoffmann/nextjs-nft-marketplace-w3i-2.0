@@ -52,6 +52,7 @@
 
 import { useState, useCallback, useRef, useMemo } from 'react';
 import { z } from 'zod';
+import { devLog } from '@/utils';
 
 // ===== TYPES =====
 
@@ -270,7 +271,7 @@ export function useForm<T extends Record<string, any>>({
         const isValid = await validateForm();
 
         if (!isValid) {
-            console.log('❌ Form validation failed:', errors);
+            devLog.log('❌ Form validation failed:', errors);
             return;
         }
 
@@ -284,7 +285,7 @@ export function useForm<T extends Record<string, any>>({
                     reset();
                 }
             } catch (error) {
-                console.error('❌ Form submission failed:', error);
+                devLog.error('❌ Form submission failed:', error);
                 // Don't reset on error
             } finally {
                 setIsSubmitting(false);

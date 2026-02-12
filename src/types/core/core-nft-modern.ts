@@ -87,6 +87,8 @@ export type AggregatedNFT = {
     tokenId: string
     listed: boolean
     listing?: ActiveItem
+    tokenStandard?: 'ERC721' | 'ERC1155'
+    balance?: string
     core: NftCore
     meta?: NftMeta
     social?: SocialStats

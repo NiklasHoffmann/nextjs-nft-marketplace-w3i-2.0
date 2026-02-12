@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, getQueryParam } from '@/lib/api';
 import { getCollection } from '@/lib/mongodb';
+import { devLog } from '@/utils';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -17,7 +18,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
     const sortBy = getQueryParam(request, 'sortBy') || 'itemCount';
     const sortOrder = getQueryParam(request, 'sortOrder') === 'asc' ? 1 : -1;
 
-    console.log('🔍 [Collections API] Aggregating from marketplace_items...');
+    devLog.debug('🔍 [Collections API] Aggregating from marketplace_items...');
     const startTime = Date.now();
 
     try {
@@ -74,7 +75,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
         const collections = await marketplaceItems.aggregate(pipeline).toArray();
 
         const fetchTime = Date.now() - startTime;
-        console.log(`✅ [Collections API] Aggregated ${collections.length} collections in ${fetchTime}ms`);
+        devLog.debug(`✅ [Collections API] Aggregated ${collections.length} collections in ${fetchTime}ms`);
 
         // Get metadata for collections (from nft_metadata) - get multiple images per collection
         const nftMetadata = await getCollection('nft_metadata');
@@ -211,8 +212,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
         });
 
         const totalTime = Date.now() - startTime;
-        console.log(`📊 [Collections API] Total processing time: ${totalTime}ms`);
-        console.log(`📸 [Collections API] Preview images loaded for ${transformedCollections.filter((c: any) => c.previewImages.length > 0).length} collections`);
+        devLog.debug(`📊 [Collections API] Total processing time: ${totalTime}ms`);
+        devLog.debug(`📸 [Collections API] Preview images loaded for ${transformedCollections.filter((c: any) => c.previewImages.length > 0).length} collections`);
 
         const response = apiSuccess({
             collections: transformedCollections,
@@ -222,18 +223,18 @@ export const GET = apiHandler(async (request: NextRequest) => {
         response.headers.set('Cache-Control', 'no-store, max-age=0');
         return response;
     } catch (error: any) {
-        console.error('❌ [Collections API] Error:', error);
+        devLog.error('❌ [Collections API] Error:', error);
 
         // Check for MongoDB connection errors with helpful messages
         if (error.isMongoError || error.name === 'MongoConnectionError') {
-            console.error('\n' + error.userMessage + '\n');
+            devLog.error('\n' + error.userMessage + '\n');
             throw new Error('MongoDB Verbindung fehlgeschlagen. Siehe Server-Logs für Details. Häufigste Ursache: IP nicht in MongoDB Atlas Whitelist.');
         }
 
         if (error.name === 'MongoServerError' || error.reason?.type === 'ReplicaSetNoPrimary') {
-            console.error('\n🚫 MONGODB VERBINDUNGSFEHLER - IP WHITELIST PRÜFEN!\n');
-            console.error('1. https://cloud.mongodb.com → Network Access');
-            console.error('2. Add IP Address → Aktuelle IP hinzufügen\n');
+            devLog.error('\n🚫 MONGODB VERBINDUNGSFEHLER - IP WHITELIST PRÜFEN!\n');
+            devLog.error('1. https://cloud.mongodb.com → Network Access');
+            devLog.error('2. Add IP Address → Aktuelle IP hinzufügen\n');
             throw new Error('MongoDB Verbindung fehlgeschlagen. LÖSUNG: IP-Adresse in MongoDB Atlas Network Access hinzufügen!');
         }
 

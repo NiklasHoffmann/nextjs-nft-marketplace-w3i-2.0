@@ -10,6 +10,7 @@ import { getCollection } from '@/lib/mongodb';
 import { apiSuccess, apiError } from '@/lib/api';
 import { createPublicClient, http } from 'viem';
 import { sepolia } from 'viem/chains';
+import { devLog } from '@/utils';
 
 const ERC721_ABI = [
     {
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
 
         const lowerContractAddress = contractAddress.toLowerCase();
 
-        console.log(`🔄 [Update Owner] Fetching real owner from blockchain for ${lowerContractAddress}/${tokenId}`);
+        devLog.info(`🔄 [Update Owner] Fetching real owner from blockchain for ${lowerContractAddress}/${tokenId}`);
 
         // Fetch REAL owner from blockchain
         const client = createPublicClient({
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
 
         const lowerOwner = (owner as string).toLowerCase();
 
-        console.log(`📡 [Update Owner] Blockchain says owner is: ${lowerOwner}`);
+        devLog.info(`📡 [Update Owner] Blockchain says owner is: ${lowerOwner}`);
 
         // Update nft_metadata collection with REAL owner from blockchain
         const nftMetadataCollection = await getCollection('nft_metadata');
@@ -73,9 +74,9 @@ export async function POST(request: NextRequest) {
         );
 
         if (result.matchedCount > 0) {
-            console.log(`✅ [Update Owner] Updated existing NFT document with blockchain owner`);
+            devLog.info(`✅ [Update Owner] Updated existing NFT document with blockchain owner`);
         } else if (result.upsertedCount > 0) {
-            console.log(`✅ [Update Owner] Created new NFT document with blockchain owner`);
+            devLog.info(`✅ [Update Owner] Created new NFT document with blockchain owner`);
         }
 
         return apiSuccess({
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
         });
 
     } catch (error) {
-        console.error('❌ [Update Owner] Error:', error);
+        devLog.error('❌ [Update Owner] Error:', error);
         return apiError(
             error instanceof Error ? error.message : 'Failed to update NFT ownership',
             500

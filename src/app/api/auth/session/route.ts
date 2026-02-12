@@ -1,9 +1,10 @@
 ﻿import { NextRequest } from 'next/server';
-import { apiHandler, apiSuccess, UnauthorizedError } from '@/lib/api';
+import { apiHandler, apiSuccess, UnauthorizedError, InternalError } from '@/lib/api';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
+import { devLog } from '@/utils';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -13,6 +14,9 @@ export const revalidate = 0;
  */
 function verifyToken(token: string): any | null {
     try {
+        if (!JWT_SECRET) {
+            return null;
+        }
         const parts = token.split('.');
         if (parts.length !== 3) return null;
 
@@ -51,16 +55,19 @@ function verifyToken(token: string): any | null {
  * Prüft ob eine gültige Admin-Session existiert
  */
 export const GET = apiHandler(async (request: NextRequest) => {
+    if (!JWT_SECRET) {
+        throw new InternalError('JWT_SECRET is not configured');
+    }
     const cookieStore = await cookies();
     const token = cookieStore.get('admin-session')?.value;
 
-    console.log('🔍 Session check:', {
+    devLog.info('🔍 Session check:', {
         hasCookie: !!token,
         cookieName: 'admin-session'
     });
 
     if (!token) {
-        console.log('❌ No session cookie found');
+        devLog.info('❌ No session cookie found');
         const response = apiSuccess({
             isAuthenticated: false
         });
@@ -70,14 +77,14 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
     const payload = verifyToken(token);
 
-    console.log('🔐 Token verification:', {
+    devLog.info('🔐 Token verification:', {
         isValid: !!payload,
         hasAdmin: payload?.isAdmin,
         address: payload?.address
     });
 
-    if (!payload || !payload.isAdmin) {
-        console.log('❌ Invalid token or not admin');
+    if (!payload || !payload.isAdmin || typeof payload.address !== 'string') {
+        devLog.info('❌ Invalid token or not admin');
         const response = apiSuccess({
             isAuthenticated: false
         });
@@ -85,11 +92,13 @@ export const GET = apiHandler(async (request: NextRequest) => {
         return response;
     }
 
-    console.log('✅ Session valid for:', payload.address);
+    const normalizedAddress = payload.address.toLowerCase();
+    devLog.info('✅ Session valid for:', normalizedAddress);
     const response = apiSuccess({
         isAuthenticated: true,
-        address: payload.address,
-        isAdmin: payload.isAdmin
+        address: normalizedAddress,
+        isAdmin: payload.isAdmin,
+        expiresAt: payload.exp ?? null
     });
     response.headers.set('Cache-Control', 'no-store, max-age=0');
     return response;

@@ -20,6 +20,7 @@ import { apiHandler, apiSuccess, getQueryParam, BadRequestError } from '@/lib/ap
 import { getCollection } from '@/lib/mongodb';
 import { blockchainStateSync } from '@/services/nft-sync/blockchain-state-sync';
 import { ipfsMetadataLazySync } from '@/services/nft-sync/ipfs-metadata-lazy-sync';
+import { devLog } from '@/utils';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -49,10 +50,10 @@ export const GET = apiHandler(async (request: NextRequest) => {
         (Date.now() - nft.blockchain.lastSyncedAt.getTime() > BLOCKCHAIN_CACHE_TTL);
 
     if (blockchainStale) {
-        console.log(`🔄 [NFT Detail] Blockchain state stale, syncing...`);
-        console.log(`   Contract: ${contractAddress}`);
-        console.log(`   TokenId: ${tokenId}`);
-        console.log(`   Reason: ${!nft ? 'NFT not in DB' : forceRefresh ? 'Force refresh' : !nft.blockchain?.lastSyncedAt ? 'Never synced' : 'Stale (>5min)'}`);
+        devLog.info(`🔄 [NFT Detail] Blockchain state stale, syncing...`);
+        devLog.info(`   Contract: ${contractAddress}`);
+        devLog.info(`   TokenId: ${tokenId}`);
+        devLog.info(`   Reason: ${!nft ? 'NFT not in DB' : forceRefresh ? 'Force refresh' : !nft.blockchain?.lastSyncedAt ? 'Never synced' : 'Stale (>5min)'}`);
 
         await blockchainStateSync.syncNFTState(
             contractAddress,
@@ -63,17 +64,17 @@ export const GET = apiHandler(async (request: NextRequest) => {
         // Refetch after sync
         nft = await nftMetadata.findOne({ contractAddress: normalizedAddress, tokenId });
 
-        console.log(`   ✅ After sync - approved: ${nft?.blockchain?.approved || 'NULL'}`);
-        console.log(`   ✅ After sync - isApprovedForAll: ${nft?.blockchain?.isApprovedForAll || false}`);
+        devLog.info(`   ✅ After sync - approved: ${nft?.blockchain?.approved || 'NULL'}`);
+        devLog.info(`   ✅ After sync - isApprovedForAll: ${nft?.blockchain?.isApprovedForAll || false}`);
     } else if (nft?.blockchain) {
-        console.log(`✅ [NFT Detail] Using cached blockchain state (age: ${Math.round((Date.now() - nft.blockchain.lastSyncedAt.getTime()) / 1000)}s)`);
-        console.log(`   Approved: ${nft.blockchain.approved || 'NULL'}`);
-        console.log(`   IsApprovedForAll: ${nft.blockchain.isApprovedForAll || false}`);
+        devLog.info(`✅ [NFT Detail] Using cached blockchain state (age: ${Math.round((Date.now() - nft.blockchain.lastSyncedAt.getTime()) / 1000)}s)`);
+        devLog.info(`   Approved: ${nft.blockchain.approved || 'NULL'}`);
+        devLog.info(`   IsApprovedForAll: ${nft.blockchain.isApprovedForAll || false}`);
     }
 
     // Step 3: Lazy-load IPFS metadata if missing
     if (!nft?.metadata?.name) {
-        console.log(`📡 [NFT Detail] IPFS metadata missing, lazy-loading...`);
+        devLog.info(`📡 [NFT Detail] IPFS metadata missing, lazy-loading...`);
         await ipfsMetadataLazySync.ensureMetadata(contractAddress, tokenId);
         // Refetch after metadata fetch
         nft = await nftMetadata.findOne({ contractAddress: normalizedAddress, tokenId });

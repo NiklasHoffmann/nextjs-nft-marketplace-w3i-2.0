@@ -1,0 +1,12 @@
+[
+  {
+    "name": "My Happy Tent – Family Pass (3 Nights)",
+    "description": "Family Bundle: 3 Nächte (fiktiv) für Familienreisen (Demo/Testnet).",
+    "image": "family-pass.png",
+    "attributes": [
+      { "trait_type": "Nights", "value": "3" },
+      { "trait_type": "Tier", "value": "Family" },
+      { "trait_type": "Capacity", "value": "2 Adults + Kids" }
+    ]
+  }
+]

@@ -12,7 +12,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAccount, useChainId } from 'wagmi';
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 import { SyncQueue } from '@/utils/SyncQueue';
 import { useContextDevtools } from '@/hooks/useContextDevtools';
 import type { ActiveItem } from '@/types';

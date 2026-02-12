@@ -4,6 +4,8 @@
  * Manages SSE connections and broadcasts events to all connected clients.
  */
 
+import { devLog } from '@/utils';
+
 // Store all active SSE connections
 const connections = new Set<ReadableStreamDefaultController>();
 
@@ -16,7 +18,7 @@ const MIN_BROADCAST_INTERVAL = 100; // ms - prevents spam
  */
 export function addConnection(controller: ReadableStreamDefaultController): void {
     connections.add(controller);
-    console.log(`✅ [SSE] Client connected (${connections.size} total)`);
+    devLog.info(`[SSE] Client connected (${connections.size} total)`);
 }
 
 /**
@@ -24,7 +26,7 @@ export function addConnection(controller: ReadableStreamDefaultController): void
  */
 export function removeConnection(controller: ReadableStreamDefaultController): void {
     connections.delete(controller);
-    console.log(`🔌 [SSE] Client disconnected (${connections.size} remaining)`);
+    devLog.info(`[SSE] Client disconnected (${connections.size} remaining)`);
 }
 
 /**
@@ -43,7 +45,7 @@ export function broadcastMarketplaceEvent(event: any): void {
     
     // Rate limiting check
     if (now - lastBroadcast < MIN_BROADCAST_INTERVAL) {
-        console.log(`⏱️ [SSE] Rate limit - skipping broadcast (too soon after last)`);
+        devLog.debug('[SSE] Rate limit - skipping broadcast (too soon after last)');
         return;
     }
     
@@ -60,14 +62,14 @@ export function broadcastMarketplaceEvent(event: any): void {
             controller.enqueue(new TextEncoder().encode(message));
             successCount++;
         } catch (error) {
-            console.error('❌ [SSE] Failed to send to client:', error);
+            devLog.error('[SSE] Failed to send to client:', error);
             connections.delete(controller);
             failCount++;
         }
     });
-    
-    console.log(`📡 [SSE] Broadcasted to ${successCount}/${connections.size} client(s):`, event.eventName);
+
+    devLog.debug(`[SSE] Broadcasted to ${successCount}/${connections.size} client(s):`, event.eventName);
     if (failCount > 0) {
-        console.log(`⚠️ [SSE] ${failCount} client(s) failed and were removed`);
+        devLog.warn(`[SSE] ${failCount} client(s) failed and were removed`);
     }
 }

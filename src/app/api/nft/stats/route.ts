@@ -6,6 +6,7 @@ import {
   setCachedStats,
   invalidateStatsCache
 } from '@/lib/cache';
+import { devLog } from '@/utils';
 
 interface NFTStats {
   contractAddress: string; // API response still uses contractAddress for compatibility
@@ -49,7 +50,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
   // If no stats doc exists, create one by counting (migration path)
   if (!statsDoc) {
-    console.log(`📊 No stats found for ${lowerContractAddress}/${tokenId}, creating initial stats...`);
+    devLog.info(`📊 No stats found for ${lowerContractAddress}/${tokenId}, creating initial stats...`);
 
     try {
       // Count from user collections (only on first access)
@@ -99,7 +100,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
       };
 
       await statsCollection.insertOne(initialStats);
-      console.log(`✅ Created initial stats for ${lowerContractAddress}/${tokenId}:`, initialStats);
+      devLog.info(`✅ Created initial stats for ${lowerContractAddress}/${tokenId}:`, initialStats);
 
       const stats: NFTStats = {
         contractAddress: lowerContractAddress,
@@ -116,7 +117,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
       return apiSuccess(stats);
     } catch (createError) {
-      console.error('❌ Error creating initial stats:', createError);
+      devLog.error('❌ Error creating initial stats:', createError);
       // Return zero stats instead of failing
       const zeroStats: NFTStats = {
         contractAddress: lowerContractAddress,
@@ -149,7 +150,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
   // Log warning if we found negative values (indicates data corruption)
   if (statsDoc.viewCount < 0 || statsDoc.likeCount < 0 || statsDoc.favoriteCount < 0 ||
     statsDoc.watchlistCount < 0 || statsDoc.ratingCount < 0) {
-    console.warn('⚠️ Found negative stat values for', lowerContractAddress, tokenId,
+    devLog.warn('⚠️ Found negative stat values for', lowerContractAddress, tokenId,
       'Stats:', statsDoc);
   }
 
@@ -158,12 +159,12 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
 // POST /api/nft/stats - Record NFT view
 export const POST = apiHandler(async (request: NextRequest) => {
-  console.log('📊 POST /api/nft/stats - Recording view...');
+  devLog.info('📊 POST /api/nft/stats - Recording view...');
 
   // Parse and validate request body
   const body = await parseJsonBody<{ contractAddress: string; tokenId: string; userId?: string; viewerId?: string }>(request);
   const { contractAddress, tokenId, userId, viewerId: clientViewerId } = body;
-  console.log('📝 Request body:', { contractAddress, tokenId, userId });
+  devLog.info('📝 Request body:', { contractAddress, tokenId, userId });
 
   if (!contractAddress || !tokenId) {
     throw new BadRequestError('contractAddress and tokenId are required');
@@ -185,12 +186,12 @@ export const POST = apiHandler(async (request: NextRequest) => {
     viewerId = crypto.randomUUID();
     shouldSetViewerCookie = true;
   }
-  console.log('✅ Validation passed, recording view for:', lowerContractAddress, tokenId);
+  devLog.info('✅ Validation passed, recording view for:', lowerContractAddress, tokenId);
 
   // Invalidate cache when recording a view
   invalidateStatsCache(lowerContractAddress, tokenId);
 
-  console.log('🔌 Getting nft_views collection...');
+  devLog.info('🔌 Getting nft_views collection...');
   const collection = await getCollection('nft_views');
 
   const viewRecord = {
@@ -201,7 +202,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
     viewedAt: timestamp
   };
 
-  console.log('💾 Inserting view record and updating stats...');
+  devLog.info('💾 Inserting view record and updating stats...');
   let shouldIncrement = true;
 
   if (normalizedUserId) {
@@ -247,9 +248,9 @@ export const POST = apiHandler(async (request: NextRequest) => {
   }
 
   if (shouldIncrement) {
-    console.log('📈 Getting nft_stats collection...');
+    devLog.info('📈 Getting nft_stats collection...');
     const statsCollection = await getCollection('nft_stats');
-    console.log('⬆️  Updating viewCount...');
+    devLog.info('⬆️  Updating viewCount...');
     await statsCollection.updateOne(
       { contractAddress: lowerContractAddress, tokenId },
       {
@@ -267,7 +268,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
       },
       { upsert: true }
     );
-    console.log('✅ Stats updated successfully');
+    devLog.info('✅ Stats updated successfully');
   }
 
   const statsCollection = await getCollection('nft_stats');
@@ -276,7 +277,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
     tokenId
   });
 
-  console.log('🎉 View recorded successfully');
+  devLog.info('🎉 View recorded successfully');
   const response = apiSuccess({
     message: shouldIncrement ? 'View recorded' : 'View already recorded',
     stats: updatedStats ? {

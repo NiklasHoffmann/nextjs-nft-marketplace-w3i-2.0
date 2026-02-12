@@ -1,7 +1,7 @@
 ﻿import { NextRequest } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
-import { apiHandler } from '@/lib/api/handler';
-import { apiSuccess } from '@/lib/api/responses';
+import { apiHandler } from '@/lib/api';
+import { apiSuccess } from '@/lib/api';
 
 // GET /api/nft/insights - Read-only access to NFT insights
 // For admin CUD operations, use /api/nft/admin/insights

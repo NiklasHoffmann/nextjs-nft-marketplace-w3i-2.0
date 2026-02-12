@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
-import { apiHandler } from '@/lib/api/handler';
+import { apiHandler, apiSuccess } from '@/lib/api';
 import { createPublicClient, http } from 'viem';
 import { mainnet, sepolia } from 'viem/chains';
+import { devLog } from '@/utils';
+import '@/lib/dev-services-auto-start';
 
 /**
  * GET /api/admin/system/health
@@ -96,7 +98,7 @@ async function handler(req: NextRequest) {
                 network: chain.name
             };
         } catch (error) {
-            console.error('[Health Check] Contract owner check failed:', error);
+            devLog.error('[Health Check] Contract owner check failed:', error);
         }
     }
 
@@ -118,28 +120,25 @@ async function handler(req: NextRequest) {
         })
     ]);
 
-    return NextResponse.json({
-        success: true,
-        data: {
-            database: {
-                status: 'online',
-                latency: dbLatency
-            },
-            subgraph: {
-                status: subgraphStatus,
-                minutesSinceLastSync,
-                lastSyncAt
-            },
-            contract: ownerStatus,
-            syncService: {
-                status: isSyncActive ? 'active' : 'idle',
-                recentUpdates: syncServiceStatus
-            },
-            marketplace: {
-                pending: pendingCount,
-                cancelled: cancelledCount,
-                stale: staleCount
-            }
+    return apiSuccess({
+        database: {
+            status: 'online',
+            latency: dbLatency
+        },
+        subgraph: {
+            status: subgraphStatus,
+            minutesSinceLastSync,
+            lastSyncAt
+        },
+        contract: ownerStatus,
+        syncService: {
+            status: isSyncActive ? 'active' : 'idle',
+            recentUpdates: syncServiceStatus
+        },
+        marketplace: {
+            pending: pendingCount,
+            cancelled: cancelledCount,
+            stale: staleCount
         }
     });
 }

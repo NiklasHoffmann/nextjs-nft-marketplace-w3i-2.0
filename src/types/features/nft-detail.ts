@@ -121,12 +121,17 @@ export interface NFTPriceCardProps {
     // For swap/trade functionality
     desiredContractAddress?: string;
     desiredTokenId?: string;
+    desiredErc1155Quantity?: string | null;
     // Payment currency
     currency?: string | null | undefined;
     // v2 Marketplace fields
     status?: 'LISTED' | 'PARTIALLY_FILLED' | 'SOLD_OUT' | 'CANCELED' | 'INVALIDATED' | null;
     listingType?: 'PURE_ETH' | 'SWAP_AND_ETH' | 'PURE_SWAP' | null;
     tokenStandard?: 'ERC721' | 'ERC1155' | null;
+    erc1155QuantityListed?: string | null;
+    remainingQuantity?: string | null;
+    unitPrice?: string | null;
+    partialBuyEnabled?: boolean;
 }
 
 export interface NFTTabNavigationProps {

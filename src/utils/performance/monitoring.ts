@@ -2,7 +2,7 @@
  * Performance monitoring utilities for the NFT marketplace
  */
 
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 
 interface PerformanceMetric {
     name: string;

@@ -8,7 +8,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 import { CollectionsService, type Collection } from './CollectionsService';
 import { CollectionsCache, type CollectionsState } from './CollectionsCache';
 import {

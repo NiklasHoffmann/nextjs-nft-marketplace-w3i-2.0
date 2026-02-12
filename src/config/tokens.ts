@@ -1,3 +1,5 @@
+import { devLog } from '@/utils';
+
 /**
  * Token Configuration
  * Supported ERC20 tokens for marketplace payments
@@ -120,28 +122,27 @@ export const TOKENS: NetworkTokens = {
             decimals: 18,
             isMock: true
         },
-        // ⚠️ DISABLED - Not whitelisted in marketplace contract
-        // MOCK_WBTC: {
-        //     address: "0xB1A8786Fd1bBDB7F56f8cEa78A77897a0Aa9fAb2", // MockWBTC_8 (deployed on Sepolia) ❌ NOT WHITELISTED
-        //     symbol: "MWBTC",
-        //     name: "Mock Wrapped Bitcoin",
-        //     decimals: 8,
-        //     isMock: true
-        // },
-        // MOCK_EURS: {
-        //     address: "0xe06E78AB6314993FCa9106536aecfE4284aA791a", // MockEURS_2 (deployed on Sepolia) ❌ NOT WHITELISTED
-        //     symbol: "MEURS",
-        //     name: "Mock STASIS EURS",
-        //     decimals: 2,
-        //     isMock: true
-        // },
-        // MOCK_USDT: {
-        //     address: "0xd11Db19892F8c9C89A03Ba6EFD636795cbBc0d74", // MockUSDTLike_6 (deployed on Sepolia) ❌ NOT WHITELISTED
-        //     symbol: "MUSDT",
-        //     name: "Mock Tether USD",
-        //     decimals: 6,
-        //     isMock: true
-        // }
+        MOCK_WBTC: {
+            address: "0xB1A8786Fd1bBDB7F56f8cEa78A77897a0Aa9fAb2", // MockWBTC_8 (deployed on Sepolia)
+            symbol: "MWBTC",
+            name: "Mock Wrapped Bitcoin",
+            decimals: 8,
+            isMock: true
+        },
+        MOCK_EURS: {
+            address: "0xe06E78AB6314993FCa9106536aecfE4284aA791a", // MockEURS_2 (deployed on Sepolia)
+            symbol: "MEURS",
+            name: "Mock STASIS EURS",
+            decimals: 2,
+            isMock: true
+        },
+        MOCK_USDT: {
+            address: "0xd11Db19892F8c9C89A03Ba6EFD636795cbBc0d74", // MockUSDTLike_6 (deployed on Sepolia)
+            symbol: "MUSDT",
+            name: "Mock Tether USD",
+            decimals: 6,
+            isMock: true
+        }
         // ======================================== END MOCK TOKENS
     },
     // Ethereum Mainnet
@@ -226,7 +227,7 @@ function normalizeAddress(address?: string | null): string {
 export function getTokenSymbolByAddress(chainId: number | string, address: string): string | null {
     const networkTokens = TOKENS[chainId.toString()];
     if (!networkTokens) {
-        console.log('⚠️ [getTokenSymbolByAddress] No tokens for chainId:', chainId);
+        devLog.warn('⚠️ [getTokenSymbolByAddress] No tokens for chainId:', chainId);
         return null;
     }
 
@@ -236,7 +237,7 @@ export function getTokenSymbolByAddress(chainId: number | string, address: strin
     }
     
     // DEBUG: Log what we're looking up
-    console.log('🔍 [getTokenSymbolByAddress] Lookup:', {
+    devLog.debug('🔍 [getTokenSymbolByAddress] Lookup:', {
         chainId,
         address: addressLower,
         mockERC20Address: normalizeAddress(networkTokens.MOCK_ERC20?.address),
@@ -252,10 +253,9 @@ export function getTokenSymbolByAddress(chainId: number | string, address: strin
     // ======================================== MOCK TOKENS LOOKUP
     // Check mock tokens (easy to remove this entire block)
     if (normalizeAddress(networkTokens.MOCK_ERC20?.address) === addressLower) return 'MERC20';
-    // DISABLED - Not whitelisted in marketplace:
-    // if (networkTokens.MOCK_WBTC?.address.toLowerCase() === addressLower) return 'MWBTC';
-    // if (networkTokens.MOCK_EURS?.address.toLowerCase() === addressLower) return 'MEURS';
-    // if (networkTokens.MOCK_USDT?.address.toLowerCase() === addressLower) return 'MUSDT';
+    if (normalizeAddress(networkTokens.MOCK_WBTC?.address) === addressLower) return 'MWBTC';
+    if (normalizeAddress(networkTokens.MOCK_EURS?.address) === addressLower) return 'MEURS';
+    if (normalizeAddress(networkTokens.MOCK_USDT?.address) === addressLower) return 'MUSDT';
     // ======================================== END MOCK TOKENS
 
     return null;
@@ -306,7 +306,7 @@ export function getCurrencySymbolByAddress(chainId: number | string, currency?: 
     const fallbackSymbol = symbol ? null : findTokenSymbolByAddress(currency);
     
     // DEBUG: Log symbol lookup
-    console.log('🔍 [getCurrencySymbolByAddress]', {
+    devLog.debug('🔍 [getCurrencySymbolByAddress]', {
         chainId,
         currency,
         symbol,

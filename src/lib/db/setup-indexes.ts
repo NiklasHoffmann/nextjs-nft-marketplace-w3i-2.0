@@ -6,10 +6,11 @@
  */
 
 import { getDatabase } from '@/lib/mongodb';
+import { devLog } from '@/utils';
 
 export async function setupMongoDBIndexes() {
     try {
-        console.log('🔧 [MongoDB] Setting up indexes...');
+        devLog.info('🔧 [MongoDB] Setting up indexes...');
         const db = await getDatabase();
 
         // ============================================
@@ -26,26 +27,26 @@ export async function setupMongoDBIndexes() {
                 background: true 
             }
         );
-        console.log('  ✅ nft_metadata: unique_nft index');
+        devLog.info('  ✅ nft_metadata: unique_nft index');
 
         // Query indexes
         await nftMetadata.createIndex(
             { 'blockchain.owner': 1 },
             { name: 'owner_lookup', background: true }
         );
-        console.log('  ✅ nft_metadata: owner_lookup index');
+        devLog.info('  ✅ nft_metadata: owner_lookup index');
 
         await nftMetadata.createIndex(
             { isListed: 1 },
             { name: 'is_listed', background: true }
         );
-        console.log('  ✅ nft_metadata: is_listed index');
+        devLog.info('  ✅ nft_metadata: is_listed index');
 
         await nftMetadata.createIndex(
             { 'blockchain.lastSyncedAt': 1 },
             { name: 'last_synced', background: true }
         );
-        console.log('  ✅ nft_metadata: last_synced index');
+        devLog.info('  ✅ nft_metadata: last_synced index');
 
         // ============================================
         // marketplace_items collection
@@ -61,26 +62,26 @@ export async function setupMongoDBIndexes() {
                 background: true 
             }
         );
-        console.log('  ✅ marketplace_items: unique_listing index');
+        devLog.info('  ✅ marketplace_items: unique_listing index');
 
         // Query indexes
         await marketplaceItems.createIndex(
             { isListed: 1, active: 1 },
             { name: 'active_listings', background: true }
         );
-        console.log('  ✅ marketplace_items: active_listings index');
+        devLog.info('  ✅ marketplace_items: active_listings index');
 
         await marketplaceItems.createIndex(
             { seller: 1 },
             { name: 'seller_lookup', background: true }
         );
-        console.log('  ✅ marketplace_items: seller_lookup index');
+        devLog.info('  ✅ marketplace_items: seller_lookup index');
 
         await marketplaceItems.createIndex(
             { chainId: 1 },
             { name: 'chain_id', background: true }
         );
-        console.log('  ✅ marketplace_items: chain_id index');
+        devLog.info('  ✅ marketplace_items: chain_id index');
 
         // ============================================
         // nft_stats collection
@@ -96,26 +97,26 @@ export async function setupMongoDBIndexes() {
                 background: true 
             }
         );
-        console.log('  ✅ nft_stats: unique_nft_stats index');
+        devLog.info('  ✅ nft_stats: unique_nft_stats index');
 
         // Sorting indexes
         await nftStats.createIndex(
             { viewCount: -1 },
             { name: 'view_count_desc', background: true }
         );
-        console.log('  ✅ nft_stats: view_count_desc index');
+        devLog.info('  ✅ nft_stats: view_count_desc index');
 
         await nftStats.createIndex(
             { likeCount: -1 },
             { name: 'like_count_desc', background: true }
         );
-        console.log('  ✅ nft_stats: like_count_desc index');
+        devLog.info('  ✅ nft_stats: like_count_desc index');
 
         await nftStats.createIndex(
             { averageRating: -1 },
             { name: 'rating_desc', background: true }
         );
-        console.log('  ✅ nft_stats: rating_desc index');
+        devLog.info('  ✅ nft_stats: rating_desc index');
 
         // ============================================
         // admin_nft_insights collection
@@ -127,28 +128,28 @@ export async function setupMongoDBIndexes() {
             { contractAddress: 1, tokenId: 1 },
             { name: 'insights_lookup', background: true }
         );
-        console.log('  ✅ admin_nft_insights: insights_lookup index');
+        devLog.info('  ✅ admin_nft_insights: insights_lookup index');
 
         await insights.createIndex(
             { category: 1 },
             { name: 'category_filter', background: true }
         );
-        console.log('  ✅ admin_nft_insights: category_filter index');
+        devLog.info('  ✅ admin_nft_insights: category_filter index');
 
         await insights.createIndex(
             { rarity: 1 },
             { name: 'rarity_filter', background: true }
         );
-        console.log('  ✅ admin_nft_insights: rarity_filter index');
+        devLog.info('  ✅ admin_nft_insights: rarity_filter index');
 
-        console.log('✅ [MongoDB] All indexes created successfully');
+        devLog.info('✅ [MongoDB] All indexes created successfully');
 
     } catch (error: any) {
         // Index already exists errors are OK
         if (error.code === 85 || error.message?.includes('already exists')) {
-            console.log('  ℹ️  Some indexes already exist (this is OK)');
+            devLog.info('  ℹ️  Some indexes already exist (this is OK)');
         } else {
-            console.error('❌ [MongoDB] Index creation failed:', error);
+            devLog.error('❌ [MongoDB] Index creation failed:', error);
             throw error;
         }
     }

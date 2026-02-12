@@ -6,6 +6,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { devLog } from '@/utils';
 
 // ===== TYPE-SAFE RESPONSE TYPES =====
 
@@ -125,7 +126,7 @@ export function apiTooManyRequests(message: string = 'Too Many Requests', retryA
 export function apiInternalError(message: string = 'Internal Server Error', error?: unknown) {
     // Log error for debugging in development
     if (process.env.NODE_ENV === 'development' && error) {
-        console.error('API Internal Error:', error);
+        devLog.error('API Internal Error:', error);
     }
 
     return apiError(

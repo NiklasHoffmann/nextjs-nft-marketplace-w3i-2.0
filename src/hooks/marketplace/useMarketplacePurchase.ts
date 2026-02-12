@@ -9,13 +9,17 @@ import { useWriteContract, useWaitForTransactionReceipt, usePublicClient, useCha
 import { parseUnits } from 'viem';
 import { IDEATION_MARKET_FACET_ABI } from '@/config/abis/ideation-market-facet';
 import { getAvailableTokens, ZERO_ADDRESS } from '@/config/tokens';
+import { devLog } from '@/utils';
 
 interface PurchaseListingParams {
   listingId: string;
   expectedPrice: string; // in ETH
   expectedCurrency?: string; // Payment token address (default: ETH)
+  expectedErc1155Quantity?: string;
   expectedDesiredTokenAddress?: string;
   expectedDesiredTokenId?: string;
+  expectedDesiredErc1155Quantity?: string;
+  erc1155PurchaseQuantity?: string;
   desiredErc1155Holder?: string; // for swap transactions
   onProgress?: (step: 'preparing' | 'signing' | 'pending' | 'success', txHash?: string) => void; // Progress callback with optional hash
 }
@@ -42,7 +46,7 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
   // Combine errors from both hooks
   const combinedError = error || (writeError ? String(writeError) : null) || (receiptError ? String(receiptError) : null);
 
-  console.log('🔍 Hook state:', {
+  devLog.info('useMarketplacePurchase state:', {
     submittedHash,
     isConfirming,
     isSuccess,
@@ -55,8 +59,11 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
     listingId,
     expectedPrice,
     expectedCurrency = ZERO_ADDRESS, // Default: ETH
+    expectedErc1155Quantity = "0",
     expectedDesiredTokenAddress = ZERO_ADDRESS,
     expectedDesiredTokenId = "0",
+    expectedDesiredErc1155Quantity = "0",
+    erc1155PurchaseQuantity = "0",
     desiredErc1155Holder = ZERO_ADDRESS,
     onProgress
   }: PurchaseListingParams) => {
@@ -77,7 +84,7 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
       // Only send ETH value if paying with native ETH (not WETH or swap)
       const ethValue = (isSwap || !isNative) ? BigInt(0) : parseUnits(expectedPrice, 18);
 
-      console.log('🚀 Calling writeContractAsync with:', {
+      devLog.info('Calling writeContractAsync with:', {
         listingId,
         expectedPrice,
         expectedCurrency,
@@ -99,18 +106,18 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
           BigInt(listingId), // listingId
           expectedPriceUnits, // expectedPrice
           (expectedCurrency || ZERO_ADDRESS) as `0x${string}`, // expectedCurrency (0x0 for ETH, WETH address for WETH)
-          BigInt("0"), // expectedErc1155Quantity (0 for ERC721, quantity for ERC1155)
+          BigInt(expectedErc1155Quantity || "0"), // expectedErc1155Quantity
           expectedDesiredTokenAddress as `0x${string}`, // expectedDesiredTokenAddress
           BigInt(expectedDesiredTokenId), // expectedDesiredTokenId
-          BigInt("0"), // expectedDesiredErc1155Quantity (not needed for pure ETH sales)
-          BigInt("0"), // erc1155PurchaseQuantity (0 for ERC721, quantity for ERC1155)
+          BigInt(expectedDesiredErc1155Quantity || "0"), // expectedDesiredErc1155Quantity
+          BigInt(erc1155PurchaseQuantity || "0"), // erc1155PurchaseQuantity
           desiredErc1155Holder as `0x${string}` // desiredErc1155Holder (for swaps)
         ] as const,
         value: ethValue,
         gas: BigInt(500000) // Safe limit: high enough for NFT purchases, well below 16.7M cap
       });
 
-      console.log('✅ Transaction submitted! Hash:', hash);
+      devLog.info('Transaction submitted. Hash:', hash);
       setSubmittedHash(hash); // Store hash for useWaitForTransactionReceipt
 
       onProgress?.('pending', hash);
@@ -118,13 +125,13 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
       // Manually check the transaction receipt
       // This helps catch reverted transactions immediately
       if (publicClient) {
-        console.log('🔍 Waiting for transaction receipt:', hash);
+        devLog.info('Waiting for transaction receipt:', hash);
         const receipt = await publicClient.waitForTransactionReceipt({
           hash,
           timeout: 120_000 // 2 minutes
         });
 
-        console.log('📋 Transaction receipt:', {
+        devLog.info('Transaction receipt:', {
           status: receipt.status,
           blockNumber: receipt.blockNumber,
           gasUsed: receipt.gasUsed.toString()
@@ -132,7 +139,7 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
 
         if (receipt.status === 'reverted') {
           const errorMsg = 'Transaction reverted on blockchain. The NFT may have been sold, removed, or the price changed.';
-          console.error('❌', errorMsg);
+          devLog.error(errorMsg);
           setError(errorMsg);
           throw new Error(errorMsg);
         }
@@ -143,7 +150,7 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
       return hash;
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to purchase listing';
-      console.error('❌ useMarketplacePurchase error:', {
+      devLog.error('useMarketplacePurchase error:', {
         message: errorMessage,
         error: err,
         stack: err.stack

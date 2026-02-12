@@ -7,7 +7,7 @@
  * Separated from context for better testability and reusability.
  */
 
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 import type { WalletNFT } from './WalletNFTsService';
 
 export interface WalletNFTsState {

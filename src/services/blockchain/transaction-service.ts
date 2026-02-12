@@ -31,7 +31,7 @@
  *   });
  *   
  *   if (result.success) {
- *     console.log('TX Hash:', result.txHash);
+ *     devLog.info('TX Hash:', result.txHash);
  *   }
  * };
  * ```
@@ -45,6 +45,7 @@ import { useMarketplaceContracts } from '@/hooks/marketplace/useMarketplaceContr
 import { useNotifications } from '@/contexts/notifications';
 import { formatEther } from 'viem';
 import { usePublicClient } from 'wagmi';
+import { devLog } from '@/utils';
 import {
     invalidateAfterPurchase,
     invalidateAfterCancelListing,
@@ -79,8 +80,11 @@ export interface PurchaseNFTParams {
     buyer?: string; // For data invalidation
     contractAddress: string;
     tokenId: string;
+    expectedErc1155Quantity?: string;
+    erc1155PurchaseQuantity?: string;
     desiredContractAddress?: string;
     desiredTokenId?: string;
+    desiredErc1155Quantity?: string;
     onProgress?: (step: TransactionStep) => void;
     onError?: (error: string) => void;
     onSuccess?: (result: TransactionResult) => void;
@@ -116,8 +120,12 @@ export interface CreateListingParams {
     tokenId: string;
     price: string;
     currency?: string; // Payment token address (0x0000...0000 = ETH, WETH/USDC/etc = token address)
+    tokenStandard?: 'ERC721' | 'ERC1155';
+    erc1155Quantity?: string;
+    partialBuyEnabled?: boolean;
     desiredContractAddress?: string;
     desiredTokenId?: string;
+    desiredErc1155Quantity?: string;
     buyerWhitelistEnabled?: boolean;
     allowedBuyers?: string[];
     onProgress?: (step: TransactionStep) => void;
@@ -199,8 +207,12 @@ export function useTransactionService() {
         const {
             listingId,
             price,
+            currency,
+            expectedErc1155Quantity,
+            erc1155PurchaseQuantity,
             desiredContractAddress,
             desiredTokenId,
+            desiredErc1155Quantity,
             onProgress,
             onError,
             onSuccess,
@@ -221,7 +233,7 @@ export function useTransactionService() {
                 'Setting up your transaction...'
             );
 
-            console.log('📦 Preparing purchase transaction:', {
+            devLog.info('📦 Preparing purchase transaction:', {
                 listingId,
                 price,
                 isSwap: !!desiredContractAddress && desiredContractAddress !== '0x0000000000000000000000000000000000000000'
@@ -233,10 +245,14 @@ export function useTransactionService() {
             const hash = await purchaseHook.purchaseListing({
                 listingId,
                 expectedPrice: price,
+                expectedCurrency: currency,
+                expectedErc1155Quantity,
                 expectedDesiredTokenAddress: desiredContractAddress,
                 expectedDesiredTokenId: desiredTokenId,
+                expectedDesiredErc1155Quantity: desiredErc1155Quantity,
+                erc1155PurchaseQuantity,
                 onProgress: (step, txHash) => {
-                    console.log('📊 Purchase progress:', step, txHash ? `hash: ${txHash}` : '');
+                    devLog.info('📊 Purchase progress:', step, txHash ? `hash: ${txHash}` : '');
                     setCurrentStep(step);
                     onProgress?.(step);
 
@@ -265,7 +281,7 @@ export function useTransactionService() {
                 }
             });
 
-            console.log('✅ Purchase complete! Hash:', hash);
+            devLog.info('✅ Purchase complete! Hash:', hash);
 
             const result: TransactionResult = {
                 success: true,
@@ -274,7 +290,7 @@ export function useTransactionService() {
 
             // Invalidate data to refresh all NFT lists
             if (params.contractAddress && params.tokenId && params.buyer) {
-                console.log('🔄 Invalidating data after purchase');
+                devLog.info('🔄 Invalidating data after purchase');
                 invalidateAfterPurchase(
                     params.contractAddress,
                     params.tokenId,
@@ -298,7 +314,7 @@ export function useTransactionService() {
         } catch (error: any) {
             const errorMessage = parseTransactionError(error);
 
-            console.error('❌ Purchase failed:', error);
+            devLog.error('❌ Purchase failed:', error);
             setCurrentStep('error');
             setCurrentError(errorMessage);
             onProgress?.('error');
@@ -346,7 +362,7 @@ export function useTransactionService() {
                 'Setting up listing update...'
             );
 
-            console.log('📝 Preparing update listing transaction:', {
+            devLog.info('📝 Preparing update listing transaction:', {
                 listingId,
                 newPrice,
                 hasSwap: !!newDesiredContractAddress
@@ -369,7 +385,7 @@ export function useTransactionService() {
                 newDesiredTokenId: newDesiredTokenId
             });
 
-            console.log('✅ Update listing transaction submitted');
+            devLog.info('✅ Update listing transaction submitted');
 
             setCurrentStep('pending');
             onProgress?.('pending');
@@ -398,7 +414,7 @@ export function useTransactionService() {
                 }, 300000);
             });
 
-            console.log('✅ Update listing confirmed on blockchain');
+            devLog.info('✅ Update listing confirmed on blockchain');
 
             const result: TransactionResult = {
                 success: true,
@@ -421,7 +437,7 @@ export function useTransactionService() {
 
             // Invalidate data to refresh all NFT lists (update = cancel + create)
             if (params.contractAddress && params.tokenId) {
-                console.log('🔄 Invalidating data after update listing');
+                devLog.info('🔄 Invalidating data after update listing');
                 invalidateAfterListing(
                     params.contractAddress,
                     params.tokenId,
@@ -444,7 +460,7 @@ export function useTransactionService() {
         } catch (error: any) {
             const errorMessage = parseTransactionError(error);
 
-            console.error('❌ Update listing failed:', error);
+            devLog.error('❌ Update listing failed:', error);
             setCurrentStep('error');
             setCurrentError(errorMessage);
             onProgress?.('error');
@@ -487,7 +503,7 @@ export function useTransactionService() {
                 'Setting up listing cancellation...'
             );
 
-            console.log('🚫 Preparing cancel listing transaction:', { listingId });
+            devLog.info('🚫 Preparing cancel listing transaction:', { listingId });
 
             setCurrentStep('signing');
             onProgress?.('signing');
@@ -500,7 +516,7 @@ export function useTransactionService() {
 
             await listingHook.cancelListing(listingId);
 
-            console.log('✅ Cancel listing transaction submitted');
+            devLog.info('✅ Cancel listing transaction submitted');
 
             setCurrentStep('pending');
             onProgress?.('pending');
@@ -529,7 +545,7 @@ export function useTransactionService() {
                 }, 300000);
             });
 
-            console.log('✅ Cancel listing confirmed on blockchain');
+            devLog.info('✅ Cancel listing confirmed on blockchain');
 
             const result: TransactionResult = {
                 success: true,
@@ -552,7 +568,7 @@ export function useTransactionService() {
 
             // Invalidate data to refresh all NFT lists
             if (params.contractAddress && params.tokenId) {
-                console.log('🔄 Invalidating data after cancel listing');
+                devLog.info('🔄 Invalidating data after cancel listing');
                 invalidateAfterCancelListing(
                     params.contractAddress,
                     params.tokenId,
@@ -575,7 +591,7 @@ export function useTransactionService() {
         } catch (error: any) {
             const errorMessage = parseTransactionError(error);
 
-            console.error('❌ Cancel listing failed:', error);
+            devLog.error('❌ Cancel listing failed:', error);
             setCurrentStep('error');
             setCurrentError(errorMessage);
             onProgress?.('error');
@@ -602,8 +618,12 @@ export function useTransactionService() {
             tokenId,
             price,
             currency,
+            tokenStandard,
+            erc1155Quantity,
+            partialBuyEnabled,
             desiredContractAddress,
             desiredTokenId,
+            desiredErc1155Quantity,
             buyerWhitelistEnabled,
             allowedBuyers,
             onProgress,
@@ -625,13 +645,13 @@ export function useTransactionService() {
                 'Setting up your NFT listing...'
             );
 
-            console.log('📝 [TRANSACTION SERVICE] Preparing create listing transaction:');
-            console.log('   contractAddress:', contractAddress);
-            console.log('   tokenId:', tokenId);
-            console.log('   price:', price);
-            console.log('   currency:', currency);
-            console.log('   desiredContractAddress:', desiredContractAddress);
-            console.log('   hasSwap:', !!desiredContractAddress);
+            devLog.info('📝 [TRANSACTION SERVICE] Preparing create listing transaction:');
+            devLog.info('   contractAddress:', contractAddress);
+            devLog.info('   tokenId:', tokenId);
+            devLog.info('   price:', price);
+            devLog.info('   currency:', currency);
+            devLog.info('   desiredContractAddress:', desiredContractAddress);
+            devLog.info('   hasSwap:', !!desiredContractAddress);
 
             setCurrentStep('signing');
             onProgress?.('signing');
@@ -642,28 +662,32 @@ export function useTransactionService() {
                 'Please confirm the listing in your wallet'
             );
 
-            console.log('🔍 [TRANSACTION SERVICE] Calling listingHook.createListing with:');
-            console.log('   tokenAddress:', contractAddress);
-            console.log('   tokenId:', tokenId);
-            console.log('   price:', price);
-            console.log('   currency:', currency);
-            console.log('   desiredTokenAddress:', desiredContractAddress);
-            console.log('   desiredTokenId:', desiredTokenId);
-            console.log('   buyerWhitelistEnabled:', buyerWhitelistEnabled);
-            console.log('   allowedBuyers:', allowedBuyers);
+            devLog.info('🔍 [TRANSACTION SERVICE] Calling listingHook.createListing with:');
+            devLog.info('   tokenAddress:', contractAddress);
+            devLog.info('   tokenId:', tokenId);
+            devLog.info('   price:', price);
+            devLog.info('   currency:', currency);
+            devLog.info('   desiredTokenAddress:', desiredContractAddress);
+            devLog.info('   desiredTokenId:', desiredTokenId);
+            devLog.info('   buyerWhitelistEnabled:', buyerWhitelistEnabled);
+            devLog.info('   allowedBuyers:', allowedBuyers);
 
             const txHash = await listingHook.createListing({
                 tokenAddress: contractAddress,
                 tokenId,
                 price,
                 currency: currency, // Pass currency parameter
+                tokenStandard: tokenStandard || (erc1155Quantity ? 'ERC1155' : 'ERC721'),
+                erc1155Quantity,
+                partialBuyEnabled,
                 desiredTokenAddress: desiredContractAddress,
                 desiredTokenId: desiredTokenId,
+                desiredErc1155Quantity,
                 buyerWhitelistEnabled: buyerWhitelistEnabled || false,
                 allowedBuyers: allowedBuyers || []
             });
 
-            console.log('✅ Create listing transaction submitted, hash:', txHash);
+            devLog.info('✅ Create listing transaction submitted, hash:', txHash);
 
             setCurrentStep('pending');
             onProgress?.('pending');
@@ -675,7 +699,7 @@ export function useTransactionService() {
             );
 
             // Wait for transaction confirmation directly from blockchain
-            console.log('⏳ Waiting for transaction receipt from blockchain...');
+            devLog.info('⏳ Waiting for transaction receipt from blockchain...');
 
             if (!publicClient) {
                 throw new Error('Public client not available');
@@ -687,7 +711,7 @@ export function useTransactionService() {
                 timeout: 300_000 // 5 minutes
             });
 
-            console.log('✅ Transaction receipt received:', {
+            devLog.info('✅ Transaction receipt received:', {
                 status: receipt.status,
                 blockNumber: receipt.blockNumber,
                 gasUsed: receipt.gasUsed.toString()
@@ -697,7 +721,7 @@ export function useTransactionService() {
                 throw new Error('Transaction reverted on blockchain');
             }
 
-            console.log('✅ Create listing confirmed on blockchain');
+            devLog.info('✅ Create listing confirmed on blockchain');
 
             const result: TransactionResult = {
                 success: true,
@@ -720,7 +744,7 @@ export function useTransactionService() {
 
             // Invalidate data to refresh all NFT lists
             if (contractAddress && tokenId) {
-                console.log('🔄 Invalidating data after create listing');
+                devLog.info('🔄 Invalidating data after create listing');
                 invalidateAfterListing(
                     contractAddress,
                     tokenId
@@ -742,7 +766,7 @@ export function useTransactionService() {
         } catch (error: any) {
             // Special handling for ALREADY_LISTED error
             if (error.code === 'ALREADY_LISTED' || error.message === 'ALREADY_LISTED') {
-                console.log('ℹ️ NFT already listed - treating as success');
+                devLog.info('ℹ️ NFT already listed - treating as success');
 
                 setCurrentStep('success');
                 onProgress?.('success');
@@ -773,7 +797,7 @@ export function useTransactionService() {
 
             const errorMessage = parseTransactionError(error);
 
-            console.error('❌ Create listing failed:', error);
+            devLog.error('❌ Create listing failed:', error);
             setCurrentStep('error');
             setCurrentError(errorMessage);
             onProgress?.('error');

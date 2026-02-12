@@ -5,6 +5,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
+import { devLog } from '@/utils';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useNotifications } from '@/contexts/notifications';
 import {
@@ -91,7 +92,7 @@ export function useMultisigProposals(marketplaceAddress?: string) {
                 executed: data.executed
             });
         } catch (err: any) {
-            console.error('Failed to fetch proposals:', err);
+            devLog.error('Failed to fetch proposals:', err);
             setError(err.message);
             notifications.error('Failed to fetch proposals', err.message);
         } finally {
@@ -127,7 +128,7 @@ export function useMultisigProposals(marketplaceAddress?: string) {
 
             return data.proposalId;
         } catch (err: any) {
-            console.error('Failed to create proposal:', err);
+            devLog.error('Failed to create proposal:', err);
             setError(err.message);
             notifications.error('Failed to create proposal', err.message);
             return null;
@@ -162,7 +163,7 @@ export function useMultisigProposals(marketplaceAddress?: string) {
 
             return true;
         } catch (err: any) {
-            console.error('Failed to confirm proposal:', err);
+            devLog.error('Failed to confirm proposal:', err);
             setError(err.message);
             notifications.error('Failed to confirm', err.message);
             return false;
@@ -196,7 +197,7 @@ export function useMultisigProposals(marketplaceAddress?: string) {
 
             return true;
         } catch (err: any) {
-            console.error('Failed to reject proposal:', err);
+            devLog.error('Failed to reject proposal:', err);
             setError(err.message);
             notifications.error('Failed to reject', err.message);
             return false;
@@ -258,7 +259,7 @@ export function useMultisigProposals(marketplaceAddress?: string) {
 
             return true;
         } catch (err: any) {
-            console.error('Failed to execute proposal:', err);
+            devLog.error('Failed to execute proposal:', err);
             setError(err.message);
             notifications.error('Execution Failed', err.message);
             return false;
@@ -302,7 +303,7 @@ export function useMultisigProposals(marketplaceAddress?: string) {
             await fetchProposals();
             return true;
         } catch (err: any) {
-            console.error('Failed to mark as executed:', err);
+            devLog.error('Failed to mark as executed:', err);
             return false;
         }
     };

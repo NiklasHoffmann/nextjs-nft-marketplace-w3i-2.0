@@ -11,7 +11,7 @@
  * Zentrale Conversion-Logik für NFT Datenstrukturen.
  */
 
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 import type { NFTScrollItem, FilterableNFTItem } from '@/types/marketplace';
 
 /**
@@ -155,7 +155,7 @@ export function convertToFilterableItems(
  * ```typescript
  * if (isNFTScrollItem(unknownItem)) {
  *   // TypeScript weiÃ jetzt: unknownItem ist NFTScrollItem
- *   console.log(unknownItem.contractAddress);
+ *   devLog.info(unknownItem.contractAddress);
  * }
  * ```
  */

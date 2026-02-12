@@ -1,0 +1,12 @@
+[
+  {
+    "name": "My Happy Tent – Night Pass (1 Night)",
+    "description": "1 Token → 1 Nacht. Standard-Pass für eine fiktive Übernachtung im My Happy Tent Netzwerk (Demo/Testnet).",
+    "image": "night-pass.png",
+    "attributes": [
+      { "trait_type": "Nights", "value": "1" },
+      { "trait_type": "Tier", "value": "Standard" },
+      { "trait_type": "Redeemable", "value": "Yes" }
+    ]
+  }
+]

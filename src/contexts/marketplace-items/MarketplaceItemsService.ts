@@ -7,7 +7,7 @@
  * Separated from context for better testability and reusability.
  */
 
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 import type { EnrichedNFTDocument, MarketplaceItemsResponse } from '@/types/marketplace/enriched-nft';
 import type { NFTStatsUpdateDetail } from '@/types';
 import { MarketplaceItemsCache } from './MarketplaceItemsCache';

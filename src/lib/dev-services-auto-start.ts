@@ -6,6 +6,7 @@
  */
 
 import { getNFTSyncService } from '@/services/nft-sync';
+import { devLog } from '@/utils';
 
 let devServicesStarted = false;
 
@@ -15,7 +16,7 @@ export async function startDevServices() {
 
     devServicesStarted = true;
 
-    console.log('\n🚀 [Dev Mode] Auto-starting background services...');
+    devLog.info('\n🚀 [Dev Mode] Auto-starting background services...');
 
     try {
         const syncService = getNFTSyncService();
@@ -23,16 +24,16 @@ export async function startDevServices() {
 
         if (!status.isRunning) {
             await syncService.start();
-            console.log('✅ [Dev Mode] NFT Sync Service started\n');
+            devLog.info('✅ [Dev Mode] NFT Sync Service started\n');
         } else {
-            console.log('⚠️ [Dev Mode] NFT Sync Service already running\n');
+            devLog.warn('⚠️ [Dev Mode] NFT Sync Service already running\n');
         }
     } catch (error) {
-        console.error('❌ [Dev Mode] Failed to start background services:', error);
+        devLog.error('❌ [Dev Mode] Failed to start background services:', error);
     }
 }
 
 // Auto-start on module load (server-side only)
 if (typeof window === 'undefined') {
-    startDevServices().catch(console.error);
+    startDevServices().catch((error) => devLog.error('❌ [Dev Mode] Auto-start failed:', error));
 }

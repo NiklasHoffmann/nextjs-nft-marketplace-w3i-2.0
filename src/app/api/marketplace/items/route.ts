@@ -25,10 +25,11 @@
  * - sortOrder: asc|desc
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
-import { apiHandler } from '@/lib/api/handler';
+import { apiHandler, apiSuccess } from '@/lib/api';
 import type { MarketplaceItemsResponse } from '@/types/marketplace/enriched-nft';
+import { devLog } from '@/utils';
 
 // Auto-start sync service in dev mode
 import '@/lib/dev-services-auto-start';
@@ -77,9 +78,11 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
     // Marketplace filters
     if (contractAddress) {
-        query.contractAddress = contractAddress;
-    } else {
-        query.contractAddress = { $exists: true, $nin: [null, '', 'undefined'] };
+        query.$or = [
+            { contractAddress },
+            { nftAddress: contractAddress },
+            { tokenAddress: contractAddress }
+        ];
     }
     if (seller) query.seller = seller;
 
@@ -94,6 +97,16 @@ export const GET = apiHandler(async (request: NextRequest) => {
     // Build aggregation pipeline
     const pipeline: any[] = [
         { $match: query },
+
+        // Normalize legacy address fields for downstream lookups
+        {
+            $addFields: {
+                resolvedContractAddress: {
+                    $ifNull: ['$contractAddress', { $ifNull: ['$nftAddress', '$tokenAddress'] }]
+                },
+                resolvedTokenId: { $toString: '$tokenId' }
+            }
+        },
 
         // Price filters using string comparison (price stored as string Wei)
         ...(minPrice ? [{
@@ -122,8 +135,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
             $lookup: {
                 from: 'nft_metadata',
                 let: {
-                    contractAddr: '$contractAddress',
-                    tokId: { $toString: '$tokenId' } // CRITICAL: Convert number to string for match
+                    contractAddr: '$resolvedContractAddress',
+                    tokId: '$resolvedTokenId' // CRITICAL: Convert number to string for match
                 },
                 pipeline: [
                     {
@@ -166,8 +179,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
             $lookup: {
                 from: 'admin_nft_insights',
                 let: {
-                    contractAddr: '$contractAddress',
-                    tokId: { $toString: '$tokenId' }
+                    contractAddr: '$resolvedContractAddress',
+                    tokId: '$resolvedTokenId'
                 },
                 pipeline: [
                     {
@@ -225,8 +238,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
             $lookup: {
                 from: 'nft_stats',
                 let: {
-                    contractAddr: '$contractAddress',
-                    tokId: '$tokenId'
+                    contractAddr: '$resolvedContractAddress',
+                    tokId: '$resolvedTokenId'
                 },
                 pipeline: [
                     {
@@ -257,7 +270,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
             $addFields: {
                 // Keep original marketplace_items fields at root level
                 // (for backward compatibility with NFTGallery/NFTCard)
-                contractAddress: '$contractAddress',
+                contractAddress: '$resolvedContractAddress',
                 // CRITICAL: Convert price to STRING (MongoDB may store as BSON Long)
                 price: { $toString: { $ifNull: ['$price', '0'] } },
                 seller: '$seller',
@@ -403,7 +416,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
     // Category filter - case-insensitive match with special character escaping
     if (category && category.length > 0) {
-        console.log('🏷️ [API] Category filter requested:', category);
+        devLog.info('🏷️ [API] Category filter requested:', category);
         // Escape special regex characters and create regex for each category to match case-insensitively
         const categoryRegexes = category.map(cat => {
             // Escape special regex characters (including spaces)
@@ -411,7 +424,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
             return new RegExp(`^${escapedCat}$`, 'i');
         });
         metadataFilters['insights.category'] = { $in: categoryRegexes };
-        console.log('🏷️ [API] Category filter applied:', {
+        devLog.info('🏷️ [API] Category filter applied:', {
             input: category,
             regexes: categoryRegexes.map(r => r.source)
         });
@@ -469,19 +482,19 @@ export const GET = apiHandler(async (request: NextRequest) => {
     const itemsBeforeCleanup = await collection.aggregate(pipeline).toArray();
     if (itemsBeforeCleanup.length > 0) {
         const firstItem: any = itemsBeforeCleanup[0];
-        console.log('\n🔍 [API Debug] BEFORE $project cleanup:');
-        console.log('  - contractAddress:', firstItem.contractAddress);
-        console.log('  - tokenId:', firstItem.tokenId);
-        console.log('  - Debug lookup keys:', firstItem._debug_lookupKeys);
-        console.log('  - nftData array length:', firstItem.nftData?.length || 0);
+        devLog.debug('\n🔍 [API Debug] BEFORE $project cleanup:');
+        devLog.debug('  - contractAddress:', firstItem.contractAddress);
+        devLog.debug('  - tokenId:', firstItem.tokenId);
+        devLog.debug('  - Debug lookup keys:', firstItem._debug_lookupKeys);
+        devLog.debug('  - nftData array length:', firstItem.nftData?.length || 0);
         if (firstItem.nftData?.[0]) {
-            console.log('  - nftData[0] exists with metadata?', !!firstItem.nftData[0].metadata);
+            devLog.debug('  - nftData[0] exists with metadata?', !!firstItem.nftData[0].metadata);
         }
-        console.log('  - Has insightsData field?', 'insightsData' in firstItem);
-        console.log('  - insightsData value:', firstItem.insightsData);
-        console.log('  - Has insights field?', 'insights' in firstItem);
-        console.log('  - insights value:', firstItem.insights);
-        console.log('');
+        devLog.debug('  - Has insightsData field?', 'insightsData' in firstItem);
+        devLog.debug('  - insightsData value:', firstItem.insightsData);
+        devLog.debug('  - Has insights field?', 'insights' in firstItem);
+        devLog.debug('  - insights value:', firstItem.insights);
+        devLog.debug('');
     }
 
     // Clean up temporary fields but keep everything else
@@ -507,44 +520,44 @@ export const GET = apiHandler(async (request: NextRequest) => {
     // Debug: Count items with/without insights
     const withInsights = items.filter((item: any) => item.insights).length;
     const withoutInsights = items.filter((item: any) => !item.insights).length;
-    console.log(`\n📊 [Marketplace API] Insights Stats:`);
-    console.log(`  - Total items: ${items.length}`);
-    console.log(`  - With insights: ${withInsights}`);
-    console.log(`  - Without insights: ${withoutInsights}`);
+    devLog.debug(`\n📊 [Marketplace API] Insights Stats:`);
+    devLog.debug(`  - Total items: ${items.length}`);
+    devLog.debug(`  - With insights: ${withInsights}`);
+    devLog.debug(`  - Without insights: ${withoutInsights}`);
     if (withoutInsights > 0 && withoutInsights <= 3) {
         const missing = items.filter((item: any) => !item.insights).map((item: any) => ({
             address: item.contractAddress,
             tokenId: item.tokenId,
             name: item.metadata?.name
         }));
-        console.log(`  - Missing insights for:`, missing);
+        devLog.debug(`  - Missing insights for:`, missing);
     }
-    console.log('');
+    devLog.debug('');
 
     // Debug: Log first item structure
     if (items.length > 0) {
         const firstItem: any = items[0];
-        console.log('\n📋 [Marketplace API] First Item Structure:');
-        console.log('Root Level Fields:');
-        console.log('  - contractAddress:', firstItem.contractAddress);
-        console.log('  - tokenId:', firstItem.tokenId);
-        console.log('  - price:', firstItem.price);
-        console.log('  - seller:', firstItem.seller);
-        console.log('  - isListed:', firstItem.isListed);
-        console.log('  - listingId:', firstItem.listingId);
-        console.log('\nEnriched Data:');
-        console.log('  - metadata:', !!firstItem.metadata, firstItem.metadata ? `(name: ${firstItem.metadata.name})` : '');
-        console.log('  - contract:', !!firstItem.contract, firstItem.contract ? `(name: ${firstItem.contract.name})` : '');
-        console.log('  - insights:', !!firstItem.insights, firstItem.insights ? `(category: ${firstItem.insights.category}, rarity: ${firstItem.insights.rarity})` : '');
+        devLog.debug('\n📋 [Marketplace API] First Item Structure:');
+        devLog.debug('Root Level Fields:');
+        devLog.debug('  - contractAddress:', firstItem.contractAddress);
+        devLog.debug('  - tokenId:', firstItem.tokenId);
+        devLog.debug('  - price:', firstItem.price);
+        devLog.debug('  - seller:', firstItem.seller);
+        devLog.debug('  - isListed:', firstItem.isListed);
+        devLog.debug('  - listingId:', firstItem.listingId);
+        devLog.debug('\nEnriched Data:');
+        devLog.debug('  - metadata:', !!firstItem.metadata, firstItem.metadata ? `(name: ${firstItem.metadata.name})` : '');
+        devLog.debug('  - contract:', !!firstItem.contract, firstItem.contract ? `(name: ${firstItem.contract.name})` : '');
+        devLog.debug('  - insights:', !!firstItem.insights, firstItem.insights ? `(category: ${firstItem.insights.category}, rarity: ${firstItem.insights.rarity})` : '');
         // Stats removed - loaded via StatsContext
-        console.log('  - marketplace (nested):', !!firstItem.marketplace);
-        console.log('');
+        devLog.debug('  - marketplace (nested):', !!firstItem.marketplace);
+        devLog.debug('');
     }
 
     // Debug: Log all unique categories in result set (if category filter was used)
     if (category && category.length > 0) {
         const uniqueCategories = new Set(items.map((item: any) => item.insights?.category).filter(Boolean));
-        console.log('🏷️ [API] Unique categories in filtered results:', Array.from(uniqueCategories));
+        devLog.debug('🏷️ [API] Unique categories in filtered results:', Array.from(uniqueCategories));
     }
 
     // Get filter options (available categories, rarities, price range)
@@ -558,51 +571,51 @@ export const GET = apiHandler(async (request: NextRequest) => {
             {
                 $group: {
                     _id: null,
-                    minPrice: { $min: '$price' },
-                    maxPrice: { $max: '$price' }
+                    minPrice: { $min: { $toDecimal: { $ifNull: ['$price', '0'] } } },
+                    maxPrice: { $max: { $toDecimal: { $ifNull: ['$price', '0'] } } }
                 }
             }
         ]).toArray()
     ]);
 
     // Debug: Log all available categories from insights
-    console.log('🏷️ [API] Available categories in admin_nft_insights:', categories);
+    devLog.debug('🏷️ [API] Available categories in admin_nft_insights:', categories);
 
-    const response: MarketplaceItemsResponse = {
-        success: true,
-        data: {
-            items: items as any[],
-            pagination: {
-                page,
-                limit,
-                total,
-                totalPages: Math.ceil(total / limit),
-                hasMore: page * limit < total
+    const priceMin = priceStats[0]?.minPrice ? priceStats[0].minPrice.toString() : '0';
+    const priceMax = priceStats[0]?.maxPrice ? priceStats[0].maxPrice.toString() : '0';
+
+    const response: MarketplaceItemsResponse['data'] = {
+        items: items as any[],
+        pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+            hasMore: page * limit < total
+        },
+        filters: {
+            appliedFilters: {
+                search,
+                contractAddress,
+                minPrice,
+                maxPrice,
+                seller,
+                isListed,
+                category,
+                rarity,
+                tags,
+                minRating,
+                minViews,
+                minLikes,
+                minWatchlistCount,
+                sortBy,
+                sortOrder
             },
-            filters: {
-                appliedFilters: {
-                    search,
-                    contractAddress,
-                    minPrice,
-                    maxPrice,
-                    seller,
-                    isListed,
-                    category,
-                    rarity,
-                    tags,
-                    minRating,
-                    minViews,
-                    minLikes,
-                    minWatchlistCount,
-                    sortBy,
-                    sortOrder
-                },
-                availableCategories: categories.filter(Boolean),
-                availableRarities: rarities.filter(Boolean),
-                priceRange: {
-                    min: priceStats[0]?.minPrice || '0',
-                    max: priceStats[0]?.maxPrice || '0'
-                }
+            availableCategories: categories.filter(Boolean),
+            availableRarities: rarities.filter(Boolean),
+            priceRange: {
+                min: priceMin,
+                max: priceMax
             }
         },
         timestamp: Date.now(),
@@ -610,7 +623,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
     };
 
     const duration = Date.now() - startTime;
-    console.log(`✅ Marketplace query completed in ${duration}ms (${total} total, ${items.length} returned)`);
+    devLog.info(`✅ Marketplace query completed in ${duration}ms (${total} total, ${items.length} returned)`);
 
-    return NextResponse.json(response);
+    return apiSuccess(response);
 });

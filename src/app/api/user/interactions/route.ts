@@ -1,23 +1,18 @@
 ﻿import { NextRequest } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
-import { apiHandler } from '@/lib/api/handler';
-import { withAuth } from '@/lib/middleware';
 import {
     getCachedInteractions,
     setCachedInteractions,
     invalidateAllCachesForNFT
 } from '@/lib/cache';
 import {
+    apiHandler,
     apiSuccess,
-    apiBadRequest,
-    apiInternalError,
-    rateLimit,
-    RATE_LIMIT_CONFIG,
     getQueryParam,
-    parseJsonBody,
     isValidAddress,
     BadRequestError
 } from '@/lib/api';
+import { devLog } from '@/utils';
 
 interface UserInteractionData {
     // Favorites
@@ -45,21 +40,9 @@ interface UserInteractionData {
     lastUpdated: string;
 }
 
-interface CombinedUserInteractionsResponse {
-    success: boolean;
-    data?: UserInteractionData;
-    error?: string;
-}
-
 // GET /api/user/interactions - Get all user interactions for an NFT (AUTH REQUIRED)
 export const GET = apiHandler(async (request: NextRequest) => {
-    // Require authentication
-    await withAuth(request);
-    // @ts-ignore - added by withAuth middleware
     const authenticatedUser = request.userAddress as string;
-
-    // Apply rate limiting (lenient for read operations)
-    await rateLimit(request, RATE_LIMIT_CONFIG.LENIENT);
 
     // Extract and validate parameters
     const userId = getQueryParam(request, 'userId', true);
@@ -84,7 +67,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
     const lowerUserId = authenticatedUser.toLowerCase();
     if (userId.toLowerCase() !== lowerUserId) {
-        console.warn('[user/interactions] userId mismatch, using authenticated user instead');
+        devLog.warn('[user/interactions] userId mismatch, using authenticated user instead');
     }
     const lowerContractAddress = contractAddress.toLowerCase();
 
@@ -149,30 +132,27 @@ export const GET = apiHandler(async (request: NextRequest) => {
     setCachedInteractions(lowerUserId, lowerContractAddress, tokenId, combinedData);
 
     return apiSuccess(combinedData);
-});
+}, { auth: true });
 
 
 // POST /api/user/interactions - Update user interactions (AUTH REQUIRED)
 export const POST = apiHandler(async (request: NextRequest) => {
-    // Require authentication
-    await withAuth(request);
-    // @ts-ignore
     const authenticatedUser = request.userAddress as string;
 
     const body = await request.json();
     const { userId, contractAddress, tokenId, ...updates } = body;
 
     if (!contractAddress || !tokenId) {
-        return apiBadRequest('contractAddress and tokenId are required');
+        throw new BadRequestError('contractAddress and tokenId are required');
     }
 
     if (!isValidAddress(contractAddress)) {
-        return apiBadRequest('Invalid contract address format');
+        throw new BadRequestError('Invalid contract address format');
     }
 
     const lowerUserId = authenticatedUser.toLowerCase();
     if (userId && userId.toLowerCase() !== lowerUserId) {
-        console.warn('[user/interactions] userId mismatch, using authenticated user instead');
+        devLog.warn('[user/interactions] userId mismatch, using authenticated user instead');
     }
     const lowerContractAddress = contractAddress.toLowerCase();
     const timestamp = new Date().toISOString();
@@ -537,10 +517,10 @@ export const POST = apiHandler(async (request: NextRequest) => {
         } : null,
         results
     });
-});
+}, { auth: true });
 
 // PUT /api/user/interactions - Alias for POST (AUTH REQUIRED)
 export const PUT = apiHandler(async (request: NextRequest) => {
     // Re-use POST logic with auth
     return POST(request);
-});
+}, { auth: true });

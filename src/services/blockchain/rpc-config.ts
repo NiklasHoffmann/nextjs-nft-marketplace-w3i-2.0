@@ -1,7 +1,7 @@
 // utils/04-blockchain/05-blockchain-rpc-config.ts
 import { createPublicClient, http, type PublicClient, type Chain, type Transport } from 'viem';
 import { sepolia, mainnet } from 'viem/chains';
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 
 interface RPCEndpointConfig {
     endpoints: string[];

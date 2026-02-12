@@ -22,6 +22,7 @@ import { COLLECTION_WHITELIST_FACET_ABI } from '@/config/abis/collection-whiteli
 import { BUYER_WHITELIST_FACET_ABI } from '@/config/abis/buyer-whitelist-facet';
 import { CURRENCY_WHITELIST_FACET_ABI } from '@/config/abis/currency-whitelist-facet';
 import { DIAMOND_CUT_ABI } from '@/config/abis/diamond-cut';
+import { devLog } from '@/utils';
 
 // ============================================================================
 // Transaction Encoding
@@ -63,7 +64,7 @@ export function encodeDiamondOperation(
 
         return data;
     } catch (error) {
-        console.error(`Failed to encode ${operation}:`, error);
+        devLog.error(`Failed to encode ${operation}:`, error);
         throw new Error(`Failed to encode ${operation}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
@@ -156,7 +157,7 @@ export function decodeContractCall(
             })) ?? [],
         };
     } catch (error) {
-        console.warn('Failed to decode contract call:', error);
+        devLog.warn('Failed to decode contract call:', error);
         return null;
     }
 }

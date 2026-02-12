@@ -3,6 +3,7 @@ import { apiHandler, apiSuccess, BadRequestError } from '@/lib/api';
 import { promises as fs } from 'fs';
 import path from 'path';
 import sharp from 'sharp';
+import { devLog } from '@/utils';
 
 /**
  * IPFS Image Proxy - Layer 3 (Server-Side Image Cache with Compression)
@@ -60,7 +61,7 @@ async function ensureCacheDir() {
     try {
         await fs.mkdir(CACHE_DIR, { recursive: true });
     } catch (err) {
-        console.warn('⚠️ Failed to create cache directory:', err);
+        devLog.warn('⚠️ Failed to create cache directory:', err);
     }
 }
 
@@ -87,7 +88,7 @@ async function saveMetadata(metadata: CacheMetadata): Promise<void> {
     try {
         await fs.writeFile(METADATA_FILE, JSON.stringify(metadata, null, 2));
     } catch (err) {
-        console.warn('⚠️ Failed to save metadata:', err);
+        devLog.warn('⚠️ Failed to save metadata:', err);
     }
 }
 
@@ -132,7 +133,7 @@ async function checkAndCleanup(): Promise<void> {
         return; // No cleanup needed
     }
     
-    console.log(`🧹 Cache cleanup triggered: ${(metadata.totalSize / 1024 / 1024).toFixed(2)} MB / ${MAX_CACHE_SIZE_MB} MB`);
+    devLog.info(`🧹 Cache cleanup triggered: ${(metadata.totalSize / 1024 / 1024).toFixed(2)} MB / ${MAX_CACHE_SIZE_MB} MB`);
     
     const now = Date.now();
     const maxAge = MAX_FILE_AGE_DAYS * 24 * 60 * 60 * 1000;
@@ -165,7 +166,7 @@ async function checkAndCleanup(): Promise<void> {
                 currentSize -= file.size;
                 deleted++;
             } catch (err) {
-                console.warn(`⚠️ Failed to delete ${file.hash}:`, err);
+                devLog.warn(`⚠️ Failed to delete ${file.hash}:`, err);
             }
         }
     }
@@ -174,7 +175,7 @@ async function checkAndCleanup(): Promise<void> {
     metadata.lastCleanup = now;
     await saveMetadata(metadata);
     
-    console.log(`✅ Cleanup complete: Deleted ${deleted} files, ${(currentSize / 1024 / 1024).toFixed(2)} MB remaining`);
+    devLog.info(`✅ Cleanup complete: Deleted ${deleted} files, ${(currentSize / 1024 / 1024).toFixed(2)} MB remaining`);
 }
 
 /**
@@ -192,7 +193,7 @@ async function compressImage(buffer: Buffer): Promise<{ buffer: Buffer; format: 
         const compressedSize = compressed.length;
         const ratio = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
         
-        console.log(`📦 Compressed: ${(originalSize / 1024).toFixed(1)} KB → ${(compressedSize / 1024).toFixed(1)} KB (${ratio}% saved)`);
+        devLog.info(`📦 Compressed: ${(originalSize / 1024).toFixed(1)} KB → ${(compressedSize / 1024).toFixed(1)} KB (${ratio}% saved)`);
         
         return {
             buffer: compressed,
@@ -201,7 +202,7 @@ async function compressImage(buffer: Buffer): Promise<{ buffer: Buffer; format: 
             compressedSize
         };
     } catch (err) {
-        console.warn('⚠️ Compression failed, using original:', err);
+        devLog.warn('⚠️ Compression failed, using original:', err);
         return {
             buffer,
             format: 'original',
@@ -270,7 +271,7 @@ async function fetchFromIPFS(ipfsHash: string): Promise<Buffer | null> {
         }
     }
 
-    console.error('❌ All IPFS gateways failed for:', ipfsHash);
+    devLog.error('❌ All IPFS gateways failed for:', ipfsHash);
     return null;
 }
 
@@ -389,7 +390,7 @@ export async function GET(
         await saveMetadata(metadata);
         
     } catch (err) {
-        console.warn('⚠️ Failed to cache image:', err);
+        devLog.warn('⚠️ Failed to cache image:', err);
     }
 
     // Return compressed image
@@ -437,7 +438,7 @@ export async function DELETE(
                     await fs.unlink(filePath);
                     deleted++;
                 } catch (err) {
-                    console.warn(`⚠️ Failed to delete ${file}:`, err);
+                    devLog.warn(`⚠️ Failed to delete ${file}:`, err);
                 }
             }
             

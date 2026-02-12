@@ -9,7 +9,6 @@
 
 import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, parseJsonBody, NotFoundError, BadRequestError } from '@/lib/api';
-import { withAdmin } from '@/lib/middleware';
 import clientPromise from '@/lib/mongodb';
 import { MultisigProposal } from '@/types';
 
@@ -25,13 +24,10 @@ export async function POST(
     { params }: { params: Promise<{ proposalId: string }> }
 ) {
     return apiHandler(async (req: NextRequest) => {
-        await withAdmin(req);
-
         const { proposalId } = await params;
         const body = await parseJsonBody<ExecuteProposalRequest>(req);
         const { txHash } = body;
 
-        // @ts-ignore - Injected by withAdmin
         const adminAddress = (req.userAddress as string).toLowerCase();
 
         if (!txHash) {
@@ -83,5 +79,5 @@ export async function POST(
             proposal: { ...updatedProposal, _id: updatedProposal?._id?.toString() },
             message: 'Proposal marked as executed successfully'
         });
-    })(request);
+    }, { admin: true })(request);
 }

@@ -5,12 +5,15 @@
  */
 
 import { getEnrichedNFTsCollection } from '@/lib/mongodb';
+import { devLog } from '@/utils';
 
 export class InsightsSync {
     private intervalId: NodeJS.Timeout | null = null;
     private isRunning: boolean = false;
     private itemsProcessed: number = 0;
     private lastRun: Date | null = null;
+    private errorCount: number = 0;
+    private lastErrorAt: Date | null = null;
 
     // Run every 30 minutes (insights change less frequently)
     private readonly INTERVAL_MS = 30 * 60 * 1000;
@@ -23,11 +26,11 @@ export class InsightsSync {
      */
     start() {
         if (this.isRunning) {
-            console.log('⚠️ Insights sync already running');
+            devLog.warn('⚠️ Insights sync already running');
             return;
         }
 
-        console.log('💡 Starting insights sync service...');
+        devLog.info('💡 Starting insights sync service...');
         this.isRunning = true;
 
         // Run after 2 minutes, then on interval
@@ -36,7 +39,7 @@ export class InsightsSync {
             this.intervalId = setInterval(() => this.runSync(), this.INTERVAL_MS);
         }, 2 * 60 * 1000);
 
-        console.log(`✅ Insights sync started (runs every ${this.INTERVAL_MS / 1000 / 60} minutes)`);
+        devLog.info(`✅ Insights sync started (runs every ${this.INTERVAL_MS / 1000 / 60} minutes)`);
     }
 
     /**
@@ -48,7 +51,7 @@ export class InsightsSync {
             this.intervalId = null;
         }
         this.isRunning = false;
-        console.log('🛑 Insights sync stopped');
+        devLog.info('🛑 Insights sync stopped');
     }
 
     /**
@@ -66,7 +69,7 @@ export class InsightsSync {
             const data = await response.json();
 
             if (!data.success || !data.data) {
-                console.log('⚠️ No insights data available');
+                devLog.warn('⚠️ No insights data available');
                 return;
             }
 
@@ -76,7 +79,7 @@ export class InsightsSync {
                 return;
             }
 
-            console.log(`💡 Syncing ${insights.length} insights...`);
+            devLog.info(`💡 Syncing ${insights.length} insights...`);
 
             const collection = await getEnrichedNFTsCollection();
 
@@ -85,14 +88,18 @@ export class InsightsSync {
                     await this.syncInsightForNFT(insight, collection);
                     this.itemsProcessed++;
                 } catch (error) {
-                    console.error(`❌ Error syncing insight for ${insight.contractAddress}-${insight.tokenId}:`, error);
+                    devLog.error(`❌ Error syncing insight for ${insight.contractAddress}-${insight.tokenId}:`, error);
+                    this.errorCount++;
+                    this.lastErrorAt = new Date();
                 }
             }
 
             this.lastRun = new Date();
-            console.log(`✅ Insights sync complete. Processed: ${this.itemsProcessed} total`);
+            devLog.info(`✅ Insights sync complete. Processed: ${this.itemsProcessed} total`);
         } catch (error) {
-            console.error('❌ Error in insights sync:', error);
+            devLog.error('❌ Error in insights sync:', error);
+            this.errorCount++;
+            this.lastErrorAt = new Date();
         }
     }
 
@@ -140,9 +147,9 @@ export class InsightsSync {
             const collection = await getEnrichedNFTsCollection();
             await this.syncInsightForNFT(data.data, collection);
 
-            console.log(`✅ Synced insights for ${contractAddress}-${tokenId}`);
+            devLog.info(`✅ Synced insights for ${contractAddress}-${tokenId}`);
         } catch (error) {
-            console.error(`❌ Failed to sync insights for ${contractAddress}-${tokenId}:`, error);
+            devLog.error(`❌ Failed to sync insights for ${contractAddress}-${tokenId}:`, error);
         }
     }
 
@@ -156,6 +163,8 @@ export class InsightsSync {
             lastRun: this.lastRun,
             intervalMs: this.INTERVAL_MS,
             batchSize: this.BATCH_SIZE,
+            errorCount: this.errorCount,
+            lastErrorAt: this.lastErrorAt,
         };
     }
 }

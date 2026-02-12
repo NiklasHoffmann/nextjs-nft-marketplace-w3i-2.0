@@ -7,7 +7,7 @@
  * Separated from context for better testability and reusability.
  */
 
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 import type { EnrichedNFTDocument, MarketplaceItemsResponse } from '@/types/marketplace/enriched-nft';
 
 export interface MarketplaceItemsCacheEntry {
@@ -58,9 +58,10 @@ export class MarketplaceItemsCache {
      * Set cache entry
      */
     setCache(filterKey: string, data: MarketplaceItemsResponse['data']): void {
+        const items = Array.isArray(data?.items) ? data.items : [];
         // Debug: Log incoming data structure
-        if (data.items.length > 0) {
-            const firstItem: any = data.items[0];
+        if (items.length > 0) {
+            const firstItem: any = items[0];
             devLog.debug('\n📥 [MarketplaceItemsCache] Incoming Data Structure:');
             devLog.debug('Root Level Fields:', {
                 contractAddress: firstItem.contractAddress,
@@ -79,13 +80,16 @@ export class MarketplaceItemsCache {
         }
 
         this.state.entries.set(filterKey, {
-            data,
+            data: {
+                ...data,
+                items,
+            },
             timestamp: Date.now(),
             filters: filterKey
         });
 
         this.state.lastFetched = Date.now();
-        devLog.cache(`Cached ${data.items.length} items for key: ${filterKey}`);
+        devLog.cache(`Cached ${items.length} items for key: ${filterKey}`);
     }
 
     /**

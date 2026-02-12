@@ -12,6 +12,7 @@ import type {
     ProcessedItemBoughtEvent,
     ProcessedItemCanceledEvent
 } from '@/types/marketplace/contract-events';
+import { devLog } from '@/utils';
 
 /**
  * Immediately sync a single listing to MongoDB (real-time)
@@ -20,7 +21,7 @@ import type {
  */
 export async function syncListingToMongoDB(event: ProcessedItemListedEvent): Promise<void> {
     try {
-        console.log('💾 [MongoDB Sync] Syncing listing to database immediately...');
+        devLog.info('💾 [MongoDB Sync] Syncing listing to database immediately...');
 
         const db = await getDatabase();
         const marketplaceCollection = db.collection('marketplace_items');
@@ -90,12 +91,12 @@ export async function syncListingToMongoDB(event: ProcessedItemListedEvent): Pro
         });
 
         if (!existingNFT || !existingNFT.metadata?.name) {
-            console.log('🔍 [MongoDB Sync] NFT metadata missing, triggering IPFS enrichment...');
+            devLog.info('🔍 [MongoDB Sync] NFT metadata missing, triggering IPFS enrichment...');
             
             // Trigger IPFS metadata fetch (don't wait for it - async)
             const metadataSync = new IPFSMetadataLazySync();
             metadataSync.ensureMetadata(nftAddress.toLowerCase(), tokenId.toString()).catch(err => {
-                console.error('⚠️ [MongoDB Sync] Metadata enrichment failed:', err.message);
+                devLog.error('⚠️ [MongoDB Sync] Metadata enrichment failed:', err.message);
             });
         }
 
@@ -114,13 +115,13 @@ export async function syncListingToMongoDB(event: ProcessedItemListedEvent): Pro
             }
         );
 
-        console.log('✅ [MongoDB Sync] Listing synced:', {
+        devLog.info('✅ [MongoDB Sync] Listing synced:', {
             listingId: listingId.toString(),
             nft: `${nftAddress}:${tokenId}`
         });
 
     } catch (error) {
-        console.error('❌ [MongoDB Sync] Failed to sync listing:', error);
+        devLog.error('❌ [MongoDB Sync] Failed to sync listing:', error);
         throw error;
     }
 }
@@ -131,7 +132,7 @@ export async function syncListingToMongoDB(event: ProcessedItemListedEvent): Pro
  */
 export async function removeListingFromMongoDB(contractAddress: string, tokenId: string, listingId: string, buyer?: string): Promise<void> {
     try {
-        console.log('💾 [MongoDB Sync] Removing listing from database...');
+        devLog.info('💾 [MongoDB Sync] Removing listing from database...');
 
         const db = await getDatabase();
         const marketplaceCollection = db.collection('marketplace_items');
@@ -167,7 +168,7 @@ export async function removeListingFromMongoDB(contractAddress: string, tokenId:
 
             // Add old owner to history if exists and owner changed
             if (oldOwner && oldOwner.toLowerCase() !== buyer.toLowerCase()) {
-                console.log(`📝 [MongoDB Sync] Owner changed: ${oldOwner} → ${buyer}`);
+                devLog.info(`📝 [MongoDB Sync] Owner changed: ${oldOwner} → ${buyer}`);
                 
                 // Ensure 'from' timestamp is a Date object
                 let fromDate: Date;
@@ -208,14 +209,14 @@ export async function removeListingFromMongoDB(contractAddress: string, tokenId:
             }
         );
 
-        console.log('✅ [MongoDB Sync] Listing removed:', {
+        devLog.info('✅ [MongoDB Sync] Listing removed:', {
             listingId,
             nft: `${contractAddress}:${tokenId}`,
             newOwner: buyer || 'unchanged'
         });
 
     } catch (error) {
-        console.error('❌ [MongoDB Sync] Failed to remove listing:', error);
+        devLog.error('❌ [MongoDB Sync] Failed to remove listing:', error);
         throw error;
     }
 }
@@ -226,7 +227,7 @@ export async function removeListingFromMongoDB(contractAddress: string, tokenId:
  */
 export async function removeListingByListingId(contractAddress: string, listingId: string): Promise<void> {
     try {
-        console.log('💾 [MongoDB Sync] Removing listing by listingId...');
+        devLog.info('💾 [MongoDB Sync] Removing listing by listingId...');
 
         const db = await getDatabase();
         const marketplaceCollection = db.collection('marketplace_items');
@@ -237,7 +238,7 @@ export async function removeListingByListingId(contractAddress: string, listingI
         });
 
         if (!listing) {
-            console.warn('⚠️ [MongoDB Sync] Listing not found for listingId removal:', {
+            devLog.warn('⚠️ [MongoDB Sync] Listing not found for listingId removal:', {
                 contractAddress,
                 listingId
             });
@@ -250,7 +251,7 @@ export async function removeListingByListingId(contractAddress: string, listingI
             listingId.toString()
         );
     } catch (error) {
-        console.error('❌ [MongoDB Sync] Failed to remove listing by listingId:', error);
+        devLog.error('❌ [MongoDB Sync] Failed to remove listing by listingId:', error);
         throw error;
     }
 }
@@ -261,7 +262,7 @@ export async function removeListingByListingId(contractAddress: string, listingI
  */
 export async function updateListingInMongoDB(event: any): Promise<void> {
     try {
-        console.log('💾 [MongoDB Sync] Updating listing in database...');
+        devLog.info('💾 [MongoDB Sync] Updating listing in database...');
 
         const db = await getDatabase();
         const marketplaceCollection = db.collection('marketplace_items');
@@ -303,9 +304,9 @@ export async function updateListingInMongoDB(event: any): Promise<void> {
         );
 
         if (result.matchedCount === 0) {
-            console.warn('⚠️ [MongoDB Sync] Listing not found for update, might need to sync from TheGraph');
+            devLog.warn('⚠️ [MongoDB Sync] Listing not found for update, might need to sync from TheGraph');
         } else {
-            console.log('✅ [MongoDB Sync] Listing updated:', {
+            devLog.info('✅ [MongoDB Sync] Listing updated:', {
                 listingId: listingId.toString(),
                 nft: `${nftAddress}:${tokenId}`,
                 newPrice: newPrice.toString(),
@@ -314,7 +315,7 @@ export async function updateListingInMongoDB(event: any): Promise<void> {
         }
 
     } catch (error) {
-        console.error('❌ [MongoDB Sync] Failed to update listing:', error);
+        devLog.error('❌ [MongoDB Sync] Failed to update listing:', error);
         throw error;
     }
 }

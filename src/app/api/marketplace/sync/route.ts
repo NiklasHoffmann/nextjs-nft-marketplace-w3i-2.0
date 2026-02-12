@@ -9,6 +9,7 @@ import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, BadRequestError } from '@/lib/api';
 import { getNFTSyncService } from '@/services/nft-sync';
 import { setupMongoDBIndexes } from '@/lib/db/setup-indexes';
+import { devLog } from '@/utils';
 
 // Auto-start service on module load (server-side only)
 if (typeof window === 'undefined') {
@@ -27,12 +28,12 @@ if (typeof window === 'undefined') {
                 const status = syncService.getStatus();
 
                 if (!status.isRunning) {
-                    console.log('🚀 Auto-starting NFT Sync Service...');
+                    devLog.info('🚀 Auto-starting NFT Sync Service...');
                     await syncService.start();
-                    console.log('✅ NFT Sync Service auto-started successfully');
+                    devLog.info('✅ NFT Sync Service auto-started successfully');
                 }
             } catch (error) {
-                console.error('❌ Failed to auto-start NFT Sync Service:', error);
+                devLog.error('❌ Failed to auto-start NFT Sync Service:', error);
             }
         });
     }
@@ -73,7 +74,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
     }
 
     // action === 'force'
-    console.log('🔄 [API] Force sync triggered');
+    devLog.info('🔄 [API] Force sync triggered');
     await syncService.syncOnce();
     return apiSuccess({
         message: 'Immediate sync completed',

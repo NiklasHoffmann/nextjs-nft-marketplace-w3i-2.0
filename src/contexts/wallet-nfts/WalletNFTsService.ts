@@ -7,7 +7,7 @@
  * Separated from context to follow Single Responsibility Principle.
  */
 
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 import type { EnrichedNFTDocument } from '@/types/marketplace/enriched-nft';
 
 // External NFT data from Alchemy/Moralis
@@ -87,7 +87,7 @@ export class WalletNFTsService {
                 const walletNFTs: WalletNFT[] = dbResult.data.nfts.map((nft: any, index: number) => {
                     // DEBUG: Log first listed NFT
                     if (nft.isListed && index === 0) {
-                        console.log('🔍 [WalletNFTsService] First listed NFT from API:', {
+                        devLog.debug('🔍 [WalletNFTsService] First listed NFT from API:', {
                             tokenId: nft.tokenId,
                             price: nft.price,
                             currency: nft.currency,
@@ -137,7 +137,7 @@ export class WalletNFTsService {
                 // DEBUG: Log first mapped listed NFT
                 const firstMappedListed = walletNFTs.find(n => n.isListed);
                 if (firstMappedListed) {
-                    console.log('🔍 [WalletNFTsService] First mapped listed NFT:', {
+                    devLog.debug('🔍 [WalletNFTsService] First mapped listed NFT:', {
                         tokenId: firstMappedListed.tokenId,
                         listingPrice: firstMappedListed.listingPrice,
                         currency: firstMappedListed.currency,

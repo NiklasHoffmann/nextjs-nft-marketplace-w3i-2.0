@@ -275,6 +275,8 @@ export interface EventListenerState {
     lastEventAt: number | null;
     /** Connection attempts */
     reconnectAttempts: number;
+    /** Keepalive failure count */
+    keepaliveFailures: number;
     /** Active event subscriptions */
     activeSubscriptions: MarketplaceEventName[];
 }

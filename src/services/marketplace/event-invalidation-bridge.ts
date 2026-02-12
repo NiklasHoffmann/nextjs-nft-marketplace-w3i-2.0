@@ -22,6 +22,7 @@ import {
     invalidateAfterCancelListing,
     type InvalidationEventDetail
 } from '@/services/validation';
+import { devLog } from '@/utils';
 import type {
     ProcessedMarketplaceEvent,
     ProcessedItemListedEvent,
@@ -37,7 +38,7 @@ import type {
 export function handleListingCreated(event: ProcessedItemListedEvent): void {
     const { nftAddress, tokenId, listingId, seller } = event.data;
 
-    console.log('🔄 [EventBridge] ListingCreated:', {
+    devLog.info('[EventBridge] ListingCreated:', {
         listingId: listingId.toString(),
         nft: `${nftAddress}:${tokenId}`,
         seller
@@ -45,7 +46,7 @@ export function handleListingCreated(event: ProcessedItemListedEvent): void {
 
     // CLIENT-SIDE: Invalidate using existing context system (immediate feedback for active user)
     if (typeof window !== 'undefined') {
-        console.log('🔄 [EventBridge CLIENT] Triggering client-side invalidation...');
+        devLog.info('[EventBridge CLIENT] Triggering client-side invalidation...');
         invalidateAfterListing(
             nftAddress,
             tokenId.toString(),
@@ -77,7 +78,7 @@ export function handleListingPurchased(event: ProcessedItemBoughtEvent): void {
     const { nftAddress, tokenId, listingId, buyer } = event.data;
     const seller = (event.data as any).seller; // May not be in type yet
 
-    console.log('🔄 [EventBridge] ListingPurchased:', {
+    devLog.info('[EventBridge] ListingPurchased:', {
         listingId: listingId.toString(),
         nft: `${nftAddress}:${tokenId}`,
         buyer,
@@ -115,7 +116,7 @@ export function handleListingPurchased(event: ProcessedItemBoughtEvent): void {
 export function handleListingCanceled(event: ProcessedItemCanceledEvent): void {
     const { nftAddress, tokenId, listingId, seller } = event.data;
 
-    console.log('🔄 [EventBridge] ListingCanceled:', {
+    devLog.info('[EventBridge] ListingCanceled:', {
         listingId: listingId.toString(),
         nft: `${nftAddress}:${tokenId}`,
         seller
@@ -150,7 +151,7 @@ export function handleListingCanceled(event: ProcessedItemCanceledEvent): void {
 export function handleListingCanceledDueToInvalid(event: ProcessedListingCanceledDueToInvalidListingEvent): void {
     const { nftAddress, tokenId, listingId, seller, triggeredBy } = event.data;
 
-    console.log('🔄 [EventBridge] ListingCanceledDueToInvalidListing:', {
+        devLog.info('[EventBridge] ListingCanceledDueToInvalidListing:', {
         listingId: listingId.toString(),
         nft: `${nftAddress}:${tokenId}`,
         seller,
@@ -189,7 +190,7 @@ export function handleListingCanceledDueToInvalid(event: ProcessedListingCancele
 export function handleCollectionWhitelistRevoked(event: ProcessedCollectionWhitelistRevokedCancelTriggeredEvent): void {
     const { listingId, tokenAddress } = event.data;
 
-    console.log('🔄 [EventBridge] CollectionWhitelistRevokedCancelTriggered:', {
+        devLog.info('[EventBridge] CollectionWhitelistRevokedCancelTriggered:', {
         listingId: listingId.toString(),
         collection: tokenAddress,
         reason: 'Collection removed from whitelist'
@@ -225,7 +226,7 @@ export function handleCollectionWhitelistRevoked(event: ProcessedCollectionWhite
 export function handleBuyerWhitelisted(event: ProcessedBuyerWhitelistedEvent): void {
     const { listingId, buyer } = event.data;
 
-    console.log('🔄 [EventBridge] BuyerWhitelisted:', {
+        devLog.info('[EventBridge] BuyerWhitelisted:', {
         listingId: listingId.toString(),
         buyer
     });
@@ -238,7 +239,7 @@ export function handleBuyerWhitelisted(event: ProcessedBuyerWhitelistedEvent): v
 export function handleBuyerRemovedFromWhitelist(event: ProcessedBuyerRemovedFromWhitelistEvent): void {
     const { listingId, buyer } = event.data;
 
-    console.log('🔄 [EventBridge] BuyerRemovedFromWhitelist:', {
+        devLog.info('[EventBridge] BuyerRemovedFromWhitelist:', {
         listingId: listingId.toString(),
         buyer
     });
@@ -251,7 +252,7 @@ export function handleBuyerRemovedFromWhitelist(event: ProcessedBuyerRemovedFrom
 export function handleListingUpdated(event: ProcessedItemUpdatedEvent): void {
     const { nftAddress, tokenId, listingId, newPrice } = event.data;
 
-    console.log('🔄 [EventBridge] ListingUpdated:', {
+        devLog.info('[EventBridge] ListingUpdated:', {
         listingId: listingId.toString(),
         nft: `${nftAddress}:${tokenId}`,
         newPrice: newPrice.toString()
@@ -373,14 +374,14 @@ export function routeMarketplaceEvent(event: ProcessedMarketplaceEvent | any): v
                 break;
 
             default:
-                console.warn('⚠️ [EventBridge] Unknown event type:', (event as any).eventName);
+                    devLog.warn('[EventBridge] Unknown event type:', (event as any).eventName);
         }
     } catch (error) {
-        console.error('❌ [EventBridge] Event routing error:', error);
-        console.error('   Error message:', (error as any)?.message);
-        console.error('   Error stack:', (error as any)?.stack);
-        console.error('   Error name:', (error as any)?.name);
-        console.error('   Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+            devLog.error('[EventBridge] Event routing error:', error);
+            devLog.error('Error message:', (error as any)?.message);
+            devLog.error('Error stack:', (error as any)?.stack);
+            devLog.error('Error name:', (error as any)?.name);
+            devLog.error('Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     }
 }
 
@@ -391,14 +392,14 @@ export function routeMarketplaceEvent(event: ProcessedMarketplaceEvent | any): v
  * Call this once in your app root
  */
 export function setupGlobalEventInvalidation(): () => void {
-    console.log('🔗 [EventBridge] Setting up global event invalidation...');
+    devLog.info('[EventBridge] Setting up global event invalidation...');
 
     // This will be connected to the event listener service
     // For now, it's a placeholder
 
     // Return cleanup function
     return () => {
-        console.log('🔗 [EventBridge] Cleaning up global event invalidation');
+           devLog.info('[EventBridge] Cleaning up global event invalidation');
     };
 }
 

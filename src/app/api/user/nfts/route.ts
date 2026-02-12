@@ -6,20 +6,17 @@
  */
 
 import { NextRequest } from 'next/server';
-import { apiHandler } from '@/lib/api/handler';
-import { withAuth } from '@/lib/middleware';
 import {
+    apiHandler,
     apiSuccess,
-    apiBadRequest,
-    apiInternalError,
-    rateLimit,
-    RATE_LIMIT_CONFIG,
     getQueryParam,
     isValidAddress,
-    BadRequestError
+    BadRequestError,
+    ForbiddenError
 } from '@/lib/api';
 import { getCollection } from '@/lib/mongodb';
 import type { EnrichedNFTMetadata } from '@/types';
+import { devLog } from '@/utils';
 
 /**
  * GET /api/user/nfts
@@ -28,11 +25,7 @@ import type { EnrichedNFTMetadata } from '@/types';
  * Query params: walletAddress (required), plus filters (same as /api/marketplace/items)
  */
 export const GET = apiHandler(async (request: NextRequest) => {
-    await withAuth(request);
-    // @ts-ignore
     const authenticatedUser = request.userAddress as string;
-
-    await rateLimit(request, RATE_LIMIT_CONFIG.LENIENT);
 
     const walletAddress = getQueryParam(request, 'walletAddress', true);
 
@@ -41,6 +34,11 @@ export const GET = apiHandler(async (request: NextRequest) => {
     }
 
     const lowerWalletAddress = walletAddress.toLowerCase();
+    const lowerAuthenticatedUser = authenticatedUser.toLowerCase();
+
+    if (lowerWalletAddress !== lowerAuthenticatedUser) {
+        throw new ForbiddenError('Wallet address does not match authenticated user');
+    }
 
     // Parse filter parameters (same as marketplace)
     const { searchParams } = new URL(request.url);
@@ -59,19 +57,22 @@ export const GET = apiHandler(async (request: NextRequest) => {
     const sortBy = searchParams.get('sortBy') || 'lastVerified';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
 
-    console.log(`📋 [User NFTs] Loading NFTs for wallet: ${lowerWalletAddress}`);
-    console.log(`🔍 [User NFTs] Filters:`, {
+    devLog.debug(`📋 [User NFTs] Loading NFTs for wallet: ${lowerWalletAddress}`);
+    devLog.debug(`🔍 [User NFTs] Filters:`, {
         search, category, rarity, minPrice, maxPrice,
         minRating, minViews, minLikes, minWatchlistCount, isListed
     });
-    console.log(`📊 [User NFTs] Sort:`, { sortBy, sortOrder });
+    devLog.debug(`📊 [User NFTs] Sort:`, { sortBy, sortOrder });
 
     // Query nft_metadata with enrichment
     const nftMetadataCollection = await getCollection('nft_metadata');
 
     // Build match query for wallet + basic filters
     const matchQuery: any = {
-        currentOwner: lowerWalletAddress
+        $or: [
+            { currentOwner: lowerWalletAddress },
+            { 'blockchain.owner': lowerWalletAddress }
+        ]
     };
 
     // Apply filters (same logic as marketplace)
@@ -306,12 +307,12 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
     const nfts = await nftMetadataCollection.aggregate(pipeline).toArray();
 
-    console.log(`✅ [User NFTs] Found ${nfts.length} NFTs`);
+    devLog.debug(`✅ [User NFTs] Found ${nfts.length} NFTs`);
 
     // DEBUG: Log first listed NFT to check currency/listingType
     const firstListed = nfts.find((n: any) => n.isListed);
     if (firstListed) {
-        console.log('🔍 [API /user/nfts] First listed NFT from MongoDB:', {
+        devLog.debug('🔍 [API /user/nfts] First listed NFT from MongoDB:', {
             tokenId: firstListed.tokenId,
             price: firstListed.price,
             currency: firstListed.currency,
@@ -332,4 +333,4 @@ export const GET = apiHandler(async (request: NextRequest) => {
         source: 'database',
         cached: true
     });
-});
+}, { auth: true });

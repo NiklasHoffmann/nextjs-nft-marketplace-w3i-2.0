@@ -5,12 +5,15 @@
  */
 
 import { getEnrichedNFTsCollection, getCollection } from '@/lib/mongodb';
+import { devLog } from '@/utils';
 
 export class StatsSync {
     private intervalId: NodeJS.Timeout | null = null;
     private isRunning: boolean = false;
     private itemsProcessed: number = 0;
     private lastRun: Date | null = null;
+    private errorCount: number = 0;
+    private lastErrorAt: Date | null = null;
 
     // Run every 5 minutes
     private readonly INTERVAL_MS = 5 * 60 * 1000;
@@ -23,11 +26,11 @@ export class StatsSync {
      */
     start() {
         if (this.isRunning) {
-            console.log('⚠️ Stats sync already running');
+            devLog.warn('⚠️ Stats sync already running');
             return;
         }
 
-        console.log('📊 Starting stats sync service...');
+        devLog.info('📊 Starting stats sync service...');
         this.isRunning = true;
 
         // Run after 1 minute, then on interval
@@ -36,7 +39,7 @@ export class StatsSync {
             this.intervalId = setInterval(() => this.runSync(), this.INTERVAL_MS);
         }, 60 * 1000);
 
-        console.log(`✅ Stats sync started (runs every ${this.INTERVAL_MS / 1000 / 60} minutes)`);
+        devLog.info(`✅ Stats sync started (runs every ${this.INTERVAL_MS / 1000 / 60} minutes)`);
     }
 
     /**
@@ -48,7 +51,7 @@ export class StatsSync {
             this.intervalId = null;
         }
         this.isRunning = false;
-        console.log('🛑 Stats sync stopped');
+        devLog.info('🛑 Stats sync stopped');
     }
 
     /**
@@ -73,21 +76,25 @@ export class StatsSync {
                 return;
             }
 
-            console.log(`📊 Syncing stats for ${activeNFTs.length} NFTs...`);
+            devLog.info(`📊 Syncing stats for ${activeNFTs.length} NFTs...`);
 
             for (const nft of activeNFTs) {
                 try {
                     await this.syncStatsForNFT(nft.contractAddress, nft.tokenId);
                     this.itemsProcessed++;
                 } catch (error) {
-                    console.error(`❌ Error syncing stats for ${nft.contractAddress}-${nft.tokenId}:`, error);
+                    devLog.error(`❌ Error syncing stats for ${nft.contractAddress}-${nft.tokenId}:`, error);
+                    this.errorCount++;
+                    this.lastErrorAt = new Date();
                 }
             }
 
             this.lastRun = new Date();
-            console.log(`✅ Stats sync complete. Processed: ${this.itemsProcessed} total`);
+            devLog.info(`✅ Stats sync complete. Processed: ${this.itemsProcessed} total`);
         } catch (error) {
-            console.error('❌ Error in stats sync:', error);
+            devLog.error('❌ Error in stats sync:', error);
+            this.errorCount++;
+            this.lastErrorAt = new Date();
         }
     }
 
@@ -144,7 +151,7 @@ export class StatsSync {
                 { $set: { 'lastSync.stats': new Date() } }
             );
         } catch (error) {
-            console.error(`❌ Failed to sync stats for ${contractAddress}-${tokenId}:`, error);
+            devLog.error(`❌ Failed to sync stats for ${contractAddress}-${tokenId}:`, error);
         }
     }
 
@@ -158,6 +165,8 @@ export class StatsSync {
             lastRun: this.lastRun,
             intervalMs: this.INTERVAL_MS,
             batchSize: this.BATCH_SIZE,
+            errorCount: this.errorCount,
+            lastErrorAt: this.lastErrorAt,
         };
     }
 }

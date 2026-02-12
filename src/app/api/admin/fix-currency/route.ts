@@ -13,8 +13,8 @@
  */
 
 import { NextRequest } from 'next/server';
-import { apiHandler } from '@/lib/api/handler';
-import { createSuccessResponse } from '@/lib/api/responses';
+import { apiHandler } from '@/lib/api';
+import { createSuccessResponse } from '@/lib/api';
 import { getCurrencyFixSync } from '@/services/nft-sync/currency-fix-sync';
 
 export const POST = apiHandler(async (request: NextRequest) => {

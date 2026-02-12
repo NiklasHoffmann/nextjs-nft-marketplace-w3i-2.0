@@ -8,11 +8,11 @@
  * ```typescript
  * const { isConnected, eventsReceived } = useMarketplaceEvents({
  *   onItemListed: (event) => {
- *     console.log('New listing:', event.data.listingId);
+ *     devLog.info('New listing:', event.data.listingId);
  *     // Invalidate cache, update UI
  *   },
  *   onItemBought: (event) => {
- *     console.log('NFT sold:', event.data.listingId);
+ *     devLog.info('NFT sold:', event.data.listingId);
  *   }
  * });
  * ```
@@ -40,6 +40,7 @@ import type {
     MarketplaceEventCallback
 } from '@/types/marketplace/contract-events';
 import type { Address } from 'viem';
+import { devLog } from '@/utils';
 
 // ===== HOOK CONFIGURATION =====
 
@@ -79,7 +80,7 @@ const DEFAULT_MARKETPLACE_ADDRESS: Address = '0x1107Eb26D47A5bF88E9a9F97cbC7EA38
 // ===== HOOK IMPLEMENTATION =====
 
 export function useMarketplaceEvents(config: UseMarketplaceEventsConfig = {}): UseMarketplaceEventsReturn {
-    console.log('🎣 [useMarketplaceEvents] Hook initialized with config:', {
+    devLog.info('🎣 [useMarketplaceEvents] Hook initialized with config:', {
         autoStart: config.autoStart ?? true,
         requireConnection: config.requireConnection ?? false,
         marketplaceAddress: config.marketplaceAddress || 'default',
@@ -109,10 +110,10 @@ export function useMarketplaceEvents(config: UseMarketplaceEventsConfig = {}): U
 
     const isStartedRef = useRef(listenerRef.current.getState().isActive);
 
-    console.log('🔗 [useMarketplaceEvents] Service instance created/retrieved');
-    console.log('   listenerRef.current:', !!listenerRef.current);
-    console.log('   marketplaceAddress:', marketplaceAddress);
-    console.log('   wsUrl:', wsUrl || 'from env');
+    devLog.info('🔗 [useMarketplaceEvents] Service instance created/retrieved');
+    devLog.info('   listenerRef.current:', !!listenerRef.current);
+    devLog.info('   marketplaceAddress:', marketplaceAddress);
+    devLog.info('   wsUrl:', wsUrl || 'from env');
 
     // Update config ref when it changes
     useEffect(() => {
@@ -123,10 +124,10 @@ export function useMarketplaceEvents(config: UseMarketplaceEventsConfig = {}): U
     const updateState = useCallback(() => {
         try {
             const newState = listenerRef.current.getState();
-            console.log('🔄 [updateState] Callback triggered, syncing state:', newState);
+            devLog.info('🔄 [updateState] Callback triggered, syncing state:', newState);
             setState(newState);
         } catch (error) {
-            console.error('❌ [updateState] Error:', error);
+            devLog.error('❌ [updateState] Error:', error);
         }
     }, []);
 
@@ -180,18 +181,18 @@ export function useMarketplaceEvents(config: UseMarketplaceEventsConfig = {}): U
 
     // Auto-start effect (runs ONCE on mount)
     useEffect(() => {
-        console.log('🚀 [Auto-Start Effect] Mounted, autoStart:', autoStart);
+        devLog.info('🚀 [Auto-Start Effect] Mounted, autoStart:', autoStart);
 
         if (autoStart && !isStartedRef.current) {
             const currentState = listenerRef.current.getState();
-            console.log('📊 [Auto-Start] Current service state:', currentState);
+            devLog.info('📊 [Auto-Start] Current service state:', currentState);
 
             if (!currentState.isActive) {
-                console.log('🚀 [Auto-Start] Starting listener with callbacks...');
+                devLog.info('🚀 [Auto-Start] Starting listener with callbacks...');
                 isStartedRef.current = true;
                 listenerRef.current.start(wrappedConfigRef.current);
             } else {
-                console.log('✅ [Auto-Start] Service already active');
+                devLog.info('✅ [Auto-Start] Service already active');
                 isStartedRef.current = true;
             }
         }
@@ -205,31 +206,31 @@ export function useMarketplaceEvents(config: UseMarketplaceEventsConfig = {}): U
 
     // Start listening
     const start = useCallback(async () => {
-        console.log('🚀 [useMarketplaceEvents] start() called');
-        console.log('   isStartedRef.current:', isStartedRef.current);
-        console.log('   requireConnection:', requireConnection);
-        console.log('   walletConnected:', walletConnected);
+        devLog.info('🚀 [useMarketplaceEvents] start() called');
+        devLog.info('   isStartedRef.current:', isStartedRef.current);
+        devLog.info('   requireConnection:', requireConnection);
+        devLog.info('   walletConnected:', walletConnected);
 
         if (isStartedRef.current) {
-            console.log('⏭️ [useMarketplaceEvents] Already started, skipping');
+            devLog.info('⏭️ [useMarketplaceEvents] Already started, skipping');
             return;
         }
 
         // Check wallet connection requirement
         if (requireConnection && !walletConnected) {
-            console.log('⏸️ [useMarketplaceEvents] Waiting for wallet connection...');
+            devLog.info('⏸️ [useMarketplaceEvents] Waiting for wallet connection...');
             return;
         }
 
-        console.log('✓ [useMarketplaceEvents] Starting event listener...');
+        devLog.info('✓ [useMarketplaceEvents] Starting event listener...');
         try {
             await listenerRef.current.start(wrappedConfigRef.current);
             isStartedRef.current = true;
             updateState();
-            console.log('✅ [useMarketplaceEvents] Event listener started successfully!');
+            devLog.info('✅ [useMarketplaceEvents] Event listener started successfully!');
         } catch (error) {
-            console.error('❌ [useMarketplaceEvents] Start failed:', error);
-            console.error('   Error details:', error instanceof Error ? error.message : String(error));
+            devLog.error('❌ [useMarketplaceEvents] Start failed:', error);
+            devLog.error('   Error details:', error instanceof Error ? error.message : String(error));
         }
     }, [requireConnection, walletConnected, updateState]);
 
@@ -244,7 +245,7 @@ export function useMarketplaceEvents(config: UseMarketplaceEventsConfig = {}): U
             isStartedRef.current = false;
             updateState();
         } catch (error) {
-            console.error('❌ [useMarketplaceEvents] Stop failed:', error);
+            devLog.error('❌ [useMarketplaceEvents] Stop failed:', error);
         }
     }, [updateState]);
 
@@ -253,7 +254,7 @@ export function useMarketplaceEvents(config: UseMarketplaceEventsConfig = {}): U
         return listenerRef.current.subscribe(eventName as any, callback);
     }, []);
 
-    console.log('📋 [useMarketplaceEvents] Before effects - state:', {
+    devLog.info('📋 [useMarketplaceEvents] Before effects - state:', {
         autoStart,
         isStartedRef: isStartedRef.current,
         requireConnection,
@@ -262,15 +263,15 @@ export function useMarketplaceEvents(config: UseMarketplaceEventsConfig = {}): U
 
     // Auto-start effect
     useEffect(() => {
-        console.log('🔄 [useMarketplaceEvents] Auto-start effect triggered');
-        console.log('   autoStart:', autoStart);
-        console.log('   isStartedRef.current:', isStartedRef.current);
+        devLog.info('🔄 [useMarketplaceEvents] Auto-start effect triggered');
+        devLog.info('   autoStart:', autoStart);
+        devLog.info('   isStartedRef.current:', isStartedRef.current);
 
         if (autoStart && !isStartedRef.current) {
-            console.log('➡️ [useMarketplaceEvents] Calling start()...');
+            devLog.info('➡️ [useMarketplaceEvents] Calling start()...');
             start();
         } else if (!autoStart) {
-            console.log('⏸️ [useMarketplaceEvents] autoStart is false, not starting');
+            devLog.info('⏸️ [useMarketplaceEvents] autoStart is false, not starting');
         }
 
         // NO cleanup - service is a singleton and should persist across component lifecycles
@@ -288,7 +289,7 @@ export function useMarketplaceEvents(config: UseMarketplaceEventsConfig = {}): U
         }
     }, [requireConnection, walletConnected, start, stop]);
 
-    console.log('✅ [useMarketplaceEvents] Hook render complete, returning state');
+    devLog.info('✅ [useMarketplaceEvents] Hook render complete, returning state');
 
     return {
         isConnected: state.isConnected,

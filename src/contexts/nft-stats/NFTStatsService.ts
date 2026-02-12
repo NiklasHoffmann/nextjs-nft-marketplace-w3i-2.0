@@ -8,7 +8,7 @@
  */
 
 import type { NFTStatsWithMeta } from '@/types';
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 
 // Re-export the stats type with metadata
 export type NFTStats = NFTStatsWithMeta;

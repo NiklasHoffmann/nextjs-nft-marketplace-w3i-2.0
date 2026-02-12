@@ -4,7 +4,7 @@
  */
 
 import { QueryClient } from '@tanstack/react-query';
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 
 export interface CacheInvalidationConfig {
     // Blockchain events that trigger invalidation

@@ -2,7 +2,7 @@
  * Utility functions for Admin access control
  */
 
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 
 /**
  * Check if a wallet address has admin access

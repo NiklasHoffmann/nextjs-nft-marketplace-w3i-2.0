@@ -1,4 +1,5 @@
 import { MongoClient, Db, MongoClientOptions } from 'mongodb';
+import { devLog } from '@/utils';
 
 if (!process.env.MONGODB_URI) {
     throw new Error('Please add your MongoDB URI to .env.local');
@@ -47,7 +48,7 @@ export async function connectToDatabase(): Promise<{ db: Db; client: MongoClient
         const db = client.db();
         return { db, client };
     } catch (error: any) {
-        console.error('❌ [MongoDB] Connection failed:', error);
+        devLog.error('❌ [MongoDB] Connection failed:', error);
         throw new MongoConnectionError(error);
     }
 }
@@ -59,7 +60,7 @@ export async function getDatabase(): Promise<Db> {
         // Use the database name from the URI instead of hardcoding it
         return client.db(); // This will use the database name from the connection string
     } catch (error: any) {
-        console.error('❌ [MongoDB] Connection failed:', error);
+        devLog.error('❌ [MongoDB] Connection failed:', error);
         throw new MongoConnectionError(error);
     }
 }
@@ -174,7 +175,7 @@ export async function initializeIndexes() {
     const db = await getDatabase();
     const enrichedNFTs = db.collection('marketplace_items');
 
-    console.log('🔧 Creating MongoDB indexes...');
+    devLog.info('🔧 Creating MongoDB indexes...');
 
     try {
         // Unique compound index for NFT identifier
@@ -211,9 +212,9 @@ export async function initializeIndexes() {
         await enrichedNFTs.createIndex({ lastUpdated: 1 }, { name: 'last_updated' });
         await enrichedNFTs.createIndex({ createdAt: 1 }, { name: 'created_at' });
 
-        console.log('✅ MongoDB indexes created successfully');
+        devLog.info('✅ MongoDB indexes created successfully');
     } catch (error) {
-        console.error('❌ Error creating MongoDB indexes:', error);
+        devLog.error('❌ Error creating MongoDB indexes:', error);
         throw error;
     }
 }

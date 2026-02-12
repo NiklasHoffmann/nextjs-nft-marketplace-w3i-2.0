@@ -88,7 +88,7 @@ export type NFTStatsChangedEvent = CustomEvent<NFTStatsChangedDetail>;
  * ```typescript
  * window.addEventListener('nft-stats-updated', (event) => {
  *   // event.detail is properly typed as NFTStatsUpdateDetail
- *   console.log(event.detail.stats.favoriteCount);
+ *   devLog.info(event.detail.stats.favoriteCount);
  * });
  * ```
  */

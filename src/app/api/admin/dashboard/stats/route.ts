@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
-import { apiHandler } from '@/lib/api/handler';
+import { apiHandler, apiSuccess } from '@/lib/api';
 
 /**
  * GET /api/admin/dashboard/stats
@@ -127,27 +127,24 @@ async function handler(req: NextRequest) {
         .limit(5)
         .toArray();
 
-    return NextResponse.json({
-        success: true,
-        data: {
-            totalNFTs,
-            activeListings,
-            listedVolume,      // Summe der Preise von aktuell gelisteten Items
-            salesVolume,       // Summe der Preise von verkauften Items
-            totalVolume: salesVolume, // Backwards compatibility
-            totalUsers,
-            totalSales,
-            pendingListings,
-            cancelledListings,
-            recentSales: recentSales.map((sale: any) => ({
-                nftAddress: sale.nftAddress,
-                tokenId: sale.tokenId,
-                price: sale.price,
-                seller: sale.seller,
-                buyer: sale.buyer,
-                soldAt: sale.updatedAt
-            }))
-        }
+    return apiSuccess({
+        totalNFTs,
+        activeListings,
+        listedVolume,      // Summe der Preise von aktuell gelisteten Items
+        salesVolume,       // Summe der Preise von verkauften Items
+        totalVolume: salesVolume, // Backwards compatibility
+        totalUsers,
+        totalSales,
+        pendingListings,
+        cancelledListings,
+        recentSales: recentSales.map((sale: any) => ({
+            nftAddress: sale.nftAddress,
+            tokenId: sale.tokenId,
+            price: sale.price,
+            seller: sale.seller,
+            buyer: sale.buyer,
+            soldAt: sale.updatedAt
+        }))
     });
 }
 

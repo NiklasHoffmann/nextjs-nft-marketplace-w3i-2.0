@@ -8,6 +8,7 @@ import {
 } from '@rainbow-me/rainbowkit/wallets'
 import { createConfig } from 'wagmi'
 import { createPublicClient } from 'viem'
+import { devLog } from '@/utils'
 
 export const appName = 'Next.js NFT Marketplace W3i 2.0'
 
@@ -29,8 +30,8 @@ const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
 
 // Validierung der Project ID
 if (!projectId) {
-    console.warn('⚠️ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ist nicht gesetzt. WalletConnect wird möglicherweise nicht funktionieren.')
-    console.warn('📝 Erstelle eine Project ID auf https://cloud.walletconnect.com')
+    devLog.warn('⚠️ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ist nicht gesetzt. WalletConnect wird möglicherweise nicht funktionieren.')
+    devLog.warn('📝 Erstelle eine Project ID auf https://cloud.walletconnect.com')
 }
 
 // Simplified Connector-Konfiguration - Use injected wallet instead of MetaMask SDK

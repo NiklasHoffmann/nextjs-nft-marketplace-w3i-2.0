@@ -6,7 +6,6 @@
 
 import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, NotFoundError, BadRequestError, ForbiddenError } from '@/lib/api';
-import { withAdmin } from '@/lib/middleware';
 import clientPromise from '@/lib/mongodb';
 import { MultisigProposal, ProposalConfirmation } from '@/types';
 
@@ -18,10 +17,7 @@ export async function POST(
     { params }: { params: Promise<{ proposalId: string }> }
 ) {
     return apiHandler(async (req: NextRequest) => {
-        await withAdmin(req);
-
         const { proposalId } = await params;
-        // @ts-ignore - Injected by withAdmin
         const adminAddress = (req.userAddress as string).toLowerCase();
 
         const client = await clientPromise;
@@ -99,5 +95,5 @@ export async function POST(
                 ? 'Proposal confirmed! Ready to execute.'
                 : 'Confirmation added successfully'
         });
-    })(request);
+    }, { admin: true })(request);
 }

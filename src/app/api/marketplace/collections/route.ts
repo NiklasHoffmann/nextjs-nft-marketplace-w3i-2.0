@@ -18,8 +18,9 @@
 import { NextRequest } from 'next/server';
 import { getEnrichedNFTsCollection } from '@/lib/mongodb';
 import { formatEther } from 'viem';
-import { apiHandler } from '@/lib/api/handler';
-import { apiSuccess } from '@/lib/api/responses';
+import { apiHandler } from '@/lib/api';
+import { apiSuccess } from '@/lib/api';
+import { devLog } from '@/utils';
 
 export const GET = apiHandler(async (request: NextRequest) => {
     const startTime = Date.now();
@@ -171,7 +172,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
     };
 
     const duration = Date.now() - startTime;
-    console.log(`✅ Collections query completed in ${duration}ms (${total} collections)`);
+    devLog.info(`✅ Collections query completed in ${duration}ms (${total} collections)`);
 
     return apiSuccess({
         data: {

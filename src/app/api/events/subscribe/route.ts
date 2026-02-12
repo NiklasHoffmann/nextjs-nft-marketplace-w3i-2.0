@@ -7,6 +7,7 @@
 
 import { NextRequest } from 'next/server';
 import { addConnection, removeConnection } from '@/services/sse/broadcast';
+import { devLog } from '@/utils';
 
 /**
  * GET /api/events/subscribe
@@ -14,7 +15,7 @@ import { addConnection, removeConnection } from '@/services/sse/broadcast';
  * Establishes SSE connection for real-time event updates
  */
 export async function GET(request: NextRequest) {
-    console.log('🔌 [SSE] New client connecting...');
+    devLog.info('🔌 [SSE] New client connecting...');
 
     const stream = new ReadableStream({
         start(controller) {

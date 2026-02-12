@@ -1,0 +1,12 @@
+[
+  {
+    "name": "My Happy Tent – Explorer Pass (5 Nights)",
+    "description": "Für längere Abenteuer: 5 Nächte (fiktiv) + Explorer-Vibes (Demo/Testnet).",
+    "image": "explorer-pass.png",
+    "attributes": [
+      { "trait_type": "Nights", "value": "5" },
+      { "trait_type": "Tier", "value": "Explorer" },
+      { "trait_type": "Perk", "value": "Priority Spots" }
+    ]
+  }
+]

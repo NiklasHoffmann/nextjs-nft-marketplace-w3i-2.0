@@ -1,7 +1,6 @@
 // utils/04-blockchain/04-blockchain-nft-fetcher.ts
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 import {
-    executeCriticalCall,
     executeOptionalCall,
     executeBatchContractCalls
 } from './contract-calls';
@@ -25,13 +24,23 @@ interface BlockchainNFTData {
     totalSupply?: string;
     ownerBalance?: string;
     approvedAddress?: string;
+    tokenStandard?: 'ERC721' | 'ERC1155';
+}
+
+function normalizeErc1155TokenUri(tokenUri: string, tokenId: bigint): string {
+    const hexTokenId = tokenId.toString(16).padStart(64, '0');
+    return tokenUri.replace(/\{id\}/gi, hexTokenId);
 }
 
 /**
  * Temporäre neue fetchComprehensiveNFTData Funktion mit intelligentem Caching
  * Fetches comprehensive NFT data from blockchain
  */
-export async function fetchComprehensiveNFTDataNew(contractAddress: string, tokenId: string): Promise<BlockchainNFTData | undefined> {
+export async function fetchComprehensiveNFTDataNew(
+    contractAddress: string,
+    tokenId: string,
+    ownerAddress?: string
+): Promise<BlockchainNFTData | undefined> {
     try {
         // Enhanced ERC721 ABI mit allen wichtigen Funktionen
         const ERC721_ABI = [
@@ -83,6 +92,26 @@ export async function fetchComprehensiveNFTDataNew(contractAddress: string, toke
                 stateMutability: 'view',
                 inputs: [{ name: 'tokenId', type: 'uint256' }],
                 outputs: [{ name: '', type: 'address' }],
+            },
+        ] as const;
+
+        const ERC1155_ABI = [
+            {
+                name: 'uri',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [{ name: 'tokenId', type: 'uint256' }],
+                outputs: [{ name: '', type: 'string' }],
+            },
+            {
+                name: 'balanceOf',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [
+                    { name: 'account', type: 'address' },
+                    { name: 'id', type: 'uint256' }
+                ],
+                outputs: [{ name: '', type: 'uint256' }],
             },
         ] as const;
 
@@ -157,24 +186,44 @@ export async function fetchComprehensiveNFTDataNew(contractAddress: string, toke
         const tokenCacheKey = getCacheKeys.tokenMetadata(contractAddress, tokenId);
         let tokenMetadata = tokenMetadataCache.get(tokenCacheKey);
 
-        if (!tokenMetadata) {
+        let tokenStandard: 'ERC721' | 'ERC1155' | undefined;
 
-            const tokenURIResult = await executeCriticalCall<string>({
+        if (!tokenMetadata) {
+            const tokenUri721 = await executeOptionalCall<string>({
                 address: contractAddr,
                 abi: ERC721_ABI,
                 functionName: 'tokenURI',
                 args: [tokenIdBigInt],
             });
 
-            if (!tokenURIResult.success) {
-                devLog.error('nft-fetcher', '❌ Critical tokenURI call failed');
+            let resolvedTokenUri = tokenUri721 || undefined;
+
+            if (resolvedTokenUri) {
+                tokenStandard = 'ERC721';
+            } else {
+                const tokenUri1155 = await executeOptionalCall<string>({
+                    address: contractAddr,
+                    abi: ERC1155_ABI,
+                    functionName: 'uri',
+                    args: [tokenIdBigInt],
+                });
+
+                if (tokenUri1155) {
+                    tokenStandard = 'ERC1155';
+                    resolvedTokenUri = normalizeErc1155TokenUri(tokenUri1155, tokenIdBigInt);
+                }
+            }
+
+            if (!resolvedTokenUri) {
+                devLog.error('nft-fetcher', '❌ tokenURI/uri call failed');
                 return undefined;
             }
 
             tokenMetadata = {
                 contractAddress: contractAddress,
                 tokenId,
-                tokenURI: tokenURIResult.data,
+                tokenURI: resolvedTokenUri,
+                tokenStandard,
                 cached: false,
                 cachedAt: Date.now()
             };
@@ -185,35 +234,70 @@ export async function fetchComprehensiveNFTDataNew(contractAddress: string, toke
         } else {
 
             tokenMetadata.cached = true;
+            tokenStandard = tokenMetadata.tokenStandard;
+            if (!tokenStandard) {
+                tokenStandard = tokenMetadata.tokenURI?.includes('{id}') ? 'ERC1155' : 'ERC721';
+            }
         }
 
         // ✨ STEP 3: Check Cache für Ownership Data (Owner, Balance) - kürzeres Caching
-        const ownershipCacheKey = getCacheKeys.ownership(contractAddress, tokenId);
-        let ownershipData = ownershipCache.get(ownershipCacheKey);
+        let ownershipData: OwnershipData | undefined;
+        const isErc1155 = tokenStandard === 'ERC1155';
 
-        if (!ownershipData) {
+        if (!isErc1155) {
+            const ownershipCacheKey = getCacheKeys.ownership(contractAddress, tokenId);
+            ownershipData = ownershipCache.get(ownershipCacheKey);
 
-            const ownershipCalls = [
-                {
-                    address: contractAddr,
-                    abi: ERC721_ABI,
-                    functionName: 'ownerOf',
-                    args: [tokenIdBigInt],
-                    callType: 'optional' as const
+            if (!ownershipData) {
+                const ownershipCalls = [
+                    {
+                        address: contractAddr,
+                        abi: ERC721_ABI,
+                        functionName: 'ownerOf',
+                        args: [tokenIdBigInt],
+                        callType: 'optional' as const
+                    }
+                ];
+
+                const { results } = await executeBatchContractCalls(ownershipCalls);
+                const owner = results[0]?.success ? results[0].data as string : undefined;
+
+                // Get owner's balance if we have the owner address
+                let ownerBalance: string | undefined;
+                if (owner) {
+                    const balanceResult = await executeOptionalCall<bigint>({
+                        address: contractAddr,
+                        abi: ERC721_ABI,
+                        functionName: 'balanceOf',
+                        args: [owner as `0x${string}`],
+                    });
+                    ownerBalance = balanceResult?.toString();
                 }
-            ];
 
-            const { results } = await executeBatchContractCalls(ownershipCalls);
-            const owner = results[0]?.success ? results[0].data as string : undefined;
+                ownershipData = {
+                    contractAddress: contractAddress,
+                    tokenId,
+                    owner,
+                    ownerBalance,
+                    cached: false,
+                    cachedAt: Date.now()
+                };
 
-            // Get owner's balance if we have the owner address
+                // Cache für 5 Minuten (Owner kann sich ändern)
+                ownershipCache.set(ownershipCacheKey, ownershipData);
+
+            } else {
+
+                ownershipData.cached = true;
+            }
+        } else {
             let ownerBalance: string | undefined;
-            if (owner) {
+            if (ownerAddress) {
                 const balanceResult = await executeOptionalCall<bigint>({
                     address: contractAddr,
-                    abi: ERC721_ABI,
+                    abi: ERC1155_ABI,
                     functionName: 'balanceOf',
-                    args: [owner as `0x${string}`],
+                    args: [ownerAddress as `0x${string}`, tokenIdBigInt],
                 });
                 ownerBalance = balanceResult?.toString();
             }
@@ -221,37 +305,32 @@ export async function fetchComprehensiveNFTDataNew(contractAddress: string, toke
             ownershipData = {
                 contractAddress: contractAddress,
                 tokenId,
-                owner,
+                owner: ownerAddress,
                 ownerBalance,
                 cached: false,
                 cachedAt: Date.now()
             };
-
-            // Cache für 5 Minuten (Owner kann sich ändern)
-            ownershipCache.set(ownershipCacheKey, ownershipData);
-
-        } else {
-
-            ownershipData.cached = true;
         }
 
         // ✨ STEP 4: Check Cache für Approval Status - sehr kurzes Caching
-        const approvalCacheKey = getCacheKeys.approval(contractAddress, tokenId);
-        let approvedAddress = approvalCache.get(approvalCacheKey);
+        let approvedAddress: string | undefined;
+        if (!isErc1155) {
+            const approvalCacheKey = getCacheKeys.approval(contractAddress, tokenId);
+            approvedAddress = approvalCache.get(approvalCacheKey);
 
-        if (!approvedAddress) {
+            if (!approvedAddress) {
+                const approvalResult = await executeOptionalCall<string>({
+                    address: contractAddr,
+                    abi: ERC721_ABI,
+                    functionName: 'getApproved',
+                    args: [tokenIdBigInt],
+                });
 
-            const approvalResult = await executeOptionalCall<string>({
-                address: contractAddr,
-                abi: ERC721_ABI,
-                functionName: 'getApproved',
-                args: [tokenIdBigInt],
-            });
+                approvedAddress = approvalResult || '';
 
-            approvedAddress = approvalResult || '';
-
-            // Cache für 2 Minuten (Approvals ändern sich häufig)
-            approvalCache.set(approvalCacheKey, approvedAddress);
+                // Cache für 2 Minuten (Approvals ändern sich häufig)
+                approvalCache.set(approvalCacheKey, approvedAddress);
+            }
         }
 
         return {
@@ -262,6 +341,7 @@ export async function fetchComprehensiveNFTDataNew(contractAddress: string, toke
             totalSupply: contractProperties.totalSupply,
             ownerBalance: ownershipData.ownerBalance,
             approvedAddress: approvedAddress || undefined,
+            tokenStandard,
         };
 
     } catch (error) {

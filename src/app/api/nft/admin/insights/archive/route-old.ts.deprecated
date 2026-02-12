@@ -3,6 +3,7 @@ import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import type { NFTProjectDescriptions, NFTFunctionalitiesDescriptions } from '@/types/features/nft-insights';
 import { apiBadRequest, apiSuccess, apiError, apiInternalError } from '@/lib/api/responses';
+import { devLog } from '@/utils';
 
 interface AdminNFTInsight {
   _id?: ObjectId;
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
     return apiSuccess(created);
 
   } catch (error) {
-    console.error('Error creating admin NFT insight:', error);
+    devLog.error('Error creating admin NFT insight:', error);
     return apiInternalError('Failed to create insight');
   }
 }
@@ -155,7 +156,7 @@ export async function PUT(request: NextRequest) {
     return apiSuccess(updated);
 
   } catch (error) {
-    console.error('Error updating admin NFT insight:', error);
+    devLog.error('Error updating admin NFT insight:', error);
     return apiInternalError('Failed to update insight');
   }
 }
@@ -203,7 +204,7 @@ export async function DELETE(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error deleting admin NFT insight:', error);
+    devLog.error('Error deleting admin NFT insight:', error);
     return apiInternalError('Failed to delete insight');
   }
 }

@@ -13,6 +13,7 @@ import { useCollections } from '@/contexts/collections';
 import type { EnrichedNFTDocument, MarketplaceItemsResponse } from '@/types/marketplace/enriched-nft';
 import { DB_SYNC_DELAY_MS, MARKETPLACE_INVALIDATION_TYPES } from '@/services/validation';
 import type { InvalidationEventDetail } from '@/services/validation';
+import { devLog } from '@/utils';
 
 interface UseMarketplaceItemsOptions {
   // Pagination
@@ -70,6 +71,7 @@ interface UseMarketplaceItemsReturn {
  * With intelligent caching to prevent unnecessary reloads
  */
 export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): UseMarketplaceItemsReturn {
+  const CACHE_VERSION = 2;
   const {
     page: initialPage = 1,
     limit = 20,
@@ -98,6 +100,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
   // Create cache key from filters
   const createFilterKey = useCallback(() => {
     return JSON.stringify({
+      cacheVersion: CACHE_VERSION,
       search: filters.search || '',
       contractAddress: filters.contractAddress || '',
       minPrice: filters.minPrice || '',
@@ -152,13 +155,13 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     // Check cache first (only for page 1, not for pagination)
     // IMPORTANT: Check cache BEFORE clearing items to avoid flicker
     const filterKey = createFilterKey();
-    console.log('🔍 [useMarketplaceItems] Checking cache for key:', filterKey);
+    devLog.info('🔍 [useMarketplaceItems] Checking cache for key:', filterKey);
 
     if (!append && pageNum === 1) {
       const cached = cacheContext.getCached(filterKey);
 
       if (cached) {
-        console.log('✅ [useMarketplaceItems] Cache HIT - using cached data:', cached.data.items.length);
+        devLog.info('✅ [useMarketplaceItems] Cache HIT - using cached data:', cached.data.items.length);
         // Cache hit - set items immediately without clearing first
         setItems(cached.data.items);
         setPagination(cached.data.pagination);
@@ -169,7 +172,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
         loadingRef.current = false;
         return;
       }
-      console.log('❌ [useMarketplaceItems] Cache MISS - fetching from API');
+      devLog.info('❌ [useMarketplaceItems] Cache MISS - fetching from API');
     }
 
     // Clear items AFTER cache check (only if cache miss and not appending)
@@ -177,10 +180,10 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     // FIXED: Don't clear items immediately - keep showing old data until new data arrives
     // Only clear on initial load or when explicitly needed
     if (!append && items.length === 0) {
-      console.log('🗑️ [useMarketplaceItems] Initial load - clearing items');
+      devLog.info('🗑️ [useMarketplaceItems] Initial load - clearing items');
       setItems([]);
     } else if (!append && items.length > 0) {
-      console.log('♻️ [useMarketplaceItems] Keeping old items until new data arrives');
+      devLog.info('♻️ [useMarketplaceItems] Keeping old items until new data arrives');
       // Keep old items displayed - they'll be replaced when new data arrives
     }
 
@@ -188,7 +191,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     setLoading(true);
     setError(null);
 
-    console.log('🌐 [useMarketplaceItems] Starting API request...');
+    devLog.info('🌐 [useMarketplaceItems] Starting API request...');
 
     try {
       // Build query string
@@ -216,7 +219,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
         signal: abortController.signal
       });
 
-      console.log('📡 [useMarketplaceItems] Response received:', response.status, response.ok);
+      devLog.info('📡 [useMarketplaceItems] Response received:', response.status, response.ok);
 
       if (!response.ok) {
         // Try to get error details from response
@@ -232,11 +235,12 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
 
       const data: MarketplaceItemsResponse = await response.json();
 
-      console.log('📊 [useMarketplaceItems] API Response:', {
+      const itemsFromApi = Array.isArray(data.data?.items) ? data.data.items : [];
+      devLog.info('📊 [useMarketplaceItems] API Response:', {
         success: data.success,
-        itemsCount: data.data?.items?.length || 0,
+        itemsCount: itemsFromApi.length,
         pagination: data.data?.pagination,
-        firstItem: data.data?.items?.[0]
+        firstItem: itemsFromApi[0]
       });
 
       if (!data.success) {
@@ -250,8 +254,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
           setItems(prev => {
             // Deduplication: Filter out items that already exist (by listingId)
             const existingIds = new Set(prev.map(item => item.listingId).filter(Boolean));
-            const newItems = data.data.items.filter((item: EnrichedNFTDocument) => {
-              console.log('📦 [useMarketplaceItems] Setting items:', data.data.items.length);
+            const newItems = itemsFromApi.filter((item: EnrichedNFTDocument) => {
               if (!item.listingId) return true; // Keep items without listingId
               return !existingIds.has(item.listingId); // Skip duplicates
             });
@@ -259,29 +262,39 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
             return [...prev, ...newItems];
           });
         } else {
-          setItems(data.data.items);
+          setItems(itemsFromApi);
 
           // Cache the result (only for page 1)
-          if (pageNum === 1) {
+          if (pageNum === 1 && data.data && Array.isArray(data.data.items)) {
             const filterKey = createFilterKey();
             cacheContext.setCache(filterKey, data.data);
           }
         }
 
-        setPagination(data.data.pagination);
-        setAvailableFilters(data.data.filters || null);
+        if (data.data?.pagination) {
+          setPagination(data.data.pagination);
+        } else {
+          setPagination({
+            page: pageNum,
+            limit,
+            total: itemsFromApi.length,
+            totalPages: itemsFromApi.length > 0 ? 1 : 0,
+            hasMore: false,
+          });
+        }
+        setAvailableFilters(data.data?.filters || null);
         setInitialLoading(false);
         setLoading(false); // Set loading false immediately after setting data
       }
     } catch (err) {
       // Ignore abort errors (normal flow when filters change)
       if (err instanceof Error && err.name === 'AbortError') {
-        console.log('⚠️ [useMarketplaceItems] Request aborted (normal)');
+        devLog.info('⚠️ [useMarketplaceItems] Request aborted (normal)');
         loadingRef.current = false; // Reset loading ref on abort
         return;
       }
 
-      console.error('❌ [useMarketplaceItems] Fetch error:', err);
+      devLog.error('❌ [useMarketplaceItems] Fetch error:', err);
 
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch items';
       setError(errorMessage);
@@ -346,7 +359,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
       return;
     }
 
-    console.log('[useMarketplaceItems] useEffect triggered - clearing items and fetching...');
+    devLog.info('[useMarketplaceItems] useEffect triggered - clearing items and fetching...');
 
     // CRITICAL: Clear items immediately when filters change to prevent showing stale data
     // This happens BEFORE the fetchItems call to ensure instant UI update
@@ -363,7 +376,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     setPage(1);
 
     // Call fetchItems directly (not via ref to avoid race condition)
-    console.log('[useMarketplaceItems] Calling fetchItems...');
+    devLog.info('[useMarketplaceItems] Calling fetchItems...');
     fetchItems(1, false);
 
     // NO cleanup - let requests complete even if component unmounts or re-renders
@@ -408,22 +421,22 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
       const shouldReload = !!eventType && MARKETPLACE_INVALIDATION_TYPES.has(eventType);
 
       if (shouldReload) {
-        console.log(`🔄 [useMarketplaceItems] ${eventType} event detected, invalidating cache and reloading...`);
+        devLog.info(`🔄 [useMarketplaceItems] ${eventType} event detected, invalidating cache and reloading...`);
 
         // CRITICAL: Invalidate cache IMMEDIATELY to force fresh fetch
         const filterKey = createFilterKey();
         cacheContext.invalidateCache(filterKey);
-        console.log(`🗑️  [useMarketplaceItems] Cache invalidated for key: ${filterKey}`);
+        devLog.info(`🗑️  [useMarketplaceItems] Cache invalidated for key: ${filterKey}`);
 
         // Only reload if component is still mounted and not during initial load
         if (isMountedRef.current && !initialLoading) {
           // Increased delay for MongoDB sync + TheGraph → MongoDB propagation
           // Event-bridge syncs immediately, but MongoDB write + index update needs time
-          console.log(`⏱️  [useMarketplaceItems] Waiting ${DB_SYNC_DELAY_MS}ms for MongoDB sync...`);
+          devLog.info(`⏱️  [useMarketplaceItems] Waiting ${DB_SYNC_DELAY_MS}ms for MongoDB sync...`);
 
           setTimeout(() => {
             if (isMountedRef.current) {
-              console.log(`✅ [useMarketplaceItems] Reloading after ${eventType}`);
+              devLog.info(`✅ [useMarketplaceItems] Reloading after ${eventType}`);
               fetchItems(1, false);
             }
           }, DB_SYNC_DELAY_MS);

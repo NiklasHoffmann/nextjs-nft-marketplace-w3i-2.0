@@ -24,6 +24,7 @@ import { createPublicClient, webSocket, decodeEventLog, type Address, type Hash,
 import { sepolia } from 'viem/chains';
 import { IDEATION_MARKET_FACET_ABI } from '@/config/abis/ideation-market-facet';
 import { BUYER_WHITELIST_FACET_ABI } from '@/config/abis/buyer-whitelist-facet';
+import { devLog } from '@/utils';
 import type {
     MarketplaceEventName,
     ProcessedMarketplaceEvent,
@@ -102,16 +103,16 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             || process.env.INFURA_URL_WSS
             || '';
 
-        console.log('🔍 [EventListener] Constructor Debug:');
-        console.log('   Marketplace Address:', marketplaceAddress);
-        console.log('   Provided WSS URL:', wsUrl || 'none');
-        console.log('   NEXT_PUBLIC_ALCHEMY_URL_WSS:', process.env.NEXT_PUBLIC_ALCHEMY_URL_WSS || 'not set');
-        console.log('   NEXT_PUBLIC_INFURA_URL_WSS:', process.env.NEXT_PUBLIC_INFURA_URL_WSS || 'not set');
-        console.log('   Final WSS URL:', this.wsUrl || 'NONE - SERVICE WILL NOT WORK!');
+        devLog.log('🔍 [EventListener] Constructor Debug:');
+        devLog.log('   Marketplace Address:', marketplaceAddress);
+        devLog.log('   Provided WSS URL:', wsUrl || 'none');
+        devLog.log('   NEXT_PUBLIC_ALCHEMY_URL_WSS:', process.env.NEXT_PUBLIC_ALCHEMY_URL_WSS || 'not set');
+        devLog.log('   NEXT_PUBLIC_INFURA_URL_WSS:', process.env.NEXT_PUBLIC_INFURA_URL_WSS || 'not set');
+        devLog.log('   Final WSS URL:', this.wsUrl || 'NONE - SERVICE WILL NOT WORK!');
 
         if (!this.wsUrl) {
-            console.error('❌ [EventListener] No WebSocket URL configured. Service will not work.');
-            console.error('   Please set NEXT_PUBLIC_ALCHEMY_URL_WSS or NEXT_PUBLIC_INFURA_URL_WSS in .env.local');
+            devLog.error('❌ [EventListener] No WebSocket URL configured. Service will not work.');
+            devLog.error('   Please set NEXT_PUBLIC_ALCHEMY_URL_WSS or NEXT_PUBLIC_INFURA_URL_WSS in .env.local');
         }
 
         // Initialize callback storage
@@ -132,7 +133,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
      */
     async start(config?: EventListenerConfig): Promise<void> {
         if (this.isActive) {
-            console.warn('⚠️ [EventListener] Already active');
+            devLog.warn('⚠️ [EventListener] Already active');
             return;
         }
 
@@ -143,9 +144,9 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
         this.config = { ...this.config, ...config };
         this.isActive = true;
 
-        console.log('🚀 [EventListener] Starting...');
-        console.log(`   Marketplace: ${this.marketplaceAddress}`);
-        console.log(`   WebSocket: ${this.wsUrl.substring(0, 50)}...`);
+        devLog.log('🚀 [EventListener] Starting...');
+        devLog.log(`   Marketplace: ${this.marketplaceAddress}`);
+        devLog.log(`   WebSocket: ${this.wsUrl.substring(0, 50)}...`);
 
         await this.connect();
 
@@ -154,7 +155,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             this.cleanupProcessedEvents();
         }, 10000);
 
-        console.log('✅ [EventListener] Started');
+        devLog.log('✅ [EventListener] Started');
     }
 
     /**
@@ -165,7 +166,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             return;
         }
 
-        console.log('🛑 [EventListener] Stopping...');
+        devLog.log('🛑 [EventListener] Stopping...');
 
         this.isActive = false;
         this.disconnect();
@@ -196,7 +197,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
         // Clear processed events
         this.processedEvents.clear();
 
-        console.log('✅ [EventListener] Stopped');
+        devLog.log('✅ [EventListener] Stopped');
     }
 
     /**
@@ -209,6 +210,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             eventsProcessed: this.eventsProcessed,
             lastEventAt: this.lastEventAt,
             reconnectAttempts: this.reconnectAttempts,
+            keepaliveFailures: this.keepaliveFailures,
             activeSubscriptions: this.getActiveEventNames()
         };
     }
@@ -243,14 +245,14 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
      */
     private async connect(): Promise<void> {
         const environment = typeof window === 'undefined' ? 'SERVER' : 'CLIENT';
-        console.log(`🔌 [EventListener ${environment}] Attempting to connect...`);
-        console.log('   WSS URL:', this.wsUrl);
-        console.log('   Chain:', sepolia.name);
-        console.log('   Marketplace:', this.marketplaceAddress);
+        devLog.log(`🔌 [EventListener ${environment}] Attempting to connect...`);
+        devLog.log('   WSS URL:', this.wsUrl);
+        devLog.log('   Chain:', sepolia.name);
+        devLog.log('   Marketplace:', this.marketplaceAddress);
 
         try {
             // Create viem client with WebSocket transport
-            console.log(`📡 [EventListener ${environment}] Creating WebSocket client...`);
+            devLog.log(`📡 [EventListener ${environment}] Creating WebSocket client...`);
             this.client = createPublicClient({
                 chain: sepolia,
                 transport: webSocket(this.wsUrl, {
@@ -260,31 +262,31 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                     retryDelay: 1000
                 })
             });
-            console.log(`✓ Client created (${environment})`);
+            devLog.log(`✓ Client created (${environment})`);
 
             // Watch all marketplace events
-            console.log(`👀 [EventListener ${environment}] Starting event watcher...`);
+            devLog.log(`👀 [EventListener ${environment}] Starting event watcher...`);
             this.unwatch = this.client.watchContractEvent({
                 address: this.marketplaceAddress,
                 abi: MARKETPLACE_EVENT_ABI,
                 onLogs: (logs) => {
-                    console.log(`🔔 [EventListener ${environment}] onLogs callback triggered with ${logs.length} logs`);
+                    devLog.log(`🔔 [EventListener ${environment}] onLogs callback triggered with ${logs.length} logs`);
                     this.handleLogs(logs);
                 },
                 onError: (error) => {
-                    console.error(`❌ [EventListener ${environment}] onError callback triggered:`, error);
+                    devLog.error(`❌ [EventListener ${environment}] onError callback triggered:`, error);
                     this.handleError(error);
                 },
                 strict: false, // Don't throw on decode errors
             });
-            console.log(`✓ Event watcher started (${environment})`);
+            devLog.log(`✓ Event watcher started (${environment})`);
 
             this.isConnected = true;
             this.reconnectAttempts = 0;
 
-            console.log(`✅ [EventListener ${environment}] WebSocket connected successfully!`);
-            console.log('   Status: CONNECTED');
-            console.log('   Listening for: ItemListed, ItemBought, ItemCanceled, ItemUpdated, ListingCanceledDueToInvalidListing, CollectionWhitelistRevokedCancelTriggered, BuyerWhitelisted, BuyerRemovedFromWhitelist');
+            devLog.log(`✅ [EventListener ${environment}] WebSocket connected successfully!`);
+            devLog.log('   Status: CONNECTED');
+            devLog.log('   Listening for: ItemListed, ItemBought, ItemCanceled, ItemUpdated, ListingCanceledDueToInvalidListing, CollectionWhitelistRevokedCancelTriggered, BuyerWhitelisted, BuyerRemovedFromWhitelist');
 
             // Start keepalive to prevent WebSocket timeout
             this.startKeepalive();
@@ -293,10 +295,10 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             this.config.onConnectionChange?.(true);
 
         } catch (error) {
-            console.error('❌ [EventListener] Connection failed!');
-            console.error('   Error:', error);
-            console.error('   Error type:', error instanceof Error ? error.constructor.name : typeof error);
-            console.error('   Error message:', error instanceof Error ? error.message : String(error));
+            devLog.error('❌ [EventListener] Connection failed!');
+            devLog.error('   Error:', error);
+            devLog.error('   Error type:', error instanceof Error ? error.constructor.name : typeof error);
+            devLog.error('   Error message:', error instanceof Error ? error.message : String(error));
             this.handleConnectionFailure(error as Error);
         }
     }
@@ -353,10 +355,10 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             try {
                 // Make a lightweight RPC call to keep connection alive
                 await this.client.getBlockNumber();
-                console.log(`💓 [EventListener ${environment}] Keepalive ping successful`);
+                devLog.log(`💓 [EventListener ${environment}] Keepalive ping successful`);
                 this.keepaliveFailures = 0;
             } catch (error) {
-                console.warn(`⚠️ [EventListener ${environment}] Keepalive ping failed:`, error);
+                devLog.warn(`⚠️ [EventListener ${environment}] Keepalive ping failed:`, error);
                 this.keepaliveFailures += 1;
                 const backoffDelay = Math.min(
                     KEEPALIVE_INTERVAL * Math.pow(2, this.keepaliveFailures),
@@ -376,7 +378,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             }
         }, KEEPALIVE_INTERVAL);
 
-        console.log(`💓 [EventListener ${environment}] Keepalive started (${KEEPALIVE_INTERVAL}ms interval)`);
+        devLog.log(`💓 [EventListener ${environment}] Keepalive started (${KEEPALIVE_INTERVAL}ms interval)`);
     }
 
     /**
@@ -384,11 +386,11 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
      */
     private async handleLogs(logs: Log[]): Promise<void> {
         const environment = typeof window === 'undefined' ? 'SERVER' : 'CLIENT';
-        console.log(`📬 [EventListener ${environment}] Received ${logs.length} log(s)`);
+        devLog.log(`📬 [EventListener ${environment}] Received ${logs.length} log(s)`);
 
         for (const log of logs) {
             try {
-                console.log(`📝 [EventListener ${environment}] Processing log:`, {
+                devLog.log(`📝 [EventListener ${environment}] Processing log:`, {
                     eventName: (log as any).eventName,
                     txHash: log.transactionHash,
                     blockNumber: log.blockNumber
@@ -397,13 +399,13 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                 const result = await this.processLog(log);
 
                 if (result.success && result.event) {
-                    console.log(`✅ [EventListener ${environment}] Event processed successfully:`, result.event.eventName);
+                    devLog.log(`✅ [EventListener ${environment}] Event processed successfully:`, result.event.eventName);
                     await this.dispatchEvent(result.event);
                 } else if (result.skipped) {
-                    console.log(`⏭️ [EventListener ${environment}] Event skipped (${result.skipReason})`);
+                    devLog.log(`⏭️ [EventListener ${environment}] Event skipped (${result.skipReason})`);
                 }
             } catch (error) {
-                console.error(`❌ [EventListener ${environment}] Log processing error:`, error);
+                devLog.error(`❌ [EventListener ${environment}] Log processing error:`, error);
                 this.config.onError?.(error as Error);
             }
         }
@@ -454,7 +456,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
      * set log.eventName automatically. We need to decode it from topics.
      */
     private async decodeLog(log: any): Promise<ProcessedMarketplaceEvent | null> {
-        console.log('🔍 [decodeLog] Input log:', {
+        devLog.log('🔍 [decodeLog] Input log:', {
             eventName: log.eventName,
             topics: log.topics?.length,
             hasArgs: !!log.args,
@@ -463,10 +465,10 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
 
         // If eventName is not set, try to decode from topics
         if (!log.eventName && log.topics && log.topics.length > 0) {
-            console.log('🔍 [decodeLog] No eventName, attempting manual decode...');
-            console.log('   Event Signature:', log.topics[0]);
-            console.log('   From Contract:', log.address);
-            console.log('   Expected Contract:', this.marketplaceAddress);
+            devLog.log('🔍 [decodeLog] No eventName, attempting manual decode...');
+            devLog.log('   Event Signature:', log.topics[0]);
+            devLog.log('   From Contract:', log.address);
+            devLog.log('   Expected Contract:', this.marketplaceAddress);
 
             try {
                 const decoded = decodeEventLog({
@@ -476,18 +478,18 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                     strict: false // Don't throw on unknown events
                 });
 
-                console.log('✅ [decodeLog] Manual decode successful:', decoded.eventName);
+                devLog.log('✅ [decodeLog] Manual decode successful:', decoded.eventName);
                 log.eventName = decoded.eventName;
                 log.args = decoded.args;
             } catch (error) {
-                console.log('⚠️ [decodeLog] Could not decode event (possibly not a marketplace listing event)');
-                console.log('   Error:', error instanceof Error ? error.message : String(error));
+                devLog.log('⚠️ [decodeLog] Could not decode event (possibly not a marketplace listing event)');
+                devLog.log('   Error:', error instanceof Error ? error.message : String(error));
                 return null;
             }
         }
 
         if (!log || !log.eventName) {
-            console.log('❌ [decodeLog] Still no eventName after decode attempt');
+            devLog.log('❌ [decodeLog] Still no eventName after decode attempt');
             return null;
         }
 
@@ -503,11 +505,11 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             'BuyerRemovedFromWhitelist'
         ];
         if (!supportedEvents.includes(log.eventName)) {
-            console.log(`⏭️ [decodeLog] Skipping non-marketplace event: ${log.eventName}`);
+            devLog.log(`⏭️ [decodeLog] Skipping non-marketplace event: ${log.eventName}`);
             return null;
         }
 
-        console.log('✅ [decodeLog] Processing event:', log.eventName);
+        devLog.log('✅ [decodeLog] Processing event:', log.eventName);
 
         try {
             const processedAt = Date.now();
@@ -653,12 +655,12 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                     } as ProcessedBuyerRemovedFromWhitelistEvent;
 
                 default:
-                    console.warn('⚠️ [EventListener] Unknown event:', log.eventName);
+                    devLog.warn('⚠️ [EventListener] Unknown event:', log.eventName);
                     return null;
             }
 
         } catch (error) {
-            console.error('❌ [EventListener] Decode error:', error);
+            devLog.error('❌ [EventListener] Decode error:', error);
             return null;
         }
     }
@@ -668,7 +670,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
      */
     private async dispatchEvent(event: ProcessedMarketplaceEvent): Promise<void> {
         const environment = typeof window === 'undefined' ? 'SERVER' : 'CLIENT';
-        console.log(`📡 [EventListener ${environment}] Dispatching ${event.eventName}:`, {
+        devLog.log(`📡 [EventListener ${environment}] Dispatching ${event.eventName}:`, {
             txHash: event.transactionHash.substring(0, 10) + '...',
             block: event.blockNumber.toString(),
             data: event.data
@@ -677,7 +679,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
         // On client-side: Forward event to server API for MongoDB sync
         if (typeof window !== 'undefined') {
             try {
-                console.log(`📤 [EventListener CLIENT] Forwarding event to server API...`);
+                devLog.log(`📤 [EventListener CLIENT] Forwarding event to server API...`);
                 const response = await fetch('/api/events/marketplace', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -685,54 +687,54 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                 });
 
                 if (response.ok) {
-                    console.log(`✅ [EventListener CLIENT] Event forwarded to server successfully`);
+                    devLog.log(`✅ [EventListener CLIENT] Event forwarded to server successfully`);
                 } else {
-                    console.error(`❌ [EventListener CLIENT] Failed to forward event:`, response.status);
+                    devLog.error(`❌ [EventListener CLIENT] Failed to forward event:`, response.status);
                 }
             } catch (error) {
-                console.error(`❌ [EventListener CLIENT] Error forwarding event:`, error);
+                devLog.error(`❌ [EventListener CLIENT] Error forwarding event:`, error);
             }
         }
 
         // Call general event callback
         if (this.config.onEvent) {
-            console.log('   → Calling onEvent callback');
+            devLog.log('   → Calling onEvent callback');
             try {
                 await this.config.onEvent(event);
-                console.log('   ✅ onEvent callback completed');
+                devLog.log('   ✅ onEvent callback completed');
             } catch (error) {
-                console.error('❌ [EventListener] General callback error:', error);
+                devLog.error('❌ [EventListener] General callback error:', error);
             }
         } else {
-            console.log('   ⚠️ No onEvent callback configured');
+            devLog.log('   ⚠️ No onEvent callback configured');
         }
 
         // Call specific event callbacks from config
         const specificCallback = this.getSpecificCallback(event.eventName);
         if (specificCallback) {
-            console.log(`   → Calling ${event.eventName} specific callback`);
+            devLog.log(`   → Calling ${event.eventName} specific callback`);
             try {
                 await specificCallback(event as any);
-                console.log(`   ✅ ${event.eventName} callback completed`);
+                devLog.log(`   ✅ ${event.eventName} callback completed`);
             } catch (error) {
-                console.error(`❌ [EventListener] ${event.eventName} callback error:`, error);
+                devLog.error(`❌ [EventListener] ${event.eventName} callback error:`, error);
             }
         }
 
         // Call programmatic subscriptions
         const callbacks = this.eventCallbacks.get(event.eventName);
         if (callbacks && callbacks.size > 0) {
-            console.log(`   → Calling ${callbacks.size} subscription callback(s)`);
+            devLog.log(`   → Calling ${callbacks.size} subscription callback(s)`);
             for (const callback of callbacks) {
                 try {
                     await callback(event);
                 } catch (error) {
-                    console.error(`❌ [EventListener] Subscription callback error:`, error);
+                    devLog.error(`❌ [EventListener] Subscription callback error:`, error);
                 }
             }
         }
 
-        console.log(`✅ [EventListener ${environment}] ${event.eventName} dispatch complete`);
+        devLog.log(`✅ [EventListener ${environment}] ${event.eventName} dispatch complete`);
     }
 
     /**
@@ -789,7 +791,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
 
         // Only log meaningful errors (skip empty WebSocket close events)
         if (!isEmptyError || !this.isConnected) {
-            console.log('🔍 [EventListener] Connection event:', {
+            devLog.log('🔍 [EventListener] Connection event:', {
                 isConnectionError,
                 isEmptyError,
                 errorMessage,
@@ -808,7 +810,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
 
         // Only reconnect on actual connection failures (not normal close events)
         if (this.isActive && isConnectionError && !isEmptyError) {
-            console.warn('⚠️ [EventListener] Connection lost, attempting reconnect...');
+            devLog.warn('⚠️ [EventListener] Connection lost, attempting reconnect...');
             this.handleConnectionFailure(error as Error);
         }
     }
@@ -825,7 +827,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
         this.disconnect();
 
         if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            console.error('❌ [EventListener] Max reconnection attempts reached');
+            devLog.error('❌ [EventListener] Max reconnection attempts reached');
             this.config.onError?.(new Error('Max reconnection attempts reached'));
             this.stop();
             return;
@@ -840,7 +842,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             MAX_RECONNECT_DELAY
         );
 
-        console.log(`🔄 [EventListener] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+        devLog.log(`🔄 [EventListener] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
 
         this.reconnectTimeout = setTimeout(async () => {
             this.isReconnecting = false;
@@ -860,7 +862,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
 
         // Simple approach: clear all if too many stored
         if (this.processedEvents.size > 1000) {
-            console.log('🧹 [EventListener] Cleaning up processed events cache');
+            devLog.log('🧹 [EventListener] Cleaning up processed events cache');
             this.processedEvents.clear();
         }
     }
@@ -897,17 +899,17 @@ let globalEventListener: MarketplaceEventListenerService | null = null;
  * Get or create global event listener instance
  */
 export function getMarketplaceEventListener(marketplaceAddress: Address, wsUrl?: string): MarketplaceEventListenerService {
-    console.log('🔍 [Singleton] getMarketplaceEventListener called');
-    console.log('   Current instance exists:', !!globalEventListener);
-    console.log('   Requested marketplace:', marketplaceAddress);
-    console.log('   Provided wsUrl:', wsUrl || 'none');
-    console.log('   NEXT_PUBLIC_ALCHEMY_URL_WSS from env:', process.env.NEXT_PUBLIC_ALCHEMY_URL_WSS || 'NOT SET');
+    devLog.log('🔍 [Singleton] getMarketplaceEventListener called');
+    devLog.log('   Current instance exists:', !!globalEventListener);
+    devLog.log('   Requested marketplace:', marketplaceAddress);
+    devLog.log('   Provided wsUrl:', wsUrl || 'none');
+    devLog.log('   NEXT_PUBLIC_ALCHEMY_URL_WSS from env:', process.env.NEXT_PUBLIC_ALCHEMY_URL_WSS || 'NOT SET');
 
     if (!globalEventListener) {
-        console.log('   ➡️ Creating NEW singleton instance');
+        devLog.log('   ➡️ Creating NEW singleton instance');
         globalEventListener = new MarketplaceEventListenerService(marketplaceAddress, wsUrl);
     } else {
-        console.log('   ➡️ Returning EXISTING singleton instance');
+        devLog.log('   ➡️ Returning EXISTING singleton instance');
     }
     return globalEventListener;
 }
@@ -917,10 +919,10 @@ export function getMarketplaceEventListener(marketplaceAddress: Address, wsUrl?:
  */
 export async function destroyMarketplaceEventListener(): Promise<void> {
     if (globalEventListener) {
-        console.log('🗑️ [Singleton] Destroying existing event listener');
+        devLog.log('🗑️ [Singleton] Destroying existing event listener');
         await globalEventListener.stop();
         globalEventListener = null;
-        console.log('✅ [Singleton] Event listener destroyed');
+        devLog.log('✅ [Singleton] Event listener destroyed');
     }
 }
 
@@ -929,7 +931,7 @@ export async function destroyMarketplaceEventListener(): Promise<void> {
  * Use this when WebSocket URL needs to be updated
  */
 export async function resetMarketplaceEventListener(marketplaceAddress: Address, wsUrl?: string): Promise<MarketplaceEventListenerService> {
-    console.log('🔄 [Singleton] Resetting event listener with new config');
+    devLog.log('🔄 [Singleton] Resetting event listener with new config');
     await destroyMarketplaceEventListener();
     return getMarketplaceEventListener(marketplaceAddress, wsUrl);
 }

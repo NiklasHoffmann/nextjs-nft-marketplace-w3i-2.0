@@ -8,6 +8,7 @@
 import { createPublicClient, http, type Address } from 'viem';
 import { sepolia } from 'viem/chains';
 import { getEnrichedNFTsCollection } from '@/lib/mongodb';
+import { devLog } from '@/utils';
 
 // ERC-721 ABI fragments we need
 const ERC721_ABI = [
@@ -96,7 +97,7 @@ function createClient() {
     const rpcUrl = process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL ||
         'https://rpc.sepolia.org'; // Free public RPC as fallback
 
-    console.log(`🔗 [Blockchain] Using RPC: ${rpcUrl.substring(0, 40)}...`);
+    devLog.info(`🔗 [Blockchain] Using RPC: ${rpcUrl.substring(0, 40)}...`);
 
     return createPublicClient({
         chain: sepolia,
@@ -133,13 +134,13 @@ async function fetchMetadata(tokenURI: string): Promise<NFTMetadata | null> {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-            console.warn(`Failed to fetch metadata from ${url}: ${response.status}`);
+            devLog.warn(`Failed to fetch metadata from ${url}: ${response.status}`);
             return null;
         }
 
         const contentType = response.headers.get('content-type');
         if (!contentType?.includes('application/json')) {
-            console.warn(`Invalid content type for ${url}: ${contentType}`);
+            devLog.warn(`Invalid content type for ${url}: ${contentType}`);
             return null;
         }
 
@@ -162,9 +163,9 @@ async function fetchMetadata(tokenURI: string): Promise<NFTMetadata | null> {
         return metadata;
     } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
-            console.warn(`Metadata fetch timeout for ${tokenURI}`);
+            devLog.warn(`Metadata fetch timeout for ${tokenURI}`);
         } else {
-            console.warn(`Error fetching metadata from ${tokenURI}:`, error);
+            devLog.warn(`Error fetching metadata from ${tokenURI}:`, error);
         }
         return null;
     }
@@ -182,7 +183,7 @@ export async function getWalletNFTsFromBlockchain(
     const nfts: BlockchainNFT[] = [];
     const startTime = Date.now();
 
-    console.log(`🔗 [Blockchain] Fetching NFTs for ${walletAddress} from ${knownContracts.length} contracts`);
+    devLog.info(`🔗 [Blockchain] Fetching NFTs for ${walletAddress} from ${knownContracts.length} contracts`);
 
     // Process contracts in parallel (up to 3 at once to avoid rate limits)
     const CONCURRENT_CONTRACTS = 3;
@@ -197,13 +198,13 @@ export async function getWalletNFTsFromBlockchain(
             if (result.status === 'fulfilled') {
                 nfts.push(...result.value);
             } else {
-                console.error(`  ❌ Contract ${batch[index]} failed:`, result.reason);
+                devLog.error(`  ❌ Contract ${batch[index]} failed:`, result.reason);
             }
         });
     }
 
     const totalTime = Date.now() - startTime;
-    console.log(`✅ [Blockchain] Found ${nfts.length} total NFTs in ${totalTime}ms`);
+    devLog.info(`✅ [Blockchain] Found ${nfts.length} total NFTs in ${totalTime}ms`);
     return nfts;
 }
 
@@ -226,11 +227,11 @@ async function processContract(
     });
 
     if (balance === BigInt(0)) {
-        console.log(`  ↳ ${contractAddress}: 0 NFTs`);
+        devLog.info(`  ↳ ${contractAddress}: 0 NFTs`);
         return nfts;
     }
 
-    console.log(`  ↳ ${contractAddress}: ${balance} NFTs`);
+    devLog.info(`  ↳ ${contractAddress}: ${balance} NFTs`);
 
     // Step 2: Get contract info in parallel
     const [contractName, contractSymbol] = await Promise.all([
@@ -262,10 +263,10 @@ async function processContract(
             );
         }
         tokenIds = await Promise.all(enumerablePromises);
-        console.log(`    ✅ Used ERC721Enumerable for ${contractAddress}`);
+        devLog.info(`    ✅ Used ERC721Enumerable for ${contractAddress}`);
     } catch (error) {
         // Fallback: Query Transfer events
-        console.log(`    ⚠️ Not enumerable, using Transfer events for ${contractAddress}`);
+        devLog.warn(`    ⚠️ Not enumerable, using Transfer events for ${contractAddress}`);
         tokenIds = await getTokenIdsFromEvents(client, contractAddress, walletAddress);
     }
 
@@ -323,7 +324,7 @@ async function fetchTokenData(
             contractSymbol,
         };
     } catch (error) {
-        console.warn(`    ⚠️ Failed to fetch token ${tokenId}:`, error);
+        devLog.warn(`    ⚠️ Failed to fetch token ${tokenId}:`, error);
         // Return basic NFT info even if metadata fails
         return {
             contractAddress: contractAddress.toLowerCase(),
@@ -398,7 +399,7 @@ async function getTokenIdsFromEvents(
 
         return ownedTokenIds;
     } catch (error) {
-        console.error('Error querying Transfer events:', error);
+        devLog.error('Error querying Transfer events:', error);
         return [];
     }
 }
@@ -420,11 +421,11 @@ export async function getKnownContractAddresses(): Promise<Address[]> {
             .filter((addr): addr is string => typeof addr === 'string' && addr.length > 0)
             .map(addr => addr.toLowerCase());
 
-        console.log(`  ↳ Found ${uniqueAddresses.length} unique contract addresses in marketplace`);
+        devLog.info(`  ↳ Found ${uniqueAddresses.length} unique contract addresses in marketplace`);
         return uniqueAddresses as Address[];
     } catch (error) {
-        console.error('Error fetching known contracts:', error instanceof Error ? error.message : 'Unknown error');
-        console.error('  Stack:', error);
+        devLog.error('Error fetching known contracts:', error instanceof Error ? error.message : 'Unknown error');
+        devLog.error('  Stack:', error);
         return [];
     }
 }

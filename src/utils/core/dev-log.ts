@@ -4,14 +4,29 @@
  */
 
 const isDev = process.env.NODE_ENV === 'development';
+type LogLevel = 'error' | 'warn' | 'info' | 'debug';
+
+const rawLevel = (process.env.DEV_LOG_LEVEL || 'info').toLowerCase() as LogLevel;
+const levelRank: Record<LogLevel, number> = {
+    error: 0,
+    warn: 1,
+    info: 2,
+    debug: 3,
+};
+const currentLevel = levelRank[rawLevel] ?? levelRank.info;
+const shouldLog = (minLevel: number) => isDev && currentLevel >= minLevel;
 
 export const devLog = {
+    log: (...args: any[]) => {
+        if (shouldLog(levelRank.info)) console.log(...args);
+    },
+
     info: (...args: any[]) => {
-        if (isDev) console.log(...args);
+        if (shouldLog(levelRank.info)) console.log(...args);
     },
 
     warn: (...args: any[]) => {
-        if (isDev) console.warn(...args);
+        if (shouldLog(levelRank.warn)) console.warn(...args);
     },
 
     error: (...args: any[]) => {
@@ -20,27 +35,27 @@ export const devLog = {
     },
 
     debug: (...args: any[]) => {
-        if (isDev) console.debug(...args);
+        if (shouldLog(levelRank.debug)) console.debug(...args);
     },
 
-    // Emojis for better visual scanning
+    // ASCII markers for better visual scanning
     success: (...args: any[]) => {
-        if (isDev) console.log('âœ…', ...args);
+        if (shouldLog(levelRank.info)) console.log('[OK]', ...args);
     },
 
     fail: (...args: any[]) => {
-        if (isDev) console.log('âŒ', ...args);
+        if (shouldLog(levelRank.warn)) console.log('[FAIL]', ...args);
     },
 
     event: (...args: any[]) => {
-        if (isDev) console.log('ðŸ“¢', ...args);
+        if (shouldLog(levelRank.info)) console.log('[EVENT]', ...args);
     },
 
     cache: (...args: any[]) => {
-        if (isDev) console.log('ðŸ’¾', ...args);
+        if (shouldLog(levelRank.info)) console.log('[CACHE]', ...args);
     },
 
     api: (...args: any[]) => {
-        if (isDev) console.log('ðŸŒ', ...args);
+        if (shouldLog(levelRank.info)) console.log('[API]', ...args);
     }
 };

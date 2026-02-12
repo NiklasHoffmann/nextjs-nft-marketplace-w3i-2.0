@@ -6,6 +6,7 @@
  */
 
 import { getCollection } from '@/lib/mongodb';
+import { devLog } from '@/utils';
 
 interface MetadataApiResponse {
     contractAddress: string;
@@ -43,7 +44,7 @@ export class MarketplaceMetadataSync {
     private readonly BATCH_DELAY = 1000;
 
     constructor() {
-        console.log('📦 MarketplaceMetadataSync Service initialisiert');
+        devLog.info('📦 MarketplaceMetadataSync Service initialisiert');
     }
 
     /**
@@ -51,19 +52,19 @@ export class MarketplaceMetadataSync {
      */
     start() {
         if (this.isRunning) {
-            console.log('⚠️ Metadata-Sync läuft bereits');
+            devLog.warn('⚠️ Metadata-Sync läuft bereits');
             return;
         }
 
-        console.log('🚀 Starte Metadata-Sync Service...');
+        devLog.info('🚀 Starte Metadata-Sync Service...');
         this.isRunning = true;
 
         // Sofort einmal ausführen
-        this.syncMetadata().catch(console.error);
+        this.syncMetadata().catch((error) => devLog.error('❌ Metadata-Sync failed:', error));
 
         // Dann regelmäßig
         this.intervalId = setInterval(() => {
-            this.syncMetadata().catch(console.error);
+            this.syncMetadata().catch((error) => devLog.error('❌ Metadata-Sync failed:', error));
         }, this.SYNC_INTERVAL);
     }
 
@@ -75,7 +76,7 @@ export class MarketplaceMetadataSync {
             return;
         }
 
-        console.log('🛑 Stoppe Metadata-Sync Service...');
+        devLog.info('🛑 Stoppe Metadata-Sync Service...');
         this.isRunning = false;
 
         if (this.intervalId) {
@@ -116,12 +117,12 @@ export class MarketplaceMetadataSync {
                 .toArray();
 
             if (nftsNeedingMetadata.length === 0) {
-                console.log('✅ Alle NFTs haben aktuelle Metadata');
+                devLog.info('✅ Alle NFTs haben aktuelle Metadata');
                 return;
             }
 
-            console.log(`\n🔄 Synce Metadata für ${nftsNeedingMetadata.length} NFTs...`);
-            console.log(`   📋 NFTs to sync:`, nftsNeedingMetadata.map(n => `${n.contractAddress?.slice(0,6)}.../${n.tokenId}`).join(', '));
+            devLog.info(`\n🔄 Synce Metadata für ${nftsNeedingMetadata.length} NFTs...`);
+            devLog.info(`   📋 NFTs to sync:`, nftsNeedingMetadata.map(n => `${n.contractAddress?.slice(0,6)}.../${n.tokenId}`).join(', '));
 
             // Verarbeite in Batches
             for (let i = 0; i < nftsNeedingMetadata.length; i += this.BATCH_SIZE) {
@@ -140,7 +141,7 @@ export class MarketplaceMetadataSync {
             }
 
         } catch (error) {
-            console.error('❌ Fehler beim Metadata-Sync:', error);
+            devLog.error('❌ Fehler beim Metadata-Sync:', error);
         }
     }
 
@@ -154,11 +155,11 @@ export class MarketplaceMetadataSync {
             const tokenId = nft.tokenId;
 
             if (!contractAddress || !tokenId) {
-                console.warn(`  ⚠️ Skipping NFT with missing address or tokenId:`, nft);
+                devLog.warn(`  ⚠️ Skipping NFT with missing address or tokenId:`, nft);
                 return;
             }
 
-            console.log(`  📡 Fetching metadata: ${contractAddress.slice(0, 6)}...${contractAddress.slice(-4)}:${tokenId}`);
+            devLog.info(`  📡 Fetching metadata: ${contractAddress.slice(0, 6)}...${contractAddress.slice(-4)}:${tokenId}`);
 
             // Nutze die EXISTIERENDE funktionierende API!
             // 🔥 NEW: Force refresh approval to get current blockchain state
@@ -173,20 +174,20 @@ export class MarketplaceMetadataSync {
             );
 
             if (!response.ok) {
-                console.error(`  ❌ API Error ${response.status} für ${contractAddress}:${tokenId}`);
+                devLog.error(`  ❌ API Error ${response.status} für ${contractAddress}:${tokenId}`);
                 return;
             }
 
             const data: MetadataApiResponse = await response.json();
             
-            console.log(`  📦 API Response for ${tokenId}:`, {
+            devLog.info(`  📦 API Response for ${tokenId}:`, {
                 hasBlockchain: !!data.blockchain,
                 approved: data.blockchain?.approved || 'NONE',
                 cached: data.cached
             });
 
             if (!data.metadata) {
-                console.warn(`  ⚠️ Keine Metadata für ${contractAddress}:${tokenId}`);
+                devLog.warn(`  ⚠️ Keine Metadata für ${contractAddress}:${tokenId}`);
                 return;
             }
 
@@ -241,11 +242,11 @@ export class MarketplaceMetadataSync {
                 }
             );
 
-            console.log(`  ✅ Updated: ${data.metadata?.name || tokenId} | Approval: ${data.blockchain?.approved || 'NULL'} | Matched: ${marketplaceUpdateResult.matchedCount} | Modified: ${marketplaceUpdateResult.modifiedCount}`);
+            devLog.info(`  ✅ Updated: ${data.metadata?.name || tokenId} | Approval: ${data.blockchain?.approved || 'NULL'} | Matched: ${marketplaceUpdateResult.matchedCount} | Modified: ${marketplaceUpdateResult.modifiedCount}`);
 
         } catch (error) {
             const contractAddress = nft.contractAddress || nft.nftAddress || 'unknown';
-            console.error(`  ❌ Fehler bei ${contractAddress}:${nft.tokenId}:`, error);
+            devLog.error(`  ❌ Fehler bei ${contractAddress}:${nft.tokenId}:`, error);
         }
     }
 

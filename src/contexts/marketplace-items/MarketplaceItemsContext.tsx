@@ -14,7 +14,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 import type { EnrichedNFTDocument, MarketplaceItemsResponse } from '@/types/marketplace/enriched-nft';
 import type { NFTStatsUpdateDetail } from '@/types';
 import { MarketplaceItemsService, type CacheEntry } from './MarketplaceItemsService';

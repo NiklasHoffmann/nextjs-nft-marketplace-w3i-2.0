@@ -1,7 +1,7 @@
 ﻿// utils/04-blockchain/03-blockchain-contract-calls.ts
 import { createPublicClient, http, type PublicClient } from 'viem';
 import { sepolia } from 'viem/chains';
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 import { createFallbackClients, getTimeoutConfig } from './rpc-config';
 
 interface ContractCallOptions {

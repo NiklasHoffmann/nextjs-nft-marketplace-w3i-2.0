@@ -5,7 +5,7 @@
  * Handles all external API calls with robust error handling and fallbacks.
  */
 
-import { devLog } from '@/utils/devLog';
+import { devLog } from '@/utils';
 import type { NftMeta, AdminNFTInsight, NFTStats, ActiveItem } from '@/types';
 
 // ===== API RESPONSE TYPES =====

@@ -27,7 +27,6 @@ export function withValidation<T>(schema: ZodSchema<T>) {
             }
 
             // Store validated data in request
-            // @ts-ignore
             req.validatedData = result.data;
         } catch (error) {
             if (error instanceof ValidationError) {
@@ -56,7 +55,6 @@ export function withQueryValidation<T>(schema: ZodSchema<T>) {
         }
 
         // Store validated data in request
-        // @ts-ignore
         req.validatedQuery = result.data;
     };
 }
@@ -65,7 +63,6 @@ export function withQueryValidation<T>(schema: ZodSchema<T>) {
  * Get validated request data
  */
 export function getValidatedData<T>(req: NextRequest): T {
-    // @ts-ignore
     return req.validatedData as T;
 }
 
@@ -73,7 +70,6 @@ export function getValidatedData<T>(req: NextRequest): T {
  * Get validated query parameters
  */
 export function getValidatedQuery<T>(req: NextRequest): T {
-    // @ts-ignore
     return req.validatedQuery as T;
 }
 

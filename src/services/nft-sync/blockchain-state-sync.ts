@@ -14,6 +14,7 @@
 import { createPublicClient, http } from 'viem';
 import { sepolia } from 'viem/chains';
 import { getCollection } from '@/lib/mongodb';
+import { devLog } from '@/utils';
 
 const ERC721_ABI = [
     {
@@ -42,11 +43,32 @@ const ERC721_ABI = [
     }
 ] as const;
 
+const ERC1155_ABI = [
+    {
+        name: 'uri',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [{ name: 'tokenId', type: 'uint256' }],
+        outputs: [{ name: '', type: 'string' }],
+    },
+    {
+        name: 'isApprovedForAll',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [
+            { name: 'owner', type: 'address' },
+            { name: 'operator', type: 'address' }
+        ],
+        outputs: [{ name: '', type: 'bool' }],
+    }
+] as const;
+
 export interface BlockchainState {
     owner: string;
     approved: string;
     isApprovedForAll: boolean;
     lastSyncedAt: Date;
+    tokenStandard?: 'ERC721' | 'ERC1155';
 }
 
 export class BlockchainStateSync {
@@ -68,26 +90,43 @@ export class BlockchainStateSync {
         marketplaceAddress?: string
     ): Promise<BlockchainState> {
         try {
-            // Fetch owner and approved in parallel
-            const [owner, approved] = await Promise.all([
-                this.client.readContract({
-                    address: contractAddress as `0x${string}`,
-                    abi: ERC721_ABI,
-                    functionName: 'ownerOf',
-                    args: [BigInt(tokenId)]
-                }),
-                this.client.readContract({
-                    address: contractAddress as `0x${string}`,
-                    abi: ERC721_ABI,
-                    functionName: 'getApproved',
-                    args: [BigInt(tokenId)]
-                })
-            ]);
+            let owner = '';
+            let approved = '';
+            let tokenStandard: 'ERC721' | 'ERC1155' = 'ERC721';
 
-            // console.log(`  📡 Blockchain response:`);
-            // console.log(`     Owner: ${owner}`);
-            // console.log(`     Approved (getApproved): ${approved}`);
-            // console.log(`     Marketplace address: ${marketplaceAddress || 'NOT PROVIDED'}`);
+            try {
+                const [ownerResult, approvedResult] = await Promise.all([
+                    this.client.readContract({
+                        address: contractAddress as `0x${string}`,
+                        abi: ERC721_ABI,
+                        functionName: 'ownerOf',
+                        args: [BigInt(tokenId)]
+                    }),
+                    this.client.readContract({
+                        address: contractAddress as `0x${string}`,
+                        abi: ERC721_ABI,
+                        functionName: 'getApproved',
+                        args: [BigInt(tokenId)]
+                    })
+                ]);
+
+                owner = ownerResult as string;
+                approved = approvedResult as string;
+            } catch (error) {
+                tokenStandard = 'ERC1155';
+
+                try {
+                    await this.client.readContract({
+                        address: contractAddress as `0x${string}`,
+                        abi: ERC1155_ABI,
+                        functionName: 'uri',
+                        args: [BigInt(tokenId)]
+                    });
+                } catch (uriError) {
+                    devLog.warn('  ⚠️ Could not resolve token standard:', uriError);
+                }
+            }
+
 
             // Optionally check isApprovedForAll if marketplace address provided
             let isApprovedForAll = false;
@@ -95,35 +134,31 @@ export class BlockchainStateSync {
                 try {
                     isApprovedForAll = await this.client.readContract({
                         address: contractAddress as `0x${string}`,
-                        abi: ERC721_ABI,
+                        abi: tokenStandard === 'ERC1155' ? ERC1155_ABI : ERC721_ABI,
                         functionName: 'isApprovedForAll',
                         args: [owner as `0x${string}`, marketplaceAddress as `0x${string}`]
                     });
-                    // console.log(`     IsApprovedForAll: ${isApprovedForAll}`);
                 } catch (error) {
-                    console.warn(`  ⚠️ Could not check isApprovedForAll:`, error);
+                    devLog.warn(`  ⚠️ Could not check isApprovedForAll:`, error);
                 }
             }
 
             const state: BlockchainState = {
-                owner: owner as string,
-                approved: approved as string,
+                owner,
+                approved,
                 isApprovedForAll,
-                lastSyncedAt: new Date()
+                lastSyncedAt: new Date(),
+                tokenStandard
             };
 
             // Update both collections
             await this.updateCollections(contractAddress, tokenId, state);
 
-            // console.log(`  ✅ State synced and saved to DB:`);
-            // console.log(`     Owner: ${owner.slice(0, 6)}...${owner.slice(-4)}`);
-            // console.log(`     Approved: ${approved === '0x0000000000000000000000000000000000000000' ? 'NULL (0x000...)' : approved}`);
-            // console.log(`     IsApprovedForAll: ${isApprovedForAll}`);
 
             return state;
 
         } catch (error) {
-            console.error(`❌ [Blockchain Sync] Error for ${contractAddress}/${tokenId}:`, error);
+            devLog.error(`❌ [Blockchain Sync] Error for ${contractAddress}/${tokenId}:`, error);
             throw error;
         }
     }
@@ -132,7 +167,6 @@ export class BlockchainStateSync {
      * Sync blockchain state for multiple NFTs (batch)
      */
     async syncBatch(nfts: Array<{ contractAddress: string; tokenId: string }>, marketplaceAddress?: string) {
-        // console.log(`🔄 [Blockchain Sync] Syncing batch of ${nfts.length} NFTs`);
 
         const BATCH_SIZE = 5; // Process 5 at once to avoid rate limits
         const results: Array<{ success: boolean; nft: any; error?: any }> = [];
@@ -159,7 +193,7 @@ export class BlockchainStateSync {
         }
 
         const successCount = results.filter(r => r.success).length;
-        console.log(`✅ [Blockchain Sync] Batch complete: ${successCount}/${nfts.length} successful`);
+        devLog.info(`✅ [Blockchain Sync] Batch complete: ${successCount}/${nfts.length} successful`);
 
         return results;
     }
@@ -190,7 +224,9 @@ export class BlockchainStateSync {
         // Get existing document to check for owner change
         const existingNFT = await nftMetadata.findOne({ contractAddress, tokenId });
         const oldOwner = existingNFT?.blockchain?.owner;
-        const ownerChanged = existingNFT && oldOwner && oldOwner.toLowerCase() !== state.owner.toLowerCase();
+        const ownerChanged = existingNFT && oldOwner && state.owner
+            ? oldOwner.toLowerCase() !== state.owner.toLowerCase()
+            : false;
         
         // Prepare update operations
         const updateOps: any = {
@@ -198,7 +234,6 @@ export class BlockchainStateSync {
                 // CRITICAL: Set contractAddress and tokenId explicitly for upsert
                 contractAddress,
                 tokenId,
-                'blockchain.owner': state.owner,
                 'blockchain.approved': state.approved,
                 'blockchain.isApprovedForAll': state.isApprovedForAll,
                 'blockchain.lastSyncedAt': now,
@@ -211,6 +246,14 @@ export class BlockchainStateSync {
                 ownershipHistory: [] // Initialize history array
             }
         };
+
+        if (state.tokenStandard) {
+            updateOps.$set['contract.contractType'] = state.tokenStandard;
+        }
+
+        if (state.owner) {
+            updateOps.$set['blockchain.owner'] = state.owner;
+        }
         
         // If owner changed, add to ownership history
         if (ownerChanged) {
@@ -225,7 +268,7 @@ export class BlockchainStateSync {
             // Set new owner's "ownerSince" timestamp
             updateOps.$set['blockchain.ownerSince'] = now;
             
-            console.log(`  🔄 Owner changed: ${oldOwner} → ${state.owner}`);
+            devLog.info(`  🔄 Owner changed: ${oldOwner} → ${state.owner}`);
         } else if (!existingNFT) {
             // New NFT, set initial ownerSince
             updateOps.$setOnInsert['blockchain.ownerSince'] = now;
@@ -265,10 +308,10 @@ export class BlockchainStateSync {
         const isStale = await this.isStateStale(contractAddress, tokenId, maxAgeMs);
 
         if (isStale) {
-            console.log(`  ⏰ State is stale, syncing...`);
+            devLog.info(`  ⏰ State is stale, syncing...`);
             return await this.syncNFTState(contractAddress, tokenId, marketplaceAddress);
         } else {
-            console.log(`  ✅ State is fresh, skipping sync`);
+            devLog.info(`  ✅ State is fresh, skipping sync`);
             return null;
         }
     }

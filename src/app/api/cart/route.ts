@@ -14,11 +14,10 @@
  * - Clears cart for wallet
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
-import { apiHandler } from '@/lib/api/handler';
-import { withAuth } from '@/lib/middleware';
-import { apiBadRequest } from '@/lib/api/responses';
+import { apiHandler, apiSuccess, BadRequestError, ForbiddenError } from '@/lib/api';
+import { devLog } from '@/utils';
 
 interface CartItem {
     listingId: string;
@@ -38,42 +37,43 @@ interface UserCart {
 }
 
 export const GET = apiHandler(async (request: NextRequest) => {
-    await withAuth(request);
-    // @ts-ignore
     const authenticatedUser = request.userAddress as string;
 
     const { searchParams } = new URL(request.url);
     const walletAddress = searchParams.get('walletAddress')?.toLowerCase();
 
     if (!walletAddress) {
-        return apiBadRequest('Missing walletAddress');
+        throw new BadRequestError('Missing walletAddress');
+    }
+
+    if (walletAddress !== authenticatedUser.toLowerCase()) {
+        throw new ForbiddenError('Wallet address does not match authenticated user');
     }
 
     const carts = await getCollection('user_carts');
     const cart = await carts.findOne({ walletAddress }) as UserCart | null;
 
-    return NextResponse.json({
-        success: true,
-        data: {
-            items: cart?.items || [],
-            updatedAt: cart?.updatedAt || null
-        }
+    return apiSuccess({
+        items: cart?.items || [],
+        updatedAt: cart?.updatedAt || null
     });
-});
+}, { auth: true });
 
 export const POST = apiHandler(async (request: NextRequest) => {
-    await withAuth(request);
-    // @ts-ignore
     const authenticatedUser = request.userAddress as string;
 
     const body = await request.json();
     const { walletAddress, items } = body;
 
     if (!walletAddress || !Array.isArray(items)) {
-        return apiBadRequest('Missing walletAddress or items');
+        throw new BadRequestError('Missing walletAddress or items');
     }
 
     const normalizedAddress = walletAddress.toLowerCase();
+
+    if (normalizedAddress !== authenticatedUser.toLowerCase()) {
+        throw new ForbiddenError('Wallet address does not match authenticated user');
+    }
     const carts = await getCollection('user_carts');
 
     // Upsert cart (replace entire cart)
@@ -89,36 +89,34 @@ export const POST = apiHandler(async (request: NextRequest) => {
         { upsert: true }
     );
 
-    console.log(`✅ [Cart API] Saved cart for ${normalizedAddress}:`, items.length, 'items');
+    devLog.info(`✅ [Cart API] Saved cart for ${normalizedAddress}:`, items.length, 'items');
 
-    return NextResponse.json({
-        success: true,
-        data: {
-            itemCount: items.length,
-            updatedAt: new Date()
-        }
+    return apiSuccess({
+        itemCount: items.length,
+        updatedAt: new Date()
     });
-});
+}, { auth: true });
 
 export const DELETE = apiHandler(async (request: NextRequest) => {
-    await withAuth(request);
-    // @ts-ignore
     const authenticatedUser = request.userAddress as string;
 
     const { searchParams } = new URL(request.url);
     const walletAddress = searchParams.get('walletAddress')?.toLowerCase();
 
     if (!walletAddress) {
-        return apiBadRequest('Missing walletAddress');
+        throw new BadRequestError('Missing walletAddress');
+    }
+
+    if (walletAddress !== authenticatedUser.toLowerCase()) {
+        throw new ForbiddenError('Wallet address does not match authenticated user');
     }
 
     const carts = await getCollection('user_carts');
     await carts.deleteOne({ walletAddress });
 
-    console.log(`🗑️ [Cart API] Cleared cart for ${walletAddress}`);
+    devLog.info(`🗑️ [Cart API] Cleared cart for ${walletAddress}`);
 
-    return NextResponse.json({
-        success: true,
+    return apiSuccess({
         message: 'Cart cleared'
     });
-});
+}, { auth: true });

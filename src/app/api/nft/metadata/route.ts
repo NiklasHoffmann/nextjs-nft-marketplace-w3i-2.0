@@ -4,6 +4,7 @@ import { apiHandler, apiSuccess, getQueryParam, BadRequestError, NotFoundError }
 import { LRUCache } from 'lru-cache';
 import { fetchComprehensiveNFTDataNew } from '@/services/blockchain/nft-fetcher';
 import { createRobustPublicClient, getTimeoutConfig } from '@/services/blockchain/rpc-config';
+import { devLog } from '@/utils';
 
 // Enhanced server-side cache fÃ¼r NFT Metadaten mit grÃ¶ÃŸerem TTL und besserer Performance
 const metadataCache = new LRUCache<string, any>({
@@ -64,7 +65,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
         const blockchainData = await fetchComprehensiveNFTDataNew(contractAddress, tokenId);
 
         if (!blockchainData?.tokenURI) {
-            console.warn('No tokenURI available, cannot fetch metadata');
+            devLog.warn('No tokenURI available, cannot fetch metadata');
             return NextResponse.json({ error: 'No tokenURI available' }, { status: 404 });
         }
 
@@ -77,7 +78,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
             metadata = processedMetadata;
             imageUrl = processedImageUrl;
         } catch (metadataError) {
-            console.error('Error processing metadata:', metadataError);
+            devLog.error('Error processing metadata:', metadataError);
             // Continue with blockchain data even if metadata processing fails
         }
 
@@ -108,7 +109,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
         return apiSuccess(result);
 
     } catch (error) {
-        console.error('Error fetching NFT metadata:', error);
+        devLog.error('Error fetching NFT metadata:', error);
         throw error;
     }
 });
@@ -152,7 +153,7 @@ async function processMetadata(tokenURI: string): Promise<{ metadata: any; image
 
     } catch (error) {
         clearTimeout(timeoutId);
-        console.error('Error fetching metadata from URI:', error);
+        devLog.error('Error fetching metadata from URI:', error);
         return { metadata: null, imageUrl: null };
     }
 }
@@ -172,7 +173,7 @@ async function getTokenURIWithFallback(contractAddress: string, tokenId: string)
 
         // Validate inputs
         if (!/^0x[a-fA-F0-9]{40}$/.test(contractAddress)) {
-            console.error('Invalid NFT address format');
+            devLog.error('Invalid NFT address format');
             return null;
         }
 
@@ -180,7 +181,7 @@ async function getTokenURIWithFallback(contractAddress: string, tokenId: string)
         try {
             tokenIdBigInt = BigInt(tokenId);
         } catch (error) {
-            console.error('Invalid tokenId - must be a valid number');
+            devLog.error('Invalid tokenId - must be a valid number');
             return null;
         }
 
@@ -202,7 +203,7 @@ async function getTokenURIWithFallback(contractAddress: string, tokenId: string)
 
         return tokenURI as string;
     } catch (error) {
-        console.error('Error calling Web3 directly:', error);
+        devLog.error('Error calling Web3 directly:', error);
         return null;
     }
 }
