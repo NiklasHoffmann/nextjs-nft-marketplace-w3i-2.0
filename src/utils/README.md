@@ -3,6 +3,7 @@
 Reusable helper functions organized by domain for common operations throughout the application.
 
 ## 📋 Table of Contents
+
 - [Directory Structure](#directory-structure)
 - [Quick Reference](#quick-reference)
 - [Usage Patterns](#usage-patterns)
@@ -52,28 +53,28 @@ utils/
 ### Core Utilities
 
 #### Development Logging (`core/dev-log.ts`)
+
 ```typescript
-import { devLog } from '@/utils/devLog'; // Backwards compatible
-// OR
-import { devLog } from '@/utils/core/dev-log';
+import { devLog } from "@/utils";
 
 // Only logs in development mode
-devLog.info('User action', { userId: '123' });
-devLog.warn('Performance issue detected');
-devLog.error('Critical error'); // Always logged
-devLog.debug('Detailed debug info');
+devLog.info("User action", { userId: "123" });
+devLog.warn("Performance issue detected");
+devLog.error("Critical error"); // Always logged
+devLog.debug("Detailed debug info");
 
-// Visual scanning with emojis
-devLog.success('✅ Operation completed');
-devLog.fail('❌ Operation failed');
-devLog.event('📢 Event triggered');
-devLog.cache('💾 Cache updated');
-devLog.api('🌐 API call');
+// Visual scanning with ASCII markers
+devLog.success("Operation completed");
+devLog.fail("Operation failed");
+devLog.event("Event triggered");
+devLog.cache("Cache updated");
+devLog.api("API call");
 ```
 
 #### BigInt Handling (`core/bigint.ts`)
+
 ```typescript
-import { safeStringify, parseBigIntFields } from '@/utils';
+import { safeStringify, parseBigIntFields } from "@/utils";
 
 // Serialize BigInt values
 const data = { price: 1000000000000000000n }; // 1 ETH in Wei
@@ -81,114 +82,115 @@ const json = safeStringify(data);
 // → '{"price":"1000000000000000000"}'
 
 // Parse BigInt fields
-const parsed = parseBigIntFields(data, ['price']);
+const parsed = parseBigIntFields(data, ["price"]);
 ```
 
 #### Media Utilities (`core/media.ts`)
+
 ```typescript
-import { 
-  isVideo, 
-  isImage, 
+import {
+  isVideo,
+  isImage,
   convertIpfsToHttp,
   optimizeImageUrl,
-  generateBlurDataUrl 
-} from '@/utils';
+  generateBlurDataUrl,
+} from "@/utils";
 
 // Check media types
-isVideo('video.mp4');  // true
-isImage('image.jpg');  // true
+isVideo("video.mp4"); // true
+isImage("image.jpg"); // true
 
 // IPFS conversion
-convertIpfsToHttp('ipfs://QmHash...');
+convertIpfsToHttp("ipfs://QmHash...");
 // → 'https://ipfs.io/ipfs/QmHash...'
 
 // Image optimization
-optimizeImageUrl('https://example.com/image.jpg', { width: 400 });
+optimizeImageUrl("https://example.com/image.jpg", { width: 400 });
 // → Cloudflare-optimized URL
 
 // Generate blur placeholder
-generateBlurDataUrl('https://example.com/image.jpg');
+generateBlurDataUrl("https://example.com/image.jpg");
 ```
 
 ### Formatters
 
 #### General Formatting (`formatters/general.ts`)
+
 ```typescript
-import { 
+import {
   formatPrice,
   formatNumber,
   formatDate,
   formatTimeAgo,
   formatPercentage,
-  truncateAddress
-} from '@/utils';
+  truncateAddress,
+} from "@/utils";
 
 // Currency formatting
-formatPrice('1.5', 'ETH');  // "1.5 ETH"
-formatPrice('1.5');         // "1.5"
+formatPrice("1.5", "ETH"); // "1.5 ETH"
+formatPrice("1.5"); // "1.5"
 
 // Number formatting
-formatNumber(1234567);           // "1,234,567"
-formatNumber(0.00123, 6);        // "0.001230"
+formatNumber(1234567); // "1,234,567"
+formatNumber(0.00123, 6); // "0.001230"
 
 // Date formatting
-formatDate(new Date());          // "Jan 23, 2026"
+formatDate(new Date()); // "Jan 23, 2026"
 formatTimeAgo(Date.now() - 3600000); // "1 hour ago"
 
 // Percentage
-formatPercentage(0.1234);        // "12.34%"
-formatPercentage(0.1234, 1);     // "12.3%"
+formatPercentage(0.1234); // "12.34%"
+formatPercentage(0.1234, 1); // "12.3%"
 
 // Address truncation
-truncateAddress('0x1234...abcd', 6, 4);  // "0x1234...abcd"
+truncateAddress("0x1234...abcd", 6, 4); // "0x1234...abcd"
 ```
 
 #### NFT Formatting (`formatters/nft.ts`)
+
 ```typescript
-import { 
-  formatNFTDisplayName,
-  formatContractName
-} from '@/utils';
+import { formatNFTDisplayName, formatContractName } from "@/utils";
 
 // NFT display name
-formatNFTDisplayName('Ape #123', '123', 'Ape');
+formatNFTDisplayName("Ape #123", "123", "Ape");
 // → "Ape #123"
 
-formatNFTDisplayName(null, '456', 'NFT');
+formatNFTDisplayName(null, "456", "NFT");
 // → "NFT #456"
 
 // Contract name formatting
-formatContractName('0x...', 'My Contract');
+formatContractName("0x...", "My Contract");
 // → "My Contract (0x...)"
 ```
 
 ### Validation
 
 #### Input Validation (`validation/general.ts`)
+
 ```typescript
-import { 
+import {
   isValidAddress,
   isValidTokenId,
   isValidPrice,
   isValidUrl,
-  sanitizeInput
-} from '@/utils';
+  sanitizeInput,
+} from "@/utils";
 
 // Address validation
-isValidAddress('0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb');
+isValidAddress("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb");
 // → true
 
 // Token ID validation
-isValidTokenId('123');    // true
-isValidTokenId('-1');     // false
+isValidTokenId("123"); // true
+isValidTokenId("-1"); // false
 
 // Price validation
-isValidPrice('1.5');      // true
-isValidPrice('-0.5');     // false
+isValidPrice("1.5"); // true
+isValidPrice("-0.5"); // false
 
 // URL validation
-isValidUrl('https://example.com');  // true
-isValidUrl('not-a-url');            // false
+isValidUrl("https://example.com"); // true
+isValidUrl("not-a-url"); // false
 
 // Input sanitization
 sanitizeInput('<script>alert("xss")</script>');
@@ -198,11 +200,12 @@ sanitizeInput('<script>alert("xss")</script>');
 ### API Utilities
 
 #### NFT Utilities (`api/nft.ts`)
+
 ```typescript
-import { createNFTKey, isDataFresh } from '@/utils';
+import { createNFTKey, isDataFresh } from "@/utils";
 
 // Generate unique NFT key
-const key = createNFTKey('0x123...', '42');
+const key = createNFTKey("0x123...", "42");
 // → "0x123...-42"
 
 // Check data freshness
@@ -211,8 +214,9 @@ const isFresh = isDataFresh(lastFetchTimestamp, 5 * 60 * 1000); // 5 minutes
 ```
 
 #### NFT Aggregation (`api/nft-aggregation.ts`)
+
 ```typescript
-import { aggregateNFTsByCollection, deduplicateNFTs } from '@/utils';
+import { aggregateNFTsByCollection, deduplicateNFTs } from "@/utils";
 
 // Aggregate by collection
 const collections = aggregateNFTsByCollection(nfts);
@@ -225,22 +229,23 @@ const unique = deduplicateNFTs(nfts);
 ### Performance
 
 #### Performance Monitoring (`performance/monitoring.ts`)
+
 ```typescript
-import { 
+import {
   performanceMonitor,
   measureAsync,
   measureSync,
   getMemoryUsage,
-  logPerformanceSummary
-} from '@/utils';
+  logPerformanceSummary,
+} from "@/utils";
 
 // Monitor async operations
-const result = await measureAsync('fetchNFTs', async () => {
+const result = await measureAsync("fetchNFTs", async () => {
   return await fetchNFTs();
 });
 
 // Monitor sync operations
-const value = measureSync('calculation', () => {
+const value = measureSync("calculation", () => {
   return complexCalculation();
 });
 
@@ -253,17 +258,19 @@ logPerformanceSummary();
 ```
 
 #### Cache Management (`performance/cache.ts`)
+
 ```typescript
-import { createCacheInvalidationManager } from '@/utils';
+import { createCacheInvalidationManager } from "@/utils";
+import { devLog } from "@/utils";
 
 const cacheManager = createCacheInvalidationManager({
   onInvalidate: (keys) => {
-    console.log('Invalidating:', keys);
-  }
+    devLog.info("Invalidating:", keys);
+  },
 });
 
 // Invalidate cache
-cacheManager.invalidate(['nft-123', 'collection-xyz']);
+cacheManager.invalidate(["nft-123", "collection-xyz"]);
 
 // Clear all
 cacheManager.clearAll();
@@ -272,11 +279,9 @@ cacheManager.clearAll();
 ### Marketplace
 
 #### NFT Converters (`marketplace/nft-converters.ts`)
+
 ```typescript
-import { 
-  convertToEnrichedNFT,
-  convertToMarketplaceItem
-} from '@/utils';
+import { convertToEnrichedNFT, convertToMarketplaceItem } from "@/utils";
 
 // Convert raw NFT to enriched NFT
 const enriched = convertToEnrichedNFT(rawNFT, insights);
@@ -288,14 +293,12 @@ const item = convertToMarketplaceItem(nft, listing);
 ### Features
 
 #### Admin Access (`features/admin-access.ts`)
+
 ```typescript
-import { 
-  hasAdminAccess,
-  isAdminReadOnlyMode
-} from '@/utils';
+import { hasAdminAccess, isAdminReadOnlyMode } from "@/utils";
 
 // Check admin access
-if (hasAdminAccess('0x123...')) {
+if (hasAdminAccess("0x123...")) {
   // User is admin
 }
 
@@ -310,43 +313,37 @@ if (isAdminReadOnlyMode()) {
 ## Usage Patterns
 
 ### Import from Barrel Export
+
 ```typescript
 // ✅ Recommended: Use barrel export
-import { formatPrice, isValidAddress, devLog } from '@/utils';
+import { formatPrice, isValidAddress, devLog } from "@/utils";
 
 // ✅ Also valid: Direct import
-import { formatPrice } from '@/utils/formatters/general';
+import { formatPrice } from "@/utils/formatters/general";
 ```
 
 ### Backwards Compatibility
-```typescript
-// Old import (still works)
-import { devLog } from '@/utils/devLog';
 
-// New import (preferred)
-import { devLog } from '@/utils';
-// OR
-import { devLog } from '@/utils/core/dev-log';
+Legacy `@/utils/devLog` still works, but prefer the barrel export:
+
+```typescript
+import { devLog } from "@/utils";
 ```
 
 ### Combine Multiple Utilities
+
 ```typescript
-import { 
-  formatPrice, 
-  isValidAddress, 
-  devLog,
-  measureAsync 
-} from '@/utils';
+import { formatPrice, isValidAddress, devLog, measureAsync } from "@/utils";
 
 async function processNFT(address: string) {
   if (!isValidAddress(address)) {
-    devLog.error('Invalid address:', address);
+    devLog.error("Invalid address:", address);
     return null;
   }
 
-  return measureAsync('processNFT', async () => {
+  return measureAsync("processNFT", async () => {
     const data = await fetchData(address);
-    const price = formatPrice(data.price, 'ETH');
+    const price = formatPrice(data.price, "ETH");
     return { ...data, formattedPrice: price };
   });
 }
@@ -359,14 +356,16 @@ async function processNFT(address: string) {
 ### ✅ DO
 
 #### Write Pure Functions
+
 ```typescript
 // ✅ No side effects, predictable output
-function formatPrice(amount: string, currency: string = 'ETH'): string {
+function formatPrice(amount: string, currency: string = "ETH"): string {
   return `${amount} ${currency}`;
 }
 ```
 
 #### Use Type-Safe Inputs
+
 ```typescript
 // ✅ Strong typing
 function isValidTokenId(tokenId: string): boolean {
@@ -375,28 +374,31 @@ function isValidTokenId(tokenId: string): boolean {
 ```
 
 #### Handle Edge Cases
+
 ```typescript
 // ✅ Null-safe, boundary checks
 function truncate(text: string | null | undefined, length: number): string {
-  if (!text) return '';
+  if (!text) return "";
   if (text.length <= length) return text;
-  if (length <= 3) return '...';
-  return text.slice(0, length - 3) + '...';
+  if (length <= 3) return "...";
+  return text.slice(0, length - 3) + "...";
 }
 ```
 
 #### Keep Functions Small
+
 ```typescript
 // ✅ Single responsibility
 function isVideo(url: string): boolean {
-  const videoExtensions = ['.mp4', '.webm', '.ogg'];
-  return videoExtensions.some(ext => url.toLowerCase().includes(ext));
+  const videoExtensions = [".mp4", ".webm", ".ogg"];
+  return videoExtensions.some((ext) => url.toLowerCase().includes(ext));
 }
 ```
 
 ### ❌ DON'T
 
 #### Don't Mutate Inputs
+
 ```typescript
 // ❌ Mutates original array
 function bad(arr: number[]): number[] {
@@ -411,6 +413,7 @@ function good(arr: number[]): number[] {
 ```
 
 #### Don't Use `any`
+
 ```typescript
 // ❌ Loses type safety
 function bad(input: any): any {
@@ -424,6 +427,7 @@ function good(input: string | number | bigint): string {
 ```
 
 #### Don't Add Side Effects
+
 ```typescript
 // ❌ Unexpected side effect
 function bad(data: Data): string {
@@ -444,6 +448,7 @@ function good(data: Data): string {
 ### Recent Changes
 
 #### January 2026
+
 - **Removed `utils/blockchain/`** → Moved to `@/services/blockchain`
   - Deprecated duplicate of `services/blockchain/contract-calls.ts`
   - All blockchain utilities consolidated in services layer
@@ -451,22 +456,19 @@ function good(data: Data): string {
 - **Moved `devLog.ts`** → `core/dev-log.ts`
   - Now exported from `@/utils/core`
   - Backwards compatible: `@/utils/devLog` still works via barrel export
-  - Update imports to `@/utils` or `@/utils/core/dev-log` for clarity
+  - Update imports to `@/utils` for clarity
 
 ### Import Path Updates
 
 ```typescript
 // OLD (deprecated, removed)
-import { executeContractCallWithFallback } from '@/utils/blockchain';
+import { executeContractCallWithFallback } from "@/utils/blockchain";
 
 // NEW
-import { executeContractCallWithFallback } from '@/services/blockchain';
+import { executeContractCallWithFallback } from "@/services/blockchain";
 
-// OLD (still works via backwards compatibility)
-import { devLog } from '@/utils/devLog';
-
-// NEW (preferred)
-import { devLog } from '@/utils';
+// Preferred
+import { devLog } from "@/utils";
 ```
 
 ---
@@ -474,49 +476,49 @@ import { devLog } from '@/utils';
 ## Testing Utilities
 
 ### Pure Function Testing
-```typescript
-import { truncateAddress, formatPrice } from '@/utils';
 
-describe('truncateAddress', () => {
-  it('should truncate long addresses', () => {
-    expect(truncateAddress('0x1234567890abcdef', 6, 4))
-      .toBe('0x1234...cdef');
+```typescript
+import { truncateAddress, formatPrice } from "@/utils";
+
+describe("truncateAddress", () => {
+  it("should truncate long addresses", () => {
+    expect(truncateAddress("0x1234567890abcdef", 6, 4)).toBe("0x1234...cdef");
   });
 
-  it('should handle short addresses', () => {
-    expect(truncateAddress('0x123', 6, 4))
-      .toBe('0x123');
+  it("should handle short addresses", () => {
+    expect(truncateAddress("0x123", 6, 4)).toBe("0x123");
   });
 });
 
-describe('formatPrice', () => {
-  it('should format with currency', () => {
-    expect(formatPrice('1.5', 'ETH')).toBe('1.5 ETH');
+describe("formatPrice", () => {
+  it("should format with currency", () => {
+    expect(formatPrice("1.5", "ETH")).toBe("1.5 ETH");
   });
 
-  it('should handle missing currency', () => {
-    expect(formatPrice('1.5')).toBe('1.5');
+  it("should handle missing currency", () => {
+    expect(formatPrice("1.5")).toBe("1.5");
   });
 });
 ```
 
 ### Performance Monitoring Tests
-```typescript
-import { measureSync, performanceMonitor } from '@/utils';
 
-describe('Performance Monitoring', () => {
-  it('should measure execution time', () => {
-    const result = measureSync('test', () => {
+```typescript
+import { measureSync, performanceMonitor } from "@/utils";
+
+describe("Performance Monitoring", () => {
+  it("should measure execution time", () => {
+    const result = measureSync("test", () => {
       return 42;
     });
     expect(result).toBe(42);
   });
 
-  it('should track metrics', () => {
-    performanceMonitor.startMetric('test-metric');
+  it("should track metrics", () => {
+    performanceMonitor.startMetric("test-metric");
     // ... operation ...
-    performanceMonitor.endMetric('test-metric');
-    
+    performanceMonitor.endMetric("test-metric");
+
     const metrics = performanceMonitor.getMetrics();
     expect(metrics).toHaveLength(1);
   });
@@ -537,6 +539,7 @@ describe('Performance Monitoring', () => {
 ## Support
 
 For issues or questions:
+
 1. Check [Architecture Documentation](../../docs/architecture/)
 2. Review [Development Setup](../../docs/development/setup.md)
 3. Examine existing utility implementations for patterns

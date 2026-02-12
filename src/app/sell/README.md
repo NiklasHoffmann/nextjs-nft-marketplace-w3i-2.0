@@ -5,6 +5,7 @@ List your NFTs for sale on the marketplace with support for single and batch lis
 ## 🎯 Purpose
 
 Complete NFT listing flow with:
+
 - Single NFT listing
 - Batch listing (multiple NFTs)
 - Whitelist verification
@@ -53,6 +54,7 @@ sell/
 ## 🚀 Features
 
 ### Single Listing
+
 - Select one NFT from your wallet
 - Configure price (ETH/USDC)
 - Add description and duration
@@ -61,6 +63,7 @@ sell/
 - Real-time transaction tracking
 
 ### Batch Listing
+
 - Select multiple NFTs (grid view)
 - Fixed or variable pricing
 - Bulk whitelist verification
@@ -68,6 +71,7 @@ sell/
 - Progress overlay with status updates
 
 ### Smart Flow
+
 - **Step 1**: NFT selection
 - **Step 2**: Whitelist verification (automatic)
 - **Step 3**: Approval check (automatic)
@@ -79,62 +83,70 @@ sell/
 ## 🔗 Integration Points
 
 ### Global Hooks (from @/hooks/marketplace)
+
 ```typescript
-import { useMarketplaceData } from '@/hooks/marketplace';
+import { useMarketplaceData } from "@/hooks/marketplace";
 
 const { useCollectionWhitelist } = useMarketplaceData();
 const { isWhitelisted, loading } = useCollectionWhitelist(contractAddress);
 ```
 
 ### Contexts
+
 ```typescript
-import { useListingFlow } from '../contexts/ListingFlowContext';
+import { useListingFlow } from "../contexts/ListingFlowContext";
 
 const { formData, setFormData, resetFlow } = useListingFlow();
 ```
 
 ### Services
+
 ```typescript
-import { ListingService } from '../lib/listing-service';
+import { ListingService } from "../lib/listing-service";
 
 const service = new ListingService(
   marketplaceAddress,
   createListing,
   ensureApproval,
   checkWhitelist,
-  notifications
+  notifications,
 );
 ```
 
 ## 📊 State Management
 
 ### ListingFlowContext
+
 - **Form Data**: Selected NFTs, price, currency, mode
 - **Progress Data**: Current step, status, transaction hash
 - **Session Persistence**: Auto-saves to SessionStorage
 - **Actions**: setFormData, updateProgress, resetFlow
 
 ### Flow Steps
+
 ```typescript
-type ListingStep = 
-  | 'select'      // NFT selection
-  | 'whitelist'   // Whitelist verification
-  | 'approval'    // Approval check
-  | 'form'        // Price & details
-  | 'preview'     // Transaction preview
-  | 'listing'     // Blockchain execution
-  | 'success';    // Confirmation
+type ListingStep =
+  | "select" // NFT selection
+  | "whitelist" // Whitelist verification
+  | "approval" // Approval check
+  | "form" // Price & details
+  | "preview" // Transaction preview
+  | "listing" // Blockchain execution
+  | "success"; // Confirmation
 ```
 
 ## 🎨 Component Guidelines
 
 ### Barrel Exports
+
 All components exported through [index.ts](components/index.ts):
+
 ```typescript
-import { NFTUserSelector, UnifiedListingForm } from '../components';
+import { NFTUserSelector, UnifiedListingForm } from "../components";
 ```
 
 ### Styling
+
 - Tailwind CSS utility classes
 - Consistent spacing (space-y-6, gap-4)
 - Rounded corners (rounded-xl)
@@ -156,14 +168,18 @@ npm run lint
 ## 📝 Common Use Cases
 
 ### Check if NFT is Listed
+
 ```typescript
+import { devLog } from "@/utils";
+
 const nft = await fetchNFT(contractAddress, tokenId);
 if (nft.listed) {
-  console.log('Already listed with price:', nft.listing?.price);
+  devLog.info("Already listed with price:", nft.listing?.price);
 }
 ```
 
 ### List Single NFT
+
 ```typescript
 const service = new ListingService(...);
 await service.listNFTForSale({
@@ -175,22 +191,25 @@ await service.listNFTForSale({
 ```
 
 ### Batch Listing
+
 ```typescript
 await service.listMultipleNFTs([
-  { nftAddress: '0x...', tokenId: '1', price: '0.1' },
-  { nftAddress: '0x...', tokenId: '2', price: '0.2' }
+  { nftAddress: "0x...", tokenId: "1", price: "0.1" },
+  { nftAddress: "0x...", tokenId: "2", price: "0.2" },
 ]);
 ```
 
 ## 🔧 Configuration
 
 ### Environment Variables
+
 ```bash
 NEXT_PUBLIC_MARKETPLACE_ADDRESS=0x...
 NEXT_PUBLIC_TOKEN_ADDRESS=0x...
 ```
 
 ### Contracts
+
 - **MarketplaceFacet**: Listing creation/management
 - **WhitelistFacet**: Collection verification
 - **ERC721**: NFT ownership & approval
@@ -204,12 +223,15 @@ NEXT_PUBLIC_TOKEN_ADDRESS=0x...
 ## 🐛 Troubleshooting
 
 ### "Collection not whitelisted"
+
 → Collection must be approved by admin first
 
 ### "NFT approval required"
+
 → Click "Approve NFT" button in the flow
 
 ### "Transaction failed"
+
 → Check wallet balance (gas fees)
 → Verify NFT ownership
 → Check marketplace contract status

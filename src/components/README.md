@@ -3,6 +3,7 @@
 Reusable, production-ready React components (46 components) organized by domain and complexity level. Following atomic design principles with enterprise patterns.
 
 ## 📋 Table of Contents
+
 - [Directory Structure](#directory-structure)
 - [Quick Reference](#quick-reference)
 - [Component Categories](#component-categories)
@@ -70,12 +71,10 @@ For comprehensive documentation on specific component categories, see:
 - **[Core Components](core/README.md)** - BaseCard, BaseModal, LoadingState, EmptyState, FormField
   - Composition patterns, slot system, accessibility features
   - Props interfaces, usage examples, testing patterns
-  
 - **[NFT Components](nft/README.md)** - NFTCard, LazyNFTCard, OptimizedNFTImage, Modals
   - NFT card architecture with 3D tilt effects
   - Performance optimization with lazy loading
   - Image handling with IPFS support
-  
 - **[Admin Components](admin/README.md)** - Admin UI, Multisig operations, Access control
   - Multi-signature wallet interface
   - Proposal management workflow
@@ -88,6 +87,7 @@ For comprehensive documentation on specific component categories, see:
 ### Core Components (Base Layer)
 
 #### BaseCard - Flexible Card Container
+
 ```typescript
 import { BaseCard } from '@/components';
 
@@ -103,7 +103,7 @@ import { BaseCard } from '@/components';
 </BaseCard>
 
 // All options
-<BaseCard 
+<BaseCard
   size="md"              // xs | sm | md | lg | xl
   border="gradient"      // none | default | gradient
   padding="p-6"
@@ -115,6 +115,7 @@ import { BaseCard } from '@/components';
 ```
 
 #### BaseModal - Dialog Component
+
 ```typescript
 import { BaseModal } from '@/components';
 
@@ -135,13 +136,14 @@ import { BaseModal } from '@/components';
 ```
 
 #### LoadingState - Loading Indicators
+
 ```typescript
 import { LoadingState } from '@/components';
 
 // Centered (full container)
-<LoadingState 
-  size="lg" 
-  variant="centered" 
+<LoadingState
+  size="lg"
+  variant="centered"
   message="Loading NFTs..."
   color="blue"
 />
@@ -151,6 +153,7 @@ import { LoadingState } from '@/components';
 ```
 
 #### EmptyState - Empty Placeholder
+
 ```typescript
 import { EmptyState } from '@/components';
 
@@ -163,6 +166,7 @@ import { EmptyState } from '@/components';
 ```
 
 #### FormField - Validated Input
+
 ```typescript
 import { FormField } from '@/components';
 
@@ -182,6 +186,7 @@ import { FormField } from '@/components';
 ### NFT Components
 
 #### NFTCard - Main NFT Display
+
 ```typescript
 import { NFTCard } from '@/components';
 
@@ -196,6 +201,7 @@ import { NFTCard } from '@/components';
 ```
 
 #### LazyNFTCard - Performance Optimized
+
 ```typescript
 import { LazyNFTCard } from '@/components';
 
@@ -208,11 +214,12 @@ import { LazyNFTCard } from '@/components';
 ```
 
 #### NFT Modals
+
 ```typescript
-import { 
-  BuyNowModal, 
-  UpdateListingModal, 
-  CancelListingModal 
+import {
+  BuyNowModal,
+  UpdateListingModal,
+  CancelListingModal
 } from '@/components/nft/modals';
 
 <BuyNowModal
@@ -226,6 +233,7 @@ import {
 ### Shared Components
 
 #### NFTGallery - Grid Display
+
 ```typescript
 import { NFTGallery } from '@/components/shared';
 
@@ -242,6 +250,7 @@ import { NFTGallery } from '@/components/shared';
 ```
 
 #### NFTFilterBar & Sidebar
+
 ```typescript
 import { NFTFilterBar, NFTFilterSidebar } from '@/components/shared';
 
@@ -266,6 +275,7 @@ import { NFTFilterBar, NFTFilterSidebar } from '@/components/shared';
 ### UI Components
 
 #### Button
+
 ```typescript
 import { Button } from '@/components/ui';
 
@@ -283,6 +293,7 @@ import { Button } from '@/components/ui';
 ```
 
 #### CurrencySelector
+
 ```typescript
 import { CurrencySelector } from '@/components/ui';
 
@@ -297,6 +308,7 @@ import { CurrencySelector } from '@/components/ui';
 ### Layout Components
 
 #### Web3Provider
+
 ```typescript
 import { Web3Provider } from '@/components/layout';
 
@@ -307,6 +319,7 @@ import { Web3Provider } from '@/components/layout';
 ```
 
 #### Navbar
+
 ```typescript
 import { Navbar } from '@/components/layout';
 
@@ -321,6 +334,7 @@ import { Navbar } from '@/components/layout';
 ### Auth Components
 
 #### AdminAuthGuard - Route Protection
+
 ```typescript
 import { AdminAuthGuard } from '@/components/auth';
 
@@ -335,6 +349,7 @@ export default function AdminPage() {
 ```
 
 #### AdminGuard - Conditional Render
+
 ```typescript
 import { AdminGuard } from '@/components/auth';
 
@@ -349,6 +364,7 @@ import { AdminGuard } from '@/components/auth';
 ## Component Categories
 
 ### Core Components (Atomic Design)
+
 **Purpose**: Fundamental, reusable building blocks  
 **Location**: `components/core/`
 
@@ -360,6 +376,7 @@ import { AdminGuard } from '@/components/auth';
 **Examples**: BaseCard, BaseModal, LoadingState, FormField, EmptyState
 
 ### UI Components (Atoms)
+
 **Purpose**: Small, single-purpose UI elements  
 **Location**: `components/ui/`
 
@@ -371,6 +388,7 @@ import { AdminGuard } from '@/components/auth';
 **Examples**: Button, Loading, ErrorDisplay, CurrencySelector, AddToCartButton
 
 ### Shared Components (Molecules)
+
 **Purpose**: Complex, domain-agnostic components  
 **Location**: `components/shared/`
 
@@ -382,6 +400,7 @@ import { AdminGuard } from '@/components/auth';
 **Examples**: NFTGallery, NFTFilterBar, NFTFilterSidebar
 
 ### NFT Components (Organisms)
+
 **Purpose**: NFT-specific, business logic components  
 **Location**: `components/nft/`
 
@@ -393,6 +412,7 @@ import { AdminGuard } from '@/components/auth';
 **Examples**: NFTCard, LazyNFTCard, BuyNowModal, UpdateListingModal
 
 ### Layout Components
+
 **Purpose**: Page structure and navigation  
 **Location**: `components/layout/`
 
@@ -404,6 +424,7 @@ import { AdminGuard } from '@/components/auth';
 **Examples**: Navbar, ClientLayout, Web3Provider, ErrorBoundary
 
 ### Auth Components
+
 **Purpose**: Authentication and authorization  
 **Location**: `components/auth/`
 
@@ -415,6 +436,7 @@ import { AdminGuard } from '@/components/auth';
 **Examples**: AdminAuthGuard (route-level), AdminGuard (component-level)
 
 ### Admin Components
+
 **Purpose**: Admin-only features  
 **Location**: `components/admin/`
 
@@ -433,11 +455,11 @@ import { AdminGuard } from '@/components/auth';
 
 ```typescript
 // ✅ Recommended
-import { NFTCard, NFTGallery, BaseCard } from '@/components';
+import { NFTCard, NFTGallery, BaseCard } from "@/components";
 
 // ✅ Also valid
-import { NFTCard } from '@/components/nft/NFTCard';
-import { BaseCard } from '@/components/core/Card/BaseCard';
+import { NFTCard } from "@/components/nft/NFTCard";
+import { BaseCard } from "@/components/core/Card/BaseCard";
 ```
 
 ### Composition Over Configuration
@@ -512,24 +534,23 @@ function MyPage() {
 ### ✅ DO
 
 #### Use TypeScript Interfaces
+
 ```typescript
 interface ButtonProps {
-  variant?: 'primary' | 'secondary';
-  size?: 'sm' | 'md' | 'lg';
+  variant?: "primary" | "secondary";
+  size?: "sm" | "md" | "lg";
   loading?: boolean;
   onClick?: () => void;
   children: React.ReactNode;
 }
 
-export function Button({ 
-  variant = 'primary', 
-  ...rest 
-}: ButtonProps) {
+export function Button({ variant = "primary", ...rest }: ButtonProps) {
   // Implementation
 }
 ```
 
 #### Handle All States
+
 ```typescript
 if (loading) return <LoadingState />;
 if (error) return <ErrorDisplay error={error} />;
@@ -538,6 +559,7 @@ return <Content data={data} />;
 ```
 
 #### Use Tailwind CSS
+
 ```typescript
 // ✅ Consistent
 <div className="flex items-center gap-2 p-4 rounded-lg bg-white shadow-md">
@@ -549,6 +571,7 @@ return <Content data={data} />;
 ```
 
 #### Memoize Expensive Operations
+
 ```typescript
 const sortedNFTs = useMemo(() => {
   return [...nfts].sort((a, b) => a.price - b.price);
@@ -556,6 +579,7 @@ const sortedNFTs = useMemo(() => {
 ```
 
 #### Use React.memo for Pure Components
+
 ```typescript
 export const NFTCard = memo(function NFTCard({ nft }) {
   return <BaseCard>...</BaseCard>;
@@ -565,16 +589,20 @@ export const NFTCard = memo(function NFTCard({ nft }) {
 ### ❌ DON'T
 
 #### Don't Use Any
+
 ```typescript
 // ❌ Bad
-function BadComponent(props: any) { }
+function BadComponent(props: any) {}
 
 // ✅ Good
-interface Props { data: string; }
-function GoodComponent({ data }: Props) { }
+interface Props {
+  data: string;
+}
+function GoodComponent({ data }: Props) {}
 ```
 
 #### Don't Mutate Props
+
 ```typescript
 // ❌ Bad
 function BadComponent({ items }: { items: Item[] }) {
@@ -586,6 +614,7 @@ const sortedItems = [...items].sort();
 ```
 
 #### Don't Forget Keys
+
 ```typescript
 // ❌ Bad
 {items.map((item, i) => <div key={i}>{item}</div>)}
@@ -599,6 +628,7 @@ const sortedItems = [...items].sort();
 ## Styling Guidelines
 
 ### Tailwind Conventions
+
 ```typescript
 // Spacing
 p-4 m-2 gap-4
@@ -615,13 +645,14 @@ hover:bg-gray-50 focus:ring-2 focus:ring-blue-500
 ```
 
 ### Component Sizing
+
 ```typescript
 const sizeClasses = {
-  xs: 'text-xs px-2 py-1',
-  sm: 'text-sm px-3 py-2',
-  md: 'text-base px-4 py-2',
-  lg: 'text-lg px-6 py-3',
-  xl: 'text-xl px-8 py-4'
+  xs: "text-xs px-2 py-1",
+  sm: "text-sm px-3 py-2",
+  md: "text-base px-4 py-2",
+  lg: "text-lg px-6 py-3",
+  xl: "text-xl px-8 py-4",
 };
 ```
 
@@ -630,6 +661,7 @@ const sizeClasses = {
 ## Performance Tips
 
 ### Code Splitting
+
 ```typescript
 const HeavyComponent = lazy(() => import('./HeavyComponent'));
 
@@ -639,6 +671,7 @@ const HeavyComponent = lazy(() => import('./HeavyComponent'));
 ```
 
 ### Image Optimization
+
 ```typescript
 import { OptimizedNFTImage } from '@/components/nft';
 
@@ -657,17 +690,18 @@ import { OptimizedNFTImage } from '@/components/nft';
 
 ### Recent Changes (January 2026)
 
-**Archived Deprecated Files**:
-- `nft/NFTCard.old.tsx` → `nft/archive/` (reference only)
-- `nft/NFTCard.backup.tsx` → `nft/archive/` (reference only)
+**Deprecated files removed**:
+
+- Legacy NFT card variants removed; see git history if needed.
 
 **Deprecated Exports**:
+
 ```typescript
 // OLD (ui/index.ts - deprecated)
-import { Card, CardHeader } from '@/components/ui';
+import { Card, CardHeader } from "@/components/ui";
 
 // NEW (use BaseCard)
-import { BaseCard } from '@/components';
+import { BaseCard } from "@/components";
 ```
 
 ---
@@ -675,11 +709,13 @@ import { BaseCard } from '@/components';
 ## Related Documentation
 
 ### Component Documentation
+
 - **[Core Components](core/README.md)** - Base components (BaseCard, BaseModal, LoadingState, etc.)
 - **[NFT Components](nft/README.md)** - NFT marketplace UI (NFTCard, LazyNFTCard, Modals)
 - **[Admin Components](admin/README.md)** - Admin & multisig components
 
 ### Project Documentation
+
 - [Services Layer](../services/README.md) - Backend services and blockchain integration
 - [Types System](../types/README.md) - TypeScript type definitions
 - [Utilities](../utils/README.md) - Helper functions and utilities

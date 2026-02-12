@@ -5,9 +5,11 @@ Setup guides and development workflows.
 ## Contents
 
 ### [Setup Guide](./setup.md)
+
 Complete development environment setup.
 
 **Topics:**
+
 - Prerequisites (Node.js, npm, Git)
 - Installation steps
 - Environment configuration
@@ -18,9 +20,11 @@ Complete development environment setup.
 - Testing
 
 ### [Environment Variables](./environment.md)
+
 Required environment variables and configuration.
 
 **Topics:**
+
 - App configuration
 - Web3 configuration (WalletConnect, Infura, Alchemy)
 - GraphQL subgraph (TheGraph)
@@ -40,7 +44,7 @@ cd nextjs-nft-marketplace-w3i-2.0
 npm install
 
 # Copy environment file
-cp .env.example .env.local
+cp .env.local.template .env.local
 
 # Configure environment variables (see environment.md)
 # Edit .env.local
@@ -58,9 +62,16 @@ Visit [http://localhost:3000](http://localhost:3000)
 - **Use component library** - BaseCard, BaseModal, LoadingState
 - **Centralized types** - Import from `/src/types`
 - **Utility functions** - Use helpers from `/src/utils`
+- **Logging policy** - Use `devLog` for app logging; avoid direct `console.*` except in `dev-log.ts` and `globals.ts`
 - **Performance patterns** - useCallback, useMemo, React.memo
 - **Error handling** - Proper loading/error states
 - **Code quality** - Run `npm run lint` before commits
+
+### Logging Policy
+
+- Prefer `devLog` from `@/utils` for all runtime logs.
+- Reserve direct `console.*` usage for the internal logging wrapper in `dev-log.ts` and BigInt-safe overrides in `globals.ts`.
+- Keep log payloads structured (objects) for easier filtering and avoid logging secrets or PII.
 
 ## Quick Links
 

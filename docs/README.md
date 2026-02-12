@@ -75,6 +75,12 @@ Version history, changes, and fixes
 2. Check [Troubleshooting Guide](./database/troubleshooting.md)
 3. Review [Database README](./database/README.md)
 
+## ⚠️ Known Issues and TODOs
+
+- **Admin auth automated tests pending** in [api/authentication.md](./api/authentication.md).
+- **History Towers tests pending** in [src/app/history-towers/**tests**/README.md](../src/app/history-towers/__tests__/README.md).
+- **Request typing uses `@ts-ignore`** for `NextRequest` extensions in middleware and some API routes (planned module augmentation).
+
 ## 🏗️ Project Structure
 
 ```

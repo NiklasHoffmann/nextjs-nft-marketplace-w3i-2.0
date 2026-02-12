@@ -3,6 +3,7 @@
 Production-ready NFT display components optimized for performance, user experience, and marketplace interactions. Handles NFT cards, modals, image optimization, and lazy loading.
 
 ## 📋 Table of Contents
+
 - [Overview](#overview)
 - [Components](#components)
   - [NFTCard](#nftcard---main-nft-display)
@@ -22,6 +23,7 @@ Production-ready NFT display components optimized for performance, user experien
 **Components**: 11 files + 3 modals + 4 NFTCard sub-components
 
 ### Component List
+
 - **NFTCard.tsx** (365 lines) - Main NFT card with 3D tilt effect
 - **LazyNFTCard.tsx** - Intersection Observer wrapper for lazy loading
 - **OptimizedNFTImage.tsx** - Image optimization with blur placeholders
@@ -38,6 +40,7 @@ Production-ready NFT display components optimized for performance, user experien
   - CancelListingModal.tsx
 
 ### Key Features
+
 ✅ **3D Tilt Effect** - Mouse + touch support with hardware acceleration  
 ✅ **Lazy Loading** - Intersection Observer for performance (100+ cards)  
 ✅ **Image Optimization** - Blur placeholders, IPFS conversion, CDN integration  
@@ -61,12 +64,12 @@ Production-ready NFT display components optimized for performance, user experien
 interface NFTCardProps {
   /** Complete NFT data from AggregatedNFT system */
   nft: AggregatedNFT;
-  
+
   /** Display options */
-  showStats?: boolean;         // Show likes, views, watchlist
+  showStats?: boolean; // Show likes, views, watchlist
   className?: string;
-  priority?: boolean;          // Load image immediately (above fold)
-  enableInsights?: boolean;    // Show insights/categories
+  priority?: boolean; // Load image immediately (above fold)
+  enableInsights?: boolean; // Show insights/categories
 }
 ```
 
@@ -83,6 +86,7 @@ interface NFTCardProps {
 #### Usage Examples
 
 **Basic NFT Card**
+
 ```typescript
 import { NFTCard } from '@/components/nft';
 
@@ -90,6 +94,7 @@ import { NFTCard } from '@/components/nft';
 ```
 
 **With All Features**
+
 ```typescript
 <NFTCard
   nft={nftData}
@@ -101,6 +106,7 @@ import { NFTCard } from '@/components/nft';
 ```
 
 **In Grid Layout**
+
 ```typescript
 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
   {nfts.map(nft => (
@@ -112,30 +118,34 @@ import { NFTCard } from '@/components/nft';
 #### Sub-Components Architecture
 
 **NFTCardHeader** - Title, token ID, collection badge
+
 ```typescript
 <NFTCardHeader nft={nft} />
 // Renders: Name, #tokenId, collection info
 ```
 
 **NFTCardImage** - Optimized image with blur placeholder
+
 ```typescript
-<NFTCardImage 
-  nft={nft} 
+<NFTCardImage
+  nft={nft}
   priority={priority}
 />
 // Handles: IPFS URLs, blur placeholders, fallbacks
 ```
 
 **NFTCardPrice** - Price display with currency conversion
+
 ```typescript
 <NFTCardPrice nft={nft} />
 // Shows: ETH price + USD equivalent
 ```
 
 **NFTCardFooter** - Social stats, action buttons
+
 ```typescript
-<NFTCardFooter 
-  nft={nft} 
+<NFTCardFooter
+  nft={nft}
   showStats={showStats}
 />
 // Displays: Likes, views, watchlist, CTA buttons
@@ -146,11 +156,11 @@ import { NFTCard } from '@/components/nft';
 ```typescript
 // Automatic background colors based on rarity
 const rarityBackgrounds = {
-  Common: 'bg-gradient-to-br from-blue-50 to-blue-100',
-  Uncommon: 'bg-gradient-to-br from-green-50 to-green-100',
-  Rare: 'bg-gradient-to-br from-purple-50 to-purple-100',
-  Epic: 'bg-gradient-to-br from-orange-50 to-orange-100',
-  Legendary: 'bg-gradient-to-br from-yellow-50 via-pink-50 to-purple-100'
+  Common: "bg-gradient-to-br from-blue-50 to-blue-100",
+  Uncommon: "bg-gradient-to-br from-green-50 to-green-100",
+  Rare: "bg-gradient-to-br from-purple-50 to-purple-100",
+  Epic: "bg-gradient-to-br from-orange-50 to-orange-100",
+  Legendary: "bg-gradient-to-br from-yellow-50 via-pink-50 to-purple-100",
 };
 ```
 
@@ -183,8 +193,8 @@ const { tiltRef, tiltStyle } = useCardTilt({
 ```typescript
 interface LazyNFTCardProps {
   nft: AggregatedNFT;
-  threshold?: number;      // Visibility threshold (0-1)
-  rootMargin?: string;     // Load before visible (e.g., "100px")
+  threshold?: number; // Visibility threshold (0-1)
+  rootMargin?: string; // Load before visible (e.g., "100px")
   showStats?: boolean;
   enableInsights?: boolean;
 }
@@ -193,17 +203,19 @@ interface LazyNFTCardProps {
 #### Usage Examples
 
 **Basic Lazy Loading**
+
 ```typescript
 import { LazyNFTCard } from '@/components/nft';
 
 // Loads when 10% visible
-<LazyNFTCard 
-  nft={nft} 
+<LazyNFTCard
+  nft={nft}
   threshold={0.1}
 />
 ```
 
 **Preload Before Visible**
+
 ```typescript
 // Start loading 200px before entering viewport
 <LazyNFTCard
@@ -214,6 +226,7 @@ import { LazyNFTCard } from '@/components/nft';
 ```
 
 **Large Grid Pattern**
+
 ```typescript
 // For lists with 100+ items
 <div className="grid grid-cols-4 gap-6">
@@ -236,6 +249,7 @@ import { LazyNFTCard } from '@/components/nft';
 - ✅ **Better UX** - Smooth loading experience
 
 **Benchmarks** (1000 NFTs):
+
 - Without lazy loading: ~8s initial render, 2GB memory
 - With lazy loading: ~1s initial render, 500MB memory
 
@@ -253,10 +267,10 @@ interface OptimizedNFTImageProps {
   src: string | null | undefined;
   alt: string;
   className?: string;
-  priority?: boolean;      // Load immediately (above fold)
+  priority?: boolean; // Load immediately (above fold)
   width?: number;
   height?: number;
-  blur?: boolean;          // Show blur placeholder
+  blur?: boolean; // Show blur placeholder
   fallbackSrc?: string;
   onError?: () => void;
   onLoad?: () => void;
@@ -275,6 +289,7 @@ interface OptimizedNFTImageProps {
 #### Usage Examples
 
 **Basic Image**
+
 ```typescript
 <OptimizedNFTImage
   src={nft.image}
@@ -284,6 +299,7 @@ interface OptimizedNFTImageProps {
 ```
 
 **Priority Image (Above Fold)**
+
 ```typescript
 <OptimizedNFTImage
   src={nft.image}
@@ -295,6 +311,7 @@ interface OptimizedNFTImageProps {
 ```
 
 **With Blur Placeholder**
+
 ```typescript
 <OptimizedNFTImage
   src={nft.image}
@@ -305,6 +322,7 @@ interface OptimizedNFTImageProps {
 ```
 
 **IPFS URL Handling**
+
 ```typescript
 // Automatically converts IPFS URLs
 <OptimizedNFTImage
@@ -325,19 +343,21 @@ interface OptimizedNFTImageProps {
 
 ```typescript
 import { BuyNowModal } from '@/components/nft/modals';
+import { devLog } from '@/utils';
 
 <BuyNowModal
   isOpen={isOpen}
   onClose={handleClose}
   nft={selectedNFT}
   onSuccess={(txHash) => {
-    console.log('Purchase successful:', txHash);
+    devLog.info('Purchase successful:', txHash);
     router.push(`/my-nfts`);
   }}
 />
 ```
 
 **Features**:
+
 - Price breakdown (NFT + platform fee + gas estimate)
 - Wallet balance check
 - Transaction progress (signing → confirming → complete)
@@ -351,19 +371,21 @@ import { BuyNowModal } from '@/components/nft/modals';
 
 ```typescript
 import { UpdateListingModal } from '@/components/nft/modals';
+import { devLog } from '@/utils';
 
 <UpdateListingModal
   isOpen={isOpen}
   onClose={handleClose}
   listing={currentListing}
   onSuccess={(newPrice) => {
-    console.log('Listing updated to:', newPrice);
+    devLog.info('Listing updated to:', newPrice);
     refreshListings();
   }}
 />
 ```
 
 **Features**:
+
 - Current vs. new price comparison
 - USD conversion preview
 - Price validation (min: 0.001 ETH)
@@ -377,19 +399,21 @@ import { UpdateListingModal } from '@/components/nft/modals';
 
 ```typescript
 import { CancelListingModal } from '@/components/nft/modals';
+import { devLog } from '@/utils';
 
 <CancelListingModal
   isOpen={isOpen}
   onClose={handleClose}
   listing={listing}
   onSuccess={() => {
-    console.log('Listing cancelled');
+    devLog.info('Listing cancelled');
     router.push('/my-nfts');
   }}
 />
 ```
 
 **Features**:
+
 - Confirmation step (prevent accidents)
 - Gas estimation
 - Transaction progress
@@ -439,14 +463,16 @@ NFTCard Component
 ### Context Integration
 
 **NFTStatsContext** - User interactions
+
 ```typescript
 const { stats, toggleLike, addToWatchlist } = useNFTUserStats(nft.id);
 ```
 
 **CurrencyContext** - Price conversion
+
 ```typescript
 const { selectedCurrency, convertPrice } = useCurrency();
-const usdPrice = convertPrice(nft.price, 'ETH', 'USD');
+const usdPrice = convertPrice(nft.price, "ETH", "USD");
 ```
 
 ---
@@ -506,7 +532,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 
 function NFTList({ nfts }: { nfts: NFT[] }) {
   const parentRef = useRef<HTMLDivElement>(null);
-  
+
   const virtualizer = useVirtualizer({
     count: nfts.length,
     getScrollElement: () => parentRef.current,
@@ -546,6 +572,7 @@ function NFTList({ nfts }: { nfts: NFT[] }) {
 ### ✅ DO
 
 **Use LazyNFTCard for Large Lists**
+
 ```typescript
 // For 100+ NFTs
 {nfts.map(nft => (
@@ -554,10 +581,11 @@ function NFTList({ nfts }: { nfts: NFT[] }) {
 ```
 
 **Prioritize Above-the-Fold Images**
+
 ```typescript
 {nfts.map((nft, index) => (
-  <NFTCard 
-    key={nft.id} 
+  <NFTCard
+    key={nft.id}
     nft={nft}
     priority={index < 4} // First row
   />
@@ -565,6 +593,7 @@ function NFTList({ nfts }: { nfts: NFT[] }) {
 ```
 
 **Handle Loading/Error States**
+
 ```typescript
 function NFTGallery() {
   const { nfts, loading, error } = useNFTs();
@@ -582,16 +611,21 @@ function NFTGallery() {
 ```
 
 **Memoize Callbacks**
+
 ```typescript
-const handleBuy = useCallback(async (nft: NFT) => {
-  await purchaseNFT(nft);
-  refreshNFTs();
-}, [refreshNFTs]);
+const handleBuy = useCallback(
+  async (nft: NFT) => {
+    await purchaseNFT(nft);
+    refreshNFTs();
+  },
+  [refreshNFTs],
+);
 ```
 
 ### ❌ DON'T
 
 **Don't Render All Cards Immediately**
+
 ```typescript
 // ❌ Bad - Renders 1000 cards at once
 {nfts.map(nft => <NFTCard key={nft.id} nft={nft} />)}
@@ -601,6 +635,7 @@ const handleBuy = useCallback(async (nft: NFT) => {
 ```
 
 **Don't Skip Image Optimization**
+
 ```typescript
 // ❌ Bad - Raw image URLs
 <img src={nft.image} />
@@ -610,6 +645,7 @@ const handleBuy = useCallback(async (nft: NFT) => {
 ```
 
 **Don't Ignore IPFS URLs**
+
 ```typescript
 // ❌ Bad - IPFS URLs won't load
 <img src="ipfs://QmHash..." />
@@ -638,7 +674,7 @@ describe('NFTCard', () => {
 
   it('renders NFT information', () => {
     render(<NFTCard nft={mockNFT} />);
-    
+
     expect(screen.getByText('Test NFT')).toBeInTheDocument();
     expect(screen.getByText('1.5 ETH')).toBeInTheDocument();
   });

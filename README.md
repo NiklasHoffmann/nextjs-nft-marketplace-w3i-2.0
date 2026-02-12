@@ -3,7 +3,7 @@
 A modern, full-stack NFT marketplace built with Next.js 15, TypeScript, and Web3 technologies. **Fully refactored for production with hybrid metadata system, modular components, and enterprise-grade security.**
 
 ![NFT Marketplace](https://img.shields.io/badge/Version-2.0.0-blue.svg)
-![Next.js](https://img.shields.io/badge/Next.js-15.5.2-black.svg)
+![Next.js](https://img.shields.io/badge/Next.js-15.5.9-black.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.4.5-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-green.svg)
@@ -169,7 +169,7 @@ A modern, full-stack NFT marketplace built with Next.js 15, TypeScript, and Web3
    Copy the example environment file:
 
    ```bash
-   cp .env.example .env.local
+   cp .env.local.template .env.local
    ```
 
    Configure the following environment variables:
@@ -221,6 +221,12 @@ npm run diagnose:mongodb
 
 - See [MongoDB Quick Fix Guide](docs/database/quick-fix.md) for 2-minute solution
 - Full troubleshooting: [MongoDB Troubleshooting](docs/database/troubleshooting.md)
+
+## ⚠️ Known Issues and TODOs
+
+- **Request typing uses `@ts-ignore`** for `NextRequest` extensions in auth/validation middleware and several API routes. Recommend module augmentation or a typed request wrapper to remove `@ts-ignore` usage.
+- **Admin auth automated tests pending** (see [docs/api/authentication.md](docs/api/authentication.md) Automated Tests section).
+- **History Towers tests pending** (see [src/app/history-towers/**tests**/README.md](src/app/history-towers/__tests__/README.md) TODO sections for remaining test suites).
 
 ## 📁 Project Structure
 

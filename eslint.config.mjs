@@ -31,6 +31,10 @@ const eslintConfig = [
           {
             group: ['../*', '../../*', '../../../*'],
             message: 'Verwende absolute Imports mit @/ anstelle von relativen Imports (../).'
+          },
+          {
+            group: ['**/archive/**', '**/*.deprecated', '**/*.deprecated.*'],
+            message: 'Importiere keine Dateien aus /archive oder *.deprecated (nur Referenz).'
           }
         ]
       }]

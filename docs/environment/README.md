@@ -46,6 +46,7 @@ npm run build && npm run start
 ## 🔐 Security Rules
 
 ### ✅ DO:
+
 - Keep `.env.local` and `.env.production.local` in `.gitignore`
 - Use templates (`.template` files) for documentation
 - Commit `.env` for team-wide defaults (no secrets!)
@@ -53,6 +54,7 @@ npm run build && npm run start
 - Use separate keys for dev/prod
 
 ### ❌ DON'T:
+
 - Never commit files ending in `.local`
 - Never hard-code secrets in source files
 - Never share API keys via chat/email
@@ -70,22 +72,27 @@ Next.js loads environment files in this order (later ones override earlier):
 ## 🔍 Variable Types
 
 ### Server-Side (Private)
+
 ```bash
 # No NEXT_PUBLIC_ prefix
 MONGODB_URI=...
 JWT_SECRET=...
 ALCHEMY_URL=...
 ```
+
 - Only accessible in API routes and server components
 - NEVER exposed to browser
 - Perfect for secrets
+- Required for admin session signing; auth routes return 500 when missing
 
 ### Client-Side (Public)
+
 ```bash
 # NEXT_PUBLIC_ prefix required
 NEXT_PUBLIC_MARKETPLACE_ADDRESS=...
 NEXT_PUBLIC_ALCHEMY_API_KEY=...
 ```
+
 - Exposed to browser (visible in Network tab)
 - Must have rate limits configured
 - Use for non-sensitive config only
@@ -93,6 +100,7 @@ NEXT_PUBLIC_ALCHEMY_API_KEY=...
 ## 📖 Documentation
 
 See [ENV_VARIABLES.md](./ENV_VARIABLES.md) for:
+
 - Complete variable reference
 - Security best practices
 - Troubleshooting guide
@@ -101,6 +109,7 @@ See [ENV_VARIABLES.md](./ENV_VARIABLES.md) for:
 ## 🆘 Common Issues
 
 ### "MongoDB connection failed"
+
 ```bash
 # Check your connection string
 echo $MONGODB_URI
@@ -110,11 +119,13 @@ mongosh "$MONGODB_URI"
 ```
 
 ### "RPC rate limit exceeded"
+
 - Verify API key has quota
 - Check usage in provider dashboard
 - Consider upgrading plan
 
 ### "Environment variable not loading"
+
 ```bash
 # Restart dev server after .env changes
 npm run dev
@@ -139,6 +150,7 @@ grep -r "NEXT_PUBLIC_YOUR_VAR" src/
    - Add description, type, example
 
 3. **Update your local file:**
+
    ```bash
    # Add to .env.local
    MY_NEW_VAR=value
@@ -172,14 +184,19 @@ Before deploying to production:
 ## 🛠️ Development Tools
 
 ### Generate Strong Secret
+
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 ### Validate Environment
+
 ```bash
 # Check all required vars are set
-npm run validate-env  # (if script exists)
+npm run env:check
+
+# Production env check
+npm run env:check:prod
 
 # Or manually:
 node -e "
@@ -193,6 +210,7 @@ node -e "
 ```
 
 ### List All Variables
+
 ```bash
 # Show all NEXT_PUBLIC_ variables
 env | grep NEXT_PUBLIC_

@@ -23,6 +23,7 @@ services/
 **Purpose:** Direct blockchain interaction, smart contract calls, NFT metadata fetching
 
 **Key Files:**
+
 - `TransactionService.ts` - Centralized transaction handling with progress tracking
 - `contracts.ts` - Contract ABIs, addresses, and utilities
 - `contract-calls.ts` - Smart contract interaction with retry logic
@@ -31,30 +32,35 @@ services/
 - `rpc-config.ts` - RPC provider management with fallback clients
 
 **Usage Example:**
+
 ```typescript
-import { TransactionService } from '@/services/blockchain';
+import { TransactionService } from "@/services/blockchain";
+import { devLog } from "@/utils";
 
 // Purchase NFT with progress tracking
 const result = await TransactionService.purchaseNFT({
-  contractAddress: '0x...',
-  tokenId: '123',
-  price: '0.1',
+  contractAddress: "0x...",
+  tokenId: "123",
+  price: "0.1",
   onProgress: (step) => {
-    console.log(`${step.action}: ${step.status}`);
-  }
+    devLog.info(`${step.action}: ${step.status}`);
+  },
 });
 
 // Create listing
 await TransactionService.createListing({
-  contractAddress: '0x...',
-  tokenId: '123',
-  price: '0.5',
-  listingType: 'sale',
-  onProgress: (step) => { /* ... */ }
+  contractAddress: "0x...",
+  tokenId: "123",
+  price: "0.5",
+  listingType: "sale",
+  onProgress: (step) => {
+    /* ... */
+  },
 });
 ```
 
 **Features:**
+
 - ✅ Multi-step transaction flow with progress callbacks
 - ✅ Automatic gas estimation with safety margins
 - ✅ Error handling & retry logic
@@ -68,20 +74,23 @@ await TransactionService.createListing({
 **Purpose:** Multi-layer caching for blockchain data with intelligent TTL strategies
 
 **Key Files:**
+
 - `smart-cache.ts` - LRU caches for contract properties, ownership, metadata, approvals
 
 **Cache Layers:**
+
 ```typescript
 import {
-  contractPropertiesCache,  // TTL: 24h - Static contract data
-  ownershipCache,           // TTL: 5min - Dynamic ownership data
-  tokenMetadataCache,       // TTL: 12h - IPFS metadata
-  approvalCache,            // TTL: 2min - Approval states
-  tokenURICache             // TTL: 24h - Token URIs
-} from '@/services/cache';
+  contractPropertiesCache, // TTL: 24h - Static contract data
+  ownershipCache, // TTL: 5min - Dynamic ownership data
+  tokenMetadataCache, // TTL: 12h - IPFS metadata
+  approvalCache, // TTL: 2min - Approval states
+  tokenURICache, // TTL: 24h - Token URIs
+} from "@/services/cache";
 ```
 
 **Cache Strategy:**
+
 - **Contract Properties:** 24h TTL (name, symbol, totalSupply - rarely changes)
 - **Ownership Data:** 5min TTL (owner, balance - changes on trades)
 - **Token Metadata:** 12h TTL (IPFS data - immutable but validate)
@@ -89,6 +98,7 @@ import {
 - **Token URIs:** 24h TTL (tokenURI calls - immutable)
 
 **Automatic Cleanup:**
+
 - Runs every 10 minutes
 - Removes expired entries
 - Memory-efficient with max sizes
@@ -100,11 +110,13 @@ import {
 **Purpose:** Real-time marketplace event handling and synchronization
 
 **Key Files:**
+
 - `event-listener.ts` - WebSocket-based blockchain event listening
 - `event-mongodb-sync.ts` - MongoDB synchronization for marketplace events
 - `event-invalidation-bridge.ts` - Routes events to invalidation system
 
 **Architecture:**
+
 ```
 Blockchain Events → Event Listener → MongoDB Sync → Invalidation Bridge → UI Update
                          ↓
@@ -112,8 +124,9 @@ Blockchain Events → Event Listener → MongoDB Sync → Invalidation Bridge �
 ```
 
 **Usage Example:**
+
 ```typescript
-import { getMarketplaceEventListener } from '@/services/marketplace';
+import { getMarketplaceEventListener } from "@/services/marketplace";
 
 const eventListener = getMarketplaceEventListener();
 eventListener.start(); // Auto-start in production
@@ -125,6 +138,7 @@ eventListener.start(); // Auto-start in production
 ```
 
 **Supported Events:**
+
 - `ItemListed` - New NFT listed for sale
 - `ItemBought` - NFT purchased
 - `ItemCanceled` - Listing canceled
@@ -137,6 +151,7 @@ eventListener.start(); // Auto-start in production
 **Purpose:** Hybrid real-time + polling synchronization for NFT data
 
 **Architecture:**
+
 ```
 Real-time: WebSocket Events (< 1s)
 Fallback:  The Graph v2 Polling (30s)
@@ -145,26 +160,29 @@ On-demand: Blockchain State Sync
 ```
 
 **Key Files:**
+
 - `index.ts` - Main NFT Sync Service orchestrator
-- `graph-subscription-v2.ts` - The Graph polling (listing data)
+- `graph-subscription.ts` - The Graph polling (listing data)
 - `blockchain-state-sync.ts` - On-demand blockchain state fetching
 - `ipfs-metadata-lazy-sync.ts` - Lazy IPFS metadata synchronization
 - `stats-sync.ts` - User interaction stats aggregation
 - `insights-sync.ts` - Admin insights synchronization
 
 **Usage Example:**
+
 ```typescript
-import { getNFTSyncService } from '@/services/nft-sync';
+import { getNFTSyncService } from "@/services/nft-sync";
 
 const syncService = getNFTSyncService();
 syncService.start(); // Auto-starts all sync services
 
 // On-demand sync
-import { blockchainStateSync } from '@/services/nft-sync';
+import { blockchainStateSync } from "@/services/nft-sync";
 await blockchainStateSync(nftAddress, tokenId);
 ```
 
 **Sync Strategy:**
+
 1. **Real-time Events** (WebSocket) - Instant updates
 2. **The Graph Polling** (30s) - Fallback for missed events
 3. **On-demand Sync** - Called when data needed
@@ -177,29 +195,32 @@ await blockchainStateSync(nftAddress, tokenId);
 **Purpose:** Data invalidation and cache busting for real-time UI updates
 
 **Key Files:**
+
 - `data-invalidation.ts` - Central invalidation system
 
 **Usage Example:**
+
 ```typescript
 import {
   invalidateAfterListing,
   invalidateAfterPurchase,
   invalidateAfterCancelListing,
-  onDataInvalidation
-} from '@/services/validation';
+  onDataInvalidation,
+} from "@/services/validation";
 
 // Invalidate after listing
 await invalidateAfterListing(contractAddress, tokenId);
 
 // Listen for invalidation events
 const cleanup = onDataInvalidation((event) => {
-  if (event.type === 'nft-purchased') {
+  if (event.type === "nft-purchased") {
     refetchData();
   }
 });
 ```
 
 **Invalidation Events:**
+
 - `listing-created` - New listing created
 - `listing-canceled` - Listing canceled
 - `nft-purchased` - NFT bought
@@ -208,6 +229,7 @@ const cleanup = onDataInvalidation((event) => {
 - `manual-refresh` - Manual refresh triggered
 
 **Connected Systems:**
+
 - `WalletNFTsContext` - User's NFT collection
 - `CollectionsContext` - Collection aggregations
 - `MarketplaceItemsContext` - Listed items
@@ -220,20 +242,22 @@ const cleanup = onDataInvalidation((event) => {
 **Purpose:** Multi-signature wallet operations for Diamond Standard contracts
 
 **Key Files:**
+
 - `MultisigService.ts` - Safe integration, transaction building, status tracking
 
 **Usage Example:**
+
 ```typescript
 import {
   createDiamondTransactionRequest,
   enhancePendingTransaction,
-  getTransactionStatusLabel
-} from '@/services/multisig';
+  getTransactionStatusLabel,
+} from "@/services/multisig";
 
 // Create multisig transaction
 const txRequest = createDiamondTransactionRequest({
-  operation: 'addFunction',
-  args: [facetAddress, selector]
+  operation: "addFunction",
+  args: [facetAddress, selector],
 });
 
 // Enhance pending transaction
@@ -294,10 +318,10 @@ const enhanced = await enhancePendingTransaction(transaction);
 
 ```typescript
 // instrumentation.ts or server startup
-import { initializeServices } from '@/lib/init-services';
+import { initializeServices } from "@/lib/init-services";
 
 export async function register() {
-  if (process.env.NEXT_RUNTIME === 'nodejs') {
+  if (process.env.NEXT_RUNTIME === "nodejs") {
     await initializeServices();
   }
 }
@@ -306,9 +330,9 @@ export async function register() {
 ### Use in Components
 
 ```typescript
-import { useTransactionService } from '@/services/blockchain';
-import { onDataInvalidation } from '@/services/validation';
-import { getNFTSyncService } from '@/services/nft-sync';
+import { useTransactionService } from "@/services/blockchain";
+import { onDataInvalidation } from "@/services/validation";
+import { getNFTSyncService } from "@/services/nft-sync";
 
 // Transaction handling
 const { purchaseNFT } = useTransactionService();
@@ -358,32 +382,32 @@ MONGODB_URI=mongodb+srv://...
 ### Dev Logs
 
 ```typescript
-import { devLog } from '@/utils/devLog';
+import { devLog } from "@/utils";
 
 // Logs are categorized by service
-devLog.info('nft-sync', 'Starting sync service');
-devLog.error('blockchain', 'Transaction failed', error);
+devLog.info("nft-sync", "Starting sync service");
+devLog.error("blockchain", "Transaction failed", error);
 ```
 
 ### Performance Tracking
 
 ```typescript
-import { measurePerformance } from '@/utils/performance';
+import { measurePerformance } from "@/utils/performance";
 
-const metrics = await measurePerformance('fetch-nft', async () => {
+const metrics = await measurePerformance("fetch-nft", async () => {
   return await fetchNFTData(address, tokenId);
 });
 
-console.log(`Operation took ${metrics.duration}ms`);
+devLog.info(`Operation took ${metrics.duration}ms`);
 ```
 
 ### Cache Statistics
 
 ```typescript
-import { getCacheStats } from '@/services/cache';
+import { getCacheStats } from "@/services/cache";
 
 const stats = getCacheStats();
-console.log(`Cache hit rate: ${stats.hitRate}%`);
+devLog.info(`Cache hit rate: ${stats.hitRate}%`);
 ```
 
 ---
@@ -393,9 +417,9 @@ console.log(`Cache hit rate: ${stats.hitRate}%`);
 ### Unit Tests
 
 ```typescript
-import { fetchComprehensiveNFTDataNew } from '@/services/blockchain/nft-fetcher';
+import { fetchComprehensiveNFTDataNew } from "@/services/blockchain/nft-fetcher";
 
-test('fetches NFT data with cache', async () => {
+test("fetches NFT data with cache", async () => {
   const data = await fetchComprehensiveNFTDataNew(address, tokenId);
   expect(data.owner).toBeDefined();
 });
@@ -404,9 +428,9 @@ test('fetches NFT data with cache', async () => {
 ### Integration Tests
 
 ```typescript
-import { getNFTSyncService } from '@/services/nft-sync';
+import { getNFTSyncService } from "@/services/nft-sync";
 
-test('sync service processes events', async () => {
+test("sync service processes events", async () => {
   const service = getNFTSyncService();
   await service.start();
   // Trigger event and verify DB update
@@ -457,12 +481,12 @@ test('sync service processes events', async () => {
 
 ```typescript
 // ❌ OLD
-import { invalidateAfterListing } from '@/services/DataInvalidationService';
-import { contractPropertiesCache } from '@/services/blockchain/smart-cache';
+import { invalidateAfterListing } from "@/services/DataInvalidationService";
+import { contractPropertiesCache } from "@/services/blockchain/smart-cache";
 
 // ✅ NEW
-import { invalidateAfterListing } from '@/services/validation';
-import { contractPropertiesCache } from '@/services/cache';
+import { invalidateAfterListing } from "@/services/validation";
+import { contractPropertiesCache } from "@/services/cache";
 ```
 
 ---
@@ -478,21 +502,24 @@ import { contractPropertiesCache } from '@/services/cache';
 
 **Last Updated:** January 23, 2026  
 **Version:** 2.0.0 (Reorganized & Production-Ready)
+
 - ✅ Transaction receipt validation
 
 **Progress Steps:**
+
 ```typescript
 type TransactionStep = {
-  action: 'preparing' | 'signing' | 'pending' | 'confirming' | 'success';
-  status: 'in-progress' | 'completed' | 'failed';
+  action: "preparing" | "signing" | "pending" | "confirming" | "success";
+  status: "in-progress" | "completed" | "failed";
   txHash?: string;
   error?: string;
 };
 ```
 
 ### **Data Invalidation Service** (`DataInvalidationService.ts`)
+
 ```typescript
-import { DataInvalidationService } from '@/services/DataInvalidationService';
+import { DataInvalidationService } from "@/services/DataInvalidationService";
 
 // Invalidate all caches for an NFT
 DataInvalidationService.invalidateNFT(contractAddress, tokenId);
@@ -505,11 +532,13 @@ DataInvalidationService.invalidateUserData(walletAddress);
 ```
 
 **Trigger Events:**
+
 - NFT purchase → Invalidate marketplace + wallet caches
 - Listing created → Invalidate marketplace + NFT caches
 - Rating/Favorite → Invalidate stats cache
 
 ### **NFT Sync Service** (`nft-sync/`)
+
 ```typescript
 // Background service - auto-starts on server boot
 // Syncs TheGraph → MongoDB every 30 seconds
@@ -517,6 +546,7 @@ DataInvalidationService.invalidateUserData(walletAddress);
 ```
 
 **Architecture:**
+
 ```
 TheGraph (Blockchain Events)
       ↓
@@ -530,6 +560,7 @@ React Contexts
 ```
 
 ### **Marketplace Service** (`marketplace/`)
+
 - Listing validation
 - Price calculations
 - Fee computation
@@ -538,6 +569,7 @@ React Contexts
 ## Service Architecture
 
 ### Transaction Flow
+
 ```
 1. User Action (Button Click)
       ↓
@@ -555,6 +587,7 @@ React Contexts
 ```
 
 ### Error Handling
+
 ```typescript
 try {
   await TransactionService.purchaseNFT({ ... });
@@ -572,6 +605,7 @@ try {
 ## Best Practices
 
 ### ✅ DO:
+
 - Keep services **stateless** (no React state)
 - Return **typed results**
 - Provide **progress callbacks** for long operations
@@ -579,6 +613,7 @@ try {
 - Invalidate caches after mutations
 
 ### ❌ DON'T:
+
 - Don't mix UI logic in services
 - Don't store state in services
 - Don't forget error handling

@@ -122,6 +122,7 @@ app/
 ## 🗂️ Route Types
 
 ### Public Routes
+
 - `/` - Home (Marketplace + Game)
 - `/marketplace` - NFT marketplace
 - `/nft/[contractAddress]` - Collection page
@@ -131,12 +132,14 @@ app/
 - `/wallet` - User wallet (requires connection)
 
 ### Protected Routes (Wallet Connection Required)
+
 - `/sell` - List NFTs for sale
 - `/sell/listing` - Listing flow
 - `/sell/check-listing` - Check listing status
 - `/sell/success` - Success page
 
 ### Admin Routes (Admin Authentication Required)
+
 - `/admin` - Admin dashboard
 - `/admin/dashboard` - Admin dashboard
 - `/admin/insights` - Manage NFT insights
@@ -168,6 +171,7 @@ feature/
 ```
 
 **Examples:**
+
 - `/sell` - 45 files (listing flow, forms, NFT selection)
 - `/history-towers` - 25 files (game engine, physics, rendering)
 - `/admin` - 32 files (insights, multisig, dashboard)
@@ -175,6 +179,7 @@ feature/
 ### 2. Component Colocation
 
 Components are colocated with their routes when they are:
+
 - Only used in that specific route
 - Tightly coupled to route logic
 - Part of a complex feature module
@@ -198,10 +203,10 @@ All API routes use standardized infrastructure:
 
 ```typescript
 // Standard API Route Pattern
-import { apiHandler } from '@/lib/api/handler';
-import { withAuth, withAdmin } from '@/lib/middleware';
-import { apiBadRequest, apiSuccess, apiNotFound } from '@/lib/api/responses';
-import { z } from 'zod';
+import { apiHandler } from "@/lib/api/handler";
+import { withAuth, withAdmin } from "@/lib/middleware";
+import { apiBadRequest, apiSuccess, apiNotFound } from "@/lib/api/responses";
+import { z } from "zod";
 
 // Schema validation
 const RequestSchema = z.object({
@@ -209,21 +214,25 @@ const RequestSchema = z.object({
 });
 
 // Handler with middleware
-export const POST = apiHandler(withAdmin(async (req: NextRequest) => {
-  const body = await req.json();
-  const data = RequestSchema.parse(body);
-  
-  // Business logic
-  
-  return apiSuccess(result);
-}));
+export const POST = apiHandler(
+  withAdmin(async (req: NextRequest) => {
+    const body = await req.json();
+    const data = RequestSchema.parse(body);
+
+    // Business logic
+
+    return apiSuccess(result);
+  }),
+);
 ```
 
 **Middleware:**
+
 - `withAuth()` - Requires valid session (wallet signature)
 - `withAdmin()` - Requires admin session
 
 **Response Helpers:**
+
 - `apiSuccess(data, status?)` - Success response
 - `apiBadRequest(message)` - 400 Bad Request
 - `apiNotFound(message)` - 404 Not Found
@@ -249,6 +258,7 @@ Layouts define persistent UI across route segments:
 ### 5. Page Patterns
 
 #### Simple Page (Wrapper)
+
 ```typescript
 // ✅ Good: Wrapper page for SEO/routing
 export default function WalletPage() {
@@ -257,11 +267,12 @@ export default function WalletPage() {
 ```
 
 #### Complex Page (Direct Implementation)
+
 ```typescript
 // ✅ Good: Direct implementation for route-specific logic
 export default function AdminPage() {
     const { data } = useAdminData();
-    
+
     return (
         <div>
             {/* Complex UI */}
@@ -271,19 +282,21 @@ export default function AdminPage() {
 ```
 
 #### Client Component Page
+
 ```typescript
 // ✅ Good: Use "use client" when needed
 "use client";
 
 export default function InteractivePage() {
-    const [state, setState] = useState();
-    // Client-side logic
+  const [state, setState] = useState();
+  // Client-side logic
 }
 ```
 
 ## 📝 File Naming Conventions
 
 ### Route Files
+
 - `page.tsx` - Route page component
 - `layout.tsx` - Route layout component
 - `loading.tsx` - Loading UI (not used yet)
@@ -291,21 +304,26 @@ export default function InteractivePage() {
 - `not-found.tsx` - 404 UI (not used yet)
 
 ### API Routes
+
 - `route.ts` - API route handler
 
 ### Components
+
 - `ComponentName.tsx` - PascalCase for components
 - `index.ts` - Barrel export
 
 ### Utilities
+
 - `utilityName.ts` - camelCase for utilities
 - `serviceName.ts` - camelCase for services
 
 ### Types
+
 - `typeName.types.ts` - Type definitions
 - `index.ts` - Type exports
 
 ### Documentation
+
 - `README.md` - Feature documentation
 - `ARCHITECTURE.md` - Architecture details
 
@@ -314,12 +332,14 @@ export default function InteractivePage() {
 ### Route-Local Components (`app/[route]/components/`)
 
 **When to keep components route-local:**
+
 1. Component only used in this route tree
 2. Tightly coupled to route logic/context
 3. Part of a feature module
 4. Complex workflows specific to route
 
 **Examples:**
+
 ```typescript
 // ✅ Route-local (correct)
 app/admin/components/ui/AdminModeIndicator.tsx  # Admin-specific
@@ -330,12 +350,14 @@ app/history-towers/components/HistoryJumperV2.tsx # Game specific
 ### Global Components (`src/components/`)
 
 **When to move components to global:**
+
 1. Used in 2+ routes
 2. Pure presentational (no route-specific logic)
 3. Domain components (cart, marketplace, wallet)
 4. Base components (BaseCard, BaseModal)
 
 **Examples:**
+
 ```typescript
 // ✅ Global (correct)
 src/components/cart/CartHeader.tsx          # Used across cart contexts
@@ -346,6 +368,7 @@ src/components/wallet/WalletDashboard.tsx    # Reusable dashboard
 ## 🔐 Authentication & Authorization
 
 ### Admin Authentication
+
 ```typescript
 // Session-based authentication with wallet signature
 // Session stored in HTTP-only cookies (24h expiry)
@@ -362,6 +385,7 @@ export const POST = apiHandler(withAdmin(async (req) => {
 ```
 
 ### User Authentication
+
 ```typescript
 // Wallet connection via Wagmi + RainbowKit
 // No session required for read operations
@@ -371,34 +395,37 @@ export const POST = apiHandler(withAdmin(async (req) => {
 ## 🗄️ Data Fetching Patterns
 
 ### Server Components (Default)
+
 ```typescript
 // ✅ Good: Fetch data in server components
 export default async function Page() {
     const data = await fetchData();
-    
+
     return <div>{data}</div>;
 }
 ```
 
 ### Client Components
+
 ```typescript
 // ✅ Good: Use hooks for client-side data
 "use client";
 
 export default function Page() {
     const { data, isLoading } = useData();
-    
+
     if (isLoading) return <LoadingState />;
     return <div>{data}</div>;
 }
 ```
 
 ### Hybrid Components
+
 ```typescript
 // ✅ Good: Server-fetch initial data, client-hydrate
 export default function Page({ initialData }: Props) {
     const { data } = useData(initialData);
-    
+
     return <ClientComponent data={data} />;
 }
 ```
@@ -406,18 +433,21 @@ export default function Page({ initialData }: Props) {
 ## 🎯 Performance Optimization
 
 ### Dynamic Rendering
+
 ```typescript
 // Force dynamic rendering (disable static generation)
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 ```
 
 ### Route Caching
+
 ```typescript
 // Revalidate data every X seconds
 export const revalidate = 60; // 60 seconds
 ```
 
 ### Component Lazy Loading
+
 ```typescript
 // Lazy load heavy components
 const HeavyComponent = lazy(() => import('./HeavyComponent'));
@@ -429,28 +459,30 @@ const HeavyComponent = lazy(() => import('./HeavyComponent'));
 
 ## 📊 Route Statistics
 
-| Route | Files | Components | Has Layout | Has README | Complexity |
-|-------|-------|------------|------------|------------|------------|
-| `/admin` | 32 | 12 | ✅ | ❌ | High |
-| `/sell` | 45 | 19 | ✅ | ✅ | Very High |
-| `/history-towers` | 25 | 8 | ❌ | ✅ | High |
-| `/nft/[...]/[...]` | 28 | 17 | ❌ | ✅ | High |
-| `/marketplace` | 1 | 0 | ❌ | ❌ | Low |
-| `/wallet` | 1 | 0 | ❌ | ❌ | Low |
-| `/cart` | 2 | 0 | ❌ | ❌ | Low |
-| `/api` | 40 | N/A | ❌ | ✅ | Medium |
+| Route              | Files | Components | Has Layout | Has README | Complexity |
+| ------------------ | ----- | ---------- | ---------- | ---------- | ---------- |
+| `/admin`           | 32    | 12         | ✅         | ❌         | High       |
+| `/sell`            | 45    | 19         | ✅         | ✅         | Very High  |
+| `/history-towers`  | 25    | 8          | ❌         | ✅         | High       |
+| `/nft/[...]/[...]` | 28    | 17         | ❌         | ✅         | High       |
+| `/marketplace`     | 1     | 0          | ❌         | ❌         | Low        |
+| `/wallet`          | 1     | 0          | ❌         | ❌         | Low        |
+| `/cart`            | 2     | 0          | ❌         | ❌         | Low        |
+| `/api`             | 40    | N/A        | ❌         | ✅         | Medium     |
 
 **Total:** 174 files across 8 main routes
 
 ## 🧹 Code Quality
 
 ### Cleanup Actions Taken
-- ✅ Archived deprecated route: `api/nft/admin/insights/route-old.ts` → `archive/`
+
+- ✅ Removed deprecated route: `api/nft/admin/insights/route-old.ts` (see git history)
 - ✅ Organized admin components: UI, MultiSig, Forms, Sections
 - ✅ Moved reusable components to global: cart/, marketplace/, wallet/
 - ✅ Standardized API routes with apiHandler pattern
 
 ### Best Practices
+
 - ✅ **Consistent naming:** PascalCase for components, camelCase for utilities
 - ✅ **Barrel exports:** index.ts files for clean imports
 - ✅ **Type safety:** Zod schemas for API validation
@@ -462,12 +494,14 @@ const HeavyComponent = lazy(() => import('./HeavyComponent'));
 ## 📚 Related Documentation
 
 ### Component Documentation
+
 - [src/components/README.md](../../components/README.md) - Global components
 - [src/components/core/README.md](../../components/core/README.md) - Base components
 - [src/components/nft/README.md](../../components/nft/README.md) - NFT components
 - [src/components/admin/README.md](../../components/admin/README.md) - Admin components
 
 ### Feature Documentation
+
 - [app/sell/README.md](./sell/README.md) - Sell flow documentation
 - [app/sell/ARCHITECTURE.md](./sell/ARCHITECTURE.md) - Sell architecture
 - [app/history-towers/README.md](./history-towers/README.md) - Game documentation
@@ -475,11 +509,13 @@ const HeavyComponent = lazy(() => import('./HeavyComponent'));
 - [app/api/README.md](./api/README.md) - API documentation
 
 ### Architecture Documentation
+
 - [docs/architecture/overview.md](../../docs/architecture/overview.md) - System architecture
 - [docs/architecture/route-components-analysis.md](../../docs/architecture/route-components-analysis.md) - Component placement
 - [docs/architecture/components-placement-decision.md](../../docs/architecture/components-placement-decision.md) - Decision framework
 
 ### Project Documentation
+
 - [docs/README.md](../../docs/README.md) - Project documentation hub
 - [docs/api/README.md](../../docs/api/README.md) - API documentation
 - [docs/database/README.md](../../docs/database/README.md) - Database documentation
@@ -487,6 +523,7 @@ const HeavyComponent = lazy(() => import('./HeavyComponent'));
 ## 🔄 Next Steps
 
 ### Potential Improvements
+
 1. **Loading/Error States:** Add loading.tsx and error.tsx for routes
 2. **Not Found Pages:** Add not-found.tsx for 404 handling
 3. **Admin READMEs:** Create README files for admin subdirectories
@@ -495,6 +532,7 @@ const HeavyComponent = lazy(() => import('./HeavyComponent'));
 6. **Intercepting Routes:** Implement modals with intercepting routes
 
 ### Maintenance
+
 - Keep components colocated with their routes
 - Archive deprecated files in `archive/` folders
 - Update documentation when adding new routes

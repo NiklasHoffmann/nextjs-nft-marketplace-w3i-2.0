@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 
+const { withSentryConfig } = require('@sentry/nextjs');
+
 // Bundle analyzer for production build analysis (only in dev)
 let withBundleAnalyzer = (config: any) => config;
 try {
@@ -9,6 +11,29 @@ try {
 } catch (e) {
   // Bundle analyzer not installed (production build)
 }
+
+const defaultCsp = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Needed for WalletConnect/Apollo in dev/prod
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: https: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self' https: wss:",
+  "frame-src 'self' https:",
+].join('; ');
+
+const strictCsp = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: https: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self' https: wss:",
+  "frame-src 'self' https:",
+].join('; ');
+
+const cspMode = process.env.CSP_MODE || 'relaxed';
+const cspValue = cspMode === 'strict' ? strictCsp : defaultCsp;
 
 const nextConfig: import('next').NextConfig = {
   reactStrictMode: true,
@@ -173,18 +198,28 @@ const nextConfig: import('next').NextConfig = {
             value: 'origin-when-cross-origin',
           },
           {
-            key: 'Content-Security-Policy',
-            // Secure CSP that allows necessary scripts for Web3/React
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // unsafe-eval needed for WalletConnect/Apollo
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: https: blob:",
-              "font-src 'self' data:",
-              "connect-src 'self' https: wss:",
-              "frame-src 'self' https:",
-            ].join('; '),
+            key: process.env.CSP_REPORT_ONLY === 'true'
+              ? 'Content-Security-Policy-Report-Only'
+              : 'Content-Security-Policy',
+            value: cspValue,
           },
+          ...(process.env.CSP_REPORT_URI
+            ? [{
+                key: 'Report-To',
+                value: JSON.stringify({
+                  group: 'csp-endpoint',
+                  max_age: 10886400,
+                  endpoints: [{ url: process.env.CSP_REPORT_URI }],
+                  include_subdomains: true,
+                }),
+              }]
+            : []),
+          ...(process.env.CSP_REPORT_URI
+            ? [{
+                key: 'Reporting-Endpoints',
+                value: `csp-endpoint=\"${process.env.CSP_REPORT_URI}\"`,
+              }]
+            : []),
         ],
       },
       {
@@ -219,4 +254,17 @@ const nextConfig: import('next').NextConfig = {
   },
 };
 
-export default withBundleAnalyzer(nextConfig);
+const sentryWebpackPluginOptions = {
+  silent: true,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+};
+
+const sentryOptions = {
+  hideSourceMaps: true,
+  disableLogger: true,
+};
+
+const configWithSentry = withSentryConfig(nextConfig, sentryWebpackPluginOptions, sentryOptions);
+
+export default withBundleAnalyzer(configWithSentry);

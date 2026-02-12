@@ -30,33 +30,37 @@ cart/
 ## 🔗 Data Source
 
 ### CartContext (Global State)
-```typescript
-import { useCart } from '@/contexts/cart/CartContext';
 
-const { 
-  items,           // CartItem[]
-  addToCart,       // (nft) => void
-  removeFromCart,  // (key) => void
-  clearCart,       // () => void
-  totalPrice,      // string
-  itemCount        // number
+```typescript
+import { useCart } from "@/contexts/cart/CartContext";
+import { devLog } from "@/utils";
+
+const {
+  items, // CartItem[]
+  addToCart, // (nft) => void
+  removeFromCart, // (key) => void
+  clearCart, // () => void
+  totalPrice, // string
+  itemCount, // number
 } = useCart();
 ```
 
 ### Cart Item Structure
+
 ```typescript
 interface CartItem {
-  key: string;                    // Unique identifier
-  nft: AggregatedNFT;            // Full NFT data
-  price: string;                 // Listing price
-  seller: string;                // Seller address
-  listingId: string;             // Marketplace listing ID
+  key: string; // Unique identifier
+  nft: AggregatedNFT; // Full NFT data
+  price: string; // Listing price
+  seller: string; // Seller address
+  listingId: string; // Marketplace listing ID
 }
 ```
 
 ## 🎨 Component Structure
 
 ### CartPage Component
+
 - Header with item count
 - Item list with thumbnails
 - Price breakdown
@@ -64,6 +68,7 @@ interface CartItem {
 - Empty state
 
 ### CartItem Component
+
 ```typescript
 <CartItem
   item={item}
@@ -74,23 +79,25 @@ interface CartItem {
 ## 📝 Common Use Cases
 
 ### Add to Cart (from Marketplace)
+
 ```typescript
-import { useCart } from '@/contexts/cart/CartContext';
+import { useCart } from "@/contexts/cart/CartContext";
 
 const { addToCart } = useCart();
 
 const handleAddToCart = (nft: AggregatedNFT) => {
   if (!nft.listing) {
-    console.error('NFT is not listed');
+    devLog.error("NFT is not listed");
     return;
   }
-  
+
   addToCart(nft);
-  toast.success('Added to cart');
+  toast.success("Added to cart");
 };
 ```
 
 ### Remove from Cart
+
 ```typescript
 const { removeFromCart } = useCart();
 
@@ -98,44 +105,47 @@ removeFromCart(nft.key);
 ```
 
 ### Calculate Total with Fees
+
 ```typescript
-import { useMarketplaceFees } from '@/hooks/marketplace';
+import { useMarketplaceFees } from "@/hooks/marketplace";
 
 const { calculateFees } = useMarketplaceFees();
 const { platformFee, totalWithFee } = calculateFees(totalPrice);
 ```
 
 ### Clear Cart After Purchase
+
 ```typescript
 const { clearCart } = useCart();
 
 const handleCheckout = async () => {
   // Process purchase...
   await purchaseNFTs(items);
-  
+
   // Clear cart on success
   clearCart();
-  router.push('/wallet');
+  router.push("/wallet");
 };
 ```
 
 ### Check if NFT in Cart
+
 ```typescript
 const { items } = useCart();
 
-const isInCart = items.some(item => 
-  item.nft.key === nft.key
-);
+const isInCart = items.some((item) => item.nft.key === nft.key);
 ```
 
 ## 🔧 Configuration
 
 ### LocalStorage Persistence
+
 ```typescript
-const CART_STORAGE_KEY = 'nft-marketplace-cart';
+const CART_STORAGE_KEY = "nft-marketplace-cart";
 ```
 
 ### Max Items
+
 ```typescript
 const MAX_CART_ITEMS = 50; // Prevent excessive cart size
 ```
@@ -152,6 +162,7 @@ const MAX_CART_ITEMS = 50; // Prevent excessive cart size
 ## 🎨 Styling
 
 ### Empty State
+
 ```typescript
 <EmptyState
   icon={ShoppingCart}
@@ -167,14 +178,17 @@ const MAX_CART_ITEMS = 50; // Prevent excessive cart size
 ## 🐛 Troubleshooting
 
 ### "Items disappear after refresh"
+
 → Check localStorage is enabled
 → Verify CART_STORAGE_KEY is consistent
 
 ### "Total price incorrect"
+
 → Verify all NFTs have valid listing.price
 → Check fee calculation logic
 
 ### "Can't add to cart"
+
 → Ensure NFT has listing data (nft.listed === true)
 → Check NFT is not already in cart
 

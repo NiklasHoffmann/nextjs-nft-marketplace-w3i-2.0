@@ -22,7 +22,7 @@ cd nextjs-nft-marketplace-w3i-2.0
 npm install
 
 # Copy environment file
-cp .env.example .env.local
+cp .env.local.template .env.local
 
 # Start development server
 npm run dev
@@ -52,6 +52,9 @@ NEXT_PUBLIC_SUBGRAPH_WS_URL=wss://api.thegraph.com/subgraphs/name/your-subgraph
 # MongoDB
 MONGODB_URI=mongodb://localhost:27017/nft-marketplace
 
+# Auth
+JWT_SECRET=your_strong_jwt_secret
+
 # APIs
 COINGECKO_API_KEY=your_coingecko_key
 ```
@@ -59,22 +62,26 @@ COINGECKO_API_KEY=your_coingecko_key
 ### Getting API Keys
 
 **WalletConnect**:
+
 1. Visit [cloud.walletconnect.com](https://cloud.walletconnect.com)
 2. Create new project
 3. Copy Project ID
 
 **Infura**:
+
 1. Visit [infura.io](https://infura.io)
 2. Create account
 3. Create new project
 4. Copy Project ID
 
 **Alchemy**:
+
 1. Visit [alchemy.com](https://alchemy.com)
 2. Create app
 3. Copy API Key
 
 **CoinGecko**:
+
 1. Visit [coingecko.com/api](https://www.coingecko.com/en/api)
 2. Sign up for free tier
 3. Get API key
@@ -140,7 +147,7 @@ nextjs-nft-marketplace-w3i-2.0/
 │   ├── constants/             # Constants
 │   └── schemas/               # Data schemas
 ├── .env.local                 # Environment variables (gitignored)
-├── .env.example               # Environment template
+├── .env.local.template        # Development environment template
 ├── next.config.ts             # Next.js config
 ├── tailwind.config.js         # Tailwind config
 ├── tsconfig.json              # TypeScript config
@@ -206,6 +213,7 @@ chore: update dependencies
 ### Manual Testing Checklist
 
 **NFT Detail Page**:
+
 - [ ] Image loads correctly
 - [ ] Stats display accurately
 - [ ] Like button toggles
@@ -215,12 +223,14 @@ chore: update dependencies
 - [ ] Personal notes save
 
 **Wallet Dashboard**:
+
 - [ ] NFTs load
 - [ ] Filters work
 - [ ] Favorites tab shows only favorites
 - [ ] Watchlist tab shows only watchlisted
 
 **Performance**:
+
 - [ ] Page load < 3s
 - [ ] Cached requests < 50ms
 - [ ] No console errors
@@ -256,7 +266,7 @@ interface NFT {
 }
 
 // ✅ Good: Use type for unions
-type Status = 'loading' | 'success' | 'error';
+type Status = "loading" | "success" | "error";
 
 // ✅ Good: Explicit return types
 function getNFT(id: string): Promise<NFT | null> {
@@ -264,7 +274,8 @@ function getNFT(id: string): Promise<NFT | null> {
 }
 
 // ❌ Bad: Implicit any
-function process(data) { // Missing type
+function process(data) {
+  // Missing type
   // ...
 }
 ```
@@ -289,7 +300,7 @@ const { nfts } = useNFTContext();
 // ✅ Good: Memoize expensive computations
 const sortedNFTs = useMemo(
   () => nfts.sort((a, b) => a.price - b.price),
-  [nfts]
+  [nfts],
 );
 ```
 
@@ -316,21 +327,21 @@ export interface NFTMetadata {}
 
 ```typescript
 // 1. React imports
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 // 2. External libraries
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from "@tanstack/react-query";
 
 // 3. Internal absolute imports
-import { NFTCard } from '@/components/nft/NFTCard';
-import { useNFTContext } from '@/contexts/NFTContext';
-import type { NFT } from '@/types';
+import { NFTCard } from "@/components/nft/NFTCard";
+import { useNFTContext } from "@/contexts/NFTContext";
+import type { NFT } from "@/types";
 
 // 4. Relative imports (avoid when possible)
-import { localHelper } from './helpers';
+import { localHelper } from "./helpers";
 
 // 5. Styles
-import styles from './Component.module.css';
+import styles from "./Component.module.css";
 ```
 
 ---
@@ -357,24 +368,26 @@ export { NFTNewFeature } from './nft/NFTNewFeature';
 
 ```typescript
 // src/app/api/example/route.ts
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const param = searchParams.get('param');
-    
+    const param = searchParams.get("param");
+
     // Your logic here
-    
+
     return NextResponse.json({
       success: true,
-      data: { /* your data */ }
+      data: {
+        /* your data */
+      },
     });
   } catch (error) {
-    console.error('API Error:', error);
+    console.error("API Error:", error);
     return NextResponse.json(
-      { success: false, error: 'Error message' },
-      { status: 500 }
+      { success: false, error: "Error message" },
+      { status: 500 },
     );
   }
 }
@@ -395,7 +408,7 @@ const ExampleContext = createContext<ExampleContextType | undefined>(undefined);
 
 export function ExampleProvider({ children }: { children: ReactNode }) {
   const [value, setValue] = useState('');
-  
+
   return (
     <ExampleContext.Provider value={{ value, setValue }}>
       {children}
@@ -419,6 +432,7 @@ export function useExampleContext() {
 ### Common Issues
 
 #### Issue: "Module not found"
+
 ```bash
 # Solution: Clear Next.js cache
 rm -rf .next
@@ -426,6 +440,7 @@ npm run dev
 ```
 
 #### Issue: "Type errors after dependency update"
+
 ```bash
 # Solution: Regenerate types
 rm -rf node_modules package-lock.json
@@ -433,6 +448,7 @@ npm install
 ```
 
 #### Issue: "GraphQL errors"
+
 ```bash
 # Check:
 # 1. NEXT_PUBLIC_SUBGRAPH_URL is correct
@@ -443,14 +459,17 @@ npm install
 ### Debug Tools
 
 **React DevTools**:
+
 - Install: [Chrome](https://chrome.google.com/webstore/detail/react-developer-tools/fmkadmapgofadopljbjfkapdkoienihi)
 - Use: Inspect component props/state
 
 **Apollo DevTools**:
+
 - Install: [Chrome](https://chrome.google.com/webstore/detail/apollo-client-devtools/jdkknkkbebbapilgoeccciglkfbmbnfm)
 - Use: Inspect GraphQL queries/cache
 
 **Next.js DevTools**:
+
 - Built-in: Check terminal output
 - Fast Refresh: Auto-reloads on changes
 
@@ -458,10 +477,10 @@ npm install
 
 ```typescript
 // Development only
-import { devLog } from '@/utils/devLog';
+import { devLog } from "@/utils";
 
-devLog('Debug message', data);  // Only logs in development
-console.log('Always logs');     // Logs in all environments
+devLog("Debug message", data); // Only logs in development
+console.log("Always logs"); // Logs in all environments
 ```
 
 ---
@@ -470,10 +489,10 @@ console.log('Always logs');     // Logs in all environments
 
 ```json
 {
-  "dev": "next dev",              // Start development server
-  "build": "next build",          // Build for production
-  "start": "next start",          // Start production server
-  "lint": "eslint"                // Run linter
+  "dev": "next dev", // Start development server
+  "build": "next build", // Build for production
+  "start": "next start", // Start production server
+  "lint": "eslint" // Run linter
 }
 ```
 
@@ -506,10 +525,10 @@ npm run db:indexes        # Create indexes (if script exists)
 const config = {
   // Image optimization
   images: {
-    domains: ['ipfs.io', 'cloudflare-ipfs.com'],
-    formats: ['image/avif', 'image/webp'],
+    domains: ["ipfs.io", "cloudflare-ipfs.com"],
+    formats: ["image/avif", "image/webp"],
   },
-  
+
   // Experimental features
   experimental: {
     optimizePackageImports: true,
@@ -523,17 +542,13 @@ export default config;
 
 ```javascript
 module.exports = {
-  content: [
-    './src/**/*.{js,ts,jsx,tsx,mdx}',
-  ],
+  content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     extend: {
       // Custom colors, fonts, etc.
     },
   },
-  plugins: [
-    require('@tailwindcss/forms'),
-  ],
+  plugins: [require("@tailwindcss/forms")],
 };
 ```
 
@@ -560,11 +575,9 @@ module.exports = {
 1. **Connect Repository**:
    - Visit [vercel.com](https://vercel.com)
    - Import Git repository
-   
 2. **Configure Environment**:
    - Add all `.env` variables
    - Set production values
-   
 3. **Deploy**:
    - Automatic on `main` branch push
    - Preview deployments on PRs
@@ -583,22 +596,27 @@ module.exports = {
 ## 📚 Learning Resources
 
 ### Next.js
+
 - [Docs](https://nextjs.org/docs)
 - [Learn](https://nextjs.org/learn)
 
 ### React
+
 - [Docs](https://react.dev)
 - [Beta Docs](https://react.dev/learn)
 
 ### TypeScript
+
 - [Handbook](https://www.typescriptlang.org/docs/handbook/intro.html)
 - [Playground](https://www.typescriptlang.org/play)
 
 ### Tailwind CSS
+
 - [Docs](https://tailwindcss.com/docs)
 - [Cheatsheet](https://nerdcave.com/tailwind-cheat-sheet)
 
 ### Web3
+
 - [Wagmi Docs](https://wagmi.sh)
 - [Viem Docs](https://viem.sh)
 - [RainbowKit Docs](https://www.rainbowkit.com)
@@ -620,20 +638,24 @@ module.exports = {
 
 ```markdown
 ## Description
+
 Brief description of changes
 
 ## Type of Change
+
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Refactoring
 - [ ] Documentation
 
 ## Testing
+
 - [ ] Tested locally
 - [ ] No console errors
 - [ ] Builds successfully
 
 ## Screenshots (if UI changes)
+
 [Add screenshots]
 ```
 

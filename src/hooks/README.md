@@ -86,6 +86,7 @@ await createListing({
 
 ```typescript
 import { useMarketplacePurchase } from "@/hooks";
+import { devLog } from "@/utils";
 
 const { purchaseListing, isLoading, isConfirming } =
   useMarketplacePurchase(marketplaceAddress);
@@ -94,7 +95,7 @@ await purchaseListing({
   listingId: "123",
   expectedPrice: "0.1",
   onProgress: (step, txHash) => {
-    console.log(`Step: ${step}, TX: ${txHash}`);
+    devLog.info(`Step: ${step}, TX: ${txHash}`);
   },
 });
 ```
@@ -118,11 +119,12 @@ await addWhitelistedCollection("0x...");
 
 ```typescript
 import { useMarketplaceUser } from "@/hooks";
+import { devLog } from "@/utils";
 
 const { proceeds, withdrawProceeds, isLoading } =
   useMarketplaceUser(marketplaceAddress);
 
-console.log("Available proceeds:", proceeds); // bigint
+devLog.info("Available proceeds:", proceeds); // bigint
 
 await withdrawProceeds();
 ```
@@ -237,16 +239,17 @@ if (!approval.isFullyApproved) {
 }
 
 // Status checks
-console.log("Fully approved:", approval.isFullyApproved);
-console.log("Single approved:", approval.isSingleApproved);
-console.log("All approved:", approval.isApprovedForAll);
-console.log("Loading:", approval.isLoading);
+devLog.info("Fully approved:", approval.isFullyApproved);
+devLog.info("Single approved:", approval.isSingleApproved);
+devLog.info("All approved:", approval.isApprovedForAll);
+devLog.info("Loading:", approval.isLoading);
 ```
 
 #### **NFT User Actions**
 
 ```typescript
 import { useNFTUserActions } from "@/hooks";
+import { devLog } from "@/utils";
 
 const {
   like,
@@ -264,18 +267,19 @@ await like();
 await addToWatchlist();
 await submitRating(5);
 
-console.log("Liked:", isLiked);
-console.log("Watchlisted:", isWatchlisted);
+devLog.info("Liked:", isLiked);
+devLog.info("Watchlisted:", isWatchlisted);
 ```
 
 #### **Price Data**
 
 ```typescript
 import { useNFTPriceData } from "@/hooks";
+import { devLog } from "@/utils";
 
 const { priceETH, priceUSD, isLoading } = useNFTPriceData(priceWei);
 
-console.log(`${priceETH} ETH = $${priceUSD}`);
+devLog.info(`${priceETH} ETH = $${priceUSD}`);
 ```
 
 #### **Filtering**
@@ -300,6 +304,7 @@ User wallet NFT management with DB-first architecture.
 
 ```typescript
 import { useWalletNFTsV2 } from "@/hooks";
+import { devLog } from "@/utils";
 
 const { nfts, isLoading, error, refetch, summary } = useWalletNFTsV2({
   walletAddress: "0x...",
@@ -308,9 +313,9 @@ const { nfts, isLoading, error, refetch, summary } = useWalletNFTsV2({
 });
 
 // Instant load from DB (~50ms)
-console.log("NFTs:", nfts);
-console.log("Total:", summary.total);
-console.log("Listed:", summary.listedCount);
+devLog.info("NFTs:", nfts);
+devLog.info("Total:", summary.total);
+devLog.info("Listed:", summary.listedCount);
 ```
 
 ---
@@ -321,6 +326,7 @@ User-specific interactions and preferences.
 
 ```typescript
 import { useUserInteractions } from "@/hooks";
+import { devLog } from "@/utils";
 
 const {
   recordView,
@@ -336,7 +342,7 @@ await recordView(contractAddress, tokenId);
 
 // Check if user liked
 const interaction = await getUserInteraction(contractAddress, tokenId);
-console.log("User liked:", interaction?.liked);
+devLog.info("User liked:", interaction?.liked);
 ```
 
 ---
@@ -443,14 +449,15 @@ if (isAdmin) {
 
 ```typescript
 import { useAdminMode } from "@/hooks";
+import { devLog } from "@/utils";
 
 const { isOwner, isMultisigOwner, requiresMultisig } =
   useAdminMode(diamondAddress);
 
 if (isOwner) {
-  console.log("Direct owner");
+  devLog.info("Direct owner");
 } else if (isMultisigOwner) {
-  console.log("MultiSig owner - requires confirmations");
+  devLog.info("MultiSig owner - requires confirmations");
 }
 ```
 
@@ -471,12 +478,14 @@ import { useMarketplaceListing } from "@/hooks/marketplace/useMarketplaceListing
 ### 2. **Error Handling**
 
 ```typescript
+import { devLog } from "@/utils";
+
 const { createListing, error } = useMarketplaceListing(address);
 
 try {
   await createListing(params);
 } catch (err) {
-  console.error('Transaction failed:', err);
+  devLog.error('Transaction failed:', err);
 }
 
 // Hook provides error state
