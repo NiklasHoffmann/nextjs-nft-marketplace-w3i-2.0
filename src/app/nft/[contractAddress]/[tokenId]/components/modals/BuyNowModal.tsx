@@ -259,6 +259,54 @@ function BuyNowModal({
 
     const isExecutingPreparedSwap = isSendingSwapTx || isSwapReceiptLoading;
 
+    const isSwapRelevant = useMemo(() => !!currency && !!wethAddress && !isNative && !isWETH, [currency, wethAddress, isNative, isWETH]);
+    const isSwapNeeded = useMemo(() => isSwapRelevant && tokenDeficit > 0.000001, [isSwapRelevant, tokenDeficit]);
+
+    const parseSwapFlowInputs = useCallback(() => {
+        if (!wethAddress || !currency || !buyer) {
+            throw new Error('Wallet address required for swap preparation');
+        }
+
+        const sourceAmountNumeric = Number.parseFloat(swapSourceAmount);
+        const slippageNumeric = Number.parseFloat(swapSlippage);
+
+        if (!Number.isFinite(sourceAmountNumeric) || sourceAmountNumeric <= 0) {
+            throw new Error('Enter a valid WETH amount for swap preparation');
+        }
+
+        if (!Number.isFinite(slippageNumeric) || slippageNumeric <= 0 || slippageNumeric > 50) {
+            throw new Error('Slippage must be between 0 and 50');
+        }
+
+        return {
+            amountInBaseUnits: parseUnits(swapSourceAmount, 18).toString(),
+            slippageNumeric,
+        };
+    }, [wethAddress, currency, buyer, swapSourceAmount, swapSlippage]);
+
+    const executePreparedSwapTx = useCallback(async (tx: { to: string; data: string; value: string }) => {
+        const to = tx.to;
+        const data = tx.data;
+
+        if (!/^0x[a-fA-F0-9]{40}$/.test(to)) {
+            throw new Error('Invalid router address in prepared transaction');
+        }
+
+        if (!/^0x[a-fA-F0-9]+$/.test(data)) {
+            throw new Error('Invalid transaction data in prepared transaction');
+        }
+
+        const hash = await sendTransactionAsync({
+            to: to as `0x${string}`,
+            data: data as `0x${string}`,
+            value: BigInt(tx.value || '0'),
+        });
+
+        setSwapExecutionHash(hash);
+        devLog.info('✅ 1inch swap tx submitted:', hash);
+        return hash;
+    }, [sendTransactionAsync]);
+
     const handleExecutePreparedSwap = useCallback(async () => {
         try {
             if (!preparedSwapResult?.tx) {
@@ -266,63 +314,23 @@ function BuyNowModal({
                 return;
             }
 
-            const tx = preparedSwapResult.tx;
-            const to = tx.to;
-            const data = tx.data;
-
-            if (!/^0x[a-fA-F0-9]{40}$/.test(to)) {
-                setSwapExecutionError('Invalid router address in prepared transaction');
-                return;
-            }
-
-            if (!/^0x[a-fA-F0-9]+$/.test(data)) {
-                setSwapExecutionError('Invalid transaction data in prepared transaction');
-                return;
-            }
-
             setSwapExecutionError(null);
             setErrorMessage(null);
-
-            const hash = await sendTransactionAsync({
-                to: to as `0x${string}`,
-                data: data as `0x${string}`,
-                value: BigInt(tx.value || '0'),
-            });
-
-            setSwapExecutionHash(hash);
-            devLog.info('✅ 1inch swap tx submitted:', hash);
+            await executePreparedSwapTx(preparedSwapResult.tx);
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to execute prepared swap transaction';
             setSwapExecutionError(message);
             devLog.error('❌ 1inch swap tx execution failed:', error);
         }
-    }, [preparedSwapResult, sendTransactionAsync]);
+    }, [preparedSwapResult, executePreparedSwapTx]);
 
     const handlePrepareSwap = useCallback(async () => {
         try {
-            if (!wethAddress || !currency || !buyer) {
-                setErrorMessage('Wallet address required for swap preparation');
-                return;
-            }
-
-            const sourceAmountNumeric = Number.parseFloat(swapSourceAmount);
-            const slippageNumeric = Number.parseFloat(swapSlippage);
-
-            if (!Number.isFinite(sourceAmountNumeric) || sourceAmountNumeric <= 0) {
-                setErrorMessage('Enter a valid WETH amount for swap preparation');
-                return;
-            }
-
-            if (!Number.isFinite(slippageNumeric) || slippageNumeric <= 0 || slippageNumeric > 50) {
-                setErrorMessage('Slippage must be between 0 and 50');
-                return;
-            }
+            const { amountInBaseUnits, slippageNumeric } = parseSwapFlowInputs();
 
             setErrorMessage(null);
 
-            const amountInBaseUnits = parseUnits(swapSourceAmount, 18).toString();
-
-            await prepareSwap({
+            return await prepareSwap({
                 chainId,
                 src: wethAddress,
                 dst: currency,
@@ -336,8 +344,27 @@ function BuyNowModal({
             });
         } catch (error) {
             setErrorMessage(error instanceof Error ? error.message : 'Failed to prepare 1inch swap');
+            return null;
         }
-    }, [wethAddress, currency, buyer, swapSourceAmount, swapSlippage, prepareSwap, chainId]);
+    }, [wethAddress, currency, buyer, parseSwapFlowInputs, prepareSwap, chainId]);
+
+    const handleSwapAndContinue = useCallback(async () => {
+        if (!isSwapNeeded) return;
+
+        try {
+            setSwapExecutionError(null);
+            setErrorMessage(null);
+
+            const preparedTx = await handlePrepareSwap();
+            if (!preparedTx) return;
+
+            await executePreparedSwapTx(preparedTx);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to run guided swap flow';
+            setSwapExecutionError(message);
+            setErrorMessage(message);
+        }
+    }, [isSwapNeeded, handlePrepareSwap, executePreparedSwapTx]);
 
     // Check if user needs to wrap ETH to WETH
     const needsWrapping = useMemo(() => {
@@ -715,6 +742,34 @@ function BuyNowModal({
 
                                 {!isNative && !isWETH && (
                                     <>
+                                        <div className="mb-3 p-3 bg-white border border-indigo-200 rounded-lg">
+                                            <p className="text-xs font-semibold text-gray-800 mb-2">Guided steps</p>
+                                            <div className="space-y-1.5 text-xs">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-gray-700">1. Required token amount</span>
+                                                    <span className={isSwapNeeded ? 'text-orange-700 font-medium' : 'text-green-700 font-medium'}>
+                                                        {isSwapNeeded ? 'Missing balance' : 'Ready'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-gray-700">2. 1inch swap</span>
+                                                    <span className={(isSwapConfirmed || !isSwapNeeded) ? 'text-green-700 font-medium' : 'text-orange-700 font-medium'}>
+                                                        {(isSwapConfirmed || !isSwapNeeded) ? 'Done' : 'Required'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-gray-700">3. Token approval</span>
+                                                    <span className={!needsApproval ? 'text-green-700 font-medium' : 'text-orange-700 font-medium'}>
+                                                        {!needsApproval ? 'Done' : 'Required'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-gray-700">4. Purchase NFT</span>
+                                                    <span className="text-blue-700 font-medium">Final step</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         <div className="grid grid-cols-2 gap-3 mb-3">
                                             <div>
                                                 <label className="block text-xs text-indigo-700 mb-1">Source (WETH)</label>
@@ -738,6 +793,11 @@ function BuyNowModal({
                                                     onChange={(event) => setSwapSlippage(event.target.value)}
                                                     className="w-full rounded-lg border border-indigo-300 px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 focus:ring-indigo-200"
                                                 />
+                                                <div className="flex gap-1.5 mt-1.5">
+                                                    <button type="button" onClick={() => setSwapSlippage('0.5')} className="px-2 py-0.5 rounded border border-indigo-300 text-indigo-700 text-[11px]">Safe</button>
+                                                    <button type="button" onClick={() => setSwapSlippage('1')} className="px-2 py-0.5 rounded border border-indigo-300 text-indigo-700 text-[11px]">Auto</button>
+                                                    <button type="button" onClick={() => setSwapSlippage('2')} className="px-2 py-0.5 rounded border border-indigo-300 text-indigo-700 text-[11px]">Fast</button>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -748,14 +808,18 @@ function BuyNowModal({
 
                                         <button
                                             type="button"
-                                            onClick={handlePrepareSwap}
-                                            disabled={isPreparingSwap || isExecutingPreparedSwap || !buyer}
+                                            onClick={handleSwapAndContinue}
+                                            disabled={isPreparingSwap || isExecutingPreparedSwap || !buyer || !isSwapNeeded}
                                             className="w-full px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            {isPreparingSwap ? 'Preparing swap tx...' : 'Prepare 1inch Swap Tx'}
+                                            {isPreparingSwap && 'Preparing swap tx...'}
+                                            {!isPreparingSwap && isSendingSwapTx && 'Sign swap in wallet...'}
+                                            {!isPreparingSwap && !isSendingSwapTx && isSwapReceiptLoading && 'Waiting for swap confirmation...'}
+                                            {!isPreparingSwap && !isSendingSwapTx && !isSwapReceiptLoading && isSwapNeeded && 'Swap & Continue'}
+                                            {!isPreparingSwap && !isSendingSwapTx && !isSwapReceiptLoading && !isSwapNeeded && 'Swap not required'}
                                         </button>
 
-                                        {!buyer && <p className="text-xs text-indigo-700 mt-2">Connect wallet to prepare swap tx.</p>}
+                                        {!buyer && <p className="text-xs text-indigo-700 mt-2">Connect wallet to continue.</p>}
                                         {swapPreparationError && <p className="text-xs text-red-600 mt-2">{swapPreparationError}</p>}
                                         {preparedSwapResult && preparedSwapDstAmountDisplay && (
                                             <div className="mt-3 p-3 bg-white border border-indigo-200 rounded-lg text-xs text-gray-700 space-y-1">
@@ -765,24 +829,21 @@ function BuyNowModal({
                                             </div>
                                         )}
 
-                                        {preparedSwapResult?.tx && (
+                                        {swapExecutionHash && (
+                                            <p className="text-xs text-emerald-700 mt-2 break-all">Swap tx: {swapExecutionHash}</p>
+                                        )}
+                                        {isSwapConfirmed && (
+                                            <p className="text-xs text-emerald-700 mt-2">Swap confirmed. You can proceed with approval/purchase.</p>
+                                        )}
+                                        {preparedSwapResult?.tx && !isSwapNeeded && !isSwapConfirmed && (
                                             <button
                                                 type="button"
                                                 onClick={handleExecutePreparedSwap}
                                                 disabled={isExecutingPreparedSwap}
                                                 className="w-full mt-3 px-4 py-2.5 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
-                                                {isSendingSwapTx && 'Sign Swap in Wallet...'}
-                                                {!isSendingSwapTx && isSwapReceiptLoading && 'Waiting for Swap Confirmation...'}
-                                                {!isExecutingPreparedSwap && 'Execute Prepared Swap'}
+                                                Execute prepared swap
                                             </button>
-                                        )}
-
-                                        {swapExecutionHash && (
-                                            <p className="text-xs text-emerald-700 mt-2 break-all">Swap tx: {swapExecutionHash}</p>
-                                        )}
-                                        {isSwapConfirmed && (
-                                            <p className="text-xs text-emerald-700 mt-2">Swap confirmed. You can proceed with approval/purchase.</p>
                                         )}
                                         {(swapExecutionError || isSwapReceiptError) && (
                                             <p className="text-xs text-red-600 mt-2">{swapExecutionError || swapReceiptError?.message || 'Swap transaction failed'}</p>
