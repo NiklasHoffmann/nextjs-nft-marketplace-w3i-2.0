@@ -58,6 +58,11 @@ interface LegacyNFTCardProps {
   currency?: string; // Payment token address (ETH = 0x0, WETH/USDC/etc = token address)
   chainId?: number; // Optional: chain ID for currency symbol lookup
   listingType?: 'PURE_ETH' | 'SWAP_AND_ETH' | 'PURE_SWAP'; // v2 field
+  tokenStandard?: 'ERC721' | 'ERC1155' | null;
+  erc1155QuantityListed?: string | null;
+  remainingQuantity?: string | null;
+  unitPrice?: string | null;
+  partialBuyEnabled?: boolean;
   metadata?: {
     name?: string | null;
     description?: string | null;
@@ -131,7 +136,12 @@ function buildLegacyAggregatedNFT(props: LegacyNFTCardProps): AggregatedNFT {
       desiredContractAddress: (props.desiredContractAddress as `0x${string}`) || null,
       desiredTokenId: props.desiredTokenId || null,
       currency: (props.currency as `0x${string}`) || null,
-      listingType: props.listingType || null
+      listingType: props.listingType || null,
+      tokenStandard: props.tokenStandard || null,
+      erc1155QuantityListed: props.erc1155QuantityListed || null,
+      remainingQuantity: props.remainingQuantity || null,
+      unitPrice: props.unitPrice || null,
+      partialBuyEnabled: props.partialBuyEnabled ?? false
     } : undefined,
     core: {
       contractAddress: contractAddress as `0x${string}`,
@@ -183,6 +193,14 @@ function getRarityBackground(rarity?: string | null, enableInsights?: boolean): 
     case 'uncommon': return 'bg-green-200';
     default: return 'bg-gray-200';
   }
+}
+
+function normalizeTokenStandard(value?: string | null): 'ERC721' | 'ERC1155' | null {
+  if (!value) return null;
+  const normalized = value.toUpperCase().replace(/[-_\s]/g, '');
+  if (normalized === 'ERC1155') return 'ERC1155';
+  if (normalized === 'ERC721') return 'ERC721';
+  return null;
 }
 
 /**
@@ -267,10 +285,42 @@ export function NFTCard(props: NFTCardAllProps) {
     ? (props.listingType ?? nft.listing?.listingType ?? null)
     : (nft.listing?.listingType || null);
   const chainId = isLegacy ? props.chainId : undefined;
+  const rawTokenStandard = isLegacy
+    ? (
+      props.tokenStandard
+      ?? nft.listing?.tokenStandard
+      ?? nft.tokenStandard
+      ?? (nft as any)?.tokenType
+      ?? (nft as any)?.marketplace?.tokenStandard
+      ?? (nft as any)?.contract?.tokenType
+    )
+    : (
+      nft.listing?.tokenStandard
+      || nft.tokenStandard
+      || (nft as any)?.tokenType
+      || (nft as any)?.marketplace?.tokenStandard
+      || (nft as any)?.contract?.tokenType
+    );
+  const erc1155QuantityListed = isLegacy
+    ? (props.erc1155QuantityListed ?? nft.listing?.erc1155QuantityListed ?? (nft as any)?.marketplace?.erc1155QuantityListed ?? null)
+    : (nft.listing?.erc1155QuantityListed || (nft as any)?.marketplace?.erc1155QuantityListed || null);
+  const remainingQuantity = isLegacy
+    ? (props.remainingQuantity ?? nft.listing?.remainingQuantity ?? (nft as any)?.marketplace?.remainingQuantity ?? null)
+    : (nft.listing?.remainingQuantity || (nft as any)?.marketplace?.remainingQuantity || null);
+  const unitPrice = isLegacy
+    ? (props.unitPrice ?? nft.listing?.unitPrice ?? (nft as any)?.marketplace?.unitPrice ?? null)
+    : (nft.listing?.unitPrice || (nft as any)?.marketplace?.unitPrice || null);
+  const partialBuyEnabled = isLegacy
+    ? (props.partialBuyEnabled ?? nft.listing?.partialBuyEnabled ?? (nft as any)?.marketplace?.partialBuyEnabled ?? false)
+    : (nft.listing?.partialBuyEnabled || (nft as any)?.marketplace?.partialBuyEnabled || false);
+  const inferredERC1155 = Boolean(
+    erc1155QuantityListed || remainingQuantity || unitPrice || partialBuyEnabled
+  );
+  const tokenStandard: 'ERC721' | 'ERC1155' | null =
+    normalizeTokenStandard(rawTokenStandard) || (inferredERC1155 ? 'ERC1155' : null);
 
   // Social stats
   const likeCount = stats?.likeCount || 0;
-  const watchlistCount = stats?.watchlistCount || 0;
   const averageRating = stats?.averageRating || null;
 
   // Rarity background color
@@ -352,7 +402,6 @@ export function NFTCard(props: NFTCardAllProps) {
               <NFTCardFooter
                 categories={categories}
                 likeCount={likeCount}
-                watchlistCount={watchlistCount}
                 enableInsights={enableInsights}
                 nft={nft}
               />
@@ -367,6 +416,11 @@ export function NFTCard(props: NFTCardAllProps) {
                 currency={currency}
                 chainId={chainId}
                 listingType={listingType}
+                tokenStandard={tokenStandard}
+                unitPrice={unitPrice}
+                erc1155QuantityListed={erc1155QuantityListed}
+                remainingQuantity={remainingQuantity}
+                partialBuyEnabled={partialBuyEnabled}
               />
             </div>
 

@@ -63,16 +63,64 @@ const ERC1155_ABI = [
     }
 ] as const;
 
+const CONTRACT_METADATA_ABI = [
+    {
+        name: 'name',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [],
+        outputs: [{ name: '', type: 'string' }],
+    },
+    {
+        name: 'symbol',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [],
+        outputs: [{ name: '', type: 'string' }],
+    }
+] as const;
+
+const ERC1155_SUPPLY_ABI = [
+    {
+        name: 'totalSupply',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [{ name: 'id', type: 'uint256' }],
+        outputs: [{ name: '', type: 'uint256' }],
+    }
+] as const;
+
 export interface BlockchainState {
     owner: string;
     approved: string;
     isApprovedForAll: boolean;
     lastSyncedAt: Date;
     tokenStandard?: 'ERC721' | 'ERC1155';
+    contractName?: string | null;
+    contractSymbol?: string | null;
+    totalSupply?: number | null;
 }
 
 export class BlockchainStateSync {
     private client;
+
+    private async safeReadContract<T>(params: {
+        address: `0x${string}`;
+        abi: any;
+        functionName: string;
+        args?: readonly unknown[];
+    }): Promise<T | null> {
+        try {
+            return await this.client.readContract({
+                address: params.address,
+                abi: params.abi,
+                functionName: params.functionName as any,
+                args: (params.args ?? []) as any
+            }) as T;
+        } catch {
+            return null;
+        }
+    }
 
     constructor() {
         this.client = createPublicClient({
@@ -90,6 +138,21 @@ export class BlockchainStateSync {
         marketplaceAddress?: string
     ): Promise<BlockchainState> {
         try {
+            const normalizedAddress = contractAddress.toLowerCase();
+            const nftMetadata = await getCollection('nft_metadata');
+            const marketplaceItems = await getCollection('marketplace_items');
+
+            const [existingNFT, activeListing] = await Promise.all([
+                nftMetadata.findOne({ contractAddress: normalizedAddress, tokenId }),
+                marketplaceItems.findOne({ contractAddress: normalizedAddress, tokenId, active: true })
+            ]);
+
+            const fallbackOwner =
+                existingNFT?.blockchain?.owner ||
+                existingNFT?.contract?.owner ||
+                activeListing?.seller ||
+                '';
+
             let owner = '';
             let approved = '';
             let tokenStandard: 'ERC721' | 'ERC1155' = 'ERC721';
@@ -125,18 +188,25 @@ export class BlockchainStateSync {
                 } catch (uriError) {
                     devLog.warn('  ⚠️ Could not resolve token standard:', uriError);
                 }
+
+                // ERC1155 has no ownerOf/getApproved. Use known seller/owner as approval check owner.
+                if (!owner && fallbackOwner) {
+                    owner = fallbackOwner;
+                }
             }
 
 
             // Optionally check isApprovedForAll if marketplace address provided
             let isApprovedForAll = false;
-            if (marketplaceAddress && owner) {
+            const approvalOwner = owner || fallbackOwner;
+
+            if (marketplaceAddress && approvalOwner) {
                 try {
                     isApprovedForAll = await this.client.readContract({
                         address: contractAddress as `0x${string}`,
                         abi: tokenStandard === 'ERC1155' ? ERC1155_ABI : ERC721_ABI,
                         functionName: 'isApprovedForAll',
-                        args: [owner as `0x${string}`, marketplaceAddress as `0x${string}`]
+                        args: [approvalOwner as `0x${string}`, marketplaceAddress as `0x${string}`]
                     });
                 } catch (error) {
                     devLog.warn(`  ⚠️ Could not check isApprovedForAll:`, error);
@@ -144,12 +214,54 @@ export class BlockchainStateSync {
             }
 
             const state: BlockchainState = {
-                owner,
+                owner: owner || fallbackOwner,
                 approved,
                 isApprovedForAll,
                 lastSyncedAt: new Date(),
                 tokenStandard
             };
+
+            const contractName = await this.safeReadContract<string>({
+                address: contractAddress as `0x${string}`,
+                abi: CONTRACT_METADATA_ABI,
+                functionName: 'name'
+            });
+
+            const contractSymbol = await this.safeReadContract<string>({
+                address: contractAddress as `0x${string}`,
+                abi: CONTRACT_METADATA_ABI,
+                functionName: 'symbol'
+            });
+
+            let totalSupply: number | null = null;
+            if (tokenStandard === 'ERC721') {
+                const erc721Supply = await this.safeReadContract<bigint>({
+                    address: contractAddress as `0x${string}`,
+                    abi: [
+                        {
+                            name: 'totalSupply',
+                            type: 'function',
+                            stateMutability: 'view',
+                            inputs: [],
+                            outputs: [{ name: '', type: 'uint256' }],
+                        }
+                    ] as const,
+                    functionName: 'totalSupply'
+                });
+                totalSupply = erc721Supply !== null ? Number(erc721Supply) : null;
+            } else {
+                const erc1155Supply = await this.safeReadContract<bigint>({
+                    address: contractAddress as `0x${string}`,
+                    abi: ERC1155_SUPPLY_ABI,
+                    functionName: 'totalSupply',
+                    args: [BigInt(tokenId)]
+                });
+                totalSupply = erc1155Supply !== null ? Number(erc1155Supply) : null;
+            }
+
+            state.contractName = contractName;
+            state.contractSymbol = contractSymbol;
+            state.totalSupply = totalSupply;
 
             // Update both collections
             await this.updateCollections(contractAddress, tokenId, state);
@@ -249,6 +361,18 @@ export class BlockchainStateSync {
 
         if (state.tokenStandard) {
             updateOps.$set['contract.contractType'] = state.tokenStandard;
+        }
+
+        if (state.contractName !== undefined) {
+            updateOps.$set['contract.name'] = state.contractName;
+        }
+
+        if (state.contractSymbol !== undefined) {
+            updateOps.$set['contract.symbol'] = state.contractSymbol;
+        }
+
+        if (state.totalSupply !== undefined) {
+            updateOps.$set['contract.totalSupply'] = state.totalSupply;
         }
 
         if (state.owner) {

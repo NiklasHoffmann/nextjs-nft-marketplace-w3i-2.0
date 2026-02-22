@@ -27,6 +27,22 @@ export class GraphQLSync {
     private readonly MIN_INTERVAL = 300000; // 5 minutes minimum (WebSocket is primary)
     private readonly MAX_INTERVAL = 900000; // 15 minutes maximum
 
+    private isTransientNetworkError(error: any): boolean {
+        const message = String(error?.message || '').toLowerCase();
+        const name = String(error?.name || '').toLowerCase();
+        const networkError = error?.networkError;
+
+        return (
+            message.includes('fetch failed')
+            || message.includes('network')
+            || message.includes('econnreset')
+            || message.includes('enotfound')
+            || message.includes('etimedout')
+            || name.includes('apolloerror')
+            || Boolean(networkError)
+        );
+    }
+
     /**
      * Start syncing from subgraph v2
      */
@@ -162,12 +178,17 @@ export class GraphQLSync {
                     this.MAX_INTERVAL
                 );
 
-                devLog.error('❌ [V2 Subgraph] Polling error:', error);
-                if (error instanceof Error) {
-                    devLog.error('   Error message:', error.message);
-                    devLog.error('   Error stack:', error.stack);
+                if (this.isTransientNetworkError(error)) {
+                    devLog.warn('⚠️ [V2 Subgraph] Transient network error, will retry with backoff');
+                    devLog.warn(`   Message: ${error?.message || 'fetch/network error'}`);
+                    devLog.warn(`   Next retry in ${this.currentInterval / 1000} seconds`);
+                } else {
+                    devLog.error('❌ [V2 Subgraph] Polling error:', error);
+                    if (error instanceof Error) {
+                        devLog.error('   Error message:', error.message);
+                    }
+                    devLog.error(`   Next retry in ${this.currentInterval / 1000} seconds`);
                 }
-                devLog.error(`   Next retry in ${this.currentInterval / 1000} seconds`);
             }
         }
     }

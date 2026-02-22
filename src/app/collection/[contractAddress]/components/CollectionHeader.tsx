@@ -16,8 +16,8 @@ interface CollectionHeaderProps {
     avgPrice?: number;
     floorPrice?: number;
     floorPriceCurrency?: string | null;
-    totalViews?: number;
-    totalLikes?: number;
+    totalSupplyItems?: number;
+    totalSupplyUnits?: number;
 }
 
 interface CollectionStatsProps {
@@ -26,8 +26,8 @@ interface CollectionStatsProps {
     avgPrice?: number;
     floorPrice?: number;
     floorPriceCurrency?: string | null;
-    totalViews?: number;
-    totalLikes?: number;
+    totalSupplyItems?: number;
+    totalSupplyUnits?: number;
     isCompact?: boolean;
 }
 
@@ -37,8 +37,8 @@ function CollectionStats({
     avgPrice,
     floorPrice,
     floorPriceCurrency,
-    totalViews,
-    totalLikes,
+    totalSupplyItems,
+    totalSupplyUnits,
     isCompact = false
 }: CollectionStatsProps) {
     const chainId = useChainId();
@@ -139,12 +139,11 @@ function CollectionStats({
             <StatCard
                 icon={
                     <svg className="h-5 w-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0v8a2 2 0 01-2 2H7a2 2 0 01-2-2v-8m14 0V9a2 2 0 00-2-2H7a2 2 0 00-2 2v2" />
                     </svg>
                 }
-                label="Views"
-                value={totalViews?.toString() || '0'}
+                label="Supply Items"
+                value={(totalSupplyItems || 0).toString()}
                 hideSecondaryPlaceholder
                 variant="blue"
                 isCompact={isCompact}
@@ -152,11 +151,11 @@ function CollectionStats({
             <StatCard
                 icon={
                     <svg className="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h10M7 12h10M7 17h10" />
                     </svg>
                 }
-                label="Likes"
-                value={totalLikes?.toString() || '0'}
+                label="Supply Units"
+                value={totalSupplyUnits && totalSupplyUnits > 0 ? totalSupplyUnits.toString() : '—'}
                 hideSecondaryPlaceholder
                 variant="red"
                 isCompact={isCompact}
@@ -174,8 +173,8 @@ export function CollectionHeader({
     avgPrice,
     floorPrice,
     floorPriceCurrency,
-    totalViews,
-    totalLikes
+    totalSupplyItems,
+    totalSupplyUnits
 }: CollectionHeaderProps) {
     return (
         <PageHeader
@@ -200,8 +199,8 @@ export function CollectionHeader({
                     avgPrice={avgPrice}
                     floorPrice={floorPrice}
                     floorPriceCurrency={floorPriceCurrency}
-                    totalViews={totalViews}
-                    totalLikes={totalLikes}
+                    totalSupplyItems={totalSupplyItems}
+                    totalSupplyUnits={totalSupplyUnits}
                 />
             }
             hasSidebar={true}

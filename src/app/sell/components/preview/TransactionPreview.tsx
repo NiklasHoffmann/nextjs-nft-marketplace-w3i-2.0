@@ -35,7 +35,7 @@ export function TransactionPreview({ data, onConfirm, onCancel, isLoading }: Tra
 
     // Get marketplace address and dynamic fees
     const { marketplaceAddress } = useMarketplaceContracts();
-    const { calculateFees, innovationFeePercentage, royaltyFeePercentage } = useMarketplaceFees({
+    const { calculateFees } = useMarketplaceFees({
         marketplaceAddress,
         contractAddress: selectedNFT?.contractAddress,
         tokenId: selectedNFT?.tokenId
@@ -106,11 +106,11 @@ export function TransactionPreview({ data, onConfirm, onCancel, isLoading }: Tra
                             <span>{displayPrice} {currencySymbol}</span>
                         </div>
                         <div className="flex justify-between text-red-600">
-                            <span>Marketplace-Gebühr ({(innovationFeePercentage * 100).toFixed(2)}%):</span>
+                            <span>Marketplace-Gebühr ({fees.marketplaceFeePercentage.toFixed(2)}%):</span>
                             <span>-{fees.marketplaceFee.toFixed(4)} {currencySymbol}</span>
                         </div>
                         <div className="flex justify-between text-red-600">
-                            <span>Creator Royalty ({(royaltyFeePercentage * 100).toFixed(2)}%):</span>
+                            <span>Creator Royalty ({fees.royaltyFeePercentage.toFixed(2)}%):</span>
                             <span>-{fees.royaltyFee.toFixed(4)} {currencySymbol}</span>
                         </div>
                         <hr className="border-blue-200" />

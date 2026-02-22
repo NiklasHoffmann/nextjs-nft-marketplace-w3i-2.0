@@ -74,9 +74,14 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
 
         try {
             const nfts = await WalletNFTsService.fetchWalletNFTs(walletAddress);
+            const normalizedNfts = Array.isArray(nfts) ? nfts : [];
+
+            if (!Array.isArray(nfts)) {
+                devLog.warn('wallet-nfts', '⚠️ Service returned non-array payload, defaulting to empty list');
+            }
 
             // Force new array and object references to trigger React re-renders
-            const freshNfts = nfts.map(nft => ({ ...nft }));
+            const freshNfts = normalizedNfts.map(nft => ({ ...nft }));
             
             const newState = WalletNFTsCache.createSuccessState(freshNfts);
 

@@ -32,6 +32,7 @@ export interface Collection {
     };
     // Additional stats from marketplace_collections
     totalSupply?: number;
+    totalSupplyUnits?: number;
     totalLikes?: number;
     totalViews?: number;
     totalWatchlist?: number;
@@ -39,6 +40,11 @@ export interface Collection {
     averageRating?: number;
     uniqueOwners?: number;
     lastSyncedAt?: Date;
+    erc721ItemCount?: number;
+    erc1155ItemCount?: number;
+    erc1155ListedUnits?: number;
+    erc1155RemainingUnits?: number;
+    partialBuyEnabledCount?: number;
 }
 
 export interface CollectionsApiResponse {

@@ -5,6 +5,7 @@ import { NFTInsights } from '@/types';
 import { PublicNFTInsights } from '@/types';
 import { InvalidListingWarning } from '../InvalidListingWarning';
 import { useChainId } from 'wagmi';
+import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
 
 interface OverviewTabProps {
     contractAddress: string;
@@ -57,6 +58,17 @@ export default function OverviewTab({ contractAddress,
     nftDetails
 }: OverviewTabProps) {
     const chainId = useChainId();
+    const { marketplaceAddress } = useMarketplaceContracts();
+    const { innovationFeePercentage, royaltyFeePercentage } = useMarketplaceFees({
+        marketplaceAddress,
+        contractAddress: contractAddress as `0x${string}`,
+        tokenId
+    });
+
+    const marketplaceFeePercentage = nftDetails?.feeRate
+        ? parseFloat(nftDetails.feeRate) / 1000
+        : innovationFeePercentage * 100;
+    const creatorRoyaltyPercentage = royaltyFeePercentage * 100;
 
     // Name priority: contractName (collection) > collection > fallback
     // Note: customTitle was removed from NFTInsights schema
@@ -64,6 +76,8 @@ export default function OverviewTab({ contractAddress,
 
     // Description priority: metadata description > fallback
     const displayDescription = description || 'No description available';
+
+
 
     return (
         <div className="space-y-6">
@@ -77,7 +91,7 @@ export default function OverviewTab({ contractAddress,
             />
 
             {/* Quick Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {insights && 'personalRating' in insights && insights.personalRating && (
                     <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-4 text-center">
                         <div className="flex justify-center mb-1">
@@ -94,21 +108,6 @@ export default function OverviewTab({ contractAddress,
                     </div>
                 )}
 
-                {(rarityRank || insights?.rarity) && (
-                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 text-center">
-                        <div className="text-2xl font-bold text-purple-600">
-                            {rarityRank ? `#${rarityRank}` : insights?.rarity ? (insights.rarity.charAt(0).toUpperCase() + insights.rarity.slice(1)) : 'N/A'}
-                        </div>
-                        <div className="text-sm text-purple-800">Rarity</div>
-                    </div>
-                )}
-
-                {totalSupply && (
-                    <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 text-center">
-                        <div className="text-2xl font-bold text-green-600">{totalSupply.toLocaleString()}</div>
-                        <div className="text-sm text-green-800">Collection Size</div>
-                    </div>
-                )}
             </div>
 
             {/* Main Information */}
@@ -144,6 +143,7 @@ export default function OverviewTab({ contractAddress,
                                 </p>
                             </div>
                         )}
+
                     </div>
                 </div>
 
@@ -310,15 +310,19 @@ export default function OverviewTab({ contractAddress,
                             </>
                         )}
 
-                        {/* Fee Rate */}
-                        {nftDetails.feeRate && (
-                            <div className="bg-white rounded-lg p-3">
-                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Marketplace Fee</label>
-                                <p className="text-sm font-semibold text-gray-900 mt-1">
-                                    {(parseFloat(nftDetails.feeRate) / 1000).toFixed(2)}%
-                                </p>
-                            </div>
-                        )}
+                        <div className="bg-white rounded-lg p-3">
+                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Marketplace Fee</label>
+                            <p className="text-sm font-semibold text-gray-900 mt-1">
+                                {marketplaceFeePercentage.toFixed(2)}%
+                            </p>
+                        </div>
+
+                        <div className="bg-white rounded-lg p-3">
+                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Creator Royalty</label>
+                            <p className="text-sm font-semibold text-gray-900 mt-1">
+                                {creatorRoyaltyPercentage.toFixed(2)}%
+                            </p>
+                        </div>
 
                         {/* Buyer Whitelist */}
                         {nftDetails.buyerWhitelistEnabled !== undefined && (

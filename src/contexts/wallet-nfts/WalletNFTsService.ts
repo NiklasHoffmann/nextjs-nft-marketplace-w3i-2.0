@@ -37,6 +37,12 @@ export interface WalletNFT extends ExternalNFT {
     seller?: string;
     currency?: string; // Payment token address (ETH = 0x0, WETH/USDC/etc = token address)
     listingType?: 'PURE_ETH' | 'SWAP_AND_ETH' | 'PURE_SWAP';
+    listingStatus?: 'LISTED' | 'PARTIALLY_FILLED' | 'SOLD_OUT' | 'CANCELED' | 'INVALIDATED' | null;
+    listingTokenStandard?: 'ERC721' | 'ERC1155' | null;
+    erc1155QuantityListed?: string | null;
+    remainingQuantity?: string | null;
+    unitPrice?: string | null;
+    partialBuyEnabled?: boolean;
     // Contract data from blockchain
     totalSupply?: number | null;
     owner?: string | null;
@@ -115,11 +121,17 @@ export class WalletNFTsService {
                         ownerBalance: nft.contract?.ownerBalance,
                         isListed: nft.isListed || false,
                         // Use flattened fields from API (from $addFields), fallback to listings array
-                        listingPrice: nft.price || nft.listings?.[0]?.price,
-                        listingId: nft.listingId || nft.listings?.[0]?.listingId,
-                        seller: nft.seller || nft.listings?.[0]?.seller,
-                        currency: nft.currency || nft.listings?.[0]?.currency,
-                        listingType: nft.listingType || nft.listings?.[0]?.listingType,
+                        listingPrice: nft.price ?? nft.listings?.[0]?.price,
+                        listingId: nft.listingId ?? nft.listings?.[0]?.listingId,
+                        seller: nft.seller ?? nft.listings?.[0]?.seller,
+                        currency: nft.currency ?? nft.listings?.[0]?.currency,
+                        listingType: nft.listingType ?? nft.listings?.[0]?.listingType,
+                        listingStatus: nft.listingStatus ?? nft.listings?.[0]?.status ?? null,
+                        listingTokenStandard: nft.listingTokenStandard ?? nft.listings?.[0]?.tokenStandard ?? null,
+                        erc1155QuantityListed: nft.erc1155QuantityListed ?? nft.listings?.[0]?.erc1155QuantityListed ?? null,
+                        remainingQuantity: nft.remainingQuantity ?? nft.listings?.[0]?.remainingQuantity ?? null,
+                        unitPrice: nft.unitPrice ?? nft.listings?.[0]?.unitPrice ?? null,
+                        partialBuyEnabled: nft.partialBuyEnabled ?? nft.listings?.[0]?.partialBuyEnabled ?? false,
                         hasMarketplaceData: !!nft.listings?.length,
                         hasInsightsData: !!nft.insights,
                         insights: nft.insights,
@@ -180,7 +192,20 @@ export class WalletNFTsService {
             throw new Error(result.error || 'Failed to fetch wallet NFTs');
         }
 
-        const externalNFTs: ExternalNFT[] = result.data || [];
+        const externalNFTsRaw = result.data;
+        const externalNFTs: ExternalNFT[] = Array.isArray(externalNFTsRaw)
+            ? externalNFTsRaw
+            : Array.isArray(externalNFTsRaw?.nfts)
+                ? externalNFTsRaw.nfts
+                : [];
+
+        if (!Array.isArray(externalNFTsRaw) && !Array.isArray(externalNFTsRaw?.nfts)) {
+            devLog.warn('Unexpected /api/wallet/nfts payload shape, defaulting to empty array', {
+                type: typeof externalNFTsRaw,
+                keys: externalNFTsRaw && typeof externalNFTsRaw === 'object' ? Object.keys(externalNFTsRaw) : []
+            });
+        }
+
         devLog.success(`Step 1/3 Complete: ${externalNFTs.length} NFTs from ${result.source || 'external API'}`);
 
         if (externalNFTs.length === 0) {

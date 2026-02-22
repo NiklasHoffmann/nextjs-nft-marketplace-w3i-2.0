@@ -44,6 +44,28 @@ export default function ProjektTab({ adminInsights, collectionInsights, loading 
   const hasEnhancedProjectInfo = (insights.projectDescriptions?.titleDescriptionPairs?.length ?? 0) > 0 ||
     (insights.specificDescriptions?.titleDescriptionPairs?.length ?? 0) > 0; // Legacy support
 
+  const normalizeText = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
+
+  const projectPairs = insights.projectDescriptions?.titleDescriptionPairs ?? [];
+  const specificPairs = insights.specificDescriptions?.titleDescriptionPairs ?? [];
+
+  const usedDescriptionValues = new Set<string>([
+    ...projectPairs.flatMap((pair: TitleDescriptionPair) =>
+      (pair.descriptions || []).map((desc: string) => normalizeText(desc).toLowerCase()).filter(Boolean)
+    ),
+    ...specificPairs.flatMap((pair: TitleDescriptionPair) =>
+      (pair.descriptions || []).map((desc: string) => normalizeText(desc).toLowerCase()).filter(Boolean)
+    )
+  ]);
+
+  const legacyDescriptions = [
+    ...(Array.isArray(insights.descriptions) ? insights.descriptions : []),
+    ...(insights.description ? [insights.description] : [])
+  ]
+    .map((desc) => normalizeText(desc))
+    .filter((desc, index, arr) => !!desc && arr.findIndex(item => item.toLowerCase() === desc.toLowerCase()) === index)
+    .filter((desc) => !usedDescriptionValues.has(desc.toLowerCase()));
+
   const hasProjectLinks = insights.projectWebsite || insights.projectTwitter ||
     insights.projectDiscord;
 
@@ -63,11 +85,10 @@ export default function ProjektTab({ adminInsights, collectionInsights, loading 
           </div>
         )}
 
-        {(hasEnhancedProjectInfo || hasProjectLinks || insights.projectDescriptions?.titleDescriptionPairs?.length || insights.specificDescriptions?.titleDescriptionPairs?.length) ? (
+        {(hasEnhancedProjectInfo || hasProjectLinks || legacyDescriptions.length > 0) ? (
           <div className="space-y-6">
-            {/* Show ALL Project Title-Description Pairs individually */}
-            {/* First check new projectDescriptions structure */}
-            {insights.projectDescriptions?.titleDescriptionPairs?.map((pair: TitleDescriptionPair, index: number) => {
+            {/* Show ALL projectDescriptions */}
+            {projectPairs.map((pair: TitleDescriptionPair, index: number) => {
               // Filter out empty pairs
               const hasContent = pair.title.trim() || pair.descriptions.some((desc: string) => desc.trim());
               if (!hasContent) return null;
@@ -95,9 +116,8 @@ export default function ProjektTab({ adminInsights, collectionInsights, loading 
               );
             })}
 
-            {/* Legacy support - show specificDescriptions if no projectDescriptions exist */}
-            {(!insights.projectDescriptions?.titleDescriptionPairs?.length && insights.specificDescriptions?.titleDescriptionPairs?.length) &&
-              insights.specificDescriptions.titleDescriptionPairs.map((pair: TitleDescriptionPair, index: number) => {
+            {/* Also show specificDescriptions (legacy/extra project sections) */}
+            {specificPairs.map((pair: TitleDescriptionPair, index: number) => {
                 // Filter out empty pairs
                 const hasContent = pair.title.trim() || pair.descriptions.some((desc: string) => desc.trim());
                 if (!hasContent) return null;
@@ -125,6 +145,25 @@ export default function ProjektTab({ adminInsights, collectionInsights, loading 
                 );
               })
             }
+
+            {/* Additional legacy descriptions not covered by title-description pairs */}
+            {legacyDescriptions.length > 0 && (
+              <div className="border border-gray-100 rounded-lg p-4 bg-gray-50">
+                <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                  <span className="text-gray-500 mr-2">📝</span>
+                  Weitere Beschreibungen
+                </h4>
+                <div className="space-y-3">
+                  {legacyDescriptions.map((desc, index) => (
+                    <div key={index} className="pl-4 border-l-2 border-gray-200">
+                      <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                        {desc}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Project Links Section */}
             {hasProjectLinks && (
@@ -176,32 +215,20 @@ export default function ProjektTab({ adminInsights, collectionInsights, loading 
         ) : (
           <div className="space-y-4">
             {/* Fallback: Show legacy descriptions if available */}
-            {insights.descriptions && insights.descriptions.length > 0 ? (
+            {legacyDescriptions.length > 0 ? (
               <div className="border border-gray-100 rounded-lg p-4 bg-gray-50">
                 <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
                   <span className="text-gray-500 mr-2">📝</span>
                   Beschreibungen (Legacy Format)
                 </h4>
                 <div className="space-y-3">
-                  {insights.descriptions.map((desc, index) => (
+                  {legacyDescriptions.map((desc, index) => (
                     <div key={index} className="pl-4 border-l-2 border-gray-200">
                       <p className="text-gray-700 leading-relaxed">
                         {desc}
                       </p>
                     </div>
                   ))}
-                </div>
-              </div>
-            ) : insights.description ? (
-              <div className="border border-gray-100 rounded-lg p-4 bg-gray-50">
-                <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
-                  <span className="text-gray-500 mr-2">📝</span>
-                  Beschreibung (Legacy Format)
-                </h4>
-                <div className="pl-4 border-l-2 border-gray-200">
-                  <p className="text-gray-700 leading-relaxed">
-                    {insights.description}
-                  </p>
                 </div>
               </div>
             ) : (

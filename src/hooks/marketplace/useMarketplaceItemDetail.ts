@@ -82,7 +82,7 @@ export function useMarketplaceItemDetail(options: UseMarketplaceItemDetailOption
         setError(null);
 
         try {
-            const response = await fetch(`/api/nft/detail?contractAddress=${contractAddress}&tokenId=${tokenId}`, {
+            let response = await fetch(`/api/nft/detail?contractAddress=${contractAddress}&tokenId=${tokenId}`, {
                 cache: 'no-store'
             });
 
@@ -188,10 +188,29 @@ export function useMarketplaceItemDetail(options: UseMarketplaceItemDetailOption
                 throw new Error(`API error: ${response.status}`);
             }
 
-            const result = await response.json();
+            let result = await response.json();
 
             // apiHandler wraps response in { success: true, data: {...} }
-            const nftData = result.success ? result.data : result;
+            let nftData = result.success ? result.data : result;
+
+            const needsApprovalRefresh =
+                nftData?.marketplace?.isListed &&
+                nftData?.marketplace?.tokenStandard === 'ERC1155' &&
+                nftData?.blockchain?.isApprovedForAll === false;
+
+            if (needsApprovalRefresh) {
+                devLog.info('🔄 [useMarketplaceItemDetail] Forcing refresh for ERC1155 approval check...');
+                const refreshedResponse = await fetch(
+                    `/api/nft/detail?contractAddress=${contractAddress}&tokenId=${tokenId}&refresh=true`,
+                    { cache: 'no-store' }
+                );
+
+                if (refreshedResponse.ok) {
+                    const refreshedResult = await refreshedResponse.json();
+                    result = refreshedResult;
+                    nftData = refreshedResult.success ? refreshedResult.data : refreshedResult;
+                }
+            }
 
             // Convert /api/nft/detail response to EnrichedNFTDocument format
             const enrichedNFT: EnrichedNFTDocument = {

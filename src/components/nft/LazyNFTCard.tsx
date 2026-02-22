@@ -15,6 +15,11 @@ interface LazyNFTCardProps {
   currency?: string;
   chainId?: number;
   listingType?: 'PURE_ETH' | 'SWAP_AND_ETH' | 'PURE_SWAP';
+  tokenStandard?: 'ERC721' | 'ERC1155' | null;
+  erc1155QuantityListed?: string | null;
+  remainingQuantity?: string | null;
+  unitPrice?: string | null;
+  partialBuyEnabled?: boolean;
   seller?: string;
   buyer?: string | null;
   isListed?: boolean;

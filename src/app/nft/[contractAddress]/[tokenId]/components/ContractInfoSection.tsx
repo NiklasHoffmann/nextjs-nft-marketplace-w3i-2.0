@@ -24,6 +24,7 @@ interface ContractInfoSectionProps {
         ownerBalance: number | null;
         approved: string | null;
     };
+    tokenStandard?: string;
     isApprovedForAll?: boolean; // Operator-level approval (separate prop!)
 }
 
@@ -42,17 +43,18 @@ function InfoRow({ label, value, subtitle }: { label: string; value: React.React
     );
 }
 
-export function ContractInfoSection({ contract, isApprovedForAll }: ContractInfoSectionProps) {
+export function ContractInfoSection({ contract, tokenStandard, isApprovedForAll }: ContractInfoSectionProps) {
     // Get current chain ID from wagmi
     const chainId = useChainId();
 
     // Get marketplace address from network.mapping.json for current chain
     const marketplaceAddress = getMarketplaceAddress(chainId);
+    const isErc1155 = tokenStandard === 'ERC1155';
     devLog.log('🏷️ ContractInfoSection - contract:', contract);
     devLog.log('🏷️ ContractInfoSection - isApprovedForAll:', isApprovedForAll);
 
     // Check Token-Level Approval (getApproved)
-    const hasTokenApproval = contract.approved && marketplaceAddress
+    const hasTokenApproval = !isErc1155 && contract.approved && marketplaceAddress
         ? contract.approved.toLowerCase() === marketplaceAddress.toLowerCase()
         : false;
 
@@ -62,7 +64,7 @@ export function ContractInfoSection({ contract, isApprovedForAll }: ContractInfo
     // NFT is approved if EITHER token-level OR operator-level approval exists
     const isApprovedForMarketplace = hasTokenApproval || hasOperatorApproval;
 
-    const isNoApproval = contract.approved === '0x0000000000000000000000000000000000000000';
+    const isNoApproval = !isErc1155 && contract.approved === '0x0000000000000000000000000000000000000000';
     const hasOtherApproval = contract.approved && !hasTokenApproval && !isNoApproval;
 
     return (
@@ -114,7 +116,9 @@ export function ContractInfoSection({ contract, isApprovedForAll }: ContractInfo
                             <div>
                                 <div className="text-xs text-gray-500 mb-1">Token Approval (getApproved):</div>
                                 <div className="flex items-center gap-2">
-                                    {contract.approved && !isNoApproval ? (
+                                    {isErc1155 ? (
+                                        <span className="text-gray-500 text-xs">Not applicable for ERC1155</span>
+                                    ) : contract.approved && !isNoApproval ? (
                                         <>
                                             <code className="bg-gray-100 px-2 py-1 rounded text-xs">
                                                 {contract.approved}
@@ -187,7 +191,9 @@ export function ContractInfoSection({ contract, isApprovedForAll }: ContractInfo
                         </div>
                     }
                     subtitle={
-                        hasOperatorApproval
+                        isErc1155 && hasOperatorApproval
+                            ? '✨ ERC1155 uses operator approval (isApprovedForAll)'
+                            : hasOperatorApproval
                             ? '✨ All your NFTs from this collection are approved (recommended)'
                             : hasTokenApproval
                                 ? '✨ Only this specific NFT is approved'

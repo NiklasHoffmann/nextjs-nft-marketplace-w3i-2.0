@@ -72,7 +72,7 @@ function NFTDetailPage() {
     } = useNFTUserStats(contractAddress, tokenId, userAddress);
 
     // UI state
-    const [activeTab, setActiveTab] = useState<TabType>('project');
+    const [activeTab, setActiveTab] = useState<TabType>('overview');
 
     // Navigation handlers
     const handleBack = useCallback(() => {
@@ -163,10 +163,19 @@ function NFTDetailPage() {
     const hasValidData = isValidParams && nftDetails;
     const finalImageUrl = imageUrl;
 
-    // Use customTitle from insights if available, otherwise use metadata name or fallback
+    // Title fallback: customTitle -> title -> metadata name
     const finalName = useMemo(() => {
-        return publicInsights?.customTitle || metadata?.name || `Token #${tokenId}`;
-    }, [publicInsights?.customTitle, metadata?.name, tokenId]);
+        return (publicInsights as any)?.customTitle || (publicInsights as any)?.title || metadata?.name || `Token #${tokenId}`;
+    }, [publicInsights, metadata?.name, tokenId]);
+
+    // Description fallback: metadata -> insights.description -> insights.descriptions[0] -> insights.cardDescriptions[0]
+    const finalDescription = useMemo(() => {
+        const insightDescription = (publicInsights as any)?.description
+            || ((publicInsights as any)?.descriptions?.[0] ?? null)
+            || ((publicInsights as any)?.cardDescriptions?.[0] ?? null);
+
+        return metadata?.description || insightDescription || '';
+    }, [metadata?.description, publicInsights]);
 
     const viewRecordedRef = useRef(false);
     const viewerIdRef = useRef<string | null>(null);
@@ -273,7 +282,7 @@ function NFTDetailPage() {
             currentOwner: nftData?.blockchain?.owner || nftData?.contract?.owner || null,
             creator: null,
             nftDetails,
-            description: metadata?.description || '',
+            description: finalDescription,
             rarityRank: null,
             rarityScore: null,
             attributes: metadata?.attributes?.map((attr: any) => ({
@@ -306,6 +315,7 @@ function NFTDetailPage() {
         };
     }, [
         activeTab, handleTabChange, contractAddress, tokenId, contractInfo, metadata, nftDetails,
+        finalDescription,
         statsUserInteractions, publicInsights, isLoading, statsToggleFavorite, statsToggleWatchlist, statsSetRating,
         isWalletConnected, nftData
     ]);

@@ -50,6 +50,7 @@ interface NFTInsightFormData {
     tokenId: string;
     customTitle: string; // Renamed from title to customTitle for clarity
     title?: string; // Legacy support
+    overviewDescription: string;
     // Legacy support for old descriptions
     descriptions: string[];
     // New enhanced description structures
@@ -71,6 +72,7 @@ const initialFormData: NFTInsightFormData = {
     tokenId: '',
     customTitle: '', // New primary field
     title: '', // Legacy support
+    overviewDescription: '',
     descriptions: [''],
     projectDescriptions: getDefaultProjectDescriptions(),
     functionalitiesDescriptions: getDefaultFunctionalitiesDescriptions(),
@@ -194,7 +196,9 @@ export default function InsightsManager() {
                 projectDescriptions = insightsToUse.specificDescriptions as NFTProjectDescriptions || getDefaultProjectDescriptions();
             } else {
                 // Migrate legacy descriptions to new structure
-                legacyDescriptions = insightsToUse.descriptions?.length ? insightsToUse.descriptions : [''];
+                legacyDescriptions = insightsToUse.descriptions?.length
+                    ? insightsToUse.descriptions
+                    : ((insightsToUse as any).description ? [(insightsToUse as any).description] : ['']);
                 projectDescriptions = migrateLegacyDescriptions(legacyDescriptions);
             }
 
@@ -213,6 +217,9 @@ export default function InsightsManager() {
                     // Diese bleiben aus dem URL-Parameter (NFT-spezifisch)
                     customTitle: insightsToUse.customTitle || insightsToUse.title || '', // Use customTitle first, fallback to title
                     title: insightsToUse.title || '', // Keep legacy support
+                    overviewDescription: (insightsToUse as any).description
+                        || insightsToUse.descriptions?.[0]
+                        || '',
                     projectDescriptions,
                     functionalitiesDescriptions,
                     cardDescriptions: (insightsToUse as any).cardDescriptions || [], // Load card descriptions (only for NFT-specific)
@@ -269,6 +276,11 @@ export default function InsightsManager() {
                 tokenId: cleanTokenId, // Explicitly clean empty values
                 customTitle: formData.customTitle || '', // Allow empty custom title
                 title: formData.title || formData.customTitle || '', // Legacy support
+                description: formData.overviewDescription.trim()
+                    || formData.projectDescriptions.titleDescriptionPairs
+                        .flatMap((pair: TitleDescriptionPair) => pair.descriptions)
+                        .find((desc: string) => desc.trim().length > 0)
+                    || '',
                 category: formData.category,
                 tags: formData.tags,
                 rarity: formData.rarity,
@@ -278,9 +290,11 @@ export default function InsightsManager() {
                 // Legacy support - keep specificDescriptions pointing to projectDescriptions
                 specificDescriptions: formData.projectDescriptions,
                 // Also keep legacy descriptions for backward compatibility (flattened)
-                descriptions: formData.projectDescriptions.titleDescriptionPairs
-                    .flatMap((pair: TitleDescriptionPair) => pair.descriptions)
-                    .filter((desc: string) => desc.trim().length > 0),
+                descriptions: [
+                    formData.overviewDescription.trim(),
+                    ...formData.projectDescriptions.titleDescriptionPairs
+                        .flatMap((pair: TitleDescriptionPair) => pair.descriptions)
+                ].filter((desc: string) => desc.trim().length > 0),
                 projectWebsite: formData.projectWebsite,
                 projectTwitter: formData.projectTwitter,
                 projectDiscord: formData.projectDiscord,
@@ -407,11 +421,13 @@ export default function InsightsManager() {
                 <BasicInfoManager
                     customTitle={formData.customTitle}
                     category={formData.category}
+                    overviewDescription={formData.overviewDescription}
                     onCustomTitleChange={(title: string) => updateFormData({
                         customTitle: title,
                         title: title // Keep legacy field in sync
                     })}
                     onCategoryChange={(category: string) => updateFormData({ category })}
+                    onOverviewDescriptionChange={(overviewDescription: string) => updateFormData({ overviewDescription })}
                 />
                 <TagsManager
                     tags={formData.tags}

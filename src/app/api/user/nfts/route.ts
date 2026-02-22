@@ -112,7 +112,13 @@ export const GET = apiHandler(async (request: NextRequest) => {
                             seller: 1,
                             listedAt: 1,
                             currency: 1,
-                            listingType: 1
+                            listingType: 1,
+                            tokenStandard: 1,
+                            status: 1,
+                            erc1155QuantityListed: 1,
+                            remainingQuantity: 1,
+                            unitPrice: 1,
+                            partialBuyEnabled: 1
                         }
                     }
                 ],
@@ -131,7 +137,12 @@ export const GET = apiHandler(async (request: NextRequest) => {
                             $expr: {
                                 $and: [
                                     // Must match contractAddress
-                                    { $eq: ['$contractAddress', '$$contractAddr'] },
+                                    {
+                                        $eq: [
+                                            { $toLower: '$contractAddress' },
+                                            { $toLower: '$$contractAddr' }
+                                        ]
+                                    },
                                     {
                                         $or: [
                                             // Case 1: Item-specific (exact tokenId match)
@@ -213,7 +224,13 @@ export const GET = apiHandler(async (request: NextRequest) => {
                 price: { $arrayElemAt: ['$listings.price', 0] },
                 seller: { $arrayElemAt: ['$listings.seller', 0] },
                 currency: { $arrayElemAt: ['$listings.currency', 0] },
-                listingType: { $arrayElemAt: ['$listings.listingType', 0] }
+                listingType: { $arrayElemAt: ['$listings.listingType', 0] },
+                listingStatus: { $arrayElemAt: ['$listings.status', 0] },
+                listingTokenStandard: { $arrayElemAt: ['$listings.tokenStandard', 0] },
+                erc1155QuantityListed: { $arrayElemAt: ['$listings.erc1155QuantityListed', 0] },
+                remainingQuantity: { $arrayElemAt: ['$listings.remainingQuantity', 0] },
+                unitPrice: { $arrayElemAt: ['$listings.unitPrice', 0] },
+                partialBuyEnabled: { $arrayElemAt: ['$listings.partialBuyEnabled', 0] }
             }
         },
         // Apply filters that need computed fields

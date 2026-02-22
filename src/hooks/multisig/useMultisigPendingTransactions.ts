@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAccount, useReadContract, useChainId, usePublicClient } from 'wagmi';
-import { parseAbiItem } from 'viem';
+import { decodeEventLog, parseAbiItem } from 'viem';
 import { MULTISIG_WALLET_ABI } from '@/config/abis/multisig-wallet';
 import { getMultisigAddress } from '@/config';
 import { MULTISIG_ADDRESSES, type PendingMultiSigTx, type MultiSigTransaction } from '@/types';
@@ -19,6 +19,9 @@ type PendingTransactionsOptions = {
     includeInactive?: boolean;
     maxTransactions?: number;
 };
+
+const ALCHEMY_FREE_TIER_LOG_RANGE = BigInt(9);
+const MAX_LOG_QUERY_REQUESTS = BigInt(150);
 
 export function useMultisigPendingTransactions(
     diamondAddress: string,
@@ -76,26 +79,53 @@ export function useMultisigPendingTransactions(
         try {
             setIsLoading(true);
             setError(null);
+            setEventFallbackError(null);
 
             const latestBlock = await publicClient.getBlockNumber();
-            const blockWindow = BigInt(50000);
+            const maxSafeBlockWindow = (ALCHEMY_FREE_TIER_LOG_RANGE + BigInt(1)) * MAX_LOG_QUERY_REQUESTS;
+            const blockWindow = BigInt(50000) > maxSafeBlockWindow ? maxSafeBlockWindow : BigInt(50000);
             const fromBlock = latestBlock > blockWindow ? latestBlock - blockWindow : BigInt(0);
             setEventFallbackRange(`${fromBlock.toString()}-${latestBlock.toString()}`);
 
-            const logs = await publicClient.getLogs({
-                address: multiSigAddress as `0x${string}`,
-                event: parseAbiItem(
-                    'event SubmitTransaction(uint8 indexed _transactionType, uint256 indexed txIndex, address indexed to, uint256 value, address tokenAddress, uint256 amountOrTokenId, address owner, bytes data)'
-                ),
-                fromBlock,
-                toBlock: 'latest'
-            });
+            const submitEvent = parseAbiItem(
+                'event SubmitTransaction(uint8 indexed _transactionType, uint256 indexed txIndex, address indexed to, uint256 value, address tokenAddress, uint256 amountOrTokenId, address owner, bytes data)'
+            );
+
+            const logs: Awaited<ReturnType<typeof publicClient.getLogs>> = [];
+            let chunkStart = fromBlock;
+
+            while (chunkStart <= latestBlock) {
+                const chunkEnd = chunkStart + ALCHEMY_FREE_TIER_LOG_RANGE > latestBlock
+                    ? latestBlock
+                    : chunkStart + ALCHEMY_FREE_TIER_LOG_RANGE;
+
+                const chunkLogs = await publicClient.getLogs({
+                    address: multiSigAddress as `0x${string}`,
+                    event: submitEvent,
+                    fromBlock: chunkStart,
+                    toBlock: chunkEnd,
+                });
+
+                logs.push(...chunkLogs);
+                chunkStart = chunkEnd + BigInt(1);
+            }
 
             const txIndexSet = new Set<number>();
             const logByIndex = new Map<number, typeof logs[number]>();
             for (const log of logs) {
-                const args = log.args as { txIndex?: bigint; };
-                const index = args?.txIndex !== undefined ? Number(args.txIndex) : undefined;
+                let index: number | undefined;
+                try {
+                    const decoded = decodeEventLog({
+                        abi: [submitEvent],
+                        data: log.data,
+                        topics: log.topics,
+                    });
+                    if (decoded.eventName !== 'SubmitTransaction') continue;
+                    const args = decoded.args as { txIndex?: bigint };
+                    index = args.txIndex !== undefined ? Number(args.txIndex) : undefined;
+                } catch {
+                    continue;
+                }
                 if (index === undefined || Number.isNaN(index)) continue;
                 txIndexSet.add(index);
                 logByIndex.set(index, log);
@@ -138,14 +168,27 @@ export function useMultisigPendingTransactions(
                 const log = logByIndex.get(index);
 
                 if (!tx && log) {
-                    const args = log.args as {
+                    let args: {
                         _transactionType?: number;
                         txIndex?: bigint;
                         to?: `0x${string}`;
                         value?: bigint;
                         owner?: `0x${string}`;
                         data?: `0x${string}`;
-                    };
+                    } = {};
+
+                    try {
+                        const decoded = decodeEventLog({
+                            abi: [submitEvent],
+                            data: log.data,
+                            topics: log.topics,
+                        });
+                        if (decoded.eventName === 'SubmitTransaction') {
+                            args = decoded.args as typeof args;
+                        }
+                    } catch {
+                        // Keep empty args fallback
+                    }
 
                     const fallbackTx: MultiSigTransaction = {
                         transactionType: Number(args._transactionType ?? 0),

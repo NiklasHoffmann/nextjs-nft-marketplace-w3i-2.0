@@ -15,6 +15,12 @@ export type ActiveItem = {
     desiredTokenId: string | null
     currency?: string | null // v2: Payment token (0x0 = ETH, WETH address = WETH)
     listingType?: 'PURE_ETH' | 'SWAP_AND_ETH' | 'PURE_SWAP' | null // v2: Listing type
+    tokenStandard?: 'ERC721' | 'ERC1155' | null
+    erc1155QuantityListed?: string | null
+    remainingQuantity?: string | null
+    unitPrice?: string | null
+    partialBuyEnabled?: boolean
+    desiredErc1155Quantity?: string | null
 }
 
 export type NftCore = {

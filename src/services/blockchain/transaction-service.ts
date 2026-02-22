@@ -173,6 +173,18 @@ function parseTransactionError(error: any): string {
         return 'The price has changed since you started';
     }
 
+    if (message.includes('InvalidPurchaseQuantity') || message.includes('WrongQuantityParameter')) {
+        return 'Invalid ERC1155 quantity selected';
+    }
+
+    if (message.includes('PartialBuyNotPossible')) {
+        return 'Partial buy is not allowed for this listing';
+    }
+
+    if (message.includes('SellerInsufficientTokenBalance')) {
+        return 'Listing quantity is no longer available in full. Please refresh and try a lower quantity.';
+    }
+
     if (message.includes('NotOwner')) {
         return 'You are not the owner of this NFT';
     }

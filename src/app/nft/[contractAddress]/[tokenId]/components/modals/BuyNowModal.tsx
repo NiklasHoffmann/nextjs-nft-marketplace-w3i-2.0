@@ -22,6 +22,7 @@ import { useERC20 } from '@/hooks/tokens/useERC20';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, getWETHAddress, isNativeETH } from '@/config/tokens';
 import { BaseModal } from '@/components/core/Modal';
 import { LoadingState } from '@/components/core/Loading';
+import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 import { useChainId } from 'wagmi';
 import { devLog } from '@/utils';
 
@@ -107,18 +108,26 @@ function BuyNowModal({
         const parsed = parseInt(purchaseQuantity || '0', 10);
         return Number.isFinite(parsed) ? parsed : 0;
     }, [purchaseQuantity]);
+    const selectedQuantity = useMemo(() => {
+        if (!isErc1155) return 0;
+        if (!partialBuyEnabled) {
+            return maxQuantity;
+        }
+        return quantityNumber;
+    }, [isErc1155, partialBuyEnabled, maxQuantity, quantityNumber]);
     const isQuantityInvalid = useMemo(() => {
         if (!isErc1155) return false;
-        if (quantityNumber <= 0) return true;
-        if (maxQuantity > 0 && quantityNumber > maxQuantity) return true;
+        if (maxQuantity <= 0) return true;
+        if (selectedQuantity <= 0) return true;
+        if (selectedQuantity > maxQuantity) return true;
         return false;
-    }, [isErc1155, quantityNumber, maxQuantity]);
+    }, [isErc1155, selectedQuantity, maxQuantity]);
     const basePriceWei = useMemo(() => {
         if (isErc1155 && unitPrice) {
-            return BigInt(unitPrice) * BigInt(quantityNumber || 0);
+            return BigInt(unitPrice) * BigInt(selectedQuantity || 0);
         }
         return BigInt(price);
-    }, [isErc1155, unitPrice, quantityNumber, price]);
+    }, [isErc1155, unitPrice, selectedQuantity, price]);
     const priceAmount = useMemo(() => formatUnits(basePriceWei, tokenDecimals), [basePriceWei, tokenDecimals]);
     const priceAmountNum = useMemo(() => parseFloat(priceAmount), [priceAmount]);
 
@@ -135,7 +144,7 @@ function BuyNowModal({
 
     // Transaction service
     const txService = useTransactionService();
-    const { calculateFees, innovationFeePercentage, royaltyFeePercentage } = useMarketplaceFees({
+    const { calculateFees } = useMarketplaceFees({
         marketplaceAddress,
         contractAddress: contractAddress as `0x${string}`,
         tokenId
@@ -153,11 +162,11 @@ function BuyNowModal({
             creatorRoyalty: fees.royaltyFee,
             gasFee,
             total,
-            platformFeePercentage: innovationFeePercentage,
-            royaltyFeePercentage,
+            platformFeePercentage: fees.marketplaceFeePercentage,
+            royaltyFeePercentage: fees.royaltyFeePercentage,
             includesGas: isNative
         };
-    }, [priceAmountNum, calculateFees, innovationFeePercentage, royaltyFeePercentage, isNative]);
+    }, [priceAmountNum, calculateFees, isNative]);
 
     // Check if user needs to wrap ETH to WETH
     const needsWrapping = useMemo(() => {
@@ -238,7 +247,7 @@ function BuyNowModal({
                 desiredContractAddress,
                 desiredTokenId,
                 expectedErc1155Quantity: isErc1155 ? (remainingQuantity || erc1155QuantityListed || '0') : undefined,
-                erc1155PurchaseQuantity: isErc1155 ? String(quantityNumber || 0) : undefined,
+                erc1155PurchaseQuantity: isErc1155 ? String(selectedQuantity || 0) : undefined,
                 desiredErc1155Quantity: desiredErc1155Quantity || undefined,
                 onProgress: (step) => {
                     devLog.info('🔄 Transaction step:', step);
@@ -321,7 +330,7 @@ function BuyNowModal({
         } finally {
             setIsPurchasing(false);
         }
-    }, [listingId, contractAddress, tokenId, priceAmount, seller, desiredContractAddress, desiredTokenId, desiredErc1155Quantity, buyer, calculations.total, txService, router, removeNFT, refreshWallet, currency, currencySymbol, isErc1155, remainingQuantity, erc1155QuantityListed, quantityNumber]);
+    }, [listingId, contractAddress, tokenId, priceAmount, seller, desiredContractAddress, desiredTokenId, desiredErc1155Quantity, buyer, calculations.total, txService, router, removeNFT, refreshWallet, currency, currencySymbol, isErc1155, remainingQuantity, erc1155QuantityListed, selectedQuantity]);
 
     const handleClose = useCallback(() => {
         if (!isPurchasing) {
@@ -359,15 +368,15 @@ function BuyNowModal({
                         {/* NFT Preview */}
                         <div className="mb-6 p-4 bg-gray-50 rounded-xl">
                             <div className="flex gap-4">
-                                {nftImage && (
-                                    <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200">
-                                        <img
-                                            src={nftImage}
-                                            alt={nftName || `NFT #${tokenId}`}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    </div>
-                                )}
+                                <div className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200">
+                                    <OptimizedNFTImage
+                                        imageUrl={nftImage || '/media/custom-nft.jpg'}
+                                        tokenId={tokenId}
+                                        alt={nftName || `NFT #${tokenId}`}
+                                        fill
+                                        className="object-cover"
+                                    />
+                                </div>
                                 <div className="flex-1 min-w-0">
                                     <h3 className="font-semibold text-gray-900 truncate">
                                         {nftName || `NFT #${tokenId}`}
@@ -399,17 +408,18 @@ function BuyNowModal({
                                 <input
                                     type="number"
                                     min={1}
+                                    max={maxQuantity > 0 ? maxQuantity : undefined}
                                     step={1}
                                     value={purchaseQuantity}
-                                    onChange={(event) => setPurchaseQuantity(event.target.value)}
+                                    onChange={(event) => setPurchaseQuantity(event.target.value.replace(/\D/g, ''))}
                                     disabled={!partialBuyEnabled}
                                     className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none ${isQuantityInvalid ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : 'border-purple-300 focus:border-purple-500 focus:ring-purple-200'} ${!partialBuyEnabled ? 'bg-purple-100 text-purple-800' : 'bg-white'}`}
                                 />
                                 {!partialBuyEnabled && (
-                                    <p className="text-xs text-purple-700 mt-1">Teilkauf deaktiviert, volle Menge erforderlich.</p>
+                                    <p className="text-xs text-purple-700 mt-1">Teilkauf deaktiviert, volle Menge erforderlich ({maxQuantity}).</p>
                                 )}
                                 {isQuantityInvalid && (
-                                    <p className="text-xs text-red-600 mt-1">Bitte eine gueltige Menge eingeben.</p>
+                                    <p className="text-xs text-red-600 mt-1">Bitte eine gueltige Menge zwischen 1 und {maxQuantity > 0 ? maxQuantity : 0} eingeben.</p>
                                 )}
                             </div>
                         )}

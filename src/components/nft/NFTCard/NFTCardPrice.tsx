@@ -21,6 +21,11 @@ interface NFTCardPriceProps {
     currency?: string | null;
     chainId?: number; // Optional: override from props
     listingType?: ListingType | null; // PURE_ETH | SWAP_AND_ETH | PURE_SWAP
+    tokenStandard?: 'ERC721' | 'ERC1155' | null;
+    unitPrice?: string | null;
+    erc1155QuantityListed?: string | null;
+    remainingQuantity?: string | null;
+    partialBuyEnabled?: boolean;
 }
 
 export const NFTCardPrice = memo<NFTCardPriceProps>(({
@@ -29,7 +34,12 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
     desiredContractAddress,
     currency,
     chainId: chainIdProp,
-    listingType
+    listingType,
+    tokenStandard,
+    unitPrice,
+    erc1155QuantityListed,
+    remainingQuantity,
+    partialBuyEnabled = false
 }) => {
     const chainIdFromHook = useChainId();
     const chainId = chainIdProp || chainIdFromHook;
@@ -76,9 +86,54 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
         [price, tokenAmount]
     );
 
+    const isERC1155 = tokenStandard === 'ERC1155';
+    const listedQty = erc1155QuantityListed ? Number(erc1155QuantityListed) : 0;
+    const hasRemainingQuantity = remainingQuantity !== undefined && remainingQuantity !== null && remainingQuantity !== '';
+    const availableQty = hasRemainingQuantity ? Number(remainingQuantity) : listedQty;
+    const isSoldOut = isERC1155
+        && isListed
+        && hasRemainingQuantity
+        && Number.isFinite(availableQty)
+        && availableQty <= 0;
+
+    const unitAmount = useMemo(() =>
+        unitPrice ? formatUnits(BigInt(unitPrice), tokenDecimals) : null,
+        [unitPrice, tokenDecimals]
+    );
+
+    const fallbackUnitRaw = useMemo(() => {
+        if (!isERC1155 || !price) return null;
+        const qty = listedQty > 0 ? listedQty : availableQty;
+        if (!qty || qty <= 0) return null;
+        try {
+            return (BigInt(price) / BigInt(qty)).toString();
+        } catch {
+            return null;
+        }
+    }, [isERC1155, price, listedQty, availableQty]);
+
+    const effectiveUnitRaw = unitPrice || fallbackUnitRaw;
+
+    const effectiveUnitAmount = useMemo(() =>
+        effectiveUnitRaw ? formatUnits(BigInt(effectiveUnitRaw), tokenDecimals) : null,
+        [effectiveUnitRaw, tokenDecimals]
+    );
+
+    const unitDisplayAmount = useMemo(() =>
+        effectiveUnitAmount ? formatTokenDisplay(effectiveUnitAmount, tokenDecimals, 4) : null,
+        [effectiveUnitAmount, tokenDecimals]
+    );
+
+    const displayTokenAmountNum = useMemo(() => {
+        if (isERC1155) {
+            return effectiveUnitAmount ? parseFloat(effectiveUnitAmount) : 0;
+        }
+        return tokenAmountNum;
+    }, [isERC1155, effectiveUnitAmount, tokenAmountNum]);
+
     // Convert token price to USD
     useEffect(() => {
-        if (!price || tokenAmountNum === 0) {
+        if (!price || displayTokenAmountNum === 0) {
             setUsdPrice('');
             return;
         }
@@ -86,7 +141,7 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
         const convert = async () => {
             setLoading(true);
             try {
-                const usdValue = await convertTokenToUSD(tokenAmountNum, currencySymbol, currency, chainId);
+                const usdValue = await convertTokenToUSD(displayTokenAmountNum, currencySymbol, currency, chainId);
                 if (usdValue > 0) {
                     const convertedAmount = await convertFromUSD(usdValue);
                     setUsdPrice(formatPrice(convertedAmount));
@@ -102,13 +157,23 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
         };
 
         convert();
-    }, [tokenAmountNum, currencySymbol, convertTokenToUSD, convertFromUSD, formatPrice, price]);
+    }, [displayTokenAmountNum, currencySymbol, convertTokenToUSD, convertFromUSD, formatPrice, price, currency, chainId]);
 
     if (!isListed || !price) {
         return (
             <div className="bg-gray-100/95 backdrop-blur-sm p-2 rounded-md shadow-2xl border border-gray-300/60 ring-1 ring-gray-400/20 h-[62px]">
                 <div className="flex justify-center items-center h-full">
                     <div className="text-gray-500 font-medium text-lg leading-tight">Not Listed</div>
+                </div>
+            </div>
+        );
+    }
+
+    if (isSoldOut) {
+        return (
+            <div className="bg-gray-100/95 backdrop-blur-sm p-2 rounded-md shadow-2xl border border-gray-300/60 ring-1 ring-gray-400/20 h-[62px]">
+                <div className="flex justify-center items-center h-full">
+                    <div className="text-gray-500 font-medium text-lg leading-tight">Sold Out</div>
                 </div>
             </div>
         );
@@ -126,26 +191,51 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
 
     return (
         <div className="bg-white/95 backdrop-blur-sm p-2 rounded-md shadow-2xl border border-gray-200/60 ring-1 ring-gray-300/20">
-            <div className="flex justify-between items-center">
-                <div className="text-left">
-                    <div className="text-orange font-semibold text-lg">
-                        {displayAmount} {currencySymbol}
+            <div className="relative">
+                <div className="text-left min-w-0 pr-24">
+                    {isERC1155 && (
+                        <div className="text-[10px] text-gray-600 leading-tight mb-0.5 truncate">
+                            Qty {availableQty}/{listedQty || availableQty} · Partial {partialBuyEnabled ? 'On' : 'Off'}
+                        </div>
+                    )}
+                    <div className="text-orange font-semibold leading-tight flex items-baseline gap-1 min-w-0">
+                        <span className="text-base md:text-[17px]">
+                            {isERC1155 && unitDisplayAmount ? unitDisplayAmount : displayAmount}
+                        </span>
+                        <span className="text-sm font-bold whitespace-nowrap">
+                            {currencySymbol}
+                        </span>
                     </div>
                     {loading ? (
                         <div className="text-xs text-gray-500">Lädt...</div>
                     ) : usdPrice ? (
-                        <div className="text-xs text-gray-600">˜ {usdPrice}</div>
+                        <div className="text-xs text-gray-600 inline-flex items-center gap-1 truncate max-w-full">
+                            <span className="leading-none">~</span>
+                            <span className="truncate">{usdPrice}</span>
+                            {isERC1155 && unitDisplayAmount && (
+                                <span className="text-[10px] text-gray-500 whitespace-nowrap">/unit</span>
+                            )}
+                        </div>
                     ) : (
                         <div className="text-xs text-gray-600">{currencySymbol} Token</div>
                     )}
                 </div>
                 {/* Sell/Swap Indicator */}
-                <div className="bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20">
-                    <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${isSwap ? 'bg-orange' : 'bg-forestgreen'}`}></div>
-                        <span className={`text-xs font-medium ${isSwap ? 'text-orange' : 'text-forestgreen'}`}>
-                            {isSwap ? 'Swap' : 'Sell'}
-                        </span>
+                <div className="absolute right-0 bottom-0 flex flex-col items-end gap-1">
+                    {tokenStandard && (
+                        <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20 inline-flex items-center whitespace-nowrap">
+                            <span className="text-[10px] font-semibold text-gray-700 whitespace-nowrap leading-none">
+                                {tokenStandard === 'ERC1155' ? 'ERC-1155' : 'ERC-721'}
+                            </span>
+                        </div>
+                    )}
+                    <div className="bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20">
+                        <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${isSwap ? 'bg-orange' : 'bg-forestgreen'}`}></div>
+                            <span className={`text-xs font-medium ${isSwap ? 'text-orange' : 'text-forestgreen'}`}>
+                                {isSwap ? 'Swap' : 'Sell'}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -30,7 +30,7 @@ export function BatchTransactionPreview({ data, onConfirm, onCancel, isLoading }
     // Get marketplace address and dynamic fees (using first NFT for fee calculation)
     const { marketplaceAddress } = useMarketplaceContracts();
     const firstNFT = data.selectedNFTs[0];
-    const { calculateFees, innovationFeePercentage, royaltyFeePercentage } = useMarketplaceFees({
+    const { calculateFees } = useMarketplaceFees({
         marketplaceAddress,
         contractAddress: firstNFT?.contractAddress,
         tokenId: firstNFT?.tokenId
@@ -173,11 +173,11 @@ export function BatchTransactionPreview({ data, onConfirm, onCancel, isLoading }
                             <span>{formatPrice(totalValue)} {currencySymbol}</span>
                         </div>
                         <div className="flex justify-between text-red-600">
-                            <span>Marketplace-Gebühr ({(innovationFeePercentage * 100).toFixed(2)}%):</span>
+                            <span>Marketplace-Gebühr ({totalFees.marketplaceFeePercentage.toFixed(2)}%):</span>
                             <span>-{totalFees.marketplaceFee.toFixed(4)} {currencySymbol}</span>
                         </div>
                         <div className="flex justify-between text-red-600">
-                            <span>Creator Royalty ({(royaltyFeePercentage * 100).toFixed(2)}%):</span>
+                            <span>Creator Royalty ({totalFees.royaltyFeePercentage.toFixed(2)}%):</span>
                             <span>-{totalFees.royaltyFee.toFixed(4)} {currencySymbol}</span>
                         </div>
                         <hr className="border-blue-200" />

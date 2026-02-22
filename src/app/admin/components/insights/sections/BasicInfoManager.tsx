@@ -5,15 +5,19 @@ import React from 'react';
 interface BasicInfoManagerProps {
     customTitle: string;
     category: string;
+    overviewDescription: string;
     onCustomTitleChange: (title: string) => void;
     onCategoryChange: (category: string) => void;
+    onOverviewDescriptionChange: (description: string) => void;
 }
 
 const BasicInfoManager: React.FC<BasicInfoManagerProps> = ({
     customTitle,
     category,
+    overviewDescription,
     onCustomTitleChange,
     onCategoryChange,
+    onOverviewDescriptionChange,
 }) => {
     return (
         <div className="space-y-6 border-t pt-6">
@@ -65,6 +69,22 @@ const BasicInfoManager: React.FC<BasicInfoManagerProps> = ({
                         <option value="Virtual Real Estate">Virtual Real Estate</option>
                     </select>
                 </div>
+            </div>
+
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Overview Description
+                </label>
+                <textarea
+                    value={overviewDescription}
+                    onChange={(e) => onOverviewDescriptionChange(e.target.value)}
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Kurzbeschreibung für den Overview-Tab"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                    Dieser Text erscheint im Overview-Tab und sollte nicht die Projekt- oder Funktionalitätsdetails duplizieren.
+                </p>
             </div>
         </div>
     );

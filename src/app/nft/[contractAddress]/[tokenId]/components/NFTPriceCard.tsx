@@ -148,6 +148,12 @@ function NFTPriceCard({
         }
     }, [isListed, status]);
 
+    const isActiveListing = useMemo(() => {
+        if (!isListed) return false;
+        if (!status) return true;
+        return status === 'LISTED' || status === 'PARTIALLY_FILLED';
+    }, [isListed, status]);
+
     // Create ActiveItem for cart
     const cartItem: ActiveItem | null = useMemo(() => {
         if (!isListed || !contractAddress || !tokenId || !seller) {
@@ -163,9 +169,16 @@ function NFTPriceCard({
             isListed: true,
             buyer: null,
             desiredContractAddress: contractAddress as `0x${string}`,
-            desiredTokenId: null
+            desiredTokenId: null,
+            tokenStandard: tokenStandard || null,
+            erc1155QuantityListed: erc1155QuantityListed || null,
+            remainingQuantity: remainingQuantity || null,
+            unitPrice: unitPrice || null,
+            partialBuyEnabled: partialBuyEnabled || false,
+            desiredErc1155Quantity: desiredErc1155Quantity || null,
+            listingType: listingType || null,
         };
-    }, [isListed, contractAddress, tokenId, seller, price, listingId, currency]);
+    }, [isListed, contractAddress, tokenId, seller, price, listingId, currency, tokenStandard, erc1155QuantityListed, remainingQuantity, unitPrice, partialBuyEnabled, desiredErc1155Quantity, listingType]);
 
     // Memoize action handlers
     const handleBuyNow = useCallback(() => {
@@ -223,7 +236,7 @@ function NFTPriceCard({
             </div>
             <div className="mt-6 space-y-3">
                 {/* Buy Now & Add to Cart - only visible if LISTED and NOT owner */}
-                {isListed && status === 'LISTED' && !isOwner && (
+                {isActiveListing && !isOwner && (
                     <div className="flex gap-3">
                         <button
                             onClick={handleBuyNow}
@@ -242,7 +255,7 @@ function NFTPriceCard({
                 {/* Owner-only buttons */}
                 {isOwner && (
                     <div className="flex gap-3">
-                        {isListed && status === 'LISTED' ? (
+                        {isActiveListing ? (
                             // NFT is listed - show Update & Cancel
                             <>
                                 <button
@@ -271,7 +284,7 @@ function NFTPriceCard({
                 )}
 
                 {/* Not owner and not listed - show informational message */}
-                {!isOwner && !isListed && (
+                {!isOwner && !isActiveListing && (
                     <div className="text-center text-gray-500 py-4">
                         This NFT is not currently listed for sale
                     </div>

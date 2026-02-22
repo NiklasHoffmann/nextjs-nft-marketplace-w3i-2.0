@@ -26,6 +26,14 @@ interface CartItem {
     price: string;
     seller: string;
     currency?: string | null;
+    tokenStandard?: 'ERC721' | 'ERC1155' | null;
+    erc1155QuantityListed?: string | null;
+    remainingQuantity?: string | null;
+    unitPrice?: string | null;
+    partialBuyEnabled?: boolean;
+    desiredErc1155Quantity?: string | null;
+    feeRate?: string | number | null;
+    royaltyFeePercentage?: number | null;
     name?: string;
     imageUrl?: string;
 }

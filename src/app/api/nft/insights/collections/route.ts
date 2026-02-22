@@ -17,11 +17,13 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
     const collection = await getCollection('admin_collection_insights');
 
+    const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
     // Build filter object
     const filter: any = {};
 
     if (contractAddress) {
-        filter.contractAddress = contractAddress.toLowerCase();
+        filter.contractAddress = { $regex: `^${escapeRegex(contractAddress)}$`, $options: 'i' };
     }
 
     if (category) {

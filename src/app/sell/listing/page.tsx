@@ -81,6 +81,19 @@ export default function ListingPage() {
                     return;
                 }
 
+                if (formData.selectedNFT.tokenStandard === 'ERC1155') {
+                    const requestedQty = Number(formData.erc1155Quantity || '0');
+                    const availableQty = Number(formData.selectedNFT.balance || '0');
+
+                    if (!Number.isFinite(requestedQty) || requestedQty <= 0) {
+                        throw new Error('Ungültige ERC1155-Menge. Bitte mindestens 1 angeben.');
+                    }
+
+                    if (Number.isFinite(availableQty) && requestedQty > availableQty) {
+                        throw new Error(`Nicht genügend ERC1155-Balance. Angefordert: ${requestedQty}, verfügbar: ${availableQty}.`);
+                    }
+                }
+
                 const listingParams = {
                     contractAddress: formData.selectedNFT.core.contractAddress,
                     tokenId: formData.selectedNFT.core.tokenId,
@@ -195,6 +208,20 @@ export default function ListingPage() {
                     if (!nft) continue;
 
                     const price = calculateBatchPrice(i, batchNFTs.length);
+                    const requestedQuantity = formData.erc1155Quantities?.[nft.key] || nft.balance;
+
+                    if (nft.tokenStandard === 'ERC1155') {
+                        const requestedQty = Number(requestedQuantity || '0');
+                        const availableQty = Number(nft.balance || '0');
+
+                        if (!Number.isFinite(requestedQty) || requestedQty <= 0) {
+                            throw new Error(`Ungültige ERC1155-Menge für Token ${nft.core.tokenId}. Bitte mindestens 1 angeben.`);
+                        }
+
+                        if (Number.isFinite(availableQty) && requestedQty > availableQty) {
+                            throw new Error(`Nicht genügend ERC1155-Balance für Token ${nft.core.tokenId}. Angefordert: ${requestedQty}, verfügbar: ${availableQty}.`);
+                        }
+                    }
 
                     await txService.createListing({
                         contractAddress: nft.core.contractAddress,
@@ -202,7 +229,7 @@ export default function ListingPage() {
                         price,
                         currency: formData.currency || ZERO_ADDRESS,
                         tokenStandard: nft.tokenStandard,
-                        erc1155Quantity: formData.erc1155Quantities?.[nft.key] || nft.balance,
+                        erc1155Quantity: requestedQuantity,
                         partialBuyEnabled: formData.partialBuyEnabled,
                         desiredContractAddress: ZERO_ADDRESS,
                         desiredTokenId: '0',
@@ -273,7 +300,14 @@ export default function ListingPage() {
 
     const fees = rawPrice > 0
         ? calculateFees(rawPrice)
-        : { marketplaceFee: 0, royaltyFee: 0, youReceive: 0 };
+        : {
+            marketplaceFee: 0,
+            royaltyFee: 0,
+            totalFees: 0,
+            youReceive: 0,
+            marketplaceFeePercentage: 0,
+            royaltyFeePercentage: 0
+        };
 
     if (isBatch) {
         const totalValue = batchNFTs.reduce((sum, _, idx) => sum + parseFloat(calculateBatchPrice(idx, batchNFTs.length)), 0);
@@ -449,11 +483,11 @@ export default function ListingPage() {
                                         <span>{displayPrice} {currencySymbol}</span>
                                     </div>
                                     <div className="flex justify-between text-red-600">
-                                        <span>Marketplace-Gebühr ({(innovationFeePercentage * 100).toFixed(2)}%):</span>
+                                        <span>Marketplace-Gebühr ({fees.marketplaceFeePercentage.toFixed(2)}%):</span>
                                         <span>-{fees.marketplaceFee.toFixed(4)} {currencySymbol}</span>
                                     </div>
                                     <div className="flex justify-between text-red-600">
-                                        <span>Creator Royalty ({(royaltyFeePercentage * 100).toFixed(2)}%):</span>
+                                        <span>Creator Royalty ({fees.royaltyFeePercentage.toFixed(2)}%):</span>
                                         <span>-{fees.royaltyFee.toFixed(4)} {currencySymbol}</span>
                                     </div>
                                     <hr className="border-blue-200" />

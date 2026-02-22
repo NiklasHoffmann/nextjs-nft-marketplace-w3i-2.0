@@ -8,7 +8,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount, useChainId } from 'wagmi';
+import { useAccount, useChainId, usePublicClient } from 'wagmi';
 import { useCart } from '@/contexts';
 import { formatUnits } from 'viem';
 import Link from 'next/link';
@@ -17,7 +17,8 @@ import { EmptyState } from '@/components/core/Empty';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
 import { useTransactionService } from '@/services/blockchain';
-import { devLog } from '@/utils';
+import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
+import { devLog, formatTokenDisplay } from '@/utils';
 
 interface EnrichedCartItem {
     listingId: string;
@@ -26,18 +27,310 @@ interface EnrichedCartItem {
     price: string;
     currency?: string | null;
     seller: string;
+    tokenStandard?: 'ERC721' | 'ERC1155' | null;
+    erc1155QuantityListed?: string | null;
+    remainingQuantity?: string | null;
+    unitPrice?: string | null;
+    partialBuyEnabled?: boolean;
+    desiredErc1155Quantity?: string | null;
+    feeRate?: string | number | null;
+    royaltyFeePercentage?: number | null;
     name?: string;
     imageUrl?: string;
 }
+
+const ERC2981_ABI = [
+    {
+        type: 'function',
+        name: 'royaltyInfo',
+        stateMutability: 'view',
+        inputs: [
+            { name: '_tokenId', type: 'uint256' },
+            { name: '_salePrice', type: 'uint256' }
+        ],
+        outputs: [
+            { name: 'receiver', type: 'address' },
+            { name: 'royaltyAmount', type: 'uint256' }
+        ]
+    }
+] as const;
 
 export function CartPage() {
     const router = useRouter();
     const { address, isConnected } = useAccount();
     const chainId = useChainId();
-    const { items, itemCount, totalPrice, totalPriceByToken, totalPriceDisplay, removeFromCart, clearCart, updateCartItem } = useCart();
+    const publicClient = usePublicClient();
+    const { items, itemCount, removeFromCart, clearCart, updateCartItem } = useCart();
+    const { marketplaceAddress } = useMarketplaceContracts();
+    const { innovationFeePercentage } = useMarketplaceFees({ marketplaceAddress });
     const txService = useTransactionService();
     const [isProcessing, setIsProcessing] = useState(false);
     const [enrichedItems, setEnrichedItems] = useState<EnrichedCartItem[]>([]);
+    const [erc1155PurchaseQuantities, setErc1155PurchaseQuantities] = useState<Record<string, string>>({});
+    const [royaltyPercentageByListingId, setRoyaltyPercentageByListingId] = useState<Record<string, number>>({});
+
+    const quantityByListingId = useMemo(() => {
+        const map = new Map<string, number>();
+
+        enrichedItems.forEach((item) => {
+            const isErc1155 = item.tokenStandard === 'ERC1155';
+            if (!isErc1155) {
+                map.set(item.listingId, 1);
+                return;
+            }
+
+            const maxRaw = item.remainingQuantity || item.erc1155QuantityListed || '0';
+            const maxQuantity = parseInt(maxRaw, 10);
+            const safeMax = Number.isFinite(maxQuantity) && maxQuantity > 0 ? maxQuantity : 0;
+
+            if (!item.partialBuyEnabled) {
+                map.set(item.listingId, safeMax);
+                return;
+            }
+
+            const selected = parseInt(erc1155PurchaseQuantities[item.listingId] || '1', 10);
+            const safeSelected = Number.isFinite(selected) ? selected : 1;
+            map.set(item.listingId, safeSelected);
+        });
+
+        return map;
+    }, [enrichedItems, erc1155PurchaseQuantities]);
+
+    const totalPriceByToken = useMemo(() => {
+        const totals = new Map<string, number>();
+
+        enrichedItems.forEach((item) => {
+            try {
+                const symbol = getCurrencySymbolByAddress(chainId || 11155111, item.currency);
+                const decimals = getTokenDecimalsByAddress(chainId || 11155111, item.currency);
+                const quantity = quantityByListingId.get(item.listingId) || 0;
+
+                let priceWei = BigInt(item.price);
+                if (item.tokenStandard === 'ERC1155' && item.unitPrice) {
+                    priceWei = BigInt(item.unitPrice) * BigInt(quantity);
+                }
+
+                const amount = parseFloat(formatUnits(priceWei, decimals));
+                totals.set(symbol, (totals.get(symbol) || 0) + amount);
+            } catch {
+                // ignore malformed item
+            }
+        });
+
+        return Array.from(totals.entries()).map(([symbol, total]) => ({ symbol, total }));
+    }, [enrichedItems, chainId, quantityByListingId]);
+
+    const totalPriceDisplay = useMemo(() => {
+        if (totalPriceByToken.length === 0) return '0';
+        return totalPriceByToken
+            .map((entry) => `${entry.total.toFixed(4)} ${entry.symbol}`)
+            .join(' + ');
+    }, [totalPriceByToken]);
+
+    useEffect(() => {
+        let canceled = false;
+
+        const fetchRoyalties = async () => {
+            if (!publicClient || enrichedItems.length === 0) {
+                if (!canceled) {
+                    setRoyaltyPercentageByListingId({});
+                }
+                return;
+            }
+
+            const entries = await Promise.all(
+                enrichedItems.map(async (item) => {
+                    try {
+                        const royaltyData = await publicClient.readContract({
+                            address: item.contractAddress as `0x${string}`,
+                            abi: ERC2981_ABI,
+                            functionName: 'royaltyInfo',
+                            args: [BigInt(item.tokenId), BigInt(10000)]
+                        });
+
+                        const royaltyBps = Number(royaltyData?.[1] ?? 0);
+                        const royaltyPercentage = Number.isFinite(royaltyBps) ? royaltyBps / 100 : 0;
+                        if (item.royaltyFeePercentage !== royaltyPercentage) {
+                            updateCartItem(item.listingId, { royaltyFeePercentage: royaltyPercentage });
+                        }
+                        return [item.listingId, royaltyPercentage] as const;
+                    } catch {
+                        if ((item.royaltyFeePercentage ?? 0) !== 0) {
+                            updateCartItem(item.listingId, { royaltyFeePercentage: 0 });
+                        }
+                        return [item.listingId, 0] as const;
+                    }
+                })
+            );
+
+            if (canceled) return;
+            setRoyaltyPercentageByListingId(Object.fromEntries(entries));
+        };
+
+        fetchRoyalties();
+
+        return () => {
+            canceled = true;
+        };
+    }, [publicClient, enrichedItems, updateCartItem]);
+
+    const feeTotalsByToken = useMemo(() => {
+        const totals = new Map<string, number>();
+
+        enrichedItems.forEach((item) => {
+            try {
+                const symbol = getCurrencySymbolByAddress(chainId || 11155111, item.currency);
+                const decimals = getTokenDecimalsByAddress(chainId || 11155111, item.currency);
+                const quantity = quantityByListingId.get(item.listingId) || 0;
+
+                let priceWei = BigInt(item.price);
+                if (item.tokenStandard === 'ERC1155' && item.unitPrice) {
+                    priceWei = BigInt(item.unitPrice) * BigInt(quantity);
+                }
+
+                const baseAmount = parseFloat(formatUnits(priceWei, decimals));
+                const marketplacePercentage = item.feeRate !== undefined && item.feeRate !== null
+                    ? Number(item.feeRate) / 1000
+                    : innovationFeePercentage * 100;
+                const royaltyPercentage = royaltyPercentageByListingId[item.listingId] || 0;
+                const totalFee = baseAmount * ((marketplacePercentage + royaltyPercentage) / 100);
+
+                totals.set(symbol, (totals.get(symbol) || 0) + totalFee);
+            } catch {
+                // ignore malformed item
+            }
+        });
+
+        return Array.from(totals.entries()).map(([symbol, total]) => ({ symbol, total }));
+    }, [enrichedItems, chainId, quantityByListingId, innovationFeePercentage, royaltyPercentageByListingId]);
+
+    const feeTotalDisplay = useMemo(() => {
+        if (feeTotalsByToken.length === 0) return '0';
+        return feeTotalsByToken
+            .map((entry) => `${entry.total.toFixed(4)} ${entry.symbol}`)
+            .join(' + ');
+    }, [feeTotalsByToken]);
+
+    const marketplaceFeeTotalsByToken = useMemo(() => {
+        const totals = new Map<string, number>();
+
+        enrichedItems.forEach((item) => {
+            try {
+                const symbol = getCurrencySymbolByAddress(chainId || 11155111, item.currency);
+                const decimals = getTokenDecimalsByAddress(chainId || 11155111, item.currency);
+                const quantity = quantityByListingId.get(item.listingId) || 0;
+
+                let priceWei = BigInt(item.price);
+                if (item.tokenStandard === 'ERC1155' && item.unitPrice) {
+                    priceWei = BigInt(item.unitPrice) * BigInt(quantity);
+                }
+
+                const baseAmount = parseFloat(formatUnits(priceWei, decimals));
+                const marketplacePercentage = item.feeRate !== undefined && item.feeRate !== null
+                    ? Number(item.feeRate) / 1000
+                    : innovationFeePercentage * 100;
+                const marketplaceFee = baseAmount * (marketplacePercentage / 100);
+
+                totals.set(symbol, (totals.get(symbol) || 0) + marketplaceFee);
+            } catch {
+                // ignore malformed item
+            }
+        });
+
+        return Array.from(totals.entries()).map(([symbol, total]) => ({ symbol, total }));
+    }, [enrichedItems, chainId, quantityByListingId, innovationFeePercentage]);
+
+    const creatorRoyaltyTotalsByToken = useMemo(() => {
+        const totals = new Map<string, number>();
+
+        enrichedItems.forEach((item) => {
+            try {
+                const symbol = getCurrencySymbolByAddress(chainId || 11155111, item.currency);
+                const decimals = getTokenDecimalsByAddress(chainId || 11155111, item.currency);
+                const quantity = quantityByListingId.get(item.listingId) || 0;
+
+                let priceWei = BigInt(item.price);
+                if (item.tokenStandard === 'ERC1155' && item.unitPrice) {
+                    priceWei = BigInt(item.unitPrice) * BigInt(quantity);
+                }
+
+                const baseAmount = parseFloat(formatUnits(priceWei, decimals));
+                const royaltyPercentage = royaltyPercentageByListingId[item.listingId] || 0;
+                const creatorRoyalty = baseAmount * (royaltyPercentage / 100);
+
+                totals.set(symbol, (totals.get(symbol) || 0) + creatorRoyalty);
+            } catch {
+                // ignore malformed item
+            }
+        });
+
+        return Array.from(totals.entries()).map(([symbol, total]) => ({ symbol, total }));
+    }, [enrichedItems, chainId, quantityByListingId, royaltyPercentageByListingId]);
+
+    const marketplaceFeeDisplay = useMemo(() => {
+        if (marketplaceFeeTotalsByToken.length === 0) return '0';
+        return marketplaceFeeTotalsByToken
+            .map((entry) => `${entry.total.toFixed(4)} ${entry.symbol}`)
+            .join(' + ');
+    }, [marketplaceFeeTotalsByToken]);
+
+    const creatorRoyaltyDisplay = useMemo(() => {
+        if (creatorRoyaltyTotalsByToken.length === 0) return '0';
+        return creatorRoyaltyTotalsByToken
+            .map((entry) => `${entry.total.toFixed(4)} ${entry.symbol}`)
+            .join(' + ');
+    }, [creatorRoyaltyTotalsByToken]);
+
+    const totalWithFeesByToken = useMemo(() => {
+        const priceMap = new Map(totalPriceByToken.map((entry) => [entry.symbol, entry.total]));
+        const feeMap = new Map(feeTotalsByToken.map((entry) => [entry.symbol, entry.total]));
+        const symbols = new Set([...priceMap.keys(), ...feeMap.keys()]);
+
+        return Array.from(symbols).map((symbol) => ({
+            symbol,
+            total: (priceMap.get(symbol) || 0) + (feeMap.get(symbol) || 0)
+        }));
+    }, [totalPriceByToken, feeTotalsByToken]);
+
+    const totalWithFeesDisplay = useMemo(() => {
+        if (totalWithFeesByToken.length === 0) return '0';
+        return totalWithFeesByToken
+            .map((entry) => `${entry.total.toFixed(4)} ${entry.symbol}`)
+            .join(' + ');
+    }, [totalWithFeesByToken]);
+
+    const feeRatesSummary = useMemo(() => {
+        const marketplaceRates = new Set<number>();
+        const creatorRates = new Set<number>();
+
+        enrichedItems.forEach((item) => {
+            const marketplaceRate = item.feeRate !== undefined && item.feeRate !== null
+                ? Number(item.feeRate) / 1000
+                : innovationFeePercentage * 100;
+            const creatorRate = royaltyPercentageByListingId[item.listingId] ?? item.royaltyFeePercentage ?? 0;
+
+            if (Number.isFinite(marketplaceRate)) marketplaceRates.add(Number(marketplaceRate.toFixed(2)));
+            if (Number.isFinite(creatorRate)) creatorRates.add(Number(creatorRate.toFixed(2)));
+        });
+
+        const marketplaceValues = Array.from(marketplaceRates);
+        const creatorValues = Array.from(creatorRates);
+
+        const formatRate = (values: number[]) => {
+            if (values.length === 0) return '0.00%';
+            if (values.length === 1) {
+                const singleValue = values[0];
+                return singleValue !== undefined ? `${singleValue.toFixed(2)}%` : '0.00%';
+            }
+            return `${Math.min(...values).toFixed(2)}% - ${Math.max(...values).toFixed(2)}%`;
+        };
+
+        return {
+            marketplaceLabel: formatRate(marketplaceValues),
+            creatorLabel: formatRate(creatorValues),
+            isMixed: marketplaceValues.length > 1 || creatorValues.length > 1
+        };
+    }, [enrichedItems, innovationFeePercentage, royaltyPercentageByListingId]);
 
     const hasSingleToken = totalPriceByToken.length === 1;
     const primaryTotal = hasSingleToken ? totalPriceByToken[0] : null;
@@ -47,9 +340,15 @@ export function CartPage() {
         const enrichItems = async () => {
             const enriched = await Promise.all(
                 items.map(async (item) => {
-                    // If already has metadata, use it
-                    if (item.imageUrl) {
-                        devLog.info('cart', 'Cart item already has metadata:', item.name, item.imageUrl);
+                    const needsListingData =
+                        item.feeRate === undefined ||
+                        item.feeRate === null ||
+                        item.tokenStandard === undefined ||
+                        item.tokenStandard === null ||
+                        (item.tokenStandard === 'ERC1155' && (!item.unitPrice || !item.remainingQuantity));
+
+                    if (item.imageUrl && item.name && !needsListingData) {
+                        devLog.info('cart', 'Cart item already enriched:', item.name, item.imageUrl);
                         return item;
                     }
 
@@ -57,19 +356,47 @@ export function CartPage() {
                     try {
                         devLog.info('cart', 'Fetching metadata for:', item.contractAddress, item.tokenId);
                         const response = await fetch(`/api/nft/detail?contractAddress=${item.contractAddress}&tokenId=${item.tokenId}`);
-                        const data = await response.json();
+                        const raw = await response.json();
+                        const data = raw?.success ? raw.data : raw;
                         devLog.info('cart', 'Metadata response:', data);
 
                         const name = data.metadata?.name || data.name || item.name;
                         const imageUrl = data.metadata?.image || data.image || item.imageUrl;
+                        const feeRate = data.marketplace?.feeRate ?? item.feeRate ?? null;
+                        const tokenStandard = data.marketplace?.tokenStandard ?? item.tokenStandard ?? null;
+                        const erc1155QuantityListed = data.marketplace?.erc1155QuantityListed ?? item.erc1155QuantityListed ?? null;
+                        const remainingQuantity = data.marketplace?.remainingQuantity ?? item.remainingQuantity ?? null;
+                        const unitPrice = data.marketplace?.unitPrice ?? item.unitPrice ?? null;
+                        const partialBuyEnabled = data.marketplace?.partialBuyEnabled ?? item.partialBuyEnabled ?? false;
+                        const desiredErc1155Quantity = data.marketplace?.desiredErc1155Quantity ?? item.desiredErc1155Quantity ?? null;
+                        const royaltyFeePercentage = item.royaltyFeePercentage ?? null;
 
                         // Update cart item with metadata (persists to localStorage)
-                        updateCartItem(item.listingId, { name, imageUrl });
+                        updateCartItem(item.listingId, {
+                            name,
+                            imageUrl,
+                            feeRate,
+                            tokenStandard,
+                            erc1155QuantityListed,
+                            remainingQuantity,
+                            unitPrice,
+                            partialBuyEnabled,
+                            desiredErc1155Quantity,
+                            royaltyFeePercentage
+                        });
 
                         const enrichedItem = {
                             ...item,
                             name,
-                            imageUrl
+                            imageUrl,
+                            feeRate,
+                            tokenStandard,
+                            erc1155QuantityListed,
+                            remainingQuantity,
+                            unitPrice,
+                            partialBuyEnabled,
+                            desiredErc1155Quantity,
+                            royaltyFeePercentage
                         };
 
                         devLog.info('cart', 'Enriched item:', enrichedItem.name, enrichedItem.imageUrl);
@@ -92,6 +419,27 @@ export function CartPage() {
         }
     }, [items, updateCartItem]);
 
+    useEffect(() => {
+        setErc1155PurchaseQuantities((prev) => {
+            const next = { ...prev };
+
+            for (const item of enrichedItems) {
+                if (item.tokenStandard !== 'ERC1155' || !item.partialBuyEnabled) continue;
+                if (!next[item.listingId]) {
+                    next[item.listingId] = '1';
+                }
+            }
+
+            for (const listingId of Object.keys(next)) {
+                if (!enrichedItems.some((item) => item.listingId === listingId)) {
+                    delete next[listingId];
+                }
+            }
+
+            return next;
+        });
+    }, [enrichedItems]);
+
     // Calculate estimated gas savings
     const estimatedGasSavings = useMemo(() => {
         if (itemCount <= 1) return '0';
@@ -108,14 +456,45 @@ export function CartPage() {
 
         setIsProcessing(true);
         try {
-            for (const item of items) {
+            for (const item of enrichedItems) {
                 if (!item.listingId || !item.contractAddress || !item.tokenId || !item.price || !item.seller) {
                     devLog.warn('cart', 'Skipping item with missing listing data:', item);
                     continue;
                 }
 
                 const tokenDecimals = getTokenDecimalsByAddress(chainId, item.currency || ZERO_ADDRESS);
-                const expectedPrice = formatUnits(BigInt(item.price), tokenDecimals);
+                const isErc1155 = item.tokenStandard === 'ERC1155';
+                const maxRaw = item.remainingQuantity || item.erc1155QuantityListed || '0';
+                const maxQuantity = parseInt(maxRaw, 10);
+                const safeMaxQuantity = Number.isFinite(maxQuantity) && maxQuantity > 0 ? maxQuantity : 0;
+
+                let expectedPriceWei = BigInt(item.price);
+                let expectedErc1155Quantity: string | undefined;
+                let erc1155PurchaseQuantity: string | undefined;
+
+                if (isErc1155) {
+                    if (safeMaxQuantity <= 0) {
+                        throw new Error(`No remaining ERC1155 quantity available for listing ${item.listingId}`);
+                    }
+
+                    const selectedRaw = item.partialBuyEnabled
+                        ? (erc1155PurchaseQuantities[item.listingId] || '1')
+                        : String(safeMaxQuantity);
+                    const selectedQty = parseInt(selectedRaw, 10);
+
+                    if (!Number.isFinite(selectedQty) || selectedQty <= 0 || selectedQty > safeMaxQuantity) {
+                        throw new Error(`Invalid ERC1155 quantity for listing ${item.listingId}. Choose 1-${safeMaxQuantity}.`);
+                    }
+
+                    expectedErc1155Quantity = String(safeMaxQuantity);
+                    erc1155PurchaseQuantity = String(selectedQty);
+
+                    if (item.unitPrice) {
+                        expectedPriceWei = BigInt(item.unitPrice) * BigInt(selectedQty);
+                    }
+                }
+
+                const expectedPrice = formatUnits(expectedPriceWei, tokenDecimals);
 
                 const result = await txService.purchaseNFT({
                     listingId: item.listingId,
@@ -124,7 +503,10 @@ export function CartPage() {
                     seller: item.seller,
                     buyer: address,
                     contractAddress: item.contractAddress,
-                    tokenId: item.tokenId
+                    tokenId: item.tokenId,
+                    expectedErc1155Quantity,
+                    erc1155PurchaseQuantity,
+                    desiredErc1155Quantity: item.desiredErc1155Quantity || undefined,
                 });
 
                 if (!result.success) {
@@ -228,9 +610,21 @@ export function CartPage() {
                                         <div className="flex-1 min-w-0">
                                             {item.contractAddress ? (
                                                 <Link href={`/nft/${item.contractAddress}/${item.tokenId}`}>
-                                                    <h3 className="text-sm font-medium text-gray-900 hover:text-blue-600 truncate">
-                                                        {item.name || `NFT #${item.tokenId}`}
-                                                    </h3>
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <h3 className="text-sm font-medium text-gray-900 hover:text-blue-600 truncate">
+                                                            {item.name || `NFT #${item.tokenId}`}
+                                                        </h3>
+                                                        {item.tokenStandard === 'ERC1155' && (
+                                                            <span
+                                                                className={`text-[10px] px-2 py-0.5 rounded-full border whitespace-nowrap ${item.partialBuyEnabled
+                                                                    ? 'bg-green-50 text-green-700 border-green-200'
+                                                                    : 'bg-purple-50 text-purple-700 border-purple-200'
+                                                                    }`}
+                                                            >
+                                                                {item.partialBuyEnabled ? 'Partial Buy Enabled' : 'Partial Buy Disabled'}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </Link>
                                             ) : (
                                                 <h3 className="text-sm font-medium text-gray-500 truncate">
@@ -246,6 +640,54 @@ export function CartPage() {
                                             <p className="text-xs text-gray-500 mt-2">
                                                 Seller: {item.seller.slice(0, 6)}...{item.seller.slice(-4)}
                                             </p>
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Fees: Marketplace {((item.feeRate !== undefined && item.feeRate !== null
+                                                    ? Number(item.feeRate) / 1000
+                                                    : innovationFeePercentage * 100)).toFixed(2)}% · Creator {(royaltyPercentageByListingId[item.listingId] ?? item.royaltyFeePercentage ?? 0).toFixed(2)}%
+                                            </p>
+                                            {item.tokenStandard === 'ERC1155' && (
+                                                <div className="mt-2 p-2 bg-purple-50 border border-purple-200 rounded-md">
+                                                    <p className="text-xs text-purple-800 mb-1">
+                                                        ERC1155 quantity (available: {item.remainingQuantity || item.erc1155QuantityListed || '0'})
+                                                    </p>
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        max={(() => {
+                                                            const maxRaw = item.remainingQuantity || item.erc1155QuantityListed || '0';
+                                                            const maxQty = parseInt(maxRaw, 10);
+                                                            return Number.isFinite(maxQty) && maxQty > 0 ? maxQty : undefined;
+                                                        })()}
+                                                        value={(() => {
+                                                            const selected = quantityByListingId.get(item.listingId);
+                                                            return selected && selected > 0 ? String(selected) : '1';
+                                                        })()}
+                                                        onChange={(event) => {
+                                                            if (!item.partialBuyEnabled) return;
+                                                            const raw = event.target.value.replace(/\D/g, '');
+                                                            const maxRaw = item.remainingQuantity || item.erc1155QuantityListed || '0';
+                                                            const maxQty = parseInt(maxRaw, 10);
+                                                            const nextValue = raw === '' ? '1' : raw;
+                                                            const parsed = parseInt(nextValue, 10);
+
+                                                            if (!Number.isFinite(parsed) || parsed <= 0) return;
+                                                            if (Number.isFinite(maxQty) && maxQty > 0 && parsed > maxQty) {
+                                                                setErc1155PurchaseQuantities((prev) => ({ ...prev, [item.listingId]: String(maxQty) }));
+                                                                updateCartItem(item.listingId, { desiredErc1155Quantity: String(maxQty) });
+                                                                return;
+                                                            }
+
+                                                            setErc1155PurchaseQuantities((prev) => ({ ...prev, [item.listingId]: String(parsed) }));
+                                                            updateCartItem(item.listingId, { desiredErc1155Quantity: String(parsed) });
+                                                        }}
+                                                        disabled={!item.partialBuyEnabled}
+                                                        className={`w-28 rounded border px-2 py-1 text-xs ${item.partialBuyEnabled ? 'bg-white border-purple-300' : 'bg-purple-100 border-purple-200 text-purple-700'}`}
+                                                    />
+                                                    {!item.partialBuyEnabled && (
+                                                        <p className="text-[11px] text-purple-700 mt-1">Partial buy disabled, full quantity required.</p>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Price & Actions */}
@@ -255,10 +697,24 @@ export function CartPage() {
                                                     {(() => {
                                                         const symbol = getCurrencySymbolByAddress(chainId || 11155111, item.currency);
                                                         const decimals = getTokenDecimalsByAddress(chainId || 11155111, item.currency);
-                                                        const amount = formatUnits(BigInt(item.price), decimals);
+                                                        const quantity = quantityByListingId.get(item.listingId) || 1;
+                                                        let priceWei = BigInt(item.price);
+                                                        if (item.tokenStandard === 'ERC1155' && item.unitPrice) {
+                                                            priceWei = BigInt(item.unitPrice) * BigInt(quantity);
+                                                        }
+                                                        const amount = formatTokenDisplay(formatUnits(priceWei, decimals), decimals);
                                                         return `${amount} ${symbol}`;
                                                     })()}
                                                 </p>
+                                                {item.tokenStandard === 'ERC1155' && item.unitPrice && (
+                                                    <p className="text-xs text-gray-500">
+                                                        Unit: {(() => {
+                                                            const symbol = getCurrencySymbolByAddress(chainId || 11155111, item.currency);
+                                                            const decimals = getTokenDecimalsByAddress(chainId || 11155111, item.currency);
+                                                            return `${formatTokenDisplay(formatUnits(BigInt(item.unitPrice), decimals), decimals)} ${symbol}`;
+                                                        })()}
+                                                    </p>
+                                                )}
                                             </div>
                                             <button
                                                 onClick={() => removeFromCart(item.listingId)}
@@ -294,6 +750,35 @@ export function CartPage() {
                                 </div>
 
                                 <div className="flex justify-between text-sm">
+                                    <span className="text-gray-600">Marketplace Fee</span>
+                                    <span className="font-medium text-gray-900">{marketplaceFeeDisplay}</span>
+                                </div>
+
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-gray-500">Marketplace Rate</span>
+                                    <span className="font-medium text-gray-700">{feeRatesSummary.marketplaceLabel}</span>
+                                </div>
+
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-600">Creator Royalty</span>
+                                    <span className="font-medium text-gray-900">{creatorRoyaltyDisplay}</span>
+                                </div>
+
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-gray-500">Creator Rate</span>
+                                    <span className="font-medium text-gray-700">{feeRatesSummary.creatorLabel}</span>
+                                </div>
+
+                                {feeRatesSummary.isMixed && (
+                                    <p className="text-[11px] text-gray-500">Fee rates vary by item.</p>
+                                )}
+
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-600">Total Fees</span>
+                                    <span className="font-medium text-gray-900">{feeTotalDisplay}</span>
+                                </div>
+
+                                <div className="flex justify-between text-sm">
                                     <span className="text-gray-600">Estimated Gas</span>
                                     <span className="font-medium text-gray-900">~0.005 ETH</span>
                                 </div>
@@ -311,10 +796,8 @@ export function CartPage() {
                                     <span className="text-base font-semibold text-gray-900">Total</span>
                                     <span className="text-lg font-bold text-gray-900">
                                         {hasSingleToken && primaryTotal && primaryTotal.symbol === 'ETH'
-                                            ? `${(primaryTotal.total + 0.005).toFixed(4)} ETH`
-                                            : (hasSingleToken && primaryTotal)
-                                                ? `${primaryTotal.total.toFixed(4)} ${primaryTotal.symbol}`
-                                                : totalPriceDisplay}
+                                            ? `${((totalWithFeesByToken[0]?.total || 0) + 0.005).toFixed(4)} ETH`
+                                            : totalWithFeesDisplay}
                                     </span>
                                 </div>
                             </div>

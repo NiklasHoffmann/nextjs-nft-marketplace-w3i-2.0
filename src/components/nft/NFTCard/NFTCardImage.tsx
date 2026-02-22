@@ -22,38 +22,63 @@ export const NFTCardImage = memo<NFTCardImageProps>(({
     const hasImage = Boolean(imageUrl);
     const hasDescription = descriptions.length > 0;
 
-    return (
-        <div className="flex gap-1 h-full">
-            {/* Left: Image - 50% - full height, auto width, center-aligned */}
-            {hasImage && (
-                <div className="w-1/2 flex justify-center items-stretch overflow-hidden">
-                    <div className="rounded-md border-2 border-white/50 backdrop-blur-sm overflow-hidden relative h-full">
-                        <OptimizedNFTImage
-                            imageUrl={imageUrl ?? ''}
-                            tokenId={tokenId}
-                            className="object-contain h-full w-auto"
-                            fill={false}
-                            width={240}
-                            height={240}
-                            priority={priority}
-                        />
-                        {/* Subtle inner glow */}
-                        <div className="absolute inset-0 rounded-md ring-1 ring-white/20 pointer-events-none"></div>
-                    </div>
+    if (hasImage && !hasDescription) {
+        return (
+            <div className="h-full w-full min-w-0">
+                <div className="rounded-md border-2 border-white/50 backdrop-blur-sm overflow-hidden relative h-full w-full">
+                    <OptimizedNFTImage
+                        imageUrl={imageUrl ?? ''}
+                        tokenId={tokenId}
+                        className="object-cover h-full w-full"
+                        fill={true}
+                        priority={priority}
+                    />
+                    <div className="absolute inset-0 rounded-md ring-1 ring-white/20 pointer-events-none"></div>
                 </div>
-            )}
+            </div>
+        );
+    }
 
-            {/* Right: Description - 50% - fills available space */}
-            {hasDescription && (
-                <div className="w-1/2">
-                    <div
-                        className="bg-white/95 backdrop-blur-sm pr-1 pt-1 rounded-md shadow-lg text-xs h-full overflow-hidden text-right break-words hyphens-auto"
-                        lang="de"
-                    >
-                        {descriptions[0]}
-                    </div>
+    if (!hasImage && hasDescription) {
+        return (
+            <div className="h-full w-full min-w-0">
+                <div
+                    className="bg-white/95 backdrop-blur-sm pr-1 pt-1 rounded-md shadow-lg text-xs h-full overflow-hidden text-right break-words hyphens-auto"
+                    lang="de"
+                >
+                    {descriptions[0]}
                 </div>
-            )}
+            </div>
+        );
+    }
+
+    if (!hasImage && !hasDescription) {
+        return null;
+    }
+
+    return (
+        <div className="grid grid-cols-2 gap-1 h-full min-w-0">
+            <div className="h-full overflow-hidden">
+                <div className="rounded-md border-2 border-white/50 backdrop-blur-sm overflow-hidden relative h-full w-full">
+                    <OptimizedNFTImage
+                        imageUrl={imageUrl ?? ''}
+                        tokenId={tokenId}
+                        className="object-cover h-full w-full"
+                        fill={true}
+                        priority={priority}
+                    />
+                    <div className="absolute inset-0 rounded-md ring-1 ring-white/20 pointer-events-none"></div>
+                </div>
+            </div>
+
+            <div className="min-w-0 h-full">
+                <div
+                    className="bg-white/95 backdrop-blur-sm pr-1 pt-1 rounded-md shadow-lg text-xs h-full overflow-hidden text-right break-words hyphens-auto"
+                    lang="de"
+                >
+                    {descriptions[0]}
+                </div>
+            </div>
         </div>
     );
 });

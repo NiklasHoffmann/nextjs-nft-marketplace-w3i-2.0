@@ -16,7 +16,7 @@ export default function CheckListingPage() {
     const { formData, setProgressStep } = useListingFlow();
     const chainId = useChainId();
     const { marketplaceAddress } = useMarketplaceContracts();
-    const { calculateFees, innovationFeePercentage, royaltyFeePercentage } = useMarketplaceFees({
+    const { calculateFees } = useMarketplaceFees({
         marketplaceAddress,
         contractAddress: formData.selectedNFT?.contractAddress,
         tokenId: formData.selectedNFT?.tokenId
@@ -89,7 +89,14 @@ export default function CheckListingPage() {
 
     const fees = rawPrice > 0
         ? calculateFees(rawPrice)
-        : { marketplaceFee: 0, royaltyFee: 0, youReceive: 0 };
+        : {
+            marketplaceFee: 0,
+            royaltyFee: 0,
+            totalFees: 0,
+            youReceive: 0,
+            marketplaceFeePercentage: 0,
+            royaltyFeePercentage: 0
+        };
 
     // Convert token price to units for the mock listing
     const priceInWei = rawPrice > 0
@@ -113,7 +120,10 @@ export default function CheckListingPage() {
             buyer: null,
             createdAt: Date.now(),
             updatedAt: Date.now(),
+            tokenStandard: formData.selectedNFT.tokenStandard || 'ERC721',
             erc1155QuantityListed: formData.erc1155Quantity,
+            remainingQuantity: formData.erc1155Quantity,
+            unitPrice: null,
             partialBuyEnabled: formData.partialBuyEnabled,
             desiredContractAddress: formData.targetNFT?.contractAddress || '0x0000000000000000000000000000000000000000',
             desiredTokenId: formData.targetNFT?.tokenId || null
@@ -219,11 +229,11 @@ export default function CheckListingPage() {
                                         <span>{displayPrice} {currencySymbol}</span>
                                     </div>
                                     <div className="flex justify-between text-red-600">
-                                        <span>Marketplace-Gebühr ({(innovationFeePercentage * 100).toFixed(2)}%):</span>
+                                        <span>Marketplace-Gebühr ({fees.marketplaceFeePercentage.toFixed(2)}%):</span>
                                         <span>-{fees.marketplaceFee.toFixed(4)} {currencySymbol}</span>
                                     </div>
                                     <div className="flex justify-between text-red-600">
-                                        <span>Creator Royalty ({(royaltyFeePercentage * 100).toFixed(2)}%):</span>
+                                        <span>Creator Royalty ({fees.royaltyFeePercentage.toFixed(2)}%):</span>
                                         <span>-{fees.royaltyFee.toFixed(4)} {currencySymbol}</span>
                                     </div>
                                     <hr className="border-blue-200" />

@@ -26,8 +26,46 @@ interface CartItem {
     price: string;
     seller: string;
     currency?: string | null;
+    tokenStandard?: 'ERC721' | 'ERC1155' | null;
+    erc1155QuantityListed?: string | null;
+    remainingQuantity?: string | null;
+    unitPrice?: string | null;
+    partialBuyEnabled?: boolean;
+    desiredErc1155Quantity?: string | null;
+    feeRate?: string | number | null;
+    royaltyFeePercentage?: number | null;
     name?: string;
     imageUrl?: string;
+}
+
+function getEffectiveErc1155Quantity(item: CartItem): number {
+    if (item.tokenStandard !== 'ERC1155') return 1;
+
+    const maxRaw = item.remainingQuantity || item.erc1155QuantityListed || '0';
+    const maxParsed = parseInt(maxRaw, 10);
+    const maxQuantity = Number.isFinite(maxParsed) && maxParsed > 0 ? maxParsed : 0;
+
+    if (!item.partialBuyEnabled) {
+        return maxQuantity;
+    }
+
+    const selectedParsed = parseInt(item.desiredErc1155Quantity || '1', 10);
+    const selectedQuantity = Number.isFinite(selectedParsed) && selectedParsed > 0 ? selectedParsed : 1;
+
+    if (maxQuantity > 0) {
+        return Math.min(selectedQuantity, maxQuantity);
+    }
+
+    return selectedQuantity;
+}
+
+function getEffectiveItemPriceWei(item: CartItem): bigint {
+    if (item.tokenStandard === 'ERC1155' && item.unitPrice) {
+        const quantity = getEffectiveErc1155Quantity(item);
+        return BigInt(item.unitPrice) * BigInt(quantity);
+    }
+
+    return BigInt(item.price);
 }
 
 interface CartContextType {
@@ -35,7 +73,9 @@ interface CartContextType {
     itemCount: number;
     totalPrice: bigint;
     totalPriceDisplay: string;
+    totalWithFeesDisplay: string;
     totalPriceByToken: Array<{ symbol: string; total: number }>;
+    totalWithFeesByToken: Array<{ symbol: string; total: number }>;
     addToCart: (item: ActiveItem) => void;
     removeFromCart: (listingId: string) => void;
     clearCart: () => void;
@@ -52,6 +92,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const chainId = useChainId();
     const [items, setItems] = useState<CartItem[]>([]);
     const [isLoaded, setIsLoaded] = useState(false);
+    const [remoteSyncEnabled, setRemoteSyncEnabled] = useState(true);
     const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Sync queue for failed DB operations (with retry)
@@ -70,18 +111,42 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                     body: JSON.stringify(payload)
                 });
 
+                if (response.status === 401 || response.status === 403) {
+                    setRemoteSyncEnabled(false);
+                    syncQueueRef.current?.clear();
+                    devLog.warn('cart', '🔒 Cart DB sync disabled (auth required), using localStorage only');
+                    return;
+                }
+
                 if (!response.ok) {
                     throw new Error(`Sync failed: ${response.status}`);
                 }
 
                 const data = await response.json();
                 if (!data.success) {
-                    throw new Error(data.error || 'Sync failed');
+                    const errorMessage = String(data.error || 'Sync failed');
+                    if (
+                        errorMessage.includes('403') ||
+                        errorMessage.includes('401') ||
+                        /forbidden|unauthorized|auth/i.test(errorMessage)
+                    ) {
+                        setRemoteSyncEnabled(false);
+                        syncQueueRef.current?.clear();
+                        devLog.warn('cart', '🔒 Cart DB sync disabled (auth required), using localStorage only');
+                        return;
+                    }
+                    throw new Error(errorMessage);
                 }
             },
             { maxRetries: 3, baseDelay: 1000 }
         );
     }
+
+    useEffect(() => {
+        if (!remoteSyncEnabled) {
+            syncQueueRef.current?.clear();
+        }
+    }, [remoteSyncEnabled]);
 
     // Load cart on mount or when wallet connects
     useEffect(() => {
@@ -91,6 +156,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 try {
                     devLog.info('cart', '📡 Loading cart from MongoDB for:', address);
                     const response = await fetch(`/api/cart?walletAddress=${address}`);
+
+                    if (response.status === 401 || response.status === 403) {
+                        devLog.warn('cart', '🔒 Cart DB load unauthorized, using localStorage cache');
+                        setRemoteSyncEnabled(false);
+                        syncQueueRef.current?.clear();
+                        loadFromLocalStorage();
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(`Cart load failed: ${response.status}`);
+                    }
+
                     const data = await response.json();
 
                     if (data.success && data.data.items) {
@@ -144,6 +222,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
         // Queue DB sync (if connected) - with retry mechanism
         if (isConnected && address) {
+            if (!remoteSyncEnabled) {
+                return;
+            }
+
             // Clear previous timeout
             if (syncTimeoutRef.current) {
                 clearTimeout(syncTimeoutRef.current);
@@ -158,7 +240,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 );
             }, 500);
         }
-    }, [isLoaded, isConnected, address]);
+    }, [isLoaded, isConnected, address, remoteSyncEnabled]);
 
     // Auto-sync when items change
     useEffect(() => {
@@ -193,6 +275,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 price: item.price,
                 seller: item.seller,
                 currency: item.currency,
+                tokenStandard: item.tokenStandard,
+                erc1155QuantityListed: item.erc1155QuantityListed,
+                remainingQuantity: item.remainingQuantity,
+                unitPrice: item.unitPrice,
+                partialBuyEnabled: item.partialBuyEnabled,
+                desiredErc1155Quantity: item.desiredErc1155Quantity,
+                feeRate: data.marketplace?.feeRate ?? null,
+                royaltyFeePercentage: null,
                 name: data.metadata?.name || data.name || undefined,
                 imageUrl: data.metadata?.image || data.image || undefined
             };
@@ -210,6 +300,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 price: item.price,
                 seller: item.seller,
                 currency: item.currency,
+                tokenStandard: item.tokenStandard,
+                erc1155QuantityListed: item.erc1155QuantityListed,
+                remainingQuantity: item.remainingQuantity,
+                unitPrice: item.unitPrice,
+                partialBuyEnabled: item.partialBuyEnabled,
+                desiredErc1155Quantity: item.desiredErc1155Quantity,
+                feeRate: null,
+                royaltyFeePercentage: null,
                 name: undefined,
                 imageUrl: undefined
             };
@@ -227,16 +325,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
         // Also clear from DB if connected
         if (isConnected && address) {
+            if (!remoteSyncEnabled) return;
+
             try {
                 await fetch(`/api/cart?walletAddress=${address}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    headers: {
+                        'X-Wallet-Address': address
+                    }
                 });
                 devLog.info('cart', '🗑️ Cleared cart in DB for:', address);
             } catch (error) {
                 devLog.error('cart', '❌ Failed to clear cart in DB:', error);
             }
         }
-    }, [isConnected, address]);
+    }, [isConnected, address, remoteSyncEnabled]);
 
     const isInCart = useCallback((listingId: string) => {
         return items.some(item => item.listingId === listingId);
@@ -253,7 +356,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // Calculate total price
     const totalPrice = items.reduce((sum, item) => {
         try {
-            return sum + BigInt(item.price);
+            return sum + getEffectiveItemPriceWei(item);
         } catch {
             return sum;
         }
@@ -266,9 +369,33 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             try {
                 const symbol = getCurrencySymbolByAddress(chainId || 11155111, item.currency);
                 const decimals = getTokenDecimalsByAddress(chainId || 11155111, item.currency);
-                const amount = parseFloat(formatUnits(BigInt(item.price), decimals));
+                const amount = parseFloat(formatUnits(getEffectiveItemPriceWei(item), decimals));
 
                 totals.set(symbol, (totals.get(symbol) || 0) + amount);
+            } catch {
+                // Ignore parse errors for malformed items
+            }
+        });
+
+        return Array.from(totals.entries()).map(([symbol, total]) => ({ symbol, total }));
+    }, [items, chainId]);
+
+    const totalWithFeesByToken = useMemo(() => {
+        const totals = new Map<string, number>();
+
+        items.forEach((item) => {
+            try {
+                const symbol = getCurrencySymbolByAddress(chainId || 11155111, item.currency);
+                const decimals = getTokenDecimalsByAddress(chainId || 11155111, item.currency);
+                const baseAmount = parseFloat(formatUnits(getEffectiveItemPriceWei(item), decimals));
+
+                const marketplacePercentage = item.feeRate !== undefined && item.feeRate !== null
+                    ? Number(item.feeRate) / 1000
+                    : 1;
+                const royaltyPercentage = item.royaltyFeePercentage ?? 0;
+
+                const totalAmount = baseAmount * (1 + ((marketplacePercentage + royaltyPercentage) / 100));
+                totals.set(symbol, (totals.get(symbol) || 0) + totalAmount);
             } catch {
                 // Ignore parse errors for malformed items
             }
@@ -284,11 +411,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             .join(' + ');
     }, [totalPriceByToken]);
 
+    const totalWithFeesDisplay = useMemo(() => {
+        if (totalWithFeesByToken.length === 0) return '0';
+        return totalWithFeesByToken
+            .map((entry) => `${entry.total.toFixed(4)} ${entry.symbol}`)
+            .join(' + ');
+    }, [totalWithFeesByToken]);
+
     // DevTools (development only)
     useContextDevtools('Cart', {
         items,
         itemCount: items.length,
         totalPrice: totalPriceDisplay,
+        totalWithFees: totalWithFeesDisplay,
         isLoaded,
         syncQueueStatus: syncQueueRef.current?.getStatus()
     });
@@ -298,13 +433,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         itemCount: items.length,
         totalPrice,
         totalPriceDisplay,
+        totalWithFeesDisplay,
         totalPriceByToken,
+        totalWithFeesByToken,
         addToCart,
         removeFromCart,
         clearCart,
         isInCart,
         updateCartItem
-    }), [items, totalPrice, totalPriceDisplay, totalPriceByToken, addToCart, removeFromCart, clearCart, isInCart, updateCartItem]);
+    }), [items, totalPrice, totalPriceDisplay, totalWithFeesDisplay, totalPriceByToken, totalWithFeesByToken, addToCart, removeFromCart, clearCart, isInCart, updateCartItem]);
 
     return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

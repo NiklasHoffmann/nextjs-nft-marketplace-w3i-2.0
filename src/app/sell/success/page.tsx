@@ -156,7 +156,12 @@ export default function SuccessPage() {
                             seller: listingData.seller as `0x${string}`,
                             buyer: null,
                             desiredContractAddress: listingData.desiredTokenAddress as `0x${string}`,
-                            desiredTokenId: listingData.desiredTokenId
+                            desiredTokenId: listingData.desiredTokenId,
+                            tokenStandard: (listingData.tokenStandard || baseNFT.tokenStandard || formData.selectedNFT?.tokenStandard || null),
+                            erc1155QuantityListed: listingData.erc1155QuantityListed || formData.erc1155Quantity || null,
+                            remainingQuantity: listingData.remainingQuantity || formData.erc1155Quantity || null,
+                            unitPrice: listingData.unitPrice || null,
+                            partialBuyEnabled: listingData.partialBuyEnabled ?? formData.partialBuyEnabled ?? false
                         }
                     };
                     setListedNFT(enrichedNFT);
@@ -175,7 +180,12 @@ export default function SuccessPage() {
                             seller: baseNFT.core.owner || '0x0' as `0x${string}`,
                             buyer: null,
                             desiredContractAddress: '0x0' as `0x${string}`,
-                            desiredTokenId: null
+                            desiredTokenId: null,
+                            tokenStandard: baseNFT.tokenStandard || formData.selectedNFT?.tokenStandard || 'ERC721',
+                            erc1155QuantityListed: formData.erc1155Quantity || null,
+                            remainingQuantity: formData.erc1155Quantity || null,
+                            unitPrice: null,
+                            partialBuyEnabled: formData.partialBuyEnabled ?? false
                         }
                     };
                     setListedNFT(enrichedNFT);
@@ -196,7 +206,12 @@ export default function SuccessPage() {
                             seller: formData.selectedNFT.core.owner || '0x0' as `0x${string}`,
                             buyer: null,
                             desiredContractAddress: '0x0' as `0x${string}`,
-                            desiredTokenId: null
+                            desiredTokenId: null,
+                            tokenStandard: formData.selectedNFT.tokenStandard || 'ERC721',
+                            erc1155QuantityListed: formData.erc1155Quantity || null,
+                            remainingQuantity: formData.erc1155Quantity || null,
+                            unitPrice: null,
+                            partialBuyEnabled: formData.partialBuyEnabled ?? false
                         }
                     };
                     setListedNFT(enrichedNFT);

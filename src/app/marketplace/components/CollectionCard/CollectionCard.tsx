@@ -12,7 +12,6 @@ export interface CollectionData {
     contractSymbol?: string;
     contractName?: string;
     previewImages?: string[];
-    totalSupply?: number;
     itemCount: number;
     totalLikes?: number;
     totalViews?: number;
@@ -21,6 +20,11 @@ export interface CollectionData {
     totalRatings?: number;
     totalValue: number;
     floorPrice: number | null;
+    erc721ItemCount?: number;
+    erc1155ItemCount?: number;
+    erc1155ListedUnits?: number;
+    erc1155RemainingUnits?: number;
+    partialBuyEnabledCount?: number;
     insights?: {
         totalSupply?: number;
     };
@@ -49,33 +53,39 @@ export const CollectionCard = React.memo(({
         <BaseCard
             size="md"
             hoverable
+            className="border-black bg-gradient-to-br from-gray-50 to-white overflow-hidden h-[30rem]"
+            padding="p-1 h-full flex flex-col [&>div]:h-full"
+            rounded="md"
             onClick={handleClick}
-            header={
-                <CollectionCardHeader
-                    contractSymbol={collection.contractSymbol}
-                    contractName={collection.contractName}
-                />
-            }
             content={
-                <CollectionCardPreview
-                    previewImages={collection.previewImages}
-                    contractAddress={collection.contractAddress}
-                    contractName={collection.contractName}
-                />
-            }
-            footer={
-                <CollectionCardStats
-                    totalSupply={collection.totalSupply}
-                    itemCount={collection.itemCount}
-                    totalLikes={collection.totalLikes}
-                    totalViews={collection.totalViews}
-                    totalWatchlist={collection.totalWatchlist}
-                    averageRating={collection.averageRating}
-                    totalRatings={collection.totalRatings}
-                    totalValue={collection.totalValue}
-                    floorPrice={collection.floorPrice}
-                    insights={collection.insights}
-                />
+                <div className="h-full flex flex-col gap-1">
+                    <CollectionCardHeader
+                        contractSymbol={collection.contractSymbol}
+                        contractName={collection.contractName}
+                        averageRating={collection.averageRating}
+                        totalRatings={collection.totalRatings}
+                    />
+
+                    <CollectionCardPreview
+                        previewImages={collection.previewImages}
+                        contractAddress={collection.contractAddress}
+                        contractName={collection.contractName}
+                    />
+
+                    <div className="mt-auto">
+                        <CollectionCardStats
+                            itemCount={collection.itemCount}
+                            totalLikes={collection.totalLikes}
+                            totalValue={collection.totalValue}
+                            floorPrice={collection.floorPrice}
+                            erc721ItemCount={collection.erc721ItemCount}
+                            erc1155ItemCount={collection.erc1155ItemCount}
+                            erc1155ListedUnits={collection.erc1155ListedUnits}
+                            erc1155RemainingUnits={collection.erc1155RemainingUnits}
+                            partialBuyEnabledCount={collection.partialBuyEnabledCount}
+                        />
+                    </div>
+                </div>
             }
         />
     );

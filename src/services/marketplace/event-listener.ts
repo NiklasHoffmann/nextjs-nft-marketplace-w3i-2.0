@@ -56,6 +56,7 @@ const MAX_RECONNECT_DELAY = 60000; // 60s
 const EVENT_DEDUP_WINDOW = 5000; // 5s - prevent duplicate event processing
 const KEEPALIVE_INTERVAL = 300000; // 5 min - send keepalive to prevent WebSocket timeout
 const KEEPALIVE_MAX_BACKOFF = 900000; // 15 min max backoff
+const ERROR_LOG_THROTTLE_MS = 30000; // 30s - suppress identical noisy WS errors
 
 // ===== SERVICE IMPLEMENTATION =====
 
@@ -91,6 +92,8 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
 
     // Event callbacks (for programmatic subscriptions)
     private eventCallbacks = new Map<MarketplaceEventName, Set<MarketplaceEventCallback>>();
+    private lastErrorSignature: string | null = null;
+    private lastErrorAt = 0;
 
     constructor(marketplaceAddress: Address, wsUrl?: string) {
         this.marketplaceAddress = marketplaceAddress;
@@ -274,7 +277,6 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                     this.handleLogs(logs);
                 },
                 onError: (error) => {
-                    devLog.error(`❌ [EventListener ${environment}] onError callback triggered:`, error);
                     this.handleError(error);
                 },
                 strict: false, // Don't throw on decode errors
@@ -777,6 +779,10 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
         const errorCode = safeError?.code;
         const errorType = safeError?.type || safeError?.constructor?.name || 'Unknown';
         const errorName = safeError?.name || 'Error';
+        const shortMessage = safeError?.shortMessage || '';
+        const signature = `${errorName}:${errorCode ?? ''}:${errorMessage || shortMessage}`;
+        const now = Date.now();
+        const isThrottledDuplicate = this.lastErrorSignature === signature && (now - this.lastErrorAt) < ERROR_LOG_THROTTLE_MS;
 
         // Classify error severity
         const isConnectionError =
@@ -790,7 +796,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             isEmptyError;
 
         // Only log meaningful errors (skip empty WebSocket close events)
-        if (!isEmptyError || !this.isConnected) {
+        if ((!isEmptyError || !this.isConnected) && !isThrottledDuplicate) {
             devLog.log('🔍 [EventListener] Connection event:', {
                 isConnectionError,
                 isEmptyError,
@@ -798,13 +804,17 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                 errorCode,
                 errorType,
                 errorName,
+                shortMessage,
                 hasStack: !!safeError?.stack,
                 wsUrl: this.wsUrl?.substring(0, 50) + '...'
             });
+
+            this.lastErrorSignature = signature;
+            this.lastErrorAt = now;
         }
 
         // Notify config error handler
-        if (!isEmptyError && this.config.onError) {
+        if (!isEmptyError && this.config.onError && !isThrottledDuplicate) {
             this.config.onError(error as Error);
         }
 

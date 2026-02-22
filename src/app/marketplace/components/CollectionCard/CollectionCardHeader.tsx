@@ -5,6 +5,8 @@ import React from 'react';
 interface CollectionCardHeaderProps {
     contractSymbol?: string;
     contractName?: string;
+    averageRating?: number;
+    totalRatings?: number;
 }
 
 /**
@@ -14,20 +16,38 @@ interface CollectionCardHeaderProps {
 export const CollectionCardHeader = React.memo(({
     contractSymbol,
     contractName,
+    averageRating,
+    totalRatings = 0,
 }: CollectionCardHeaderProps) => {
+    const rawRating = averageRating || 0;
+    const normalizedRating = rawRating > 0 ? Math.round(rawRating * 2) / 2 : null;
+    const ratingLabel = normalizedRating !== null
+        ? (Number.isInteger(normalizedRating) ? normalizedRating.toFixed(0) : normalizedRating.toFixed(1))
+        : null;
+
     return (
-        <div className="p-4 bg-gradient-to-br from-purple-50 to-indigo-50 border-b border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-                <h3 className="font-bold text-gray-900 text-lg truncate flex-1">
-                    {contractSymbol || 'Unknown'}
-                </h3>
+        <div className="bg-white/95 backdrop-blur-md p-2 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20">
+            <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold text-gray-900 truncate">
+                        {contractSymbol || 'Unknown'}
+                    </h3>
+                    <p
+                        className="text-xs text-gray-600 truncate"
+                        title={contractName || 'Unknown Collection'}
+                    >
+                        {contractName || 'Unknown Collection'}
+                    </p>
+                </div>
+
+                {normalizedRating !== null && (
+                    <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-md border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center gap-1 ml-2">
+                        <span className="text-yellow-500 text-xs leading-none">★</span>
+                        <span className="text-xs font-semibold text-gray-700 leading-none">{ratingLabel}</span>
+                        <span className="text-[10px] text-gray-500">({totalRatings})</span>
+                    </div>
+                )}
             </div>
-            <p
-                className="text-sm text-gray-600 truncate"
-                title={contractName || 'Unknown Collection'}
-            >
-                {contractName || 'Unknown Collection'}
-            </p>
         </div>
     );
 });

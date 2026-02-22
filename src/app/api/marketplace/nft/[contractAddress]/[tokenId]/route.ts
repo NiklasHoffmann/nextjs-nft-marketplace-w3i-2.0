@@ -42,7 +42,12 @@ export async function GET(
         const pipeline = [
             {
                 $match: {
-                    contractAddress: contractAddress.toLowerCase(),
+                    $expr: {
+                        $eq: [
+                            { $toLower: '$contractAddress' },
+                            contractAddress.toLowerCase()
+                        ]
+                    },
                     // Support both string and number tokenId
                     $or: [
                         { tokenId: parseInt(tokenId) },
@@ -87,7 +92,12 @@ export async function GET(
                             $match: {
                                 $expr: {
                                     $and: [
-                                        { $eq: ['$contractAddress', '$$contractAddr'] },
+                                            {
+                                                $eq: [
+                                                    { $toLower: '$contractAddress' },
+                                                    { $toLower: '$$contractAddr' }
+                                                ]
+                                            },
                                         {
                                             $or: [
                                                 // Item-specific

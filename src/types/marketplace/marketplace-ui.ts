@@ -87,6 +87,16 @@ export interface NFTScrollItem {
     currency?: string;
     /** Listing Type (PURE_ETH | SWAP_AND_ETH | PURE_SWAP) */
     listingType?: 'PURE_ETH' | 'SWAP_AND_ETH' | 'PURE_SWAP';
+    /** Token standard (ERC721/ERC1155) */
+    tokenStandard?: 'ERC721' | 'ERC1155' | null;
+    /** ERC1155 listed quantity */
+    erc1155QuantityListed?: string | null;
+    /** ERC1155 remaining quantity */
+    remainingQuantity?: string | null;
+    /** ERC1155 price per unit */
+    unitPrice?: string | null;
+    /** ERC1155 partial buy flag */
+    partialBuyEnabled?: boolean;
     /** Chain ID for currency symbol resolution */
     chainId?: number;
 

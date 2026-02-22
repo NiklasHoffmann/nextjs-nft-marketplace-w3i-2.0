@@ -55,8 +55,8 @@ export default function CollectionLayout({
         avgPrice: collection?.averagePrice || 0,
         floorPrice: collection?.floorPrice || 0,
         floorPriceCurrency: collection?.floorPriceCurrency || null,
-        totalViews: collection?.totalViews || 0,
-        totalLikes: collection?.totalLikes || 0,
+        totalSupplyItems: collection?.totalSupply || 0,
+        totalSupplyUnits: collection?.totalSupplyUnits || 0,
     }), [collection]);
 
     return (
@@ -87,8 +87,8 @@ export default function CollectionLayout({
                         avgPrice={collectionStats.avgPrice}
                         floorPrice={collectionStats.floorPrice}
                         floorPriceCurrency={collectionStats.floorPriceCurrency}
-                        totalViews={collectionStats.totalViews}
-                        totalLikes={collectionStats.totalLikes}
+                        totalSupplyItems={collectionStats.totalSupplyItems}
+                        totalSupplyUnits={collectionStats.totalSupplyUnits}
                     />
                     <div className="pt-[100px]">
                         {children}

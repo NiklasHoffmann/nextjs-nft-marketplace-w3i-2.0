@@ -151,6 +151,40 @@ export function useMarketplaceListing(marketplaceAddress: string) {
         allowedBuyers as readonly `0x${string}`[] // allowedBuyers
       ] as const;
 
+      const listingQuantity = BigInt(erc1155Quantity || '0');
+
+      if (isErc1155) {
+        if (!userAddress) {
+          throw new Error('Wallet not connected. Please reconnect and try again.');
+        }
+
+        if (listingQuantity <= BigInt(0)) {
+          throw new Error('ERC1155 quantity must be greater than 0.');
+        }
+
+        if (publicClient) {
+          const availableBalance = await publicClient.readContract({
+            address: checksummedTokenAddress as `0x${string}`,
+            abi: erc1155Abi,
+            functionName: 'balanceOf',
+            args: [userAddress, BigInt(tokenId)]
+          });
+
+          devLog.info('📦 ERC1155 balance preflight:', {
+            tokenId,
+            requested: listingQuantity.toString(),
+            available: availableBalance.toString(),
+            owner: userAddress,
+          });
+
+          if (listingQuantity > availableBalance) {
+            throw new Error(
+              `Insufficient ERC1155 balance: requested ${listingQuantity.toString()}, available ${availableBalance.toString()}. Please refresh your wallet NFTs and reduce the quantity.`
+            );
+          }
+        }
+      }
+
       devLog.info('🚀 [useMarketplaceListing] Contract args being sent to createListing():');
       devLog.info('  [0] tokenAddress:', args[0]);
       devLog.info('  [1] tokenId:', args[1]?.toString());
@@ -268,6 +302,14 @@ export function useMarketplaceListing(marketplaceAddress: string) {
       } catch (simError: any) {
         // Check error type first to reduce unnecessary logging
         const errorMessage = simError.message || '';
+
+        const isInsufficientBalanceError = errorMessage.includes('IdeationMarket__SellerInsufficientTokenBalance') ||
+          errorMessage.includes('SellerInsufficientTokenBalance');
+
+        if (isInsufficientBalanceError) {
+          devLog.error('❌ ERC1155 balance simulation error:', errorMessage);
+          throw new Error('Insufficient ERC1155 balance for listing quantity. Please reduce the quantity to your current wallet balance.');
+        }
 
         // Check for already listed error - silent handling
         const isAlreadyListedError = errorMessage.includes('IdeationMarket__AlreadyListed') ||

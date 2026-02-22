@@ -89,7 +89,12 @@ export const GET = apiHandler(async (request: NextRequest) => {
     const insightsCandidates = await insightsCollection.aggregate([
         {
             $match: {
-                contractAddress: normalizedAddress,
+                $expr: {
+                    $eq: [
+                        { $toLower: '$contractAddress' },
+                        normalizedAddress
+                    ]
+                },
                 $or: [
                     { tokenId },
                     { tokenId: null },
@@ -168,8 +173,20 @@ export const GET = apiHandler(async (request: NextRequest) => {
             ratingCount: 0
         },
 
-        // Insights (admin-managed)
-        insights: insights || null,
+        // Insights (admin-managed) with compatibility mapping
+        insights: insights ? {
+            ...insights,
+            customTitle: insights.customTitle || insights.title || null,
+            description: insights.description || (Array.isArray(insights.descriptions) ? insights.descriptions[0] : null) || null,
+            descriptions: Array.isArray(insights.descriptions)
+                ? insights.descriptions
+                : (Array.isArray(insights.cardDescriptions) ? insights.cardDescriptions : []),
+            cardDescriptions: Array.isArray(insights.cardDescriptions)
+                ? insights.cardDescriptions
+                : (Array.isArray(insights.descriptions) ? insights.descriptions : []),
+            projectDescriptions: insights.projectDescriptions || insights.specificDescriptions || null,
+            specificDescriptions: insights.specificDescriptions || insights.projectDescriptions || null
+        } : null,
 
         // Marketplace listing (if listed) - with ALL v2 fields
         marketplace: listing ? {

@@ -188,7 +188,12 @@ export const GET = apiHandler(async (request: NextRequest) => {
                             $expr: {
                                 $and: [
                                     // Must match contractAddress
-                                    { $eq: ['$contractAddress', '$$contractAddr'] },
+                                    {
+                                        $eq: [
+                                            { $toLower: '$contractAddress' },
+                                            { $toLower: '$$contractAddr' }
+                                        ]
+                                    },
                                     {
                                         $or: [
                                             // Case 1: Item-specific (exact tokenId match)

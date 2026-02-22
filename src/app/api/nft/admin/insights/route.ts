@@ -158,10 +158,12 @@ export const POST = apiHandler(async (req: NextRequest) => {
   const insight: Omit<AdminNFTInsight, '_id'> = {
     contractAddress: data.contractAddress.toLowerCase(),
     tokenId: data.tokenId || '',
-    customTitle: data.customTitle || '',
+    customTitle: data.customTitle || data.title || '',
     title: data.title || data.customTitle || '',
-    description: data.description,
-    descriptions: data.descriptions || [],
+    description: data.description || (data.descriptions && data.descriptions.length > 0 ? data.descriptions[0] : undefined),
+    descriptions: (data.descriptions && data.descriptions.length > 0)
+      ? data.descriptions
+      : (data.description ? [data.description] : []),
     projectDescriptions,
     functionalitiesDescriptions,
     specificDescriptions,
@@ -212,11 +214,17 @@ export const PUT = apiHandler(async (req: NextRequest) => {
 
   const data = parseResult.data;
   const collection = await getCollection('admin_nft_insights');
-  const projectDescriptions = normalizeDescriptions(data.projectDescriptions);
-  const functionalitiesDescriptions = normalizeDescriptions(data.functionalitiesDescriptions);
-  const specificDescriptions = normalizeDescriptions(data.specificDescriptions || data.projectDescriptions);
+  const {
+    _id,
+    projectDescriptions: rawProjectDescriptions,
+    functionalitiesDescriptions: rawFunctionalitiesDescriptions,
+    specificDescriptions: rawSpecificDescriptions,
+    ...updateData
+  } = data;
 
-  const { _id, ...updateData } = data;
+  const projectDescriptions = normalizeDescriptions(rawProjectDescriptions);
+  const functionalitiesDescriptions = normalizeDescriptions(rawFunctionalitiesDescriptions);
+  const specificDescriptions = normalizeDescriptions(rawSpecificDescriptions || rawProjectDescriptions);
 
   // Find existing insight
   const existing = await collection.findOne({ _id: new ObjectId(_id) });
@@ -227,18 +235,35 @@ export const PUT = apiHandler(async (req: NextRequest) => {
   // Prepare update
   const update: Partial<AdminNFTInsight> = {
     ...updateData,
-    projectDescriptions,
-    functionalitiesDescriptions,
-    specificDescriptions,
     updatedAt: new Date().toISOString(),
   };
+
+  if (projectDescriptions !== undefined) {
+    update.projectDescriptions = projectDescriptions;
+  }
+  if (functionalitiesDescriptions !== undefined) {
+    update.functionalitiesDescriptions = functionalitiesDescriptions;
+  }
+  if (specificDescriptions !== undefined) {
+    update.specificDescriptions = specificDescriptions;
+  }
 
   // Handle legacy field synchronization
   if (update.customTitle) {
     update.title = update.customTitle;
+  } else if (update.title) {
+    update.customTitle = update.title;
   }
   if (update.projectDescriptions) {
     update.specificDescriptions = update.projectDescriptions;
+  }
+
+  if (update.description && (!update.descriptions || update.descriptions.length === 0)) {
+    update.descriptions = [update.description];
+  }
+
+  if (update.descriptions && update.descriptions.length > 0 && !update.description) {
+    update.description = update.descriptions[0];
   }
 
   // Lowercase contract address if present

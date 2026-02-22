@@ -106,10 +106,12 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
   const insight: Omit<AdminCollectionInsight, '_id'> = {
     contractAddress: data.contractAddress.toLowerCase(),
-    customTitle: data.customTitle || '',
+    customTitle: data.customTitle || data.title || '',
     title: data.title || data.customTitle || '',
-    description: data.description,
-    descriptions: data.descriptions || [],
+    description: data.description || (data.descriptions && data.descriptions.length > 0 ? data.descriptions[0] : undefined),
+    descriptions: (data.descriptions && data.descriptions.length > 0)
+      ? data.descriptions
+      : (data.description ? [data.description] : []),
     specificDescriptions: data.specificDescriptions,
     category: data.category,
     tags: data.tags || [],
@@ -151,8 +153,10 @@ export const PUT = apiHandler(async (req: NextRequest) => {
   const updateData = {
     customTitle: data.customTitle || data.title,
     title: data.title || data.customTitle,
-    description: data.description,
-    descriptions: data.descriptions || [],
+    description: data.description || (data.descriptions && data.descriptions.length > 0 ? data.descriptions[0] : undefined),
+    descriptions: (data.descriptions && data.descriptions.length > 0)
+      ? data.descriptions
+      : (data.description ? [data.description] : []),
     specificDescriptions: data.specificDescriptions,
     category: data.category,
     tags: data.tags || [],

@@ -5,7 +5,7 @@
  * Uses Transfer events and contract calls to discover owned NFTs
  */
 
-import { createPublicClient, http, type Address } from 'viem';
+import { createPublicClient, decodeEventLog, http, type Address } from 'viem';
 import { sepolia } from 'viem/chains';
 import { getEnrichedNFTsCollection } from '@/lib/mongodb';
 import { devLog } from '@/utils';
@@ -89,6 +89,9 @@ interface NFTMetadata {
         value: string | number;
     }>;
 }
+
+const ALCHEMY_FREE_TIER_LOG_RANGE = BigInt(9);
+const MAX_EVENT_LOG_REQUESTS = BigInt(200);
 
 /**
  * Create public client with configured RPC endpoints
@@ -267,7 +270,7 @@ async function processContract(
     } catch (error) {
         // Fallback: Query Transfer events
         devLog.warn(`    ⚠️ Not enumerable, using Transfer events for ${contractAddress}`);
-        tokenIds = await getTokenIdsFromEvents(client, contractAddress, walletAddress);
+        tokenIds = await getTokenIdsFromEvents(client, contractAddress, walletAddress, balance);
     }
 
     // Step 4: Fetch metadata in optimized batches
@@ -341,33 +344,77 @@ async function fetchTokenData(
 async function getTokenIdsFromEvents(
     client: ReturnType<typeof createClient>,
     contractAddress: Address,
-    walletAddress: Address
+    walletAddress: Address,
+    expectedBalance: bigint
 ): Promise<bigint[]> {
     try {
-        // Query Transfer events where `to` is the wallet
-        const logs = await client.getLogs({
-            address: contractAddress,
-            event: {
-                type: 'event',
-                name: 'Transfer',
-                inputs: [
-                    { name: 'from', type: 'address', indexed: true },
-                    { name: 'to', type: 'address', indexed: true },
-                    { name: 'tokenId', type: 'uint256', indexed: true }
-                ],
-            },
-            args: {
-                to: walletAddress,
-            },
-            fromBlock: 'earliest',
-            toBlock: 'latest',
-        });
+        const latestBlock = await client.getBlockNumber();
+
+        // Query Transfer events in small chunks (Alchemy free tier safe)
+        const logs: Awaited<ReturnType<typeof client.getLogs>> = [];
+        let toBlock = latestBlock;
+        let requestCount = BigInt(0);
+
+        while (requestCount < MAX_EVENT_LOG_REQUESTS) {
+            const fromBlock = toBlock > ALCHEMY_FREE_TIER_LOG_RANGE
+                ? toBlock - ALCHEMY_FREE_TIER_LOG_RANGE
+                : BigInt(0);
+
+            const chunkLogs = await client.getLogs({
+                address: contractAddress,
+                event: {
+                    type: 'event',
+                    name: 'Transfer',
+                    inputs: [
+                        { name: 'from', type: 'address', indexed: true },
+                        { name: 'to', type: 'address', indexed: true },
+                        { name: 'tokenId', type: 'uint256', indexed: true }
+                    ],
+                },
+                args: {
+                    to: walletAddress,
+                },
+                fromBlock,
+                toBlock,
+            });
+
+            logs.push(...chunkLogs);
+            requestCount += BigInt(1);
+
+            if (fromBlock === BigInt(0)) {
+                break;
+            }
+
+            // Stop early if we likely collected enough candidates for current ownership
+            if (expectedBalance > BigInt(0) && BigInt(logs.length) >= expectedBalance * BigInt(3)) {
+                break;
+            }
+
+            toBlock = fromBlock - BigInt(1);
+        }
+
+        if (requestCount >= MAX_EVENT_LOG_REQUESTS) {
+            devLog.warn(`    ⚠️ Reached max event log requests (${MAX_EVENT_LOG_REQUESTS.toString()}) for ${contractAddress}`);
+        }
 
         // Extract token IDs and verify ownership
         const tokenIds = new Set<bigint>();
         for (const log of logs) {
-            if (log.args.tokenId) {
-                tokenIds.add(log.args.tokenId);
+            try {
+                const decoded = decodeEventLog({
+                    abi: ERC721_ABI,
+                    data: log.data,
+                    topics: log.topics,
+                });
+
+                if (decoded.eventName !== 'Transfer') continue;
+
+                const args = decoded.args as { tokenId?: bigint };
+                if (args.tokenId !== undefined) {
+                    tokenIds.add(args.tokenId);
+                }
+            } catch {
+                // Ignore non-decodable logs
             }
         }
 

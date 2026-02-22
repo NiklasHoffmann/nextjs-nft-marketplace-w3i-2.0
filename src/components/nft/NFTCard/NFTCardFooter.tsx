@@ -9,7 +9,6 @@ import type { AggregatedNFT } from '@/types/core/core-nft-modern';
 interface NFTCardFooterProps {
     categories: string[];
     likeCount?: number;
-    watchlistCount?: number;
     enableInsights?: boolean;
     nft?: AggregatedNFT;
 }
@@ -17,7 +16,6 @@ interface NFTCardFooterProps {
 export const NFTCardFooter = memo<NFTCardFooterProps>(({
     categories,
     likeCount = 0,
-    watchlistCount = 0,
     enableInsights = true,
     nft
 }) => {
@@ -68,16 +66,6 @@ export const NFTCardFooter = memo<NFTCardFooterProps>(({
                     </svg>
                     <span className="text-xs font-medium text-gray-700">
                         {likeCount}
-                    </span>
-                </div>
-
-                {/* Watchlist Count */}
-                <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-md border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center gap-1">
-                    <svg className="w-3 h-3 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                    </svg>
-                    <span className="text-xs font-medium text-gray-700">
-                        {watchlistCount}
                     </span>
                 </div>
             </div>

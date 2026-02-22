@@ -71,6 +71,11 @@ export function convertToScrollItems(
             scrollItem.buyer = item.buyer;
             scrollItem.desiredContractAddress = item.desiredContractAddress;
             scrollItem.desiredTokenId = item.desiredTokenId;
+            scrollItem.tokenStandard = item.tokenStandard ?? item.tokenType ?? item.marketplace?.tokenStandard ?? null;
+            scrollItem.erc1155QuantityListed = item.erc1155QuantityListed ?? item.marketplace?.erc1155QuantityListed ?? null;
+            scrollItem.remainingQuantity = item.remainingQuantity ?? item.marketplace?.remainingQuantity ?? null;
+            scrollItem.unitPrice = item.unitPrice ?? item.marketplace?.unitPrice ?? null;
+            scrollItem.partialBuyEnabled = item.partialBuyEnabled ?? item.marketplace?.partialBuyEnabled ?? false;
         }
 
         // Preserve alle anderen Properties (für Flexibilität)
@@ -110,6 +115,11 @@ export function convertToFilterableItems(
         price: item.price,
         currency: item.currency,
         listingType: item.listingType,
+        tokenStandard: item.tokenStandard ?? item.tokenType ?? item.marketplace?.tokenStandard ?? null,
+        erc1155QuantityListed: item.erc1155QuantityListed ?? item.marketplace?.erc1155QuantityListed ?? null,
+        remainingQuantity: item.remainingQuantity ?? item.marketplace?.remainingQuantity ?? null,
+        unitPrice: item.unitPrice ?? item.marketplace?.unitPrice ?? null,
+        partialBuyEnabled: item.partialBuyEnabled ?? item.marketplace?.partialBuyEnabled ?? false,
         isListed: item.isListed,
         listingId: item.listingId,
         seller: item.seller,

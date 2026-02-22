@@ -58,6 +58,7 @@ export default function TechnicalTab({ contractAddress,
                     ownerBalance: ownerBalance ?? null,
                     approved: approved ?? null
                 }}
+                tokenStandard={tokenStandard}
                 isApprovedForAll={isApprovedForAll}
             />
 

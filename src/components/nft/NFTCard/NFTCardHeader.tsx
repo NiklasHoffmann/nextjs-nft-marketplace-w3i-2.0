@@ -26,7 +26,12 @@ export const NFTCardHeader = memo<NFTCardHeaderProps>(({
 }) => {
     const displaySymbol = contractSymbol || `${contractAddress.slice(0, 6)}...${contractAddress.slice(-4)}`;
     const displayTitle = customTitle || nftName || contractName || `#${tokenId}`;
-    const ratingValue = averageRating ? Math.round(averageRating) : 0;
+    const rawRating = averageRating || 0;
+    const roundedRating = Math.round(rawRating * 2) / 2;
+    const showRating = roundedRating > 0;
+    const ratingLabel = Number.isInteger(roundedRating)
+        ? `${roundedRating.toFixed(0)}`
+        : `${roundedRating.toFixed(1)}`;
 
     return (
         <div className="bg-white/95 backdrop-blur-md p-2 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20">
@@ -42,23 +47,15 @@ export const NFTCardHeader = memo<NFTCardHeaderProps>(({
                     </p>
                 </div>
 
-                {/* Average Rating Stars */}
-                {ratingValue > 0 && (
-                    <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-md border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center gap-1 ml-2">
-                        <div className="flex items-center gap-0.5">
-                            {Array.from({ length: 5 }, (_, i) => (
-                                <svg
-                                    key={i}
-                                    className={`w-2.5 h-2.5 ${i < ratingValue ? 'text-yellow-400' : 'text-gray-300'}`}
-                                    fill="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                                </svg>
-                            ))}
+                {/* Average Rating */}
+                <div className="flex items-center gap-1 ml-2">
+                    {showRating && (
+                        <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-md border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center gap-1">
+                            <span className="text-yellow-500 text-xs leading-none">★</span>
+                            <span className="text-xs font-semibold text-gray-700 leading-none">{ratingLabel}</span>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
         </div>
     );

@@ -35,20 +35,77 @@ export const GET = apiHandler(async (request: NextRequest) => {
             },
             {
                 $addFields: {
-                    priceDecimal: { $toDecimal: '$price' }
+                    priceDecimal: { $toDecimal: '$price' },
+                    normalizedContractAddress: { $toLower: '$contractAddress' }
                 }
             },
             {
                 $sort: {
-                    contractAddress: 1,
+                    normalizedContractAddress: 1,
                     priceDecimal: 1
                 }
             },
             {
                 $group: {
-                    _id: '$contractAddress',
-                    contractAddress: { $first: '$contractAddress' },
+                    _id: '$normalizedContractAddress',
+                    contractAddress: { $first: '$normalizedContractAddress' },
                     itemCount: { $sum: 1 },
+                    erc721ItemCount: {
+                        $sum: {
+                            $cond: [{ $eq: ['$tokenStandard', 'ERC1155'] }, 0, 1]
+                        }
+                    },
+                    erc1155ItemCount: {
+                        $sum: {
+                            $cond: [{ $eq: ['$tokenStandard', 'ERC1155'] }, 1, 0]
+                        }
+                    },
+                    erc1155ListedUnits: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$tokenStandard', 'ERC1155'] },
+                                {
+                                    $convert: {
+                                        input: { $ifNull: ['$erc1155QuantityListed', 0] },
+                                        to: 'double',
+                                        onError: 0,
+                                        onNull: 0
+                                    }
+                                },
+                                0
+                            ]
+                        }
+                    },
+                    erc1155RemainingUnits: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$tokenStandard', 'ERC1155'] },
+                                {
+                                    $convert: {
+                                        input: { $ifNull: ['$remainingQuantity', '$erc1155QuantityListed'] },
+                                        to: 'double',
+                                        onError: 0,
+                                        onNull: 0
+                                    }
+                                },
+                                0
+                            ]
+                        }
+                    },
+                    partialBuyEnabledCount: {
+                        $sum: {
+                            $cond: [
+                                {
+                                    $and: [
+                                        { $eq: ['$tokenStandard', 'ERC1155'] },
+                                        { $eq: ['$partialBuyEnabled', true] }
+                                    ]
+                                },
+                                1,
+                                0
+                            ]
+                        }
+                    },
                     floorPrice: { $first: '$price' },
                     floorPriceCurrency: { $first: '$currency' },
                     totalValue: { $sum: { $toDouble: '$price' } },
@@ -80,17 +137,100 @@ export const GET = apiHandler(async (request: NextRequest) => {
         // Get metadata for collections (from nft_metadata) - get multiple images per collection
         const nftMetadata = await getCollection('nft_metadata');
         const contractAddresses = collections.map(c => c.contractAddress);
+        const normalizedContractAddresses = contractAddresses.map((address: string) => address.toLowerCase());
+        const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
         // Create lookup queries for all collections at once
         const metadataMap = new Map();
         const contractInfoMap = new Map();
 
+        // Aggregate contract info + supply once for all collections
+        if (normalizedContractAddresses.length > 0) {
+            const contractInfoAggregation = await nftMetadata.aggregate([
+                {
+                    $match: {
+                        $expr: {
+                            $in: [{ $toLower: '$contractAddress' }, normalizedContractAddresses]
+                        }
+                    }
+                },
+                {
+                    $addFields: {
+                        normalizedContractAddress: { $toLower: '$contractAddress' },
+                        normalizedTokenId: { $toString: '$tokenId' },
+                        numericTokenId: {
+                            $convert: {
+                                input: '$tokenId',
+                                to: 'double',
+                                onError: null,
+                                onNull: null
+                            }
+                        },
+                        contractNameValue: { $ifNull: ['$contract.name', '$contract.contractName'] },
+                        contractSymbolValue: { $ifNull: ['$contract.symbol', '$contract.contractSymbol'] },
+                        totalSupplyNumber: {
+                            $convert: {
+                                input: '$contract.totalSupply',
+                                to: 'double',
+                                onError: 0,
+                                onNull: 0
+                            }
+                        }
+                    }
+                },
+                {
+                    $group: {
+                        _id: {
+                            contractAddress: '$normalizedContractAddress',
+                            tokenId: '$normalizedTokenId'
+                        },
+                        contractName: { $first: '$contractNameValue' },
+                        contractSymbol: { $first: '$contractSymbolValue' },
+                        tokenIdNumericValue: { $max: '$numericTokenId' },
+                        tokenSupply: { $max: '$totalSupplyNumber' }
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$_id.contractAddress',
+                        contractName: { $first: '$contractName' },
+                        contractSymbol: { $first: '$contractSymbol' },
+                        tokenIdCount: { $sum: 1 },
+                        maxNumericTokenId: { $max: '$tokenIdNumericValue' },
+                        contractDeclaredSupply: { $max: '$tokenSupply' },
+                        totalSupplyUnits: { $sum: '$tokenSupply' }
+                    }
+                }
+            ]).toArray();
+
+            contractInfoAggregation.forEach((doc: any) => {
+                const normalizedAddress = String(doc._id || '').toLowerCase();
+                if (!normalizedAddress) return;
+
+                const tokenIdCount = doc.tokenIdCount > 0 ? Math.round(doc.tokenIdCount) : null;
+                const hasNumericMaxTokenId = typeof doc.maxNumericTokenId === 'number' && Number.isFinite(doc.maxNumericTokenId) && doc.maxNumericTokenId >= 0;
+                const inferredItemsFromMaxTokenId = hasNumericMaxTokenId ? Math.floor(doc.maxNumericTokenId) + 1 : null;
+                const inferredSupplyItems = Math.max(tokenIdCount || 0, inferredItemsFromMaxTokenId || 0) || null;
+
+                contractInfoMap.set(normalizedAddress, {
+                    contractName: doc.contractName,
+                    contractSymbol: doc.contractSymbol,
+                    tokenIdCount,
+                    inferredItemsFromMaxTokenId,
+                    inferredSupplyItems,
+                    contractDeclaredSupply: doc.contractDeclaredSupply > 0 ? Math.round(doc.contractDeclaredSupply) : null,
+                    totalSupplyUnits: doc.totalSupplyUnits > 0 ? Math.round(doc.totalSupplyUnits) : null,
+                });
+            });
+        }
+
         // Get up to 4 images per collection for preview
         for (const collection of collections) {
             const tokenIds = collection.tokenIds?.slice(0, 4) || [];
+            const normalizedContractAddress = String(collection.contractAddress || '').toLowerCase();
             if (tokenIds.length > 0) {
                 const nfts = await nftMetadata.find({
-                    contractAddress: collection.contractAddress,
+                    contractAddress: { $regex: `^${escapeRegex(normalizedContractAddress)}$`, $options: 'i' },
                     tokenId: { $in: tokenIds.map(String) }
                 }).limit(4).toArray();
 
@@ -98,17 +238,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
                     .map((nft: any) => nft.metadata?.image)
                     .filter((img: any) => img && typeof img === 'string');
 
-                metadataMap.set(collection.contractAddress, images);
-
-                // Get contract info from first NFT
-                const firstNft = nfts[0];
-                if (firstNft) {
-                    contractInfoMap.set(collection.contractAddress, {
-                        contractName: firstNft.contract?.name,
-                        contractSymbol: firstNft.contract?.symbol,
-                        totalSupply: firstNft.contract?.totalSupply
-                    });
-                }
+                metadataMap.set(normalizedContractAddress, images);
             }
         }
 
@@ -117,10 +247,16 @@ export const GET = apiHandler(async (request: NextRequest) => {
         const statsMap = new Map();
 
         const statsPipeline = [
-            { $match: { contractAddress: { $in: contractAddresses } } },
+            {
+                $match: {
+                    $expr: {
+                        $in: [{ $toLower: '$contractAddress' }, normalizedContractAddresses]
+                    }
+                }
+            },
             {
                 $group: {
-                    _id: '$contractAddress',
+                    _id: { $toLower: '$contractAddress' },
                     totalViews: { $sum: { $ifNull: ['$viewCount', 0] } },
                     totalLikes: { $sum: { $ifNull: ['$likeCount', 0] } },
                     totalWatchlist: { $sum: { $ifNull: ['$watchlistCount', 0] } },
@@ -145,7 +281,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
         const statsAggregation = await nftStats.aggregate(statsPipeline).toArray();
         statsAggregation.forEach((stat: any) => {
-            statsMap.set(stat._id, {
+            statsMap.set(String(stat._id || '').toLowerCase(), {
                 totalViews: stat.totalViews || 0,
                 totalLikes: stat.totalLikes || 0,
                 totalWatchlist: stat.totalWatchlist || 0,
@@ -160,17 +296,26 @@ export const GET = apiHandler(async (request: NextRequest) => {
         let insightsMap = new Map();
         if (includeInsights) {
             const insights = await getCollection('admin_nft_insights');
+            const contractAddressFilters = contractAddresses.map((address: string) => ({
+                contractAddress: { $regex: `^${escapeRegex(address)}$`, $options: 'i' }
+            }));
+
             const insightsDocs = await insights.find({
-                contractAddress: { $in: contractAddresses },
-                $or: [
-                    { tokenId: null },
-                    { tokenId: '' },
-                    { tokenId: { $exists: false } }
+                ...(contractAddressFilters.length > 0 ? { $or: contractAddressFilters } : {}),
+                $and: [
+                    {
+                        $or: [
+                            { tokenId: null },
+                            { tokenId: '' },
+                            { tokenId: { $exists: false } }
+                        ]
+                    }
                 ]
             }).toArray();
 
             insightsDocs.forEach((insight: any) => {
-                insightsMap.set(insight.contractAddress, {
+                const key = String(insight.contractAddress || '').toLowerCase();
+                insightsMap.set(key, {
                     category: insight.category,
                     rarity: insight.rarity,
                     totalSupply: insight.totalSupply,
@@ -181,14 +326,24 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
         // Transform to API format
         const transformedCollections = collections.map((col: any) => {
-            const previewImages = metadataMap.get(col.contractAddress) || [];
-            const contractInfo = contractInfoMap.get(col.contractAddress) || {};
-            const stats = statsMap.get(col.contractAddress) || {};
-            const insights = insightsMap.get(col.contractAddress);
+            const normalizedContractAddress = String(col.contractAddress || '').toLowerCase();
+            const previewImages = metadataMap.get(normalizedContractAddress) || [];
+            const contractInfo = contractInfoMap.get(normalizedContractAddress) || {};
+            const stats = statsMap.get(normalizedContractAddress) || {};
+            const insights = insightsMap.get(normalizedContractAddress);
+            const erc721Count = col.erc721ItemCount || 0;
+            const erc1155Count = col.erc1155ItemCount || 0;
+            const isPureERC1155 = erc1155Count > 0 && erc721Count === 0;
+            const supplyItems = isPureERC1155
+                ? (insights?.totalSupply || contractInfo.inferredSupplyItems || contractInfo.tokenIdCount || null)
+                : (contractInfo.contractDeclaredSupply || contractInfo.tokenIdCount || insights?.totalSupply || null);
+            const supplyUnits = isPureERC1155
+                ? (contractInfo.totalSupplyUnits || null)
+                : null;
 
             return {
-                contractAddress: col.contractAddress,
-                contractName: contractInfo.contractName || col.contractAddress.slice(0, 10) + '...',
+                contractAddress: normalizedContractAddress,
+                contractName: contractInfo.contractName || normalizedContractAddress.slice(0, 10) + '...',
                 contractSymbol: contractInfo.contractSymbol || 'NFT',
                 itemCount: col.itemCount,
                 floorPrice: col.floorPrice || null,
@@ -203,8 +358,14 @@ export const GET = apiHandler(async (request: NextRequest) => {
                 totalWatchlist: stats.totalWatchlist || 0,
                 totalRatings: stats.totalRatings || 0,
                 averageRating: stats.averageRating || 0,
+                erc721ItemCount: erc721Count,
+                erc1155ItemCount: erc1155Count,
+                erc1155ListedUnits: col.erc1155ListedUnits || 0,
+                erc1155RemainingUnits: col.erc1155RemainingUnits || 0,
+                partialBuyEnabledCount: col.partialBuyEnabledCount || 0,
                 // Supply info
-                totalSupply: contractInfo.totalSupply || insights?.totalSupply || null,
+                totalSupply: supplyItems,
+                totalSupplyUnits: supplyUnits,
                 // Unique owners (sellers with listed items)
                 uniqueOwners: col.uniqueSellers?.length || 0,
                 insights: includeInsights ? insights : undefined

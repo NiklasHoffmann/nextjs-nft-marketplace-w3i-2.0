@@ -29,8 +29,8 @@ export default function NFTDetailLayout({
     const publicInsights = nftData?.insights;
 
     const finalName = useMemo(() => {
-        return publicInsights?.customTitle || metadata?.name || `Token #${tokenId}`;
-    }, [publicInsights?.customTitle, metadata?.name, tokenId]);
+        return (publicInsights as any)?.customTitle || (publicInsights as any)?.title || metadata?.name || `Token #${tokenId}`;
+    }, [publicInsights, metadata?.name, tokenId]);
 
     const { address } = useAccount();
     const { isFavorited, toggleFavorite } = useUserInteractions({
