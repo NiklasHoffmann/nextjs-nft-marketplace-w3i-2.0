@@ -6,7 +6,6 @@ interface CollectionCardHeaderProps {
     contractSymbol?: string;
     contractName?: string;
     averageRating?: number;
-    totalRatings?: number;
 }
 
 /**
@@ -17,7 +16,6 @@ export const CollectionCardHeader = React.memo(({
     contractSymbol,
     contractName,
     averageRating,
-    totalRatings = 0,
 }: CollectionCardHeaderProps) => {
     const rawRating = averageRating || 0;
     const normalizedRating = rawRating > 0 ? Math.round(rawRating * 2) / 2 : null;
@@ -44,7 +42,6 @@ export const CollectionCardHeader = React.memo(({
                     <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-md border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center gap-1 ml-2">
                         <span className="text-yellow-500 text-xs leading-none">★</span>
                         <span className="text-xs font-semibold text-gray-700 leading-none">{ratingLabel}</span>
-                        <span className="text-[10px] text-gray-500">({totalRatings})</span>
                     </div>
                 )}
             </div>

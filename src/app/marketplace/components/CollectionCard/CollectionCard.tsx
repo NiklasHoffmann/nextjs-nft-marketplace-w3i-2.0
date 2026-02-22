@@ -102,7 +102,6 @@ export const CollectionCard = React.memo(({
                                     contractSymbol={collection.contractSymbol}
                                     contractName={collection.contractName}
                                     averageRating={collection.averageRating}
-                                    totalRatings={collection.totalRatings}
                                 />
                             </div>
 
