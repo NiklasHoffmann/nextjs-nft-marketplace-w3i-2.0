@@ -91,6 +91,7 @@ export function CartPage() {
     const [swapSourceAmountBySymbol, setSwapSourceAmountBySymbol] = useState<Record<string, string>>({});
     const [swapSlippageBySymbol, setSwapSlippageBySymbol] = useState<Record<string, string>>({});
     const [swapStatusBySymbol, setSwapStatusBySymbol] = useState<Record<string, { state: 'idle' | 'processing' | 'success' | 'error'; message?: string; txHash?: string }>>({});
+    const [activeSwapSymbol, setActiveSwapSymbol] = useState<string | null>(null);
 
     const wethAddress = getWETHAddress(chainId || 11155111);
 
@@ -488,15 +489,9 @@ export function CartPage() {
         });
     }, [enrichedItems]);
 
-    // Calculate estimated gas savings
-    const estimatedGasSavings = useMemo(() => {
-        if (itemCount <= 1) return '0';
-        // Rough estimate: Individual buys would cost ~0.003 ETH each in gas
-        // Batch buy costs ~0.005 ETH total
-        const individualGasCost = 0.003 * itemCount;
-        const batchGasCost = 0.005;
-        const savings = individualGasCost - batchGasCost;
-        return savings > 0 ? savings.toFixed(4) : '0';
+    const estimatedGasInfo = useMemo(() => {
+        if (itemCount <= 1) return '~0.005 ETH';
+        return 'Varies by number of individual purchase confirmations';
     }, [itemCount]);
 
     const swapRelevantCurrencies = useMemo(() => {
@@ -622,7 +617,8 @@ export function CartPage() {
                 const deficit = currencyDeficitBySymbol[entry.symbol] || 0;
                 const oneWethOutput = oneWethRateBySymbol[entry.symbol] || 0;
                 if (oneWethOutput <= 0) continue;
-                if (next[entry.symbol] && parseFloat(next[entry.symbol]) > 0) continue;
+                const currentAmount = next[entry.symbol];
+                if (currentAmount && parseFloat(currentAmount) > 0) continue;
 
                 const requiredWeth = deficit > 0 ? (deficit / oneWethOutput) * 1.02 : 0.01;
                 next[entry.symbol] = Math.max(requiredWeth, 0.01).toFixed(4);
@@ -638,6 +634,7 @@ export function CartPage() {
         const slippage = swapSlippageBySymbol[entry.symbol] || '1';
 
         try {
+            setActiveSwapSymbol(entry.symbol);
             const sourceAmountNum = parseFloat(sourceAmount);
             const slippageNum = parseFloat(slippage);
 
@@ -722,6 +719,8 @@ export function CartPage() {
                     message: error instanceof Error ? error.message : 'Swap failed',
                 },
             }));
+        } finally {
+            setActiveSwapSymbol(null);
         }
     };
 
@@ -1054,15 +1053,8 @@ export function CartPage() {
 
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-600">Estimated Gas</span>
-                                    <span className="font-medium text-gray-900">~0.005 ETH</span>
+                                    <span className="font-medium text-gray-900">{estimatedGasInfo}</span>
                                 </div>
-
-                                {itemCount > 1 && (
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-green-600">Gas Savings</span>
-                                        <span className="font-medium text-green-600">-{estimatedGasSavings} ETH</span>
-                                    </div>
-                                )}
 
                                 <hr className="border-gray-200" />
 
@@ -1084,11 +1076,11 @@ export function CartPage() {
                                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                         </svg>
                                         <div className="text-sm">
-                                            <p className="font-medium text-green-800">Batch Purchase Benefits</p>
+                                            <p className="font-medium text-green-800">Batch Purchase Workflow</p>
                                             <ul className="mt-2 text-green-700 space-y-1">
-                                                <li>• Save ~{estimatedGasSavings} ETH in gas fees</li>
-                                                <li>• Single transaction approval</li>
-                                                <li>• Faster checkout process</li>
+                                                <li>• Guided item-by-item purchase confirmations</li>
+                                                <li>• Cart keeps all selected NFTs in one place</li>
+                                                <li>• 1inch preparation helps avoid failed purchases</li>
                                             </ul>
                                         </div>
                                     </div>
@@ -1099,7 +1091,7 @@ export function CartPage() {
                                 <div className="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                                     <h3 className="text-sm font-semibold text-indigo-900 mb-3">1inch Payment Preparation</h3>
                                     <p className="text-xs text-indigo-800 mb-3">
-                                        Prepare missing payment tokens before batch purchase.
+                                        Same guided flow as Buy Now: check deficit, swap, then continue purchase.
                                     </p>
 
                                     <div className="space-y-3">
@@ -1108,39 +1100,63 @@ export function CartPage() {
                                             const balance = tokenBalanceBySymbol[entry.symbol] || 0;
                                             const oneWethRate = oneWethRateBySymbol[entry.symbol] || 0;
                                             const status = swapStatusBySymbol[entry.symbol];
+                                            const isReady = deficit <= 0.000001;
+                                            const isActive = activeSwapSymbol === entry.symbol;
+                                            const slippageValue = swapSlippageBySymbol[entry.symbol] || '1';
 
                                             return (
                                                 <div key={entry.symbol} className="bg-white border border-indigo-200 rounded-md p-3">
                                                     <div className="flex items-center justify-between mb-2">
-                                                        <p className="text-xs font-semibold text-gray-900">{entry.symbol}</p>
-                                                        <p className={`text-xs font-medium ${deficit > 0.000001 ? 'text-orange-700' : 'text-green-700'}`}>
-                                                            {deficit > 0.000001 ? `Missing ${deficit.toFixed(4)}` : 'Ready'}
+                                                        <p className="text-xs font-semibold text-gray-900">Paying with {entry.symbol}</p>
+                                                        <p className={`text-xs font-medium ${isReady ? 'text-green-700' : 'text-orange-700'}`}>
+                                                            {isReady ? 'Ready' : `Missing ${deficit.toFixed(4)} ${entry.symbol}`}
                                                         </p>
                                                     </div>
 
-                                                    <div className="text-[11px] text-gray-600 space-y-0.5 mb-2">
-                                                        <p>Required: {entry.totalRequired.toFixed(4)} {entry.symbol}</p>
-                                                        <p>Balance: {balance.toFixed(4)} {entry.symbol}</p>
-                                                        {oneWethRate > 0 && <p>1 WETH ≈ {oneWethRate.toFixed(4)} {entry.symbol}</p>}
+                                                    <div className="mb-2 p-2 bg-indigo-50 border border-indigo-100 rounded text-[11px] text-gray-700 space-y-1">
+                                                        <div className="flex justify-between">
+                                                            <span>1. Required for cart</span>
+                                                            <span className="font-medium">{entry.totalRequired.toFixed(4)} {entry.symbol}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span>2. Your current balance</span>
+                                                            <span className="font-medium">{balance.toFixed(4)} {entry.symbol}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span>3. Swap status</span>
+                                                            <span className={`font-medium ${isReady || status?.state === 'success' ? 'text-green-700' : 'text-orange-700'}`}>
+                                                                {isReady || status?.state === 'success' ? 'Done' : 'Needed'}
+                                                            </span>
+                                                        </div>
+                                                        {oneWethRate > 0 && (
+                                                            <div className="flex justify-between">
+                                                                <span>Reference rate</span>
+                                                                <span className="font-medium">1 WETH ≈ {oneWethRate.toFixed(4)} {entry.symbol}</span>
+                                                            </div>
+                                                        )}
                                                     </div>
 
                                                     <div className="grid grid-cols-2 gap-2 mb-2">
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            step="0.0001"
-                                                            value={swapSourceAmountBySymbol[entry.symbol] || '0.01'}
-                                                            onChange={(event) => setSwapSourceAmountBySymbol((prev) => ({ ...prev, [entry.symbol]: event.target.value }))}
-                                                            className="w-full rounded border border-indigo-300 px-2 py-1.5 text-xs"
-                                                            placeholder="WETH amount"
-                                                        />
-                                                        <div className="flex items-center gap-1">
+                                                        <div>
+                                                            <label className="block text-[11px] text-indigo-700 mb-1">Source (WETH)</label>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                step="0.0001"
+                                                                value={swapSourceAmountBySymbol[entry.symbol] || '0.01'}
+                                                                onChange={(event) => setSwapSourceAmountBySymbol((prev) => ({ ...prev, [entry.symbol]: event.target.value }))}
+                                                                className="w-full rounded border border-indigo-300 px-2 py-1.5 text-xs"
+                                                                placeholder="WETH amount"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[11px] text-indigo-700 mb-1">Slippage (%)</label>
                                                             <input
                                                                 type="number"
                                                                 min="0.1"
                                                                 max="50"
                                                                 step="0.1"
-                                                                value={swapSlippageBySymbol[entry.symbol] || '1'}
+                                                                value={slippageValue}
                                                                 onChange={(event) => setSwapSlippageBySymbol((prev) => ({ ...prev, [entry.symbol]: event.target.value }))}
                                                                 className="w-full rounded border border-indigo-300 px-2 py-1.5 text-xs"
                                                                 placeholder="Slippage"
@@ -1148,13 +1164,22 @@ export function CartPage() {
                                                         </div>
                                                     </div>
 
+                                                    <div className="flex gap-1.5 mb-2">
+                                                        <button type="button" onClick={() => setSwapSlippageBySymbol((prev) => ({ ...prev, [entry.symbol]: '0.5' }))} className="px-2 py-0.5 rounded border border-indigo-300 text-indigo-700 text-[11px]">Safe</button>
+                                                        <button type="button" onClick={() => setSwapSlippageBySymbol((prev) => ({ ...prev, [entry.symbol]: '1' }))} className="px-2 py-0.5 rounded border border-indigo-300 text-indigo-700 text-[11px]">Auto</button>
+                                                        <button type="button" onClick={() => setSwapSlippageBySymbol((prev) => ({ ...prev, [entry.symbol]: '2' }))} className="px-2 py-0.5 rounded border border-indigo-300 text-indigo-700 text-[11px]">Fast</button>
+                                                    </div>
+
                                                     <button
                                                         type="button"
                                                         onClick={() => handlePrepareAndExecuteCurrencySwap(entry)}
-                                                        disabled={isSigningSwapTx || deficit <= 0.000001}
+                                                        disabled={isSigningSwapTx || isActive || isReady}
                                                         className="w-full px-3 py-2 bg-indigo-600 text-white text-xs font-semibold rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
-                                                        {isSigningSwapTx ? 'Sign in wallet...' : deficit > 0.000001 ? `Swap to ${entry.symbol}` : 'No swap needed'}
+                                                        {isActive && 'Processing...'}
+                                                        {!isActive && isSigningSwapTx && 'Sign in wallet...'}
+                                                        {!isActive && !isSigningSwapTx && isReady && 'Swap not required'}
+                                                        {!isActive && !isSigningSwapTx && !isReady && 'Swap & Continue'}
                                                     </button>
 
                                                     {status?.message && (
@@ -1169,6 +1194,12 @@ export function CartPage() {
                                             );
                                         })}
                                     </div>
+
+                                    {hasUnpreparedSwapRequirement ? (
+                                        <p className="text-[11px] text-indigo-800 mt-3">Complete all required swaps above, then continue with batch purchase.</p>
+                                    ) : (
+                                        <p className="text-[11px] text-green-700 mt-3">All payment tokens are ready for batch purchase.</p>
+                                    )}
                                 </div>
                             )}
 
