@@ -223,16 +223,18 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
                 {/* Sell/Swap Indicator */}
                 <div className="absolute right-0 bottom-0 flex flex-col items-end gap-1">
                     {tokenStandard && (
-                        <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20 inline-flex items-center whitespace-nowrap">
-                            <span className="text-[10px] font-semibold text-gray-700 whitespace-nowrap leading-none">
+                        <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center whitespace-nowrap">
+                            <span className={`text-[11px] font-semibold whitespace-nowrap leading-none ${
+                                tokenStandard === 'ERC1155' ? 'text-purple-700' : 'text-blue-700'
+                            }`}>
                                 {tokenStandard === 'ERC1155' ? 'ERC-1155' : 'ERC-721'}
                             </span>
                         </div>
                     )}
-                    <div className="bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20">
-                        <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${isSwap ? 'bg-orange' : 'bg-forestgreen'}`}></div>
-                            <span className={`text-xs font-medium ${isSwap ? 'text-orange' : 'text-forestgreen'}`}>
+                    <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center">
+                        <div className="flex items-center gap-1.5">
+                            <div className={`w-1.5 h-1.5 rounded-full ${isSwap ? 'bg-orange-500' : 'bg-green-600'}`}></div>
+                            <span className={`text-xs font-semibold leading-none ${isSwap ? 'text-orange-700' : 'text-green-700'}`}>
                                 {isSwap ? 'Swap' : 'Sell'}
                             </span>
                         </div>

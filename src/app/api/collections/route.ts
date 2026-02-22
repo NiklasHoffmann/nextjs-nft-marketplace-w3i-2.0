@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, getQueryParam } from '@/lib/api';
 import { getCollection } from '@/lib/mongodb';
+import { isNativeETH, ZERO_ADDRESS } from '@/config/tokens';
 import { devLog } from '@/utils';
 
 export const dynamic = 'force-dynamic';
@@ -110,6 +111,16 @@ export const GET = apiHandler(async (request: NextRequest) => {
                     floorPriceCurrency: { $first: '$currency' },
                     totalValue: { $sum: { $toDouble: '$price' } },
                     averagePrice: { $avg: { $toDouble: '$price' } },
+                    listings: {
+                        $push: {
+                            price: '$price',
+                            currency: '$currency',
+                            tokenStandard: '$tokenStandard',
+                            unitPrice: '$unitPrice',
+                            erc1155QuantityListed: '$erc1155QuantityListed',
+                            remainingQuantity: '$remainingQuantity'
+                        }
+                    },
                     // Collect token IDs for preview images
                     tokenIds: { $push: '$tokenId' },
                     // Count unique sellers (owners)
@@ -341,14 +352,107 @@ export const GET = apiHandler(async (request: NextRequest) => {
                 ? (contractInfo.totalSupplyUnits || null)
                 : null;
 
+            const listings: Array<{
+                price?: string;
+                currency?: string | null;
+                tokenStandard?: string | null;
+                unitPrice?: string | null;
+                erc1155QuantityListed?: string | number | null;
+                remainingQuantity?: string | number | null;
+            }> = Array.isArray(col.listings)
+                ? col.listings
+                : [];
+
+            const normalizeCurrency = (currency?: string | null): string => {
+                if (!currency || isNativeETH(currency)) {
+                    return ZERO_ADDRESS;
+                }
+                return String(currency).toLowerCase();
+            };
+
+            const currencyStats = new Map<string, { totalValue: number; floorPrice: string | null; count: number }>();
+            let hasEthListing = false;
+
+            for (const listing of listings) {
+                const currency = normalizeCurrency(listing.currency);
+                const rawPrice = String(listing.price || '0');
+                const numericPrice = Number.parseFloat(rawPrice);
+                if (!Number.isFinite(numericPrice) || numericPrice < 0) {
+                    continue;
+                }
+
+                const tokenStandard = String(listing.tokenStandard || '').toUpperCase();
+                let unitFloorNumeric = numericPrice;
+
+                if (tokenStandard === 'ERC1155') {
+                    const rawUnitPrice = listing.unitPrice != null ? String(listing.unitPrice) : '';
+                    const numericUnitPrice = Number.parseFloat(rawUnitPrice);
+
+                    if (Number.isFinite(numericUnitPrice) && numericUnitPrice > 0) {
+                        unitFloorNumeric = numericUnitPrice;
+                    } else {
+                        const listedQty = Number.parseFloat(String(listing.erc1155QuantityListed ?? '0'));
+                        const remainingQty = Number.parseFloat(String(listing.remainingQuantity ?? '0'));
+                        const fallbackQty = Number.isFinite(listedQty) && listedQty > 0
+                            ? listedQty
+                            : (Number.isFinite(remainingQty) && remainingQty > 0 ? remainingQty : 0);
+
+                        if (fallbackQty > 0) {
+                            unitFloorNumeric = numericPrice / fallbackQty;
+                        }
+                    }
+                }
+
+                if (currency === ZERO_ADDRESS) {
+                    hasEthListing = true;
+                }
+
+                const current = currencyStats.get(currency);
+                if (!current) {
+                    currencyStats.set(currency, {
+                        totalValue: numericPrice,
+                        floorPrice: String(unitFloorNumeric),
+                        count: 1,
+                    });
+                    continue;
+                }
+
+                const currentFloor = Number.parseFloat(current.floorPrice || '0');
+                const nextFloor = Number.isFinite(currentFloor)
+                    ? Math.min(currentFloor, unitFloorNumeric)
+                    : unitFloorNumeric;
+
+                current.totalValue += numericPrice;
+                current.floorPrice = String(nextFloor);
+                current.count += 1;
+                currencyStats.set(currency, current);
+            }
+
+            const fallbackFloorCurrency = normalizeCurrency(col.floorPriceCurrency);
+            const displayCurrency = hasEthListing
+                ? ZERO_ADDRESS
+                : (fallbackFloorCurrency || Array.from(currencyStats.keys())[0] || ZERO_ADDRESS);
+            const displayStats = currencyStats.get(displayCurrency);
+
+            const displayTotalValue = displayStats?.totalValue ?? 0;
+            const floorPriceDisplay = displayStats?.floorPrice ?? (col.floorPrice || null);
+            const floorPriceCurrencyDisplay = displayCurrency;
+            const currencyTotals = Array.from(currencyStats.entries()).map(([currency, statsByCurrency]) => ({
+                currency,
+                totalValue: statsByCurrency.totalValue,
+            }));
+
             return {
                 contractAddress: normalizedContractAddress,
                 contractName: contractInfo.contractName || normalizedContractAddress.slice(0, 10) + '...',
                 contractSymbol: contractInfo.contractSymbol || 'NFT',
                 itemCount: col.itemCount,
-                floorPrice: col.floorPrice || null,
-                floorPriceCurrency: col.floorPriceCurrency || null,
+                floorPrice: floorPriceDisplay,
+                floorPriceCurrency: floorPriceCurrencyDisplay,
                 totalValue: col.totalValue || 0,
+                displayTotalValue,
+                totalValueCurrency: displayCurrency,
+                currencyTotals,
                 averagePrice: col.averagePrice || null,
                 imageUrl: previewImages[0] || null,
                 previewImages: previewImages,

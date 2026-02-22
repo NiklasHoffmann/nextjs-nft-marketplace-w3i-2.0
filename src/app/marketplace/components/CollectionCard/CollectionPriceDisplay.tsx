@@ -1,11 +1,20 @@
 "use client";
 
-import React from 'react';
-import { useETHPrice } from "@/contexts/CurrencyContext";
+import React, { useEffect, useMemo, useState } from 'react';
+import { useChainId } from 'wagmi';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface CollectionPriceDisplayProps {
     totalValue: number;
-    floorPrice: number | null;
+    displayTotalValue?: number;
+    totalValueCurrency?: string | null;
+    currencyTotals?: Array<{
+        currency: string;
+        totalValue: number;
+    }>;
+    floorPrice: string | null;
+    floorPriceCurrency?: string | null;
     hasERC721?: boolean;
     hasERC1155?: boolean;
 }
@@ -16,15 +25,146 @@ interface CollectionPriceDisplayProps {
  */
 export const CollectionPriceDisplay = React.memo(({
     totalValue,
+    displayTotalValue,
+    totalValueCurrency,
+    currencyTotals,
     floorPrice,
+    floorPriceCurrency,
     hasERC721 = false,
     hasERC1155 = false,
 }: CollectionPriceDisplayProps) => {
-    // Convert from Wei to ETH (divide by 10^18)
-    const totalValueInEth = totalValue / 1e18;
-    const floorPriceInEth = floorPrice ? floorPrice / 1e18 : null;
+    const chainId = useChainId();
+    const { convertTokenToUSD, convertFromUSD, convertUSDToETH, formatPrice } = useCurrency();
+    const [convertedHeadline, setConvertedHeadline] = useState<string>('');
+    const [secondaryValueLabel, setSecondaryValueLabel] = useState<string>('');
+    const [loading, setLoading] = useState(false);
 
-    const { convertedPrice, loading } = useETHPrice(totalValueInEth);
+    const effectiveChainId = chainId || 11155111;
+    const valueCurrency = totalValueCurrency || '0x0000000000000000000000000000000000000000';
+    const floorCurrency = floorPriceCurrency || valueCurrency;
+
+    const valueSymbol = useMemo(
+        () => getCurrencySymbolByAddress(effectiveChainId, valueCurrency),
+        [effectiveChainId, valueCurrency]
+    );
+
+    const floorSymbol = useMemo(
+        () => getCurrencySymbolByAddress(effectiveChainId, floorCurrency),
+        [effectiveChainId, floorCurrency]
+    );
+
+    const valueDecimals = useMemo(
+        () => getTokenDecimalsByAddress(effectiveChainId, valueCurrency),
+        [effectiveChainId, valueCurrency]
+    );
+
+    const floorDecimals = useMemo(
+        () => getTokenDecimalsByAddress(effectiveChainId, floorCurrency),
+        [effectiveChainId, floorCurrency]
+    );
+
+    const valueAmount = useMemo(() => {
+        const divisor = Math.pow(10, valueDecimals);
+        if (!Number.isFinite(divisor) || divisor <= 0) return 0;
+        const raw = typeof displayTotalValue === 'number' ? displayTotalValue : totalValue;
+        return raw / divisor;
+    }, [displayTotalValue, totalValue, valueDecimals]);
+
+    const normalizedCurrencyTotals = useMemo(() => {
+        if (Array.isArray(currencyTotals) && currencyTotals.length > 0) {
+            return currencyTotals;
+        }
+
+        const raw = typeof displayTotalValue === 'number' ? displayTotalValue : totalValue;
+        return [{
+            currency: valueCurrency,
+            totalValue: raw,
+        }];
+    }, [currencyTotals, displayTotalValue, totalValue, valueCurrency]);
+
+    const isMixedCurrency = normalizedCurrencyTotals.length > 1;
+
+    const floorAmount = useMemo(() => {
+        if (!floorPrice) return null;
+        const parsed = Number.parseFloat(floorPrice);
+        if (!Number.isFinite(parsed)) return null;
+        const divisor = Math.pow(10, floorDecimals);
+        if (!Number.isFinite(divisor) || divisor <= 0) return null;
+        return parsed / divisor;
+    }, [floorPrice, floorDecimals]);
+
+    useEffect(() => {
+        let active = true;
+
+        const convert = async () => {
+            setLoading(true);
+            try {
+                if (!Number.isFinite(valueAmount) || valueAmount <= 0 || normalizedCurrencyTotals.length === 0) {
+                    if (active) setConvertedHeadline(formatPrice(0));
+                    if (active) setSecondaryValueLabel(`0.0000 ${valueSymbol}`);
+                    return;
+                }
+
+                let totalUsd = 0;
+                for (const entry of normalizedCurrencyTotals) {
+                    const entryCurrency = entry.currency || valueCurrency;
+                    const entrySymbol = getCurrencySymbolByAddress(effectiveChainId, entryCurrency);
+                    const entryDecimals = getTokenDecimalsByAddress(effectiveChainId, entryCurrency);
+                    const divisor = Math.pow(10, entryDecimals);
+                    if (!Number.isFinite(divisor) || divisor <= 0) {
+                        continue;
+                    }
+
+                    const humanAmount = (entry.totalValue || 0) / divisor;
+                    if (!Number.isFinite(humanAmount) || humanAmount <= 0) {
+                        continue;
+                    }
+
+                    if (entrySymbol === 'ETH') {
+                        const usdFromEth = await convertTokenToUSD(humanAmount, 'ETH', entryCurrency, effectiveChainId);
+                        totalUsd += usdFromEth;
+                    } else {
+                        const usdFromToken = await convertTokenToUSD(humanAmount, entrySymbol, entryCurrency, effectiveChainId);
+                        totalUsd += usdFromToken;
+                    }
+                }
+
+                const convertedFiat = totalUsd > 0 ? await convertFromUSD(totalUsd) : 0;
+                if (active) setConvertedHeadline(formatPrice(convertedFiat));
+
+                if (valueSymbol === 'ETH') {
+                    const ethValue = totalUsd > 0 ? await convertUSDToETH(totalUsd) : 0;
+                    if (active) setSecondaryValueLabel(`${ethValue.toFixed(4)} ETH`);
+                    return;
+                }
+
+                const usdPerDisplayUnit = await convertTokenToUSD(1, valueSymbol, valueCurrency, effectiveChainId);
+                const displayUnits = usdPerDisplayUnit > 0 ? totalUsd / usdPerDisplayUnit : valueAmount;
+                if (active) setSecondaryValueLabel(`${displayUnits.toFixed(4)} ${valueSymbol}`);
+            } catch {
+                if (active) setConvertedHeadline('—');
+                if (active) setSecondaryValueLabel(`${valueAmount.toFixed(4)} ${valueSymbol}`);
+            } finally {
+                if (active) setLoading(false);
+            }
+        };
+
+        convert();
+
+        return () => {
+            active = false;
+        };
+    }, [
+        valueAmount,
+        normalizedCurrencyTotals,
+        valueSymbol,
+        valueCurrency,
+        effectiveChainId,
+        convertTokenToUSD,
+        convertFromUSD,
+        convertUSDToETH,
+        formatPrice,
+    ]);
 
     return (
         <div className="bg-white/95 backdrop-blur-sm p-2 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20 min-h-[62px]">
@@ -33,23 +173,34 @@ export const CollectionPriceDisplay = React.memo(({
                     {loading ? (
                         <div className="text-sm font-semibold text-gray-900">Lädt...</div>
                     ) : (
-                        <div className="text-sm font-semibold text-gray-900">{convertedPrice}</div>
+                        <div className="text-sm font-semibold text-gray-900 inline-flex items-center gap-1">
+                            <span className="leading-none">~</span>
+                            <span>{convertedHeadline || '—'}</span>
+                        </div>
                     )}
-                    <div className="text-xs text-gray-600">≈ {totalValueInEth.toFixed(4)} ETH</div>
+                    <div className="text-xs text-gray-600">{secondaryValueLabel || `${valueAmount.toFixed(4)} ${valueSymbol}`}</div>
                     <div className="text-xs text-blue-600 mt-0.5">
-                        {floorPriceInEth ? `Floor: ${floorPriceInEth.toFixed(4)} ETH` : 'Floor: —'}
+                        {floorAmount !== null ? `Floor: ${floorAmount.toFixed(4)} ${floorSymbol}` : 'Floor: —'}
                     </div>
                 </div>
+
+                {isMixedCurrency && (
+                    <div className="absolute right-0 bottom-7">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-white/95 backdrop-blur-sm shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20 text-amber-700">
+                            Mixed
+                        </span>
+                    </div>
+                )}
 
                 {(hasERC721 || hasERC1155) && (
                     <div className="absolute right-0 bottom-0 flex items-center gap-1">
                         {hasERC721 && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-700 border border-blue-200 whitespace-nowrap">
+                            <span className="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-semibold bg-white/95 backdrop-blur-sm shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20 text-blue-700 whitespace-nowrap h-6">
                                 ERC-721
                             </span>
                         )}
                         {hasERC1155 && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-100 text-purple-700 border border-purple-200 whitespace-nowrap">
+                            <span className="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-semibold bg-white/95 backdrop-blur-sm shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20 text-purple-700 whitespace-nowrap h-6">
                                 ERC-1155
                             </span>
                         )}

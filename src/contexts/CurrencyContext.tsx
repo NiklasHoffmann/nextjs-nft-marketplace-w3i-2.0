@@ -19,6 +19,15 @@ export const currencies: Currency[] = [
     { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar', flag: '🇨🇦' },
 ];
 
+const CURRENCY_LOCALE_MAP: Record<string, string> = {
+    USD: 'en-US',
+    EUR: 'de-DE',
+    GBP: 'en-GB',
+    JPY: 'ja-JP',
+    CHF: 'de-CH',
+    CAD: 'en-CA',
+};
+
 interface CurrencyContextType {
     selectedCurrency: Currency;
     setCurrency: (currency: Currency) => void;
@@ -405,7 +414,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
             maximumFractionDigits = 4;
         }
 
-        return new Intl.NumberFormat('en-US', {
+        const locale = CURRENCY_LOCALE_MAP[selectedCurrency.code] || 'en-US';
+
+        return new Intl.NumberFormat(locale, {
             style: 'currency',
             currency: selectedCurrency.code,
             minimumFractionDigits,

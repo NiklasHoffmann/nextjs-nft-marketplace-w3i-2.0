@@ -14,9 +14,15 @@ export interface Collection {
     contractName?: string;
     contractSymbol?: string;
     itemCount: number;
-    floorPrice: number | null;
+    floorPrice: string | null;
     floorPriceCurrency?: string | null;
     totalValue: number;
+    displayTotalValue?: number;
+    totalValueCurrency?: string | null;
+    currencyTotals?: Array<{
+        currency: string;
+        totalValue: number;
+    }>;
     averagePrice: number | null;
     imageUrl: string | null;
     previewImages: string[];

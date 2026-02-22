@@ -10,7 +10,14 @@ interface CollectionCardStatsProps {
     totalLikes?: number;
     // Price
     totalValue: number;
-    floorPrice: number | null;
+    displayTotalValue?: number;
+    totalValueCurrency?: string | null;
+    currencyTotals?: Array<{
+        currency: string;
+        totalValue: number;
+    }>;
+    floorPrice: string | null;
+    floorPriceCurrency?: string | null;
     erc721ItemCount?: number;
     erc1155ItemCount?: number;
     erc1155ListedUnits?: number;
@@ -26,7 +33,11 @@ export const CollectionCardStats = React.memo(({
     itemCount,
     totalLikes = 0,
     totalValue,
+    displayTotalValue,
+    totalValueCurrency,
+    currencyTotals,
     floorPrice,
+    floorPriceCurrency,
     erc721ItemCount = 0,
     erc1155ItemCount = 0,
     erc1155ListedUnits = 0,
@@ -44,19 +55,19 @@ export const CollectionCardStats = React.memo(({
         <div className="flex flex-col gap-1">
             <div className="flex items-stretch justify-between gap-2">
                 <div className="flex flex-col items-start gap-1 min-w-0">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-700 border border-green-200 whitespace-nowrap">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-700 border border-green-200 shadow-xl whitespace-nowrap">
                         Listed Items: {itemCount}
                     </span>
 
                     {(hasQtyBadge || hasPartialBuyBadge) && (
                         <div className="flex items-center gap-2 flex-wrap">
                             {hasQtyBadge && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-700 border border-purple-200 whitespace-nowrap">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-700 border border-purple-200 shadow-xl whitespace-nowrap">
                                     Units (Rem/List): {remaining1155Units} / {listed1155Units}
                                 </span>
                             )}
                             {hasPartialBuyBadge && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200 whitespace-nowrap">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-xl whitespace-nowrap">
                                     Partial Buy: {partialBuyEnabledCount}
                                 </span>
                             )}
@@ -79,7 +90,11 @@ export const CollectionCardStats = React.memo(({
                 <div className="mt-1">
                     <CollectionPriceDisplay
                         totalValue={totalValue}
+                        displayTotalValue={displayTotalValue}
+                        totalValueCurrency={totalValueCurrency}
+                        currencyTotals={currencyTotals}
                         floorPrice={floorPrice}
+                        floorPriceCurrency={floorPriceCurrency}
                         hasERC721={hasERC721}
                         hasERC1155={hasERC1155}
                     />
