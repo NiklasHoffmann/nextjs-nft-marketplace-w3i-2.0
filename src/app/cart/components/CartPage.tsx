@@ -146,13 +146,6 @@ export function CartPage() {
         return Array.from(totals.entries()).map(([symbol, total]) => ({ symbol, total }));
     }, [enrichedItems, chainId, quantityByListingId]);
 
-    const totalPriceDisplay = useMemo(() => {
-        if (totalPriceByToken.length === 0) return '0';
-        return totalPriceByToken
-            .map((entry) => `${entry.total.toFixed(4)} ${entry.symbol}`)
-            .join(' + ');
-    }, [totalPriceByToken]);
-
     useEffect(() => {
         let canceled = false;
 
@@ -230,13 +223,6 @@ export function CartPage() {
         return Array.from(totals.entries()).map(([symbol, total]) => ({ symbol, total }));
     }, [enrichedItems, chainId, quantityByListingId, innovationFeePercentage, royaltyPercentageByListingId]);
 
-    const feeTotalDisplay = useMemo(() => {
-        if (feeTotalsByToken.length === 0) return '0';
-        return feeTotalsByToken
-            .map((entry) => `${entry.total.toFixed(4)} ${entry.symbol}`)
-            .join(' + ');
-    }, [feeTotalsByToken]);
-
     const marketplaceFeeTotalsByToken = useMemo(() => {
         const totals = new Map<string, number>();
 
@@ -293,20 +279,6 @@ export function CartPage() {
         return Array.from(totals.entries()).map(([symbol, total]) => ({ symbol, total }));
     }, [enrichedItems, chainId, quantityByListingId, royaltyPercentageByListingId]);
 
-    const marketplaceFeeDisplay = useMemo(() => {
-        if (marketplaceFeeTotalsByToken.length === 0) return '0';
-        return marketplaceFeeTotalsByToken
-            .map((entry) => `${entry.total.toFixed(4)} ${entry.symbol}`)
-            .join(' + ');
-    }, [marketplaceFeeTotalsByToken]);
-
-    const creatorRoyaltyDisplay = useMemo(() => {
-        if (creatorRoyaltyTotalsByToken.length === 0) return '0';
-        return creatorRoyaltyTotalsByToken
-            .map((entry) => `${entry.total.toFixed(4)} ${entry.symbol}`)
-            .join(' + ');
-    }, [creatorRoyaltyTotalsByToken]);
-
     const totalWithFeesByToken = useMemo(() => {
         const priceMap = new Map(totalPriceByToken.map((entry) => [entry.symbol, entry.total]));
         const feeMap = new Map(feeTotalsByToken.map((entry) => [entry.symbol, entry.total]));
@@ -317,13 +289,6 @@ export function CartPage() {
             total: (priceMap.get(symbol) || 0) + (feeMap.get(symbol) || 0)
         }));
     }, [totalPriceByToken, feeTotalsByToken]);
-
-    const totalWithFeesDisplay = useMemo(() => {
-        if (totalWithFeesByToken.length === 0) return '0';
-        return totalWithFeesByToken
-            .map((entry) => `${entry.total.toFixed(4)} ${entry.symbol}`)
-            .join(' + ');
-    }, [totalWithFeesByToken]);
 
     const cartCurrencyRequirements = useMemo<CurrencyRequirement[]>(() => {
         return totalWithFeesByToken
@@ -383,6 +348,30 @@ export function CartPage() {
 
     const hasSingleToken = totalPriceByToken.length === 1;
     const primaryTotal = hasSingleToken ? totalPriceByToken[0] : null;
+
+    const totalSummaryByToken = useMemo(() => {
+        if (hasSingleToken && primaryTotal && primaryTotal.symbol === 'ETH') {
+            return [{ symbol: 'ETH', total: ((totalWithFeesByToken[0]?.total || 0) + 0.005) }];
+        }
+        return totalWithFeesByToken;
+    }, [hasSingleToken, primaryTotal, totalWithFeesByToken]);
+
+    const renderTokenRows = (entries: Array<{ symbol: string; total: number }>, amountClassName: string = 'font-medium text-gray-900') => {
+        if (entries.length === 0) {
+            return <span className={amountClassName}>0</span>;
+        }
+
+        return (
+            <span className="inline-flex flex-col items-end gap-0.5">
+                {entries.map((entry) => (
+                    <span key={`${entry.symbol}-${entry.total}`} className="inline-grid grid-cols-[1fr_3.5rem] gap-2 items-baseline tabular-nums">
+                        <span className={`text-right ${amountClassName}`}>{entry.total.toFixed(4)}</span>
+                        <span className="text-left font-semibold text-gray-700">{entry.symbol}</span>
+                    </span>
+                ))}
+            </span>
+        );
+    };
 
     // Enrich cart items with metadata from MongoDB
     useEffect(() => {
@@ -966,21 +955,25 @@ export function CartPage() {
                                         {/* Price & Actions */}
                                         <div className="flex flex-col items-end justify-between">
                                             <div className="text-right">
-                                                <p className="text-lg font-bold text-gray-900">
-                                                    {(() => {
-                                                        const symbol = getCurrencySymbolByAddress(chainId || 11155111, item.currency);
-                                                        const decimals = getTokenDecimalsByAddress(chainId || 11155111, item.currency);
-                                                        const quantity = quantityByListingId.get(item.listingId) || 1;
-                                                        let priceWei = BigInt(item.price);
-                                                        if (item.tokenStandard === 'ERC1155' && item.unitPrice) {
-                                                            priceWei = BigInt(item.unitPrice) * BigInt(quantity);
-                                                        }
-                                                        const amount = formatTokenDisplay(formatUnits(priceWei, decimals), decimals);
-                                                        return `${amount} ${symbol}`;
-                                                    })()}
-                                                </p>
+                                                {(() => {
+                                                    const symbol = getCurrencySymbolByAddress(chainId || 11155111, item.currency);
+                                                    const decimals = getTokenDecimalsByAddress(chainId || 11155111, item.currency);
+                                                    const quantity = quantityByListingId.get(item.listingId) || 1;
+                                                    let priceWei = BigInt(item.price);
+                                                    if (item.tokenStandard === 'ERC1155' && item.unitPrice) {
+                                                        priceWei = BigInt(item.unitPrice) * BigInt(quantity);
+                                                    }
+                                                    const amount = formatTokenDisplay(formatUnits(priceWei, decimals), decimals);
+
+                                                    return (
+                                                        <div className="inline-grid grid-cols-[1fr_3.5rem] items-baseline gap-2">
+                                                            <span className="text-lg font-bold text-gray-900 tabular-nums text-right">{amount}</span>
+                                                            <span className="text-sm font-semibold text-gray-700 text-left">{symbol}</span>
+                                                        </div>
+                                                    );
+                                                })()}
                                                 {item.tokenStandard === 'ERC1155' && item.unitPrice && (
-                                                    <p className="text-xs text-gray-500">
+                                                    <p className="text-xs text-gray-500 tabular-nums">
                                                         Unit: {(() => {
                                                             const symbol = getCurrencySymbolByAddress(chainId || 11155111, item.currency);
                                                             const decimals = getTokenDecimalsByAddress(chainId || 11155111, item.currency);
@@ -1015,16 +1008,12 @@ export function CartPage() {
                             <div className="space-y-3 mb-6">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-600">Items ({itemCount})</span>
-                                    <span className="font-medium text-gray-900">
-                                        {hasSingleToken && primaryTotal
-                                            ? `${primaryTotal.total.toFixed(4)} ${primaryTotal.symbol}`
-                                            : totalPriceDisplay}
-                                    </span>
+                                    {renderTokenRows(totalPriceByToken)}
                                 </div>
 
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-600">Marketplace Fee</span>
-                                    <span className="font-medium text-gray-900">{marketplaceFeeDisplay}</span>
+                                    {renderTokenRows(marketplaceFeeTotalsByToken)}
                                 </div>
 
                                 <div className="flex justify-between text-xs">
@@ -1034,7 +1023,7 @@ export function CartPage() {
 
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-600">Creator Royalty</span>
-                                    <span className="font-medium text-gray-900">{creatorRoyaltyDisplay}</span>
+                                    {renderTokenRows(creatorRoyaltyTotalsByToken)}
                                 </div>
 
                                 <div className="flex justify-between text-xs">
@@ -1048,7 +1037,7 @@ export function CartPage() {
 
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-600">Total Fees</span>
-                                    <span className="font-medium text-gray-900">{feeTotalDisplay}</span>
+                                    {renderTokenRows(feeTotalsByToken)}
                                 </div>
 
                                 <div className="flex justify-between text-sm">
@@ -1060,11 +1049,7 @@ export function CartPage() {
 
                                 <div className="flex justify-between">
                                     <span className="text-base font-semibold text-gray-900">Total</span>
-                                    <span className="text-lg font-bold text-gray-900">
-                                        {hasSingleToken && primaryTotal && primaryTotal.symbol === 'ETH'
-                                            ? `${((totalWithFeesByToken[0]?.total || 0) + 0.005).toFixed(4)} ETH`
-                                            : totalWithFeesDisplay}
-                                    </span>
+                                    {renderTokenRows(totalSummaryByToken, 'text-lg font-bold text-gray-900')}
                                 </div>
                             </div>
 
@@ -1219,7 +1204,7 @@ export function CartPage() {
                                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                                         </svg>
-                                        {hasUnpreparedSwapRequirement ? 'Prepare payment tokens first' : 'Complete Batch Purchase'}
+                                        {hasUnpreparedSwapRequirement ? 'Prepare payment tokens first' : 'Start Item-by-Item Purchase'}
                                     </>
                                 )}
                             </button>
