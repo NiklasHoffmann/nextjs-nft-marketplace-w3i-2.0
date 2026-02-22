@@ -24,7 +24,7 @@ import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, getWETHAddress, 
 import { BaseModal } from '@/components/core/Modal';
 import { LoadingState } from '@/components/core/Loading';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
-import { useChainId } from 'wagmi';
+import { useChainId, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 import { devLog } from '@/utils';
 
 interface BuyNowModalProps {
@@ -77,6 +77,8 @@ function BuyNowModal({
     const [purchaseQuantity, setPurchaseQuantity] = useState('1');
     const [swapSourceAmount, setSwapSourceAmount] = useState('0.1');
     const [swapSlippage, setSwapSlippage] = useState('1');
+    const [swapExecutionHash, setSwapExecutionHash] = useState<`0x${string}` | null>(null);
+    const [swapExecutionError, setSwapExecutionError] = useState<string | null>(null);
 
     // Hooks
     const router = useRouter();
@@ -85,6 +87,15 @@ function BuyNowModal({
     const { refresh: refreshWallet } = useWalletNFTs();
     const chainId = useChainId();
     const { prepareSwap, loading: isPreparingSwap, error: swapPreparationError, result: preparedSwapResult, reset: resetPreparedSwap } = useOneInchSwap();
+    const { sendTransactionAsync, isPending: isSendingSwapTx } = useSendTransaction();
+    const {
+        isLoading: isSwapReceiptLoading,
+        isSuccess: isSwapConfirmed,
+        isError: isSwapReceiptError,
+        error: swapReceiptError,
+    } = useWaitForTransactionReceipt({
+        hash: swapExecutionHash || undefined,
+    });
 
     // WETH Hook for approval check
     const isNative = isNativeETH(currency || '');
@@ -219,6 +230,47 @@ function BuyNowModal({
         if (!preparedSwapResult?.dstAmount) return null;
         return formatUnits(BigInt(preparedSwapResult.dstAmount), tokenDecimals);
     }, [preparedSwapResult, tokenDecimals]);
+
+    const isExecutingPreparedSwap = isSendingSwapTx || isSwapReceiptLoading;
+
+    const handleExecutePreparedSwap = useCallback(async () => {
+        try {
+            if (!preparedSwapResult?.tx) {
+                setSwapExecutionError('Prepare a swap transaction first');
+                return;
+            }
+
+            const tx = preparedSwapResult.tx;
+            const to = tx.to;
+            const data = tx.data;
+
+            if (!/^0x[a-fA-F0-9]{40}$/.test(to)) {
+                setSwapExecutionError('Invalid router address in prepared transaction');
+                return;
+            }
+
+            if (!/^0x[a-fA-F0-9]+$/.test(data)) {
+                setSwapExecutionError('Invalid transaction data in prepared transaction');
+                return;
+            }
+
+            setSwapExecutionError(null);
+            setErrorMessage(null);
+
+            const hash = await sendTransactionAsync({
+                to: to as `0x${string}`,
+                data: data as `0x${string}`,
+                value: BigInt(tx.value || '0'),
+            });
+
+            setSwapExecutionHash(hash);
+            devLog.info('✅ 1inch swap tx submitted:', hash);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to execute prepared swap transaction';
+            setSwapExecutionError(message);
+            devLog.error('❌ 1inch swap tx execution failed:', error);
+        }
+    }, [preparedSwapResult, sendTransactionAsync]);
 
     const handlePrepareSwap = useCallback(async () => {
         try {
@@ -431,6 +483,8 @@ function BuyNowModal({
             setPurchaseStep('review');
             setTransactionStep('preparing');
             setErrorMessage(null);
+            setSwapExecutionHash(null);
+            setSwapExecutionError(null);
             resetPreparedSwap();
         }
     }, [isPurchasing, onClose, resetPreparedSwap]);
@@ -653,7 +707,7 @@ function BuyNowModal({
                                 <button
                                     type="button"
                                     onClick={handlePrepareSwap}
-                                    disabled={isPreparingSwap || !buyer}
+                                    disabled={isPreparingSwap || isExecutingPreparedSwap || !buyer}
                                     className="w-full px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isPreparingSwap ? 'Preparing swap tx...' : 'Prepare 1inch Swap Tx'}
@@ -667,6 +721,29 @@ function BuyNowModal({
                                         <p>Router: {preparedSwapResult.tx.to.slice(0, 10)}...{preparedSwapResult.tx.to.slice(-8)}</p>
                                         <p>Value: {preparedSwapResult.tx.value}</p>
                                     </div>
+                                )}
+
+                                {preparedSwapResult?.tx && (
+                                    <button
+                                        type="button"
+                                        onClick={handleExecutePreparedSwap}
+                                        disabled={isExecutingPreparedSwap}
+                                        className="w-full mt-3 px-4 py-2.5 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {isSendingSwapTx && 'Sign Swap in Wallet...'}
+                                        {!isSendingSwapTx && isSwapReceiptLoading && 'Waiting for Swap Confirmation...'}
+                                        {!isExecutingPreparedSwap && 'Execute Prepared Swap'}
+                                    </button>
+                                )}
+
+                                {swapExecutionHash && (
+                                    <p className="text-xs text-emerald-700 mt-2 break-all">Swap tx: {swapExecutionHash}</p>
+                                )}
+                                {isSwapConfirmed && (
+                                    <p className="text-xs text-emerald-700 mt-2">Swap confirmed. You can proceed with approval/purchase.</p>
+                                )}
+                                {(swapExecutionError || isSwapReceiptError) && (
+                                    <p className="text-xs text-red-600 mt-2">{swapExecutionError || swapReceiptError?.message || 'Swap transaction failed'}</p>
                                 )}
                             </div>
                         )}
