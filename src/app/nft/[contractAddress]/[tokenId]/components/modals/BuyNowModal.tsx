@@ -107,6 +107,9 @@ function BuyNowModal({
         wrap,
         wethBalance,
         ethBalance,
+        refetchBalance: refetchWethBalance,
+        refetchEthBalance,
+        refetchAllowance: refetchWethAllowance,
         isApproving,
         isWrapping
     } = useWETH({ marketplaceAddress });
@@ -150,6 +153,8 @@ function BuyNowModal({
         hasEnoughAllowance: hasEnoughTokenAllowance,
         approve: approveToken,
         balance: tokenBalance,
+        refetchBalance: refetchTokenBalance,
+        refetchAllowance: refetchTokenAllowance,
         isApproving: isApprovingToken
     } = useERC20({
         tokenAddress: !isNative ? (currency as `0x${string}` | undefined) : undefined,
@@ -188,7 +193,7 @@ function BuyNowModal({
         return !!currency && !!wethAddress && !isNative && !isWETH;
     }, [currency, wethAddress, isNative, isWETH]);
 
-    const { quote: oneInchQuote, loading: oneInchQuoteLoading, error: oneInchQuoteError } = useOneInchQuote({
+    const { quote: oneInchQuote, loading: oneInchQuoteLoading, error: oneInchQuoteError, refetch: refetchOneInchQuote } = useOneInchQuote({
         chainId,
         src: wethAddress || '',
         dst: currency || '',
@@ -225,6 +230,27 @@ function BuyNowModal({
         const next = Math.max(buffered, 0.01).toFixed(4);
         setSwapSourceAmount(next);
     }, [isOpen, shouldFetchOneInchReferenceQuote, oneInchReferenceAmount, tokenDeficit]);
+
+    useEffect(() => {
+        if (!isSwapConfirmed) return;
+
+        setSwapExecutionError(null);
+
+        void refetchWethBalance();
+        void refetchEthBalance();
+        void refetchWethAllowance();
+        void refetchTokenBalance();
+        void refetchTokenAllowance();
+        void refetchOneInchQuote();
+    }, [
+        isSwapConfirmed,
+        refetchWethBalance,
+        refetchEthBalance,
+        refetchWethAllowance,
+        refetchTokenBalance,
+        refetchTokenAllowance,
+        refetchOneInchQuote,
+    ]);
 
     const preparedSwapDstAmountDisplay = useMemo(() => {
         if (!preparedSwapResult?.dstAmount) return null;
