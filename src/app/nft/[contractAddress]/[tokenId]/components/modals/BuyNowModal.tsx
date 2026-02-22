@@ -14,7 +14,7 @@ import { memo, useState, useCallback, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatUnits, parseUnits } from 'viem';
 import { useMarketplaceFees, useMarketplaceContracts } from '@/hooks/marketplace';
-import { useOneInchQuote } from '@/hooks/integrations';
+import { useOneInchQuote, useOneInchSwap } from '@/hooks/integrations';
 import { useTransactionService } from '@/services/blockchain';
 import { useMarketplaceItems } from '@/contexts/marketplace-items';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
@@ -75,6 +75,8 @@ function BuyNowModal({
     const [transactionStep, setTransactionStep] = useState<'preparing' | 'approving' | 'signing' | 'pending' | 'confirming' | 'success' | 'error'>('preparing');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [purchaseQuantity, setPurchaseQuantity] = useState('1');
+    const [swapSourceAmount, setSwapSourceAmount] = useState('0.1');
+    const [swapSlippage, setSwapSlippage] = useState('1');
 
     // Hooks
     const router = useRouter();
@@ -82,6 +84,7 @@ function BuyNowModal({
     const { removeNFT } = useMarketplaceItems();
     const { refresh: refreshWallet } = useWalletNFTs();
     const chainId = useChainId();
+    const { prepareSwap, loading: isPreparingSwap, error: swapPreparationError, result: preparedSwapResult, reset: resetPreparedSwap } = useOneInchSwap();
 
     // WETH Hook for approval check
     const isNative = isNativeETH(currency || '');
@@ -191,6 +194,72 @@ function BuyNowModal({
 
         return formatUnits(BigInt(oneInchQuote.dstAmount), oneInchQuote.dstToken.decimals);
     }, [oneInchQuote]);
+
+    const tokenBalanceNum = useMemo(() => parseFloat(tokenBalance || '0'), [tokenBalance]);
+    const tokenDeficit = useMemo(() => {
+        if (isNative || isWETH) return 0;
+        return Math.max(priceAmountNum - tokenBalanceNum, 0);
+    }, [isNative, isWETH, priceAmountNum, tokenBalanceNum]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        if (!shouldFetchOneInchReferenceQuote) return;
+        if (!oneInchReferenceAmount) return;
+
+        const reference = parseFloat(oneInchReferenceAmount);
+        if (!Number.isFinite(reference) || reference <= 0) return;
+
+        const requiredWeth = tokenDeficit > 0 ? tokenDeficit / reference : 0.1;
+        const buffered = requiredWeth * 1.02;
+        const next = Math.max(buffered, 0.01).toFixed(4);
+        setSwapSourceAmount(next);
+    }, [isOpen, shouldFetchOneInchReferenceQuote, oneInchReferenceAmount, tokenDeficit]);
+
+    const preparedSwapDstAmountDisplay = useMemo(() => {
+        if (!preparedSwapResult?.dstAmount) return null;
+        return formatUnits(BigInt(preparedSwapResult.dstAmount), tokenDecimals);
+    }, [preparedSwapResult, tokenDecimals]);
+
+    const handlePrepareSwap = useCallback(async () => {
+        try {
+            if (!wethAddress || !currency || !buyer) {
+                setErrorMessage('Wallet address required for swap preparation');
+                return;
+            }
+
+            const sourceAmountNumeric = Number.parseFloat(swapSourceAmount);
+            const slippageNumeric = Number.parseFloat(swapSlippage);
+
+            if (!Number.isFinite(sourceAmountNumeric) || sourceAmountNumeric <= 0) {
+                setErrorMessage('Enter a valid WETH amount for swap preparation');
+                return;
+            }
+
+            if (!Number.isFinite(slippageNumeric) || slippageNumeric <= 0 || slippageNumeric > 50) {
+                setErrorMessage('Slippage must be between 0 and 50');
+                return;
+            }
+
+            setErrorMessage(null);
+
+            const amountInBaseUnits = parseUnits(swapSourceAmount, 18).toString();
+
+            await prepareSwap({
+                chainId,
+                src: wethAddress,
+                dst: currency,
+                amount: amountInBaseUnits,
+                from: buyer,
+                slippage: slippageNumeric,
+                includeTokensInfo: true,
+                includeProtocols: false,
+                disableEstimate: false,
+                allowPartialFill: false,
+            });
+        } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : 'Failed to prepare 1inch swap');
+        }
+    }, [wethAddress, currency, buyer, swapSourceAmount, swapSlippage, prepareSwap, chainId]);
 
     // Check if user needs to wrap ETH to WETH
     const needsWrapping = useMemo(() => {
@@ -362,8 +431,9 @@ function BuyNowModal({
             setPurchaseStep('review');
             setTransactionStep('preparing');
             setErrorMessage(null);
+            resetPreparedSwap();
         }
-    }, [isPurchasing, onClose]);
+    }, [isPurchasing, onClose, resetPreparedSwap]);
 
     // Dynamic modal title based on step
     const modalTitle = useMemo(() => {
@@ -539,6 +609,65 @@ function BuyNowModal({
                                         </p>
                                     </div>
                                 </div>
+                            </div>
+                        )}
+
+                        {!isNative && !isWETH && shouldFetchOneInchReferenceQuote && (
+                            <div className="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
+                                <div className="flex items-center justify-between mb-3">
+                                    <p className="text-sm font-medium text-indigo-900">1inch Swap Preparation</p>
+                                    <p className="text-xs text-indigo-700">Optional helper</p>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                    <div>
+                                        <label className="block text-xs text-indigo-700 mb-1">Source (WETH)</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.0001"
+                                            value={swapSourceAmount}
+                                            onChange={(event) => setSwapSourceAmount(event.target.value)}
+                                            className="w-full rounded-lg border border-indigo-300 px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 focus:ring-indigo-200"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-indigo-700 mb-1">Slippage (%)</label>
+                                        <input
+                                            type="number"
+                                            min="0.1"
+                                            max="50"
+                                            step="0.1"
+                                            value={swapSlippage}
+                                            onChange={(event) => setSwapSlippage(event.target.value)}
+                                            className="w-full rounded-lg border border-indigo-300 px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 focus:ring-indigo-200"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between text-xs text-indigo-800 mb-3">
+                                    <span>Token deficit</span>
+                                    <span>{tokenDeficit.toFixed(4)} {currencySymbol}</span>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={handlePrepareSwap}
+                                    disabled={isPreparingSwap || !buyer}
+                                    className="w-full px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isPreparingSwap ? 'Preparing swap tx...' : 'Prepare 1inch Swap Tx'}
+                                </button>
+
+                                {!buyer && <p className="text-xs text-indigo-700 mt-2">Connect wallet to prepare swap tx.</p>}
+                                {swapPreparationError && <p className="text-xs text-red-600 mt-2">{swapPreparationError}</p>}
+                                {preparedSwapResult && preparedSwapDstAmountDisplay && (
+                                    <div className="mt-3 p-3 bg-white border border-indigo-200 rounded-lg text-xs text-gray-700 space-y-1">
+                                        <p>Expected output: {preparedSwapDstAmountDisplay} {currencySymbol}</p>
+                                        <p>Router: {preparedSwapResult.tx.to.slice(0, 10)}...{preparedSwapResult.tx.to.slice(-8)}</p>
+                                        <p>Value: {preparedSwapResult.tx.value}</p>
+                                    </div>
+                                )}
                             </div>
                         )}
 
