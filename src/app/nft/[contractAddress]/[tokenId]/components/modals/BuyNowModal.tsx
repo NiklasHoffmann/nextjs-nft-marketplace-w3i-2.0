@@ -12,8 +12,9 @@
 'use client';
 import { memo, useState, useCallback, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { formatUnits } from 'viem';
+import { formatUnits, parseUnits } from 'viem';
 import { useMarketplaceFees, useMarketplaceContracts } from '@/hooks/marketplace';
+import { useOneInchQuote } from '@/hooks/integrations';
 import { useTransactionService } from '@/services/blockchain';
 import { useMarketplaceItems } from '@/contexts/marketplace-items';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
@@ -167,6 +168,29 @@ function BuyNowModal({
             includesGas: isNative
         };
     }, [priceAmountNum, calculateFees, isNative]);
+
+    const oneWethInBaseUnits = useMemo(() => parseUnits('1', 18).toString(), []);
+    const shouldFetchOneInchReferenceQuote = useMemo(() => {
+        return !!currency && !!wethAddress && !isNative && !isWETH;
+    }, [currency, wethAddress, isNative, isWETH]);
+
+    const { quote: oneInchQuote, loading: oneInchQuoteLoading, error: oneInchQuoteError } = useOneInchQuote({
+        chainId,
+        src: wethAddress || '',
+        dst: currency || '',
+        amount: oneWethInBaseUnits,
+        includeTokensInfo: true,
+        includeProtocols: false,
+        enabled: shouldFetchOneInchReferenceQuote,
+    });
+
+    const oneInchReferenceAmount = useMemo(() => {
+        if (!oneInchQuote?.dstAmount || !oneInchQuote?.dstToken?.decimals) {
+            return null;
+        }
+
+        return formatUnits(BigInt(oneInchQuote.dstAmount), oneInchQuote.dstToken.decimals);
+    }, [oneInchQuote]);
 
     // Check if user needs to wrap ETH to WETH
     const needsWrapping = useMemo(() => {
@@ -467,6 +491,13 @@ function BuyNowModal({
                                 </div>
                                 {!calculations.includesGas && (
                                     <p className="text-xs text-gray-500 mt-1">Gas wird in ETH bezahlt und ist nicht enthalten.</p>
+                                )}
+                                {shouldFetchOneInchReferenceQuote && (
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {oneInchQuoteLoading && 'Loading 1inch reference quote...'}
+                                        {!oneInchQuoteLoading && oneInchReferenceAmount && `1 WETH ≈ ${oneInchReferenceAmount} ${currencySymbol} (1inch)`}
+                                        {!oneInchQuoteLoading && !oneInchReferenceAmount && oneInchQuoteError && '1inch reference quote unavailable'}
+                                    </p>
                                 )}
                             </div>
                         </div>

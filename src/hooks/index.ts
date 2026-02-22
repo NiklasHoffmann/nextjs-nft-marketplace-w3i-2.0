@@ -34,6 +34,9 @@ export * from './ui';
 // === ADMIN HOOKS ===
 export * from './admin';
 
+// === INTEGRATION HOOKS ===
+export * from './integrations';
+
 // === CONTEXT RE-EXPORTS ===
 export { useNFTStats, useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
 
