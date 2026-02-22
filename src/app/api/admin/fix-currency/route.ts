@@ -13,13 +13,17 @@
  */
 
 import { NextRequest } from 'next/server';
-import { apiHandler } from '@/lib/api';
+import { apiHandler, parseJsonBody, BadRequestError } from '@/lib/api';
 import { createSuccessResponse } from '@/lib/api';
 import { getCurrencyFixSync } from '@/services/nft-sync/currency-fix-sync';
 
 export const POST = apiHandler(async (request: NextRequest) => {
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonBody<{ listingId?: string }>(request).catch(() => ({}));
     const { listingId } = body;
+
+    if (listingId !== undefined && (typeof listingId !== 'string' || listingId.trim().length === 0)) {
+        throw new BadRequestError('listingId must be a non-empty string when provided');
+    }
 
     const currencyFix = getCurrencyFixSync();
 

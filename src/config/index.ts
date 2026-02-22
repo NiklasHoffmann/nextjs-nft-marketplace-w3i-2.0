@@ -20,6 +20,8 @@ export { HOME_CONFIG, FEATURES } from './app.config';
 // Admin Configuration (Access Control)
 export {
     ADMIN_ADDRESSES,
+    MULTISIG_OWNER_ADDRESSES,
+    ADDITIONAL_ADMIN_ADDRESSES,
     isAdminAddress,
     APP_LOCK_ENABLED,
     PUBLIC_ROUTES,

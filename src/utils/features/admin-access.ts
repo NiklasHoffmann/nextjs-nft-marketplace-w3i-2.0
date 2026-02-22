@@ -2,7 +2,8 @@
  * Utility functions for Admin access control
  */
 
-import { devLog } from '@/utils';
+import { devLog } from '@/utils/core/dev-log';
+import { isAdminAddress, ADMIN_ADDRESSES } from '@/config/admin';
 
 /**
  * Check if a wallet address has admin access
@@ -10,26 +11,7 @@ import { devLog } from '@/utils';
  * @returns boolean - True if the address has admin access
  */
 export function hasAdminAccess(walletAddress: string | undefined): boolean {
-    if (!walletAddress) return false;
-
-    // Get admin addresses from environment variable
-    const adminAddresses = process.env.NEXT_PUBLIC_ADMIN_ADDRESSES || process.env.NEXT_PUBLIC_INSIGHTS_ADMIN_ADDRESSES;
-
-    if (!adminAddresses) {
-        // If no admin addresses are configured, deny access
-        devLog.warn('admin-access', 'NEXT_PUBLIC_ADMIN_ADDRESSES not configured - denying admin access');
-        return false;
-    }
-
-    // Parse comma-separated addresses and normalize them
-    const allowedAddresses = adminAddresses
-        .split(',')
-        .map(addr => addr.trim().toLowerCase())
-        .filter(addr => addr.length > 0);
-
-    // Check if the wallet address is in the allowed list
-    const normalizedWalletAddress = walletAddress.toLowerCase();
-    return allowedAddresses.includes(normalizedWalletAddress);
+    return isAdminAddress(walletAddress);
 }
 
 /**
@@ -134,14 +116,5 @@ export function isValidEthereumAddress(address: string): boolean {
  * @returns string[] - Array of admin addresses
  */
 export function getAdminAddressesList(): string[] {
-    const adminAddresses = process.env.NEXT_PUBLIC_ADMIN_ADDRESSES || process.env.NEXT_PUBLIC_INSIGHTS_ADMIN_ADDRESSES;
-
-    if (!adminAddresses) {
-        return [];
-    }
-
-    return adminAddresses
-        .split(',')
-        .map(addr => addr.trim().toLowerCase()) // Make consistent with hasAdminAccess
-        .filter(addr => addr.length > 0 && isValidEthereumAddress(addr));
+    return ADMIN_ADDRESSES.filter(isValidEthereumAddress);
 }

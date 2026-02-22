@@ -7,9 +7,9 @@
 
 import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, parseJsonBody, BadRequestError } from '@/lib/api';
-import clientPromise from '@/lib/mongodb';
 import { MultisigProposal, CreateProposalRequest, ProposalStatus } from '@/types';
 import { randomUUID } from 'crypto';
+import { getMultisigProposalCollection, serializeProposal } from '@/lib/admin/multisig-proposals';
 
 /**
  * POST /api/admin/multisig/proposals
@@ -33,8 +33,16 @@ export const POST = apiHandler(async (request: NextRequest) => {
         throw new BadRequestError('Missing required fields');
     }
 
+    if (!/^0x[a-fA-F0-9]{40}$/.test(targetContract)) {
+        throw new BadRequestError('Invalid targetContract address');
+    }
+
     if (requiredConfirmations < 1 || requiredConfirmations > 10) {
         throw new BadRequestError('requiredConfirmations must be between 1 and 10');
+    }
+
+    if (expiresInDays < 1 || expiresInDays > 30) {
+        throw new BadRequestError('expiresInDays must be between 1 and 30');
     }
 
     const initiatorAddress = request.userAddress as string;
@@ -60,16 +68,14 @@ export const POST = apiHandler(async (request: NextRequest) => {
     };
 
     // Save to MongoDB
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB);
-    const collection = db.collection<MultisigProposal>('multisig_proposals');
+    const collection = await getMultisigProposalCollection();
 
     const result = await collection.insertOne(proposal);
 
     return apiSuccess({
         success: true,
         proposalId: proposal.proposalId,
-        proposal: { ...proposal, _id: result.insertedId.toString() },
+        proposal: { ...serializeProposal(proposal), _id: result.insertedId.toString() },
         message: 'Proposal created successfully'
     }, 201);
 }, { admin: true });
@@ -82,15 +88,15 @@ export const GET = apiHandler(async (request: NextRequest) => {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') as ProposalStatus | null;
     const type = searchParams.get('type');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const skip = parseInt(searchParams.get('skip') || '0');
+    const rawLimit = Number.parseInt(searchParams.get('limit') || '50', 10);
+    const rawSkip = Number.parseInt(searchParams.get('skip') || '0', 10);
+    const limit = Number.isNaN(rawLimit) ? 50 : Math.min(Math.max(rawLimit, 1), 100);
+    const skip = Number.isNaN(rawSkip) ? 0 : Math.max(rawSkip, 0);
 
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB);
-    const collection = db.collection<MultisigProposal>('multisig_proposals');
+    const collection = await getMultisigProposalCollection();
 
     // Build filter
-    const filter: any = {};
+    const filter: Partial<Pick<MultisigProposal, 'status' | 'type'>> = {};
     if (status) filter.status = status;
     if (type) filter.type = type;
 
@@ -109,7 +115,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
     const executed = await collection.countDocuments({ status: 'EXECUTED' });
 
     return apiSuccess({
-        proposals: proposals.map(p => ({ ...p, _id: p._id?.toString() })),
+        proposals: proposals.map(serializeProposal),
         total,
         pending,
         confirmed,

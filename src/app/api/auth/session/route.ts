@@ -1,54 +1,15 @@
 ﻿import { NextRequest } from 'next/server';
-import { apiHandler, apiSuccess, UnauthorizedError, InternalError } from '@/lib/api';
+import { apiHandler, apiSuccess, InternalError } from '@/lib/api';
 import { cookies } from 'next/headers';
-import crypto from 'crypto';
 import { devLog } from '@/utils';
+import { verifyAdminSessionToken } from '@/lib/auth/admin-session';
+import { isAdminSessionRevoked } from '@/lib/auth/admin-session-registry';
+import { hasAdminAccess } from '@/lib/auth/admin-access';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-/**
- * Verifiziert und dekodiert ein Token
- */
-function verifyToken(token: string): any | null {
-    try {
-        if (!JWT_SECRET) {
-            return null;
-        }
-        const parts = token.split('.');
-        if (parts.length !== 3) return null;
-
-        const [header, payload, signature] = parts;
-
-        if (!payload) {
-            return null;
-        }
-
-        // Verifiziere Signatur
-        const expectedSignature = crypto
-            .createHmac('sha256', JWT_SECRET)
-            .update(`${header}.${payload}`)
-            .digest('base64url');
-
-        if (signature !== expectedSignature) {
-            return null;
-        }
-
-        // Dekodiere Payload
-        const decodedPayload = JSON.parse(Buffer.from(payload, 'base64url').toString());
-
-        // PrÃ¼fe Ablaufdatum
-        if (decodedPayload.exp && decodedPayload.exp < Date.now()) {
-            return null;
-        }
-
-        return decodedPayload;
-    } catch (error) {
-        return null;
-    }
-}
 
 /**
  * GET /api/auth/session
@@ -75,7 +36,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
         return response;
     }
 
-    const payload = verifyToken(token);
+    const payload = verifyAdminSessionToken(token);
 
     devLog.info('🔐 Token verification:', {
         isValid: !!payload,
@@ -83,8 +44,19 @@ export const GET = apiHandler(async (request: NextRequest) => {
         address: payload?.address
     });
 
-    if (!payload || !payload.isAdmin || typeof payload.address !== 'string') {
+    const hasAccess = payload?.address ? await hasAdminAccess(payload.address) : false;
+
+    if (!payload || !payload.isAdmin || typeof payload.address !== 'string' || !hasAccess) {
         devLog.info('❌ Invalid token or not admin');
+        const response = apiSuccess({
+            isAuthenticated: false
+        });
+        response.headers.set('Cache-Control', 'no-store, max-age=0');
+        return response;
+    }
+
+    if (await isAdminSessionRevoked(payload.jti)) {
+        devLog.info('❌ Session revoked:', payload.jti);
         const response = apiSuccess({
             isAuthenticated: false
         });
@@ -96,6 +68,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
     devLog.info('✅ Session valid for:', normalizedAddress);
     const response = apiSuccess({
         isAuthenticated: true,
+        jti: payload.jti,
         address: normalizedAddress,
         isAdmin: payload.isAdmin,
         expiresAt: payload.exp ?? null

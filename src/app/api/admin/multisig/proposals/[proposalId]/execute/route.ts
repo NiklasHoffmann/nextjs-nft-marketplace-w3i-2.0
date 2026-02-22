@@ -8,9 +8,14 @@
  */
 
 import { NextRequest } from 'next/server';
-import { apiHandler, apiSuccess, parseJsonBody, NotFoundError, BadRequestError } from '@/lib/api';
-import clientPromise from '@/lib/mongodb';
-import { MultisigProposal } from '@/types';
+import { apiHandler, apiSuccess, parseJsonBody, BadRequestError } from '@/lib/api';
+import {
+    assertValidProposalId,
+    getMultisigProposalCollection,
+    getProposalOrThrow,
+    getUpdatedProposalOrThrow,
+    serializeProposal,
+} from '@/lib/admin/multisig-proposals';
 
 interface ExecuteProposalRequest {
     txHash: string; // Transaction hash from the executed on-chain transaction
@@ -25,6 +30,7 @@ export async function POST(
 ) {
     return apiHandler(async (req: NextRequest) => {
         const { proposalId } = await params;
+        assertValidProposalId(proposalId);
         const body = await parseJsonBody<ExecuteProposalRequest>(req);
         const { txHash } = body;
 
@@ -34,15 +40,12 @@ export async function POST(
             throw new BadRequestError('Transaction hash is required');
         }
 
-        const client = await clientPromise;
-        const db = client.db(process.env.MONGODB_DB);
-        const collection = db.collection<MultisigProposal>('multisig_proposals');
-
-        const proposal = await collection.findOne({ proposalId });
-
-        if (!proposal) {
-            throw new NotFoundError('Proposal not found');
+        if (!/^0x([A-Fa-f0-9]{64})$/.test(txHash)) {
+            throw new BadRequestError('Invalid transaction hash format');
         }
+
+        const collection = await getMultisigProposalCollection();
+        const proposal = await getProposalOrThrow(collection, proposalId);
 
         // Validations
         if (proposal.status !== 'CONFIRMED') {
@@ -72,11 +75,11 @@ export async function POST(
         );
 
         // Fetch updated proposal
-        const updatedProposal = await collection.findOne({ proposalId });
+        const updatedProposal = await getUpdatedProposalOrThrow(collection, proposalId);
 
         return apiSuccess({
             success: true,
-            proposal: { ...updatedProposal, _id: updatedProposal?._id?.toString() },
+            proposal: serializeProposal(updatedProposal),
             message: 'Proposal marked as executed successfully'
         });
     }, { admin: true })(request);

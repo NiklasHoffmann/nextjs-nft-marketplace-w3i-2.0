@@ -1,6 +1,7 @@
 ﻿import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess } from '@/lib/api';
-import crypto from 'crypto';
+import { createAdminChallenge } from '@/lib/auth/admin-challenge-store';
+import { RATE_LIMIT_CONFIG } from '@/lib/middleware/rateLimit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -10,12 +11,7 @@ export const revalidate = 0;
  * Generiert eine zufällige Challenge-Nachricht für Wallet-Signatur
  */
 export const GET = apiHandler(async (request: NextRequest) => {
-    // Generiere eindeutige Challenge
-    const nonce = crypto.randomBytes(16).toString('hex');
-    const timestamp = Date.now();
-
-    // Challenge-Nachricht die signiert werden muss
-    const message = `Sign this message to authenticate as admin.\n\nNonce: ${nonce}\nTimestamp: ${timestamp}`;
+    const { message, nonce, timestamp } = createAdminChallenge();
 
     const response = apiSuccess({
         message,
@@ -24,4 +20,6 @@ export const GET = apiHandler(async (request: NextRequest) => {
     });
     response.headers.set('Cache-Control', 'no-store, max-age=0');
     return response;
+}, {
+    rateLimit: RATE_LIMIT_CONFIG.STRICT,
 });

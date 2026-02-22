@@ -236,17 +236,29 @@ This document explains all environment variables used in the NFT Marketplace app
 
 ### 8️⃣ Access Control & Admin Configuration
 
-#### `NEXT_PUBLIC_INSIGHTS_ADMIN_ADDRESSES`
-- **Purpose:** Wallet addresses with admin privileges
+#### `NEXT_PUBLIC_MULTISIG_OWNER_ADDRESSES`
+- **Purpose:** Primary admin addresses (mirror of MultiSig wallet owners)
 - **Type:** Public (blockchain addresses)
-- **Required:** Yes
+- **Required:** Recommended (primary source)
+- **Format:** Comma-separated checksummed addresses (no spaces)
+- **Example:** `0x8BbA5E9b30E986C55465fEaC4D3417791065d1bb,0xf034e8ad11F249c8081d9da94852bE1734bc11a4`
+- **Notes:**
+   - Intended to match current `getOwners()` result of the MultiSig wallet.
+   - If configured, admin set is: `MULTISIG_OWNER_ADDRESSES ∪ INSIGHTS_ADMIN_ADDRESSES`.
+
+#### `NEXT_PUBLIC_INSIGHTS_ADMIN_ADDRESSES`
+- **Purpose:** Additional admin addresses (break-glass / temporary / service accounts)
+- **Type:** Public (blockchain addresses)
+- **Required:** Optional
 - **Format:** Comma-separated checksummed addresses (no spaces!)
 - **Example:** `0x8BbA5E9b30E986C55465fEaC4D3417791065d1bb,0xf034e8ad11F249c8081d9da94852bE1734bc11a4`
-- **Privileges:**
+- **Privileges (combined admin set):**
   - Create/edit NFT insights
   - Access admin dashboard
   - View system health
   - Manage marketplace settings
+- **Fallback behavior:**
+   - If `NEXT_PUBLIC_MULTISIG_OWNER_ADDRESSES` is empty, legacy admin behavior uses configured admin addresses only.
 
 #### `NEXT_PUBLIC_INSIGHTS_READ_ONLY_MODE`
 - **Purpose:** Disable admin modifications

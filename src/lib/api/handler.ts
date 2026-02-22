@@ -79,8 +79,12 @@ export function apiHandler<T = any>(
         admin = false,
         cors = false,
         logging = process.env.NODE_ENV === 'development',
-        rateLimit: rateLimitConfig = RATE_LIMIT_CONFIG.LENIENT,
+        rateLimit: rateLimitConfig,
     } = options;
+
+    const resolvedRateLimit = rateLimitConfig === undefined
+        ? (admin ? RATE_LIMIT_CONFIG.STRICT : auth ? RATE_LIMIT_CONFIG.STANDARD : RATE_LIMIT_CONFIG.LENIENT)
+        : rateLimitConfig;
 
     return async (req: NextRequest): Promise<NextResponse<T>> => {
         const startTime = Date.now();
@@ -106,9 +110,9 @@ export function apiHandler<T = any>(
                 middlewareChain.push(withAuth);
             }
 
-            if (rateLimitConfig !== false) {
+            if (resolvedRateLimit !== false) {
                 middlewareChain.push(async (request) => {
-                    await rateLimit(request, rateLimitConfig);
+                    await rateLimit(request, resolvedRateLimit);
                 });
             }
 

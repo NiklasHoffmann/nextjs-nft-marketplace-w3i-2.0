@@ -5,9 +5,13 @@
  */
 
 import { NextRequest } from 'next/server';
-import { apiHandler, apiSuccess, NotFoundError } from '@/lib/api';
-import clientPromise from '@/lib/mongodb';
-import { MultisigProposal } from '@/types';
+import { apiHandler, apiSuccess } from '@/lib/api';
+import {
+    assertValidProposalId,
+    getMultisigProposalCollection,
+    getProposalOrThrow,
+    serializeProposal,
+} from '@/lib/admin/multisig-proposals';
 
 /**
  * GET /api/admin/multisig/proposals/[proposalId]
@@ -18,19 +22,13 @@ export async function GET(
 ) {
     return apiHandler(async (req: NextRequest) => {
         const { proposalId } = await params;
+        assertValidProposalId(proposalId);
 
-        const client = await clientPromise;
-        const db = client.db(process.env.MONGODB_DB);
-        const collection = db.collection<MultisigProposal>('multisig_proposals');
-
-        const proposal = await collection.findOne({ proposalId });
-
-        if (!proposal) {
-            throw new NotFoundError('Proposal not found');
-        }
+        const collection = await getMultisigProposalCollection();
+        const proposal = await getProposalOrThrow(collection, proposalId);
 
         return apiSuccess({
-            proposal: { ...proposal, _id: proposal._id?.toString() }
+            proposal: serializeProposal(proposal)
         });
     }, { admin: true })(request);
 }

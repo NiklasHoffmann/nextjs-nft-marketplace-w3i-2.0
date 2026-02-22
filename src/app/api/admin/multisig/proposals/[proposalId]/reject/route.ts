@@ -5,9 +5,15 @@
  */
 
 import { NextRequest } from 'next/server';
-import { apiHandler, apiSuccess, NotFoundError, BadRequestError } from '@/lib/api';
-import clientPromise from '@/lib/mongodb';
-import { MultisigProposal, ProposalConfirmation } from '@/types';
+import { apiHandler, apiSuccess, BadRequestError } from '@/lib/api';
+import { ProposalConfirmation } from '@/types';
+import {
+    assertValidProposalId,
+    getMultisigProposalCollection,
+    getProposalOrThrow,
+    getUpdatedProposalOrThrow,
+    serializeProposal,
+} from '@/lib/admin/multisig-proposals';
 
 /**
  * POST /api/admin/multisig/proposals/[proposalId]/reject
@@ -18,17 +24,11 @@ export async function POST(
 ) {
     return apiHandler(async (req: NextRequest) => {
         const { proposalId } = await params;
+        assertValidProposalId(proposalId);
         const adminAddress = (req.userAddress as string).toLowerCase();
 
-        const client = await clientPromise;
-        const db = client.db(process.env.MONGODB_DB);
-        const collection = db.collection<MultisigProposal>('multisig_proposals');
-
-        const proposal = await collection.findOne({ proposalId });
-
-        if (!proposal) {
-            throw new NotFoundError('Proposal not found');
-        }
+        const collection = await getMultisigProposalCollection();
+        const proposal = await getProposalOrThrow(collection, proposalId);
 
         // Validations
         if (proposal.status === 'EXECUTED') {
@@ -67,11 +67,11 @@ export async function POST(
         );
 
         // Fetch updated proposal
-        const updatedProposal = await collection.findOne({ proposalId });
+        const updatedProposal = await getUpdatedProposalOrThrow(collection, proposalId);
 
         return apiSuccess({
             success: true,
-            proposal: { ...updatedProposal, _id: updatedProposal?._id?.toString() },
+            proposal: serializeProposal(updatedProposal),
             message: 'Proposal rejected successfully'
         });
     }, { admin: true })(request);
