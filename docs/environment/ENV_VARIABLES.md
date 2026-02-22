@@ -217,6 +217,22 @@ This document explains all environment variables used in the NFT Marketplace app
 - **Purpose:** Cache duration for exchange rates
 - **Type:** Configuration
 - **Default:** `24` (hours)
+
+---
+
+### 8️⃣ DEX Aggregation (1inch)
+
+#### `ONEINCH_API_KEY` (Server-Side)
+- **Purpose:** API key for 1inch Aggregation API (quote/swap endpoints)
+- **Type:** Secret
+- **Required:** Yes (for 1inch integration)
+- **Usage:** Backend-only in `/api/integrations/1inch/*` routes
+- **Security:** Never expose to client, do NOT use `NEXT_PUBLIC_`
+
+#### `ONE_INCH_API_KEY` (Server-Side, fallback)
+- **Purpose:** Backward-compatible alternate env name
+- **Type:** Secret
+- **Required:** Optional (only used if `ONEINCH_API_KEY` is not set)
 - **Range:** 1-168 (1 hour to 1 week)
 
 #### `NEXT_PUBLIC_EXCHANGE_RATE_UPDATE_INTERVAL_HOURS`
