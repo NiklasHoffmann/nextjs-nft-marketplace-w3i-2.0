@@ -392,7 +392,8 @@ const OptimizedNFTImage = memo(({
 
     // Check if this is a sharp image (not background) and should have glitter effect
     // CRITICAL: Convert tokenId to string (may be Number from marketplace_items)
-    const isSharpImage = !String(tokenId).includes('-bg');
+    const normalizedTokenId = String(tokenId);
+    const isSharpImage = !normalizedTokenId.includes('-bg');
 
     // Simplified glitter effect calculation for better performance
     const glitterIntensity = useMemo(() => {
@@ -511,11 +512,11 @@ const OptimizedNFTImage = memo(({
         unoptimized: currentImageUrl.startsWith('data:') || currentImageUrl.startsWith('blob:'),
         // Optimized sizes for NFT cards - use consistent sizes for better cache hits
         sizes: fill ?
-            (tokenId.includes('-bg')
+            (normalizedTokenId.includes('-bg')
                 ? "(max-width: 640px) 45vw, (max-width: 1024px) 24vw, 256px"
                 : "(max-width: 640px) 45vw, (max-width: 1024px) 24vw, 256px") :
             `${width}px`,
-        quality: tokenId.includes('-bg') ? 35 : 72, // Lower quality for background images
+        quality: normalizedTokenId.includes('-bg') ? 35 : 72, // Lower quality for background images
         ...(fill ? { fill: true } : { width, height }),
     };
 
