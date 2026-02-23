@@ -2,6 +2,10 @@
   "name": "nextjs-nft-marketplace-w3i-2.0",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.19.0",
+    "npm": ">=10"
+  },
   "scripts": {
     "dev": "next dev",
     "dev:clean": "taskkill /F /IM node.exe /T 2>nul || echo No processes killed & npm run dev",
