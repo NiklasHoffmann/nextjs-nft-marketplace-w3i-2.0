@@ -11,7 +11,7 @@ import { formatUnits } from 'viem';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
 import type { ListingType } from '@/types/marketplace/listing-v2';
 import { isSwapListing } from '@/types/marketplace/listing-v2';
-import { formatTokenDisplay } from '@/utils';
+import { formatCardCurrencyAmount } from '@/utils';
 import { devLog } from '@/utils';
 
 interface NFTCardPriceProps {
@@ -77,8 +77,8 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
     );
 
     const displayAmount = useMemo(() =>
-        formatTokenDisplay(tokenAmount, tokenDecimals, 4),
-        [tokenAmount, tokenDecimals]
+        formatCardCurrencyAmount(tokenAmount),
+        [tokenAmount]
     );
 
     const tokenAmountNum = useMemo(() =>
@@ -120,8 +120,8 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
     );
 
     const unitDisplayAmount = useMemo(() =>
-        effectiveUnitAmount ? formatTokenDisplay(effectiveUnitAmount, tokenDecimals, 4) : null,
-        [effectiveUnitAmount, tokenDecimals]
+        effectiveUnitAmount ? formatCardCurrencyAmount(effectiveUnitAmount) : null,
+        [effectiveUnitAmount]
     );
 
     const displayTokenAmountNum = useMemo(() => {
@@ -222,6 +222,14 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
                 </div>
                 {/* Sell/Swap Indicator */}
                 <div className="absolute right-0 bottom-0 flex flex-col items-end gap-1">
+                    <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center">
+                        <div className="flex items-center gap-1.5">
+                            <div className={`w-1.5 h-1.5 rounded-full ${isSwap ? 'bg-orange-500' : 'bg-green-600'}`}></div>
+                            <span className={`text-xs font-semibold leading-none ${isSwap ? 'text-orange-700' : 'text-green-700'}`}>
+                                {isSwap ? 'Swap' : 'Sell'}
+                            </span>
+                        </div>
+                    </div>
                     {tokenStandard && (
                         <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center whitespace-nowrap">
                             <span className={`text-[11px] font-semibold whitespace-nowrap leading-none ${
@@ -231,14 +239,6 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
                             </span>
                         </div>
                     )}
-                    <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center">
-                        <div className="flex items-center gap-1.5">
-                            <div className={`w-1.5 h-1.5 rounded-full ${isSwap ? 'bg-orange-500' : 'bg-green-600'}`}></div>
-                            <span className={`text-xs font-semibold leading-none ${isSwap ? 'text-orange-700' : 'text-green-700'}`}>
-                                {isSwap ? 'Swap' : 'Sell'}
-                            </span>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>

@@ -64,6 +64,26 @@ export const formatTokenDisplay = (
 };
 
 /**
+ * Card price display format:
+ * - default 2 decimals
+ * - if this would be 0.00, show 4 decimals
+ */
+export const formatCardCurrencyAmount = (amount: string | number): string => {
+    const numeric = typeof amount === 'number' ? amount : Number(amount);
+
+    if (!Number.isFinite(numeric)) {
+        return '0.00';
+    }
+
+    const absValue = Math.abs(numeric);
+    if (absValue > 0 && absValue < 0.01) {
+        return numeric.toFixed(4);
+    }
+
+    return numeric.toFixed(2);
+};
+
+/**
  * Format Ethereum address with ellipsis
  */
 export const formatAddress = (address: string, startChars: number = 6, endChars: number = 4): string => {

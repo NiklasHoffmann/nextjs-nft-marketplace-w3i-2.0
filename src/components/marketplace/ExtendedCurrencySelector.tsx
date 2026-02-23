@@ -57,6 +57,8 @@ export function ExtendedCurrencySelector({
         query: { enabled: hasMarketplaceAddress },
     });
 
+    const hasAllowedCurrencyData = Array.isArray(allowedCurrencies);
+
     const allowedCurrencySet = useMemo(() => {
         if (!Array.isArray(allowedCurrencies)) return new Set<string>();
         return new Set(allowedCurrencies.map((currency) => String(currency).toLowerCase()));
@@ -152,6 +154,7 @@ export function ExtendedCurrencySelector({
             icon: string;
             category: string;
             isAllowed: boolean;
+                isDisallowed: boolean;
         }> = [
                 {
                     address: ZERO_ADDRESS,
@@ -159,7 +162,8 @@ export function ExtendedCurrencySelector({
                     name: 'Ether',
                     icon: 'Ξ',
                     category: 'ETH_WRAPPERS',
-                    isAllowed: allowedCurrencySet.has(ZERO_ADDRESS.toLowerCase())
+                    isAllowed: hasAllowedCurrencyData && allowedCurrencySet.has(ZERO_ADDRESS.toLowerCase()),
+                    isDisallowed: hasAllowedCurrencyData && !allowedCurrencySet.has(ZERO_ADDRESS.toLowerCase())
                 }
             ];
 
@@ -172,12 +176,13 @@ export function ExtendedCurrencySelector({
                 name: token.name,
                 icon: icon,
                 category: token.category || 'OTHER',
-                isAllowed: allowedCurrencySet.has(token.address.toLowerCase())
+                isAllowed: hasAllowedCurrencyData && allowedCurrencySet.has(token.address.toLowerCase()),
+                isDisallowed: hasAllowedCurrencyData && !allowedCurrencySet.has(token.address.toLowerCase())
             });
         });
 
         return opts;
-    }, [filteredTokens, allowedCurrencySet]);
+    }, [filteredTokens, allowedCurrencySet, hasAllowedCurrencyData]);
 
     const selectedOption = options.find(opt =>
         opt.address.toLowerCase() === (value || ZERO_ADDRESS).toLowerCase()
@@ -200,6 +205,11 @@ export function ExtendedCurrencySelector({
                         {selectedOption.isAllowed && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
                                 ✓ Allowed
+                            </span>
+                        )}
+                        {selectedOption.isDisallowed && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                ⚠ Nicht erlaubt
                             </span>
                         )}
                     </div>
@@ -278,7 +288,8 @@ export function ExtendedCurrencySelector({
                                                                 key={token.address}
                                                                 token={token}
                                                                 isSelected={isSelected}
-                                                                isAllowed={allowedCurrencySet.has(token.address.toLowerCase())}
+                                                                isAllowed={hasAllowedCurrencyData && allowedCurrencySet.has(token.address.toLowerCase())}
+                                                                isDisallowed={hasAllowedCurrencyData && !allowedCurrencySet.has(token.address.toLowerCase())}
                                                                 onClick={() => {
                                                                     onChange(token.address);
                                                                     setIsOpen(false);
@@ -318,6 +329,9 @@ export function ExtendedCurrencySelector({
                                                 {option.isAllowed && (
                                                     <span className="absolute left-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px]">✓</span>
                                                 )}
+                                                {option.isDisallowed && (
+                                                    <span className="absolute left-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-white text-[10px]">!</span>
+                                                )}
                                                 {isSelected && (
                                                     <svg className="w-4 h-4 text-blue-600 absolute top-1 right-1" fill="currentColor" viewBox="0 0 20 20">
                                                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -346,10 +360,11 @@ interface TokenOptionProps {
     token: ExtendedTokenConfig;
     isSelected: boolean;
     isAllowed: boolean;
+    isDisallowed: boolean;
     onClick: () => void;
 }
 
-function TokenGridOption({ token, isSelected, isAllowed, onClick }: TokenOptionProps) {
+function TokenGridOption({ token, isSelected, isAllowed, isDisallowed, onClick }: TokenOptionProps) {
     const icon = token.icon || 'T';
 
     return (
@@ -368,6 +383,9 @@ function TokenGridOption({ token, isSelected, isAllowed, onClick }: TokenOptionP
             </div>
             {isAllowed && (
                 <span className="absolute left-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px]">✓</span>
+            )}
+            {isDisallowed && (
+                <span className="absolute left-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-white text-[10px]">!</span>
             )}
             {isSelected && (
                 <svg className="w-4 h-4 text-blue-600 absolute top-1 right-1" fill="currentColor" viewBox="0 0 20 20">

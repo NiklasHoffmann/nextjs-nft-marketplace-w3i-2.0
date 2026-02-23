@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useChainId } from 'wagmi';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { formatCardCurrencyAmount } from '@/utils';
 
 interface CollectionPriceDisplayProps {
     totalValue: number;
@@ -101,7 +102,7 @@ export const CollectionPriceDisplay = React.memo(({
             try {
                 if (!Number.isFinite(valueAmount) || valueAmount <= 0 || normalizedCurrencyTotals.length === 0) {
                     if (active) setConvertedHeadline(formatPrice(0));
-                    if (active) setSecondaryValueLabel(`0.0000 ${valueSymbol}`);
+                    if (active) setSecondaryValueLabel(`0.00 ${valueSymbol}`);
                     return;
                 }
 
@@ -134,16 +135,16 @@ export const CollectionPriceDisplay = React.memo(({
 
                 if (valueSymbol === 'ETH') {
                     const ethValue = totalUsd > 0 ? await convertUSDToETH(totalUsd) : 0;
-                    if (active) setSecondaryValueLabel(`${ethValue.toFixed(4)} ETH`);
+                    if (active) setSecondaryValueLabel(`${formatCardCurrencyAmount(ethValue)} ETH`);
                     return;
                 }
 
                 const usdPerDisplayUnit = await convertTokenToUSD(1, valueSymbol, valueCurrency, effectiveChainId);
                 const displayUnits = usdPerDisplayUnit > 0 ? totalUsd / usdPerDisplayUnit : valueAmount;
-                if (active) setSecondaryValueLabel(`${displayUnits.toFixed(4)} ${valueSymbol}`);
+                if (active) setSecondaryValueLabel(`${formatCardCurrencyAmount(displayUnits)} ${valueSymbol}`);
             } catch {
                 if (active) setConvertedHeadline('—');
-                if (active) setSecondaryValueLabel(`${valueAmount.toFixed(4)} ${valueSymbol}`);
+                if (active) setSecondaryValueLabel(`${formatCardCurrencyAmount(valueAmount)} ${valueSymbol}`);
             } finally {
                 if (active) setLoading(false);
             }
@@ -178,9 +179,9 @@ export const CollectionPriceDisplay = React.memo(({
                             <span>{convertedHeadline || '—'}</span>
                         </div>
                     )}
-                    <div className="text-xs text-gray-600">{secondaryValueLabel || `${valueAmount.toFixed(4)} ${valueSymbol}`}</div>
+                    <div className="text-xs text-gray-600">{secondaryValueLabel || `${formatCardCurrencyAmount(valueAmount)} ${valueSymbol}`}</div>
                     <div className="text-xs text-blue-600 mt-0.5">
-                        {floorAmount !== null ? `Floor: ${floorAmount.toFixed(4)} ${floorSymbol}` : 'Floor: —'}
+                        {floorAmount !== null ? `Floor: ${formatCardCurrencyAmount(floorAmount)} ${floorSymbol}` : 'Floor: —'}
                     </div>
                 </div>
 
