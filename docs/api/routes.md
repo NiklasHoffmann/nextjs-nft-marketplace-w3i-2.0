@@ -19,10 +19,10 @@ Fetch statistics for a specific NFT.
 
 #### Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `contractAddress` | string | Yes | NFT contract address |
-| `tokenId` | string | Yes | Token ID |
+| Parameter         | Type   | Required | Description          |
+| ----------------- | ------ | -------- | -------------------- |
+| `contractAddress` | string | Yes      | NFT contract address |
+| `tokenId`         | string | Yes      | Token ID             |
 
 #### Response
 
@@ -46,7 +46,7 @@ Fetch statistics for a specific NFT.
 
 ```typescript
 const response = await fetch(
-  '/api/nft/stats?contractAddress=0x41655ae49482de69eec8f6875c34a8ada01965e2&tokenId=652'
+  "/api/nft/stats?contractAddress=0x41655ae49482de69eec8f6875c34a8ada01965e2&tokenId=652",
 );
 const { success, data } = await response.json();
 console.log(data.favoriteCount); // 42
@@ -82,21 +82,21 @@ Record a view for an NFT.
   success: boolean;
   data: {
     message: string;
-  };
+  }
 }
 ```
 
 #### Example
 
 ```typescript
-await fetch('/api/nft/stats', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+await fetch("/api/nft/stats", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
-    contractAddress: '0x41655ae49482de69eec8f6875c34a8ada01965e2',
-    tokenId: '652',
-    userId: '0xf034e8ad11F249c8081d9da94852bE1734bc11a4'
-  })
+    contractAddress: "0x41655ae49482de69eec8f6875c34a8ada01965e2",
+    tokenId: "652",
+    userId: "0xf034e8ad11F249c8081d9da94852bE1734bc11a4",
+  }),
 });
 ```
 
@@ -116,11 +116,11 @@ Fetch user's interactions with a specific NFT.
 
 #### Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `userId` | string | Yes | User's wallet address |
-| `contractAddress` | string | Yes | NFT contract address |
-| `tokenId` | string | Yes | Token ID |
+| Parameter         | Type   | Required | Description           |
+| ----------------- | ------ | -------- | --------------------- |
+| `userId`          | string | Yes      | User's wallet address |
+| `contractAddress` | string | Yes      | NFT contract address  |
+| `tokenId`         | string | Yes      | Token ID              |
 
 #### Response
 
@@ -131,21 +131,21 @@ Fetch user's interactions with a specific NFT.
     // Favorites
     isFavorite: boolean;
     favoriteAddedAt?: string;
-    
+
     // Ratings
     rating?: number;           // 1-5
     ratedAt?: string;
-    
+
     // Watchlist
     isWatchlisted: boolean;
     watchlistAddedAt?: string;
-    
+
     // Personal Notes (private)
     personalNotes?: string;
     strategy?: string;
     investmentGoal?: string;
     riskLevel?: string;
-    
+
     // Metadata
     userId: string;
     contractAddress: string;
@@ -159,11 +159,12 @@ Fetch user's interactions with a specific NFT.
 
 ```typescript
 const response = await fetch(
-  '/api/user/interactions?' + new URLSearchParams({
-    userId: '0xf034e8ad11F249c8081d9da94852bE1734bc11a4',
-    contractAddress: '0x41655ae49482de69eec8f6875c34a8ada01965e2',
-    tokenId: '652'
-  })
+  "/api/user/interactions?" +
+    new URLSearchParams({
+      userId: "0xf034e8ad11F249c8081d9da94852bE1734bc11a4",
+      contractAddress: "0x41655ae49482de69eec8f6875c34a8ada01965e2",
+      tokenId: "652",
+    }),
 );
 const { data } = await response.json();
 console.log(data.isFavorite); // true
@@ -189,12 +190,12 @@ Update user's interactions with an NFT.
   userId: string;              // Required - wallet address
   contractAddress: string;     // Required
   tokenId: string;             // Required
-  
+
   // Actions (all optional, send only what you want to update)
   isFavorite?: boolean;
   rating?: number;             // 1-5, or 0 to remove
   isWatchlisted?: boolean;
-  
+
   // Personal notes (optional, private to user)
   personalNotes?: string;
   strategy?: string;
@@ -222,48 +223,48 @@ Update user's interactions with an NFT.
 #### Example: Like NFT
 
 ```typescript
-await fetch('/api/user/interactions', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+await fetch("/api/user/interactions", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
-    userId: '0xf034e8ad11F249c8081d9da94852bE1734bc11a4',
-    contractAddress: '0x41655ae49482de69eec8f6875c34a8ada01965e2',
-    tokenId: '652',
-    isFavorite: true
-  })
+    userId: "0xf034e8ad11F249c8081d9da94852bE1734bc11a4",
+    contractAddress: "0x41655ae49482de69eec8f6875c34a8ada01965e2",
+    tokenId: "652",
+    isFavorite: true,
+  }),
 });
 ```
 
 #### Example: Set Rating
 
 ```typescript
-await fetch('/api/user/interactions', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+await fetch("/api/user/interactions", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
-    userId: '0xf034e8ad11F249c8081d9da94852bE1734bc11a4',
-    contractAddress: '0x41655ae49482de69eec8f6875c34a8ada01965e2',
-    tokenId: '652',
-    rating: 5
-  })
+    userId: "0xf034e8ad11F249c8081d9da94852bE1734bc11a4",
+    contractAddress: "0x41655ae49482de69eec8f6875c34a8ada01965e2",
+    tokenId: "652",
+    rating: 5,
+  }),
 });
 ```
 
 #### Example: Update Multiple
 
 ```typescript
-await fetch('/api/user/interactions', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+await fetch("/api/user/interactions", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
-    userId: '0xf034e8ad11F249c8081d9da94852bE1734bc11a4',
-    contractAddress: '0x41655ae49482de69eec8f6875c34a8ada01965e2',
-    tokenId: '652',
+    userId: "0xf034e8ad11F249c8081d9da94852bE1734bc11a4",
+    contractAddress: "0x41655ae49482de69eec8f6875c34a8ada01965e2",
+    tokenId: "652",
     isFavorite: true,
     isWatchlisted: true,
     rating: 4,
-    personalNotes: 'Great project!'
-  })
+    personalNotes: "Great project!",
+  }),
 });
 ```
 
@@ -309,8 +310,8 @@ Recalculate NFT statistics from raw data.
 
 ```typescript
 {
-  contractAddress: string;  // Required
-  tokenId: string;          // Required
+  contractAddress: string; // Required
+  tokenId: string; // Required
 }
 ```
 
@@ -365,6 +366,103 @@ Get current user session (if using NextAuth or similar).
 
 ---
 
+## Integrations API
+
+### GET `/api/integrations/1inch/quote`
+
+Fetch a swap quote from 1inch (server-side proxied).
+
+#### Parameters
+
+| Parameter           | Type    | Required | Description                    |
+| ------------------- | ------- | -------- | ------------------------------ |
+| `chainId`           | number  | Yes      | EVM chain id (e.g. `11155111`) |
+| `src`               | string  | Yes      | Source token address           |
+| `dst`               | string  | Yes      | Destination token address      |
+| `amount`            | string  | Yes      | Source amount in base units    |
+| `includeProtocols`  | boolean | No       | Include routing protocols      |
+| `includeTokensInfo` | boolean | No       | Include token metadata         |
+
+#### Response (simplified)
+
+```typescript
+{
+  success: true;
+  data: {
+    provider: '1inch';
+    chainId: number;
+    src: string;
+    dst: string;
+    amount: string;
+    quote: {
+      srcToken: { symbol: string; address: string; decimals: number };
+      dstToken: { symbol: string; address: string; decimals: number };
+      srcAmount: string;
+      dstAmount: string;
+      estimatedGas?: number;
+    };
+  };
+}
+```
+
+---
+
+### POST `/api/integrations/1inch/swap`
+
+Prepare a 1inch swap transaction payload (`tx`) for wallet execution.
+
+#### Request Body
+
+```typescript
+{
+  chainId: number;
+  src: string;
+  dst: string;
+  amount: string; // base units
+  from: string;   // caller wallet address
+  slippage: number;
+  disableEstimate?: boolean;
+  allowPartialFill?: boolean;
+  includeProtocols?: boolean;
+  includeTokensInfo?: boolean;
+}
+```
+
+#### Response (simplified)
+
+```typescript
+{
+  success: true;
+  data: {
+    provider: '1inch';
+    chainId: number;
+    src: string;
+    dst: string;
+    amount: string;
+    from: string;
+    slippage: number;
+    swap: {
+      dstAmount: string;
+      tx: {
+        from: string;
+        to: string;
+        data: string;
+        value: string;
+        gas?: string;
+        gasPrice?: string;
+      };
+    };
+  };
+}
+```
+
+#### Notes
+
+- Requires `ONEINCH_API_KEY` on server.
+- Route only prepares tx data; signing/sending is done in frontend wallet flow.
+
+---
+
 ## Error Responses
 
 All API routes follow a consistent error format:
@@ -372,21 +470,21 @@ All API routes follow a consistent error format:
 ```typescript
 {
   success: false;
-  error: string;  // Human-readable error message
+  error: string; // Human-readable error message
 }
 ```
 
 ### Common HTTP Status Codes
 
-| Code | Meaning | When |
-|------|---------|------|
-| 200 | OK | Successful request |
-| 400 | Bad Request | Missing/invalid parameters |
-| 401 | Unauthorized | Authentication required |
-| 403 | Forbidden | Insufficient permissions |
-| 404 | Not Found | Resource doesn't exist |
-| 429 | Too Many Requests | Rate limit exceeded |
-| 500 | Internal Server Error | Server-side error |
+| Code | Meaning               | When                       |
+| ---- | --------------------- | -------------------------- |
+| 200  | OK                    | Successful request         |
+| 400  | Bad Request           | Missing/invalid parameters |
+| 401  | Unauthorized          | Authentication required    |
+| 403  | Forbidden             | Insufficient permissions   |
+| 404  | Not Found             | Resource doesn't exist     |
+| 429  | Too Many Requests     | Rate limit exceeded        |
+| 500  | Internal Server Error | Server-side error          |
 
 ---
 
@@ -421,6 +519,7 @@ Cache-Control: public, s-maxage=5, stale-while-revalidate=10
 ### Invalidation
 
 Caches are automatically invalidated when:
+
 - User performs an action (like, rate, watchlist)
 - Admin fixes stats
 - View is recorded
@@ -430,7 +529,7 @@ Caches are automatically invalidated when:
 Get cache statistics (development only):
 
 ```typescript
-import { getCacheStats } from '@/lib/cache';
+import { getCacheStats } from "@/lib/cache";
 
 const stats = getCacheStats();
 console.log(stats);
@@ -448,11 +547,11 @@ console.log(stats);
 
 ```typescript
 try {
-  const response = await fetch('/api/nft/stats?...');
-  if (!response.ok) throw new Error('API error');
+  const response = await fetch("/api/nft/stats?...");
+  if (!response.ok) throw new Error("API error");
   const data = await response.json();
 } catch (error) {
-  console.error('Failed to fetch stats:', error);
+  console.error("Failed to fetch stats:", error);
   // Show user-friendly error
 }
 ```
@@ -460,7 +559,7 @@ try {
 ### 2. Use TypeScript Types
 
 ```typescript
-import type { NFTStats, UserInteractionData } from '@/types';
+import type { NFTStats, UserInteractionData } from "@/types";
 
 const stats: NFTStats = await fetchStats();
 ```
@@ -468,10 +567,10 @@ const stats: NFTStats = await fetchStats();
 ### 3. Validate Input
 
 ```typescript
-import { isValidNFTAddress, isValidNFTTokenId } from '@/utils/nft-helpers';
+import { isValidNFTAddress, isValidNFTTokenId } from "@/utils/nft-helpers";
 
 if (!isValidNFTAddress(contractAddress)) {
-  throw new Error('Invalid contract address');
+  throw new Error("Invalid contract address");
 }
 ```
 
@@ -489,7 +588,7 @@ setInterval(() => fetchStats(...), 1000);
 
 ```typescript
 // Listen for real-time updates instead of polling
-window.addEventListener('nft-stats-updated', (event) => {
+window.addEventListener("nft-stats-updated", (event) => {
   if (event.detail.contractAddress === myContract) {
     updateUI(event.detail.stats);
   }
@@ -508,23 +607,23 @@ import type { NFTStats } from '@/types';
 
 function NFTStatsDisplay({ contract, tokenId }: Props) {
   const [stats, setStats] = useState<NFTStats | null>(null);
-  
+
   useEffect(() => {
     fetch(`/api/nft/stats?contractAddress=${contract}&tokenId=${tokenId}`)
       .then(res => res.json())
       .then(({ data }) => setStats(data));
-      
+
     // Listen for updates
     const handler = (e: CustomEvent) => {
       if (e.detail.contractAddress === contract && e.detail.tokenId === tokenId) {
         setStats(prev => ({ ...prev, ...e.detail.stats }));
       }
     };
-    
+
     window.addEventListener('nft-stats-updated', handler);
     return () => window.removeEventListener('nft-stats-updated', handler);
   }, [contract, tokenId]);
-  
+
   return <div>{stats?.favoriteCount} likes</div>;
 }
 ```
@@ -536,10 +635,10 @@ import { useNFTStatsContext } from '@/contexts/NFTStatsContext';
 
 function LikeButton({ contract, tokenId }: Props) {
   const { favorites, toggleFavorite } = useNFTStatsContext();
-  
+
   const nftKey = `${contract}-${tokenId}`;
   const isLiked = favorites.has(nftKey);
-  
+
   return (
     <button onClick={() => toggleFavorite(contract, tokenId)}>
       {isLiked ? '❤️ Liked' : '🤍 Like'}

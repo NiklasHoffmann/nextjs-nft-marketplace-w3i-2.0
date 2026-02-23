@@ -4,7 +4,7 @@
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
-    
+
     // ===== STRICT MODE =====
     "strict": true,
     "ignoreDeprecations": "6.0",
@@ -16,7 +16,7 @@
     "noImplicitAny": true,
     "noImplicitThis": true,
     "alwaysStrict": true,
-    
+
     // ===== ADDITIONAL CHECKS =====
     // Disabled for now to focus on critical type errors
     // "noUnusedLocals": true,
@@ -25,7 +25,7 @@
     "noFallthroughCasesInSwitch": true,
     "allowUnusedLabels": false,
     "allowUnreachableCode": false,
-    
+
     // ===== MODULE RESOLUTION =====
     "noEmit": true,
     "esModuleInterop": true,
@@ -33,13 +33,13 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    
+
     // ===== JSX =====
     "jsx": "preserve",
-    
+
     // ===== PERFORMANCE =====
     "incremental": true,
-    
+
     // ===== NEXT.JS =====
     "plugins": [
       {
@@ -51,5 +51,12 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "**/*.test.ts", "**/*.test.tsx", "vitest.config.ts", "src/**/__tests__/**", "scripts/**"]
+  "exclude": [
+    "node_modules",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "vitest.config.ts",
+    "src/**/__tests__/**",
+    "scripts/**"
+  ]
 }

@@ -17,6 +17,7 @@ This document explains all environment variables used in the NFT Marketplace app
 ## 🔐 Security Best Practices
 
 ### ✅ DO:
+
 - ✓ Keep `.env.local` and `.env.production.local` in `.gitignore`
 - ✓ Use strong, unique secrets for production (64+ characters)
 - ✓ Rotate API keys regularly
@@ -25,6 +26,7 @@ This document explains all environment variables used in the NFT Marketplace app
 - ✓ Review all `NEXT_PUBLIC_` variables (they're exposed to browser!)
 
 ### ❌ DON'T:
+
 - ✗ Commit secrets to git
 - ✗ Share API keys via chat/email
 - ✗ Use the same keys for dev/prod
@@ -38,17 +40,19 @@ This document explains all environment variables used in the NFT Marketplace app
 ### 1️⃣ Database Configuration
 
 #### `MONGODB_URI` (Server-Side)
+
 - **Purpose:** MongoDB connection string
 - **Type:** Secret
 - **Required:** Yes
 - **Format:** `mongodb+srv://user:pass@cluster.mongodb.net/db?options`
 - **Example:** `mongodb+srv://user:HxuTAfFm7n9Dr7bF@cluster.mongodb.net/Ideationmarket_v2?retryWrites=true&w=majority`
-- **Notes:** 
+- **Notes:**
   - Contains credentials - NEVER expose to client!
   - Use connection pooling for production
   - Enable IP whitelist in MongoDB Atlas
 
 #### `MONGODB_DB` (Server-Side)
+
 - **Purpose:** Database name
 - **Type:** Configuration
 - **Required:** Yes
@@ -60,6 +64,7 @@ This document explains all environment variables used in the NFT Marketplace app
 ### 2️⃣ Authentication & Security
 
 #### `JWT_SECRET` (Server-Side)
+
 - **Purpose:** Secret key for JWT token signing
 - **Type:** Secret (Critical!)
 - **Required:** Yes
@@ -78,6 +83,7 @@ This document explains all environment variables used in the NFT Marketplace app
 #### Server-Side RPC (Backend Only)
 
 ##### `JSON_RPC_URL`
+
 - **Purpose:** Primary RPC endpoint for server operations
 - **Type:** Secret (contains API key)
 - **Required:** Yes
@@ -85,13 +91,15 @@ This document explains all environment variables used in the NFT Marketplace app
 - **Example:** `https://eth-sepolia.g.alchemy.com/v2/NRN9Si87yQRdB-Y2n-yRG8mDkOq7-Dnz`
 
 ##### `ALCHEMY_URL` / `ALCHEMY_URL_WSS`
+
 - **Purpose:** Alchemy HTTP & WebSocket endpoints
 - **Type:** Secret
-- **Format:** 
+- **Format:**
   - HTTP: `https://eth-sepolia.g.alchemy.com/v2/{API_KEY}`
   - WSS: `wss://eth-sepolia.g.alchemy.com/v2/{API_KEY}`
 
 ##### `INFURA_URL` / `INFURA_URL_WSS`
+
 - **Purpose:** Infura HTTP & WebSocket endpoints
 - **Type:** Secret
 - **Format:**
@@ -101,6 +109,7 @@ This document explains all environment variables used in the NFT Marketplace app
 #### Client-Side RPC (Exposed to Browser)
 
 ##### `NEXT_PUBLIC_SEPOLIA_RPC_URL`
+
 - **Purpose:** Client-side RPC for wallet interactions
 - **Type:** Public (exposed to browser)
 - **Required:** Yes
@@ -108,18 +117,21 @@ This document explains all environment variables used in the NFT Marketplace app
 - **Example:** `https://eth-sepolia.g.alchemy.com/v2/PUBLIC_KEY`
 
 ##### `NEXT_PUBLIC_ALCHEMY_URL_WSS` / `NEXT_PUBLIC_INFURA_URL_WSS`
+
 - **Purpose:** WebSocket endpoints for real-time events
 - **Type:** Public
 - **Usage:** Event listeners, transaction monitoring
 - **Example:** `wss://sepolia.infura.io/ws/v3/PUBLIC_KEY`
 
 ##### `NEXT_PUBLIC_ALCHEMY_API_KEY` / `NEXT_PUBLIC_INFURA_API_KEY`
+
 - **Purpose:** Direct API access from client
 - **Type:** Public (rate-limited)
 - **Security:** MUST have rate limits configured
 - **Example:** `NRN9Si87yQRdB-Y2n-yRG8mDkOq7-Dnz`
 
 **⚠️ RPC Security Notes:**
+
 - Use separate keys for client vs server
 - Client keys should have lower rate limits
 - Configure allowlists (domains, IPs) in provider dashboards
@@ -130,7 +142,9 @@ This document explains all environment variables used in the NFT Marketplace app
 ### 4️⃣ Wallet Connect Integration
 
 #### `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
+
 #### `NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID`
+
 - **Purpose:** WalletConnect Cloud project identifier
 - **Type:** Public
 - **Required:** Yes (for mobile wallet connections)
@@ -146,6 +160,7 @@ This document explains all environment variables used in the NFT Marketplace app
 ### 5️⃣ Smart Contract Addresses
 
 #### `NEXT_PUBLIC_MARKETPLACE_ADDRESS`
+
 - **Purpose:** Diamond Marketplace contract address
 - **Type:** Public (blockchain address)
 - **Required:** Yes
@@ -157,6 +172,7 @@ This document explains all environment variables used in the NFT Marketplace app
   - Different addresses for Sepolia/Mainnet
 
 #### `NEXT_PUBLIC_MULTISIG_WALLET_ADDRESS`
+
 - **Purpose:** MultiSig governance wallet
 - **Type:** Public
 - **Required:** No (optional feature)
@@ -167,6 +183,7 @@ This document explains all environment variables used in the NFT Marketplace app
 ### 6️⃣ The Graph Subgraph Indexing
 
 #### `NEXT_PUBLIC_SUBGRAPH_VERSION`
+
 - **Purpose:** Active subgraph version identifier
 - **Type:** Configuration
 - **Options:** `v1`, `v2`
@@ -174,6 +191,7 @@ This document explains all environment variables used in the NFT Marketplace app
 - **Example:** `v2`
 
 #### `NEXT_PUBLIC_SUBGRAPH_V2_URL`
+
 - **Purpose:** The Graph API endpoint
 - **Type:** Public
 - **Required:** Yes
@@ -184,6 +202,7 @@ This document explains all environment variables used in the NFT Marketplace app
   - Decentralized: Pay per query, censorship-resistant
 
 #### `NEXT_PUBLIC_SUBGRAPH_V2_DEPLOY_KEY`
+
 - **Purpose:** Deploy key for subgraph updates
 - **Type:** Secret
 - **Required:** Only for CI/CD deployment
@@ -191,6 +210,7 @@ This document explains all environment variables used in the NFT Marketplace app
 - **Security:** Never commit! Use in CI/CD secrets only
 
 #### `USE_GRAPH_SUBSCRIPTIONS`
+
 - **Purpose:** Enable WebSocket subscriptions
 - **Type:** Feature flag
 - **Options:** `true`, `false`
@@ -202,18 +222,21 @@ This document explains all environment variables used in the NFT Marketplace app
 ### 7️⃣ Exchange Rates & Pricing
 
 #### `NEXT_PUBLIC_COINBASE_API_URL`
+
 - **Purpose:** Coinbase exchange rate API
 - **Type:** Public endpoint
 - **Default:** `https://api.coinbase.com/v2/exchange-rates`
 - **Usage:** Fallback price source
 
 #### `NEXT_PUBLIC_CRYPTOCOMPARE_API_URL`
+
 - **Purpose:** CryptoCompare price feed
 - **Type:** Public endpoint
 - **Default:** `https://min-api.cryptocompare.com/data/pricemulti`
 - **Usage:** Primary price source
 
 #### `NEXT_PUBLIC_EXCHANGE_RATE_CACHE_HOURS`
+
 - **Purpose:** Cache duration for exchange rates
 - **Type:** Configuration
 - **Default:** `24` (hours)
@@ -223,6 +246,7 @@ This document explains all environment variables used in the NFT Marketplace app
 ### 8️⃣ DEX Aggregation (1inch)
 
 #### `ONEINCH_API_KEY` (Server-Side)
+
 - **Purpose:** API key for 1inch Aggregation API (quote/swap endpoints)
 - **Type:** Secret
 - **Required:** Yes (for 1inch integration)
@@ -230,18 +254,21 @@ This document explains all environment variables used in the NFT Marketplace app
 - **Security:** Never expose to client, do NOT use `NEXT_PUBLIC_`
 
 #### `ONE_INCH_API_KEY` (Server-Side, fallback)
+
 - **Purpose:** Backward-compatible alternate env name
 - **Type:** Secret
 - **Required:** Optional (only used if `ONEINCH_API_KEY` is not set)
-- **Range:** 1-168 (1 hour to 1 week)
+- **Usage:** Same as `ONEINCH_API_KEY`, kept for compatibility
 
 #### `NEXT_PUBLIC_EXCHANGE_RATE_UPDATE_INTERVAL_HOURS`
+
 - **Purpose:** Background update frequency
 - **Type:** Configuration
 - **Default:** `6` (hours)
 - **Range:** 1-24
 
 #### `NEXT_PUBLIC_CURRENCY_DEBUG_MODE`
+
 - **Purpose:** Enable verbose logging for currency operations
 - **Type:** Feature flag
 - **Options:** `true`, `false`
@@ -250,19 +277,21 @@ This document explains all environment variables used in the NFT Marketplace app
 
 ---
 
-### 8️⃣ Access Control & Admin Configuration
+### 9️⃣ Access Control & Admin Configuration
 
 #### `NEXT_PUBLIC_MULTISIG_OWNER_ADDRESSES`
+
 - **Purpose:** Primary admin addresses (mirror of MultiSig wallet owners)
 - **Type:** Public (blockchain addresses)
 - **Required:** Recommended (primary source)
 - **Format:** Comma-separated checksummed addresses (no spaces)
 - **Example:** `0x8BbA5E9b30E986C55465fEaC4D3417791065d1bb,0xf034e8ad11F249c8081d9da94852bE1734bc11a4`
 - **Notes:**
-   - Intended to match current `getOwners()` result of the MultiSig wallet.
-   - If configured, admin set is: `MULTISIG_OWNER_ADDRESSES ∪ INSIGHTS_ADMIN_ADDRESSES`.
+  - Intended to match current `getOwners()` result of the MultiSig wallet.
+  - If configured, admin set is: `MULTISIG_OWNER_ADDRESSES ∪ INSIGHTS_ADMIN_ADDRESSES`.
 
 #### `NEXT_PUBLIC_INSIGHTS_ADMIN_ADDRESSES`
+
 - **Purpose:** Additional admin addresses (break-glass / temporary / service accounts)
 - **Type:** Public (blockchain addresses)
 - **Required:** Optional
@@ -274,9 +303,10 @@ This document explains all environment variables used in the NFT Marketplace app
   - View system health
   - Manage marketplace settings
 - **Fallback behavior:**
-   - If `NEXT_PUBLIC_MULTISIG_OWNER_ADDRESSES` is empty, legacy admin behavior uses configured admin addresses only.
+  - If `NEXT_PUBLIC_MULTISIG_OWNER_ADDRESSES` is empty, legacy admin behavior uses configured admin addresses only.
 
 #### `NEXT_PUBLIC_INSIGHTS_READ_ONLY_MODE`
+
 - **Purpose:** Disable admin modifications
 - **Type:** Feature flag
 - **Options:** `true`, `false`
@@ -284,6 +314,7 @@ This document explains all environment variables used in the NFT Marketplace app
 - **Usage:** Maintenance mode, audits
 
 #### `NEXT_PUBLIC_APP_LOCK_ENABLED`
+
 - **Purpose:** Restrict entire app to admin wallets only
 - **Type:** Feature flag
 - **Options:** `true`, `false`
@@ -295,6 +326,7 @@ This document explains all environment variables used in the NFT Marketplace app
 ### 9️⃣ External API Integrations
 
 #### `GOOGLE_API_KEY`
+
 - **Purpose:** Google Cloud API access (Maps, Analytics, etc.)
 - **Type:** Secret
 - **Required:** No (optional features)
@@ -309,6 +341,7 @@ This document explains all environment variables used in the NFT Marketplace app
 ### 🔟 Build & Deployment Configuration
 
 #### `NODE_ENV`
+
 - **Purpose:** Node.js environment mode
 - **Type:** System configuration
 - **Options:** `development`, `production`, `test`
@@ -318,6 +351,7 @@ This document explains all environment variables used in the NFT Marketplace app
   - `production`: Optimized builds, error tracking
 
 #### `NEXT_SHARP_PATH`
+
 - **Purpose:** Sharp image library path (Docker/Railway)
 - **Type:** System configuration
 - **Default:** `/tmp/node_modules/sharp`
@@ -325,6 +359,7 @@ This document explains all environment variables used in the NFT Marketplace app
 - **Notes:** Fixes sharp library loading in read-only filesystems
 
 #### `NEXT_PUBLIC_APP_NAME`
+
 - **Purpose:** Application display name
 - **Type:** Branding
 - **Default:** `IdeationMarket`
@@ -337,6 +372,7 @@ This document explains all environment variables used in the NFT Marketplace app
 ### Development Setup
 
 1. **Copy Template:**
+
    ```bash
    cp .env.local.template .env.local
    ```
@@ -360,11 +396,13 @@ This document explains all environment variables used in the NFT Marketplace app
 ### Production Deployment
 
 1. **Use Production Template:**
+
    ```bash
    cp .env.production.template .env.production.local
    ```
 
 2. **Generate Secrets:**
+
    ```bash
    # JWT Secret
    node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
@@ -394,24 +432,28 @@ This document explains all environment variables used in the NFT Marketplace app
 ### Common Issues
 
 #### "MongoDB connection failed"
+
 - ✓ Check `MONGODB_URI` format
 - ✓ Verify credentials
 - ✓ Check IP whitelist in Atlas
 - ✓ Test connection: `mongosh <MONGODB_URI>`
 
 #### "RPC rate limit exceeded"
+
 - ✓ Check usage in provider dashboard
 - ✓ Upgrade plan or use multiple providers
 - ✓ Implement request caching
 - ✓ Use different keys for client/server
 
 #### "WalletConnect not connecting"
+
 - ✓ Verify `PROJECT_ID` is correct
 - ✓ Check allowed domains in dashboard
 - ✓ Clear browser cache
 - ✓ Try different wallet app
 
 #### "Subgraph data not loading"
+
 - ✓ Check subgraph deployment status
 - ✓ Verify URL and version match
 - ✓ Test query in GraphQL Playground
@@ -470,6 +512,7 @@ This document explains all environment variables used in the NFT Marketplace app
 ## 📝 Changelog
 
 ### v2.0.0 (2026-01-22)
+
 - ✨ Restructured all environment files
 - ✨ Added comprehensive documentation
 - ✨ Created production/development templates
