@@ -1,9 +1,12 @@
 'use client';
 
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useAccount } from 'wagmi';
 import { formatUnits } from 'viem';
 import { WalletHeader } from './components';
+import { WalletLayoutContext } from './context';
+import { NFTFilterSidebar } from '@/components';
+import type { NFTFilters, NFTSortOptions } from '@/types/marketplace';
 import { useWalletNFTsV2 } from '@/hooks/wallet/useWalletNFTsV2';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
@@ -11,6 +14,18 @@ import { devLog } from '@/utils';
 
 export default function WalletLayout({ children }: { children: ReactNode }) {
     const { address, isConnected, chain } = useAccount();
+
+    const [filters, setFilters] = useState<NFTFilters>({
+        categories: [],
+        tokenStandards: [],
+        rarities: [],
+        searchTerm: '',
+    });
+    const [sort, setSort] = useState<NFTSortOptions>({
+        field: 'price',
+        direction: 'desc'
+    });
+    const [filteredCount, setFilteredCount] = useState(0);
 
     // Simple data fetching without filters
     const { nfts, total, listed, unlisted } = useWalletNFTsV2({
@@ -45,6 +60,24 @@ export default function WalletLayout({ children }: { children: ReactNode }) {
     const [totalValueUSD, setTotalValueUSD] = useState<number>(0);
     const [totalValueDisplay, setTotalValueDisplay] = useState<string>(formatPrice(0));
     const [ethPriceLoading, setEthPriceLoading] = useState<boolean>(true);
+
+    const handleFiltersChange = useCallback((newFilters: NFTFilters) => {
+        setFilters(newFilters);
+    }, []);
+
+    const handleSortChange = useCallback((newSort: NFTSortOptions) => {
+        setSort(newSort);
+    }, []);
+
+    const contextValue = useMemo(() => ({
+        filters,
+        sort,
+        onFiltersChange: handleFiltersChange,
+        onSortChange: handleSortChange,
+        totalItems: total,
+        filteredCount,
+        setFilteredCount,
+    }), [filters, sort, handleFiltersChange, handleSortChange, total, filteredCount]);
 
     useEffect(() => {
         let isMounted = true;
@@ -95,19 +128,28 @@ export default function WalletLayout({ children }: { children: ReactNode }) {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <main className="pt-[66px]">
-                <WalletHeader
-                    address={address}
-                    listedCount={listed}
-                    unlistedCount={unlisted}
-                    totalValueDisplay={totalValueDisplay}
-                    ethPriceLoading={ethPriceLoading}
+        <WalletLayoutContext.Provider value={contextValue}>
+            <div className="min-h-screen bg-gray-50">
+                <NFTFilterSidebar
+                    onFiltersChange={handleFiltersChange}
+                    onSortChange={handleSortChange}
+                    currentSort={sort}
+                    totalItems={total}
+                    filteredCount={filteredCount}
                 />
-                <div className="pt-[100px]">
-                    {children}
-                </div>
-            </main>
-        </div>
+                <main className="pt-[66px]">
+                    <WalletHeader
+                        address={address}
+                        listedCount={listed}
+                        unlistedCount={unlisted}
+                        totalValueDisplay={totalValueDisplay}
+                        ethPriceLoading={ethPriceLoading}
+                    />
+                    <div className="pt-[100px]">
+                        {children}
+                    </div>
+                </main>
+            </div>
+        </WalletLayoutContext.Provider>
     );
 }

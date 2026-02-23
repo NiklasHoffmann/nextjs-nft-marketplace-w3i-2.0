@@ -18,6 +18,8 @@ import { getCollection } from '@/lib/mongodb';
 import type { EnrichedNFTMetadata } from '@/types';
 import { devLog } from '@/utils';
 
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
  * GET /api/user/nfts
  * 
@@ -42,7 +44,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
     // Parse filter parameters (same as marketplace)
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get('search');
+    const rawSearch = searchParams.get('search')?.trim();
+    const search = rawSearch ? rawSearch.slice(0, 120) : null;
     const category = searchParams.get('category')?.split(',').filter(Boolean);
     const rarity = searchParams.get('rarity')?.split(',').filter(Boolean);
     const minPrice = searchParams.get('minPrice');
@@ -230,18 +233,57 @@ export const GET = apiHandler(async (request: NextRequest) => {
                 erc1155QuantityListed: { $arrayElemAt: ['$listings.erc1155QuantityListed', 0] },
                 remainingQuantity: { $arrayElemAt: ['$listings.remainingQuantity', 0] },
                 unitPrice: { $arrayElemAt: ['$listings.unitPrice', 0] },
-                partialBuyEnabled: { $arrayElemAt: ['$listings.partialBuyEnabled', 0] }
+                partialBuyEnabled: { $arrayElemAt: ['$listings.partialBuyEnabled', 0] },
+                sortPriceEffective: {
+                    $let: {
+                        vars: {
+                            tokenStandard: { $arrayElemAt: ['$listings.tokenStandard', 0] },
+                            totalPriceDecimal: {
+                                $convert: {
+                                    input: { $ifNull: [{ $arrayElemAt: ['$listings.price', 0] }, '0'] },
+                                    to: 'decimal',
+                                    onError: { $toDecimal: '0' },
+                                    onNull: { $toDecimal: '0' }
+                                }
+                            },
+                            unitPriceDecimal: {
+                                $convert: {
+                                    input: { $arrayElemAt: ['$listings.unitPrice', 0] },
+                                    to: 'decimal',
+                                    onError: null,
+                                    onNull: null
+                                }
+                            }
+                        },
+                        in: {
+                            $cond: [
+                                { $eq: ['$$tokenStandard', 'ERC1155'] },
+                                { $ifNull: ['$$unitPriceDecimal', '$$totalPriceDecimal'] },
+                                '$$totalPriceDecimal'
+                            ]
+                        }
+                    }
+                }
             }
         },
         // Apply filters that need computed fields
         ...(minPrice || maxPrice || minRating || minViews || minLikes || minWatchlistCount || isListed !== null || search ? [{
             $match: {
                 ...(search ? {
+                    $and: [{
                     $or: [
-                        { 'metadata.name': { $regex: search, $options: 'i' } },
-                        { 'metadata.description': { $regex: search, $options: 'i' } },
-                        { contractAddress: { $regex: search, $options: 'i' } }
+                        { 'metadata.name': { $regex: escapeRegex(search), $options: 'i' } },
+                        { 'metadata.description': { $regex: escapeRegex(search), $options: 'i' } },
+                        { 'contract.name': { $regex: escapeRegex(search), $options: 'i' } },
+                        { 'contract.symbol': { $regex: escapeRegex(search), $options: 'i' } },
+                        { 'insights.customTitle': { $regex: escapeRegex(search), $options: 'i' } },
+                        { 'insights.category': { $regex: escapeRegex(search), $options: 'i' } },
+                        { 'insights.rarity': { $regex: escapeRegex(search), $options: 'i' } },
+                        { 'insights.tags': { $regex: escapeRegex(search), $options: 'i' } },
+                        { tokenId: { $regex: escapeRegex(search), $options: 'i' } },
+                        { contractAddress: { $regex: escapeRegex(search), $options: 'i' } }
                     ]
+                    }]
                 } : {}),
                 $expr: {
                     $and: [
@@ -286,7 +328,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
                 switch (sortBy) {
                     case 'price':
-                        sortField['listings.0.price'] = sortOrder === 'asc' ? 1 : -1;
+                        sortField.sortPriceEffective = sortOrder === 'asc' ? 1 : -1;
                         break;
                     case 'rating':
                         sortField['stats.averageRating'] = sortOrder === 'asc' ? 1 : -1;
@@ -317,7 +359,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
         {
             $project: {
                 insightsData: 0,
-                statsData: 0
+                statsData: 0,
+                sortPriceEffective: 0
             }
         }
     ];

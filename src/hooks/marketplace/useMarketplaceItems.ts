@@ -11,8 +11,6 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useMarketplaceItems as useMarketplaceItemsContext } from '@/contexts/marketplace-items';
 import { useCollections } from '@/contexts/collections';
 import type { EnrichedNFTDocument, MarketplaceItemsResponse } from '@/types/marketplace/enriched-nft';
-import { DB_SYNC_DELAY_MS, MARKETPLACE_INVALIDATION_TYPES } from '@/services/validation';
-import type { InvalidationEventDetail } from '@/services/validation';
 import { devLog } from '@/utils';
 
 function parseFloorPrice(value: string | null | undefined): number | null {
@@ -36,6 +34,7 @@ interface UseMarketplaceItemsOptions {
   seller?: string;
   isListed?: boolean;
   category?: string | string[];
+  tokenStandard?: 'ERC721' | 'ERC1155' | Array<'ERC721' | 'ERC1155'>;
   rarity?: string | string[];
   tags?: string[];
   minRating?: number;
@@ -49,6 +48,9 @@ interface UseMarketplaceItemsOptions {
 
   // Auto-fetch on mount
   autoFetch?: boolean;
+
+  // Include filter facets (categories/rarities/price range)
+  includeFilters?: boolean;
 }
 
 interface UseMarketplaceItemsReturn {
@@ -82,6 +84,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     page: initialPage = 1,
     limit = 20,
     autoFetch = true,
+    includeFilters = true,
     ...filters
   } = options;
 
@@ -100,9 +103,6 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
   const loadingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Track if component is mounted
-  const isMountedRef = useRef(true);
-
   // Create cache key from filters
   const createFilterKey = useCallback(() => {
     return JSON.stringify({
@@ -114,6 +114,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
       seller: filters.seller || '',
       isListed: filters.isListed ?? true,
       category: filters.category || '',
+      tokenStandard: filters.tokenStandard || '',
       rarity: filters.rarity || '',
       tags: filters.tags?.join(',') || '',
       minRating: filters.minRating || 0,
@@ -122,8 +123,10 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
       minWatchlistCount: filters.minWatchlistCount || 0,
       sortBy: filters.sortBy || 'price',
       sortOrder: filters.sortOrder || 'desc',
+      includeFilters,
     });
   }, [
+    includeFilters,
     filters.search,
     filters.contractAddress,
     filters.minPrice,
@@ -131,6 +134,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     filters.seller,
     filters.isListed,
     filters.category,
+    filters.tokenStandard,
     filters.rarity,
     filters.tags?.join(','),
     filters.minRating,
@@ -213,12 +217,14 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
         ...(filters.seller && { seller: filters.seller }),
         ...(filters.isListed !== undefined && { isListed: filters.isListed.toString() }),
         ...(filters.category && { category: Array.isArray(filters.category) ? filters.category.join(',') : filters.category }),
+        ...(filters.tokenStandard && { tokenStandard: Array.isArray(filters.tokenStandard) ? filters.tokenStandard.join(',') : filters.tokenStandard }),
         ...(filters.rarity && { rarity: Array.isArray(filters.rarity) ? filters.rarity.join(',') : filters.rarity }),
         ...(filters.tags && filters.tags.length > 0 && { tags: filters.tags.join(',') }),
         ...(filters.minRating !== undefined && { minRating: filters.minRating.toString() }),
         ...(filters.minViews !== undefined && { minViews: filters.minViews.toString() }),
         ...(filters.minLikes !== undefined && { minLikes: filters.minLikes.toString() }),
         ...(filters.minWatchlistCount !== undefined && { minWatchlistCount: filters.minWatchlistCount.toString() }),
+        ...(includeFilters === false && { includeFilters: 'false' }),
       });
 
       const response = await fetch(`/api/marketplace/items?${params.toString()}`, {
@@ -314,6 +320,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     }
   }, [
     limit,
+    includeFilters,
     filters.search,
     filters.contractAddress,
     filters.minPrice,
@@ -365,11 +372,9 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
       return;
     }
 
-    devLog.info('[useMarketplaceItems] useEffect triggered - clearing items and fetching...');
+    devLog.info('[useMarketplaceItems] useEffect triggered - fetching with stale-while-revalidate...');
 
-    // CRITICAL: Clear items immediately when filters change to prevent showing stale data
-    // This happens BEFORE the fetchItems call to ensure instant UI update
-    setItems([]);
+    // Keep current items visible until fresh payload arrives
     setLoading(true);
 
     // Abort any pending request
@@ -412,55 +417,6 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     filters.sortBy,
     filters.sortOrder,
   ]);
-
-  // Listen for data invalidation events and auto-reload
-  useEffect(() => {
-    isMountedRef.current = true;
-
-    // Listen for marketplace data invalidation (listing-created, purchased, canceled, etc.)
-    const handleInvalidation = (event: Event) => {
-      const customEvent = event as CustomEvent<InvalidationEventDetail>;
-
-      const eventType = customEvent.detail?.type;
-
-      // Auto-reload on marketplace events that affect listings
-      const shouldReload = !!eventType && MARKETPLACE_INVALIDATION_TYPES.has(eventType);
-
-      if (shouldReload) {
-        devLog.info(`🔄 [useMarketplaceItems] ${eventType} event detected, invalidating cache and reloading...`);
-
-        // CRITICAL: Invalidate cache IMMEDIATELY to force fresh fetch
-        const filterKey = createFilterKey();
-        cacheContext.invalidateCache(filterKey);
-        devLog.info(`🗑️  [useMarketplaceItems] Cache invalidated for key: ${filterKey}`);
-
-        // Only reload if component is still mounted and not during initial load
-        if (isMountedRef.current && !initialLoading) {
-          // Increased delay for MongoDB sync + TheGraph → MongoDB propagation
-          // Event-bridge syncs immediately, but MongoDB write + index update needs time
-          devLog.info(`⏱️  [useMarketplaceItems] Waiting ${DB_SYNC_DELAY_MS}ms for MongoDB sync...`);
-
-          setTimeout(() => {
-            if (isMountedRef.current) {
-              devLog.info(`✅ [useMarketplaceItems] Reloading after ${eventType}`);
-              fetchItems(1, false);
-            }
-          }, DB_SYNC_DELAY_MS);
-        }
-      }
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('dataInvalidation', handleInvalidation);
-    }
-
-    return () => {
-      isMountedRef.current = false;
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('dataInvalidation', handleInvalidation);
-      }
-    };
-  }, [initialLoading, fetchItems, cacheContext, createFilterKey]);
 
   return {
     items,

@@ -132,10 +132,23 @@ export default function AdminLoginPage() {
             await new Promise(resolve => setTimeout(resolve, 100));
 
             const challengeRes = await fetch('/api/auth/challenge', {
-                cache: 'no-store'
+                cache: 'no-store',
+                credentials: 'include'
             });
             if (!challengeRes.ok) {
-                throw new Error('Challenge-Generierung fehlgeschlagen');
+                const challengeError = await challengeRes.json().catch(() => null);
+                const retryAfterHeader = challengeRes.headers.get('Retry-After');
+                const retryAfter = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : undefined;
+
+                if (challengeRes.status === 429) {
+                    throw new Error(
+                        retryAfter && Number.isFinite(retryAfter)
+                            ? `Zu viele Login-Anfragen. Bitte in ${retryAfter}s erneut versuchen.`
+                            : 'Zu viele Login-Anfragen. Bitte kurz warten und erneut versuchen.'
+                    );
+                }
+
+                throw new Error(challengeError?.error || challengeError?.message || 'Challenge-Generierung fehlgeschlagen');
             }
             const challengeData = await challengeRes.json();
 

@@ -20,6 +20,8 @@ const AVAILABLE_RARITIES = [
     'common', 'uncommon', 'rare', 'epic', 'legendary'
 ];
 
+const AVAILABLE_TOKEN_STANDARDS: Array<'ERC721' | 'ERC1155'> = ['ERC721', 'ERC1155'];
+
 const SORT_OPTIONS = [
     {
         field: 'price' as const,
@@ -96,6 +98,7 @@ export function NFTFilterSidebar({
 }: NFTFilterSidebarProps) {
     const [filters, setFilters] = useState<NFTFilters>({
         categories: [],
+        tokenStandards: [],
         rarities: [],
         searchTerm: '',
     });
@@ -122,6 +125,7 @@ export function NFTFilterSidebar({
     // Collapsible sections state
     const [expandedSections, setExpandedSections] = useState({
         categories: true,  // Standardmäßig offen
+        tokenStandard: true,
         price: false,
         rating: false,
         stats: false,
@@ -177,7 +181,18 @@ export function NFTFilterSidebar({
     const clearAllFilters = () => {
         setFilters({
             categories: [],
+            tokenStandards: [],
             rarities: [],
+            searchTerm: '',
+        });
+        setLocalSearchTerm('');
+        setLocalNumericFilters({
+            priceMin: undefined,
+            priceMax: undefined,
+            minRating: undefined,
+            minViews: undefined,
+            minLikes: undefined,
+            minWatchlistCount: undefined,
         });
         onSortChange({ field: 'price', direction: 'desc' });
     };
@@ -200,6 +215,17 @@ export function NFTFilterSidebar({
         onFiltersChange(newFilters);
     };
 
+    const toggleTokenStandard = (tokenStandard: 'ERC721' | 'ERC1155') => {
+        const current = filters.tokenStandards || [];
+        const newTokenStandards = current.includes(tokenStandard)
+            ? current.filter((t) => t !== tokenStandard)
+            : [...current, tokenStandard];
+
+        const newFilters = { ...filters, tokenStandards: newTokenStandards };
+        setFilters(newFilters);
+        onFiltersChange(newFilters);
+    };
+
     const getRarityColor = (rarity: string) => {
         switch (rarity) {
             case 'legendary': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
@@ -218,7 +244,7 @@ export function NFTFilterSidebar({
         }));
     };
 
-    const activeFiltersCount = filters.categories.length + filters.rarities.length;
+    const activeFiltersCount = filters.categories.length + filters.rarities.length + (filters.tokenStandards?.length || 0);
 
     // Sammle alle aktiven Filter als Chips
     const getActiveFilterChips = () => {
@@ -232,6 +258,11 @@ export function NFTFilterSidebar({
         // Rarities
         filters.rarities.forEach(rarity => {
             chips.push({ type: 'rarity', value: rarity, label: rarity });
+        });
+
+        // Token standards
+        (filters.tokenStandards || []).forEach((tokenStandard) => {
+            chips.push({ type: 'tokenStandard', value: tokenStandard, label: tokenStandard });
         });
 
         // Preis (nur anzeigen wenn tatsächlich Werte gesetzt)
@@ -274,6 +305,9 @@ export function NFTFilterSidebar({
                 break;
             case 'rarity':
                 toggleRarity(chip.value);
+                break;
+            case 'tokenStandard':
+                toggleTokenStandard(chip.value as 'ERC721' | 'ERC1155');
                 break;
             case 'price':
                 setLocalNumericFilters(prev => ({ ...prev, priceMin: undefined, priceMax: undefined }));
@@ -447,6 +481,8 @@ export function NFTFilterSidebar({
                                         return 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100';
                                     case 'category':
                                         return 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100';
+                                    case 'tokenStandard':
+                                        return 'bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100';
                                     default:
                                         return 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100';
                                 }
@@ -478,6 +514,98 @@ export function NFTFilterSidebar({
 
                 {/* Content */}
                 <div className="p-4 pt-8 space-y-3">
+                    {/* Suche */}
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                        <div className="px-4 py-3 bg-gray-50">
+                            <h4 className="text-base font-semibold text-gray-900">Suche</h4>
+                        </div>
+                        <div className="p-3 bg-white">
+                            <input
+                                type="text"
+                                placeholder="Name, Token ID, Address, Tags..."
+                                value={localSearchTerm}
+                                onChange={(e) => setLocalSearchTerm(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Kategorien */}
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                        <button
+                            onClick={() => toggleSection('categories')}
+                            className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
+                        >
+                            <h4 className="text-base font-semibold text-gray-900">Kategorien</h4>
+                            <svg
+                                className={`w-5 h-5 transition-transform ${expandedSections.categories ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {expandedSections.categories && (
+                            <div className="p-3 bg-white">
+                                <div className="flex flex-wrap gap-2">
+                                    {AVAILABLE_CATEGORIES.map((category) => (
+                                        <button
+                                            key={category}
+                                            onClick={() => toggleCategory(category)}
+                                            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${filters.categories.includes(category)
+                                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            {category}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Token Standard */}
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                        <button
+                            onClick={() => toggleSection('tokenStandard')}
+                            className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
+                        >
+                            <h4 className="text-base font-semibold text-gray-900">Token Standard</h4>
+                            <svg
+                                className={`w-5 h-5 transition-transform ${expandedSections.tokenStandard ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {expandedSections.tokenStandard && (
+                            <div className="p-3 bg-white">
+                                <div className="flex flex-wrap gap-2">
+                                    {AVAILABLE_TOKEN_STANDARDS.map((tokenStandard) => {
+                                        const selected = (filters.tokenStandards || []).includes(tokenStandard);
+
+                                        return (
+                                            <button
+                                                key={tokenStandard}
+                                                onClick={() => toggleTokenStandard(tokenStandard)}
+                                                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${selected
+                                                    ? 'bg-violet-50 text-violet-700 border-violet-200'
+                                                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                                    }`}
+                                            >
+                                                {tokenStandard}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     {/* Preis Filter */}
                     <div className="border border-gray-200 rounded-lg overflow-hidden">
                         <button

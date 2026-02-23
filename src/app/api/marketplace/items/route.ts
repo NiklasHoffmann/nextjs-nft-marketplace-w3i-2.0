@@ -15,6 +15,7 @@
  * - seller: string
  * - isListed: boolean
  * - category: string
+ * - tokenStandard: ERC721|ERC1155 (comma-separated)
  * - rarity: string
  * - tags: string (comma-separated)
  * - minRating: number
@@ -31,6 +32,8 @@ import { apiHandler, apiSuccess } from '@/lib/api';
 import type { MarketplaceItemsResponse } from '@/types/marketplace/enriched-nft';
 import { devLog } from '@/utils';
 
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // Auto-start sync service in dev mode
 import '@/lib/dev-services-auto-start';
 
@@ -44,19 +47,26 @@ export const GET = apiHandler(async (request: NextRequest) => {
     const skip = (page - 1) * limit;
 
     // Parse filters
-    const search = searchParams.get('search');
+    const rawSearch = searchParams.get('search')?.trim();
+    const search = rawSearch ? rawSearch.slice(0, 120) : null;
     const contractAddress = searchParams.get('contractAddress');
     const minPrice = searchParams.get('minPrice');
     const maxPrice = searchParams.get('maxPrice');
     const seller = searchParams.get('seller');
     const isListed = searchParams.get('isListed');
     const category = searchParams.get('category')?.split(',').filter(Boolean);
+    const tokenStandard = searchParams
+        .get('tokenStandard')
+        ?.split(',')
+        .map(value => value.trim().toUpperCase())
+        .filter((value): value is 'ERC721' | 'ERC1155' => value === 'ERC721' || value === 'ERC1155');
     const rarity = searchParams.get('rarity')?.split(',').filter(Boolean);
     const tags = searchParams.get('tags')?.split(',').filter(Boolean);
     const minRating = searchParams.get('minRating');
     const minViews = searchParams.get('minViews');
     const minLikes = searchParams.get('minLikes');
     const minWatchlistCount = searchParams.get('minWatchlistCount');
+    const includeFilters = searchParams.get('includeFilters') !== 'false';
 
     // Parse sorting
     const sortBy = searchParams.get('sortBy') || 'price';
@@ -78,13 +88,15 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
     // Marketplace filters
     if (contractAddress) {
+        const exactAddressRegex = { $regex: `^${escapeRegex(contractAddress)}$`, $options: 'i' };
         query.$or = [
-            { contractAddress },
-            { nftAddress: contractAddress },
-            { tokenAddress: contractAddress }
+            { contractAddress: exactAddressRegex },
+            { nftAddress: exactAddressRegex },
+            { tokenAddress: exactAddressRegex }
         ];
     }
     if (seller) query.seller = seller;
+    if (tokenStandard && tokenStandard.length > 0) query.tokenStandard = { $in: tokenStandard };
 
     // Note: Price filters are applied later in the pipeline using $expr
     // because price is stored as string but needs numeric comparison
@@ -346,7 +358,55 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
                 // Add sort fields with null handling
                 sortName: { $ifNull: ['$nftData.metadata.name', ''] },
-                sortPrice: { $toDecimal: { $ifNull: ['$price', '0'] } }, // Convert string Wei to decimal for sorting
+                sortPrice: {
+                    $let: {
+                        vars: {
+                            tokenStandard: { $ifNull: ['$tokenStandard', null] },
+                            totalPriceDecimal: {
+                                $convert: {
+                                    input: { $ifNull: ['$price', '0'] },
+                                    to: 'decimal',
+                                    onError: { $toDecimal: '0' },
+                                    onNull: { $toDecimal: '0' }
+                                }
+                            },
+                            unitPriceDecimal: {
+                                $convert: {
+                                    input: '$unitPrice',
+                                    to: 'decimal',
+                                    onError: null,
+                                    onNull: null
+                                }
+                            },
+                            quantityDecimal: {
+                                $convert: {
+                                    input: '$erc1155QuantityListed',
+                                    to: 'decimal',
+                                    onError: { $toDecimal: '0' },
+                                    onNull: { $toDecimal: '0' }
+                                }
+                            }
+                        },
+                        in: {
+                            $cond: [
+                                { $eq: ['$$tokenStandard', 'ERC1155'] },
+                                {
+                                    $ifNull: [
+                                        '$$unitPriceDecimal',
+                                        {
+                                            $cond: [
+                                                { $gt: ['$$quantityDecimal', { $toDecimal: '0' }] },
+                                                { $divide: ['$$totalPriceDecimal', '$$quantityDecimal'] },
+                                                '$$totalPriceDecimal'
+                                            ]
+                                        }
+                                    ]
+                                },
+                                '$$totalPriceDecimal'
+                            ]
+                        }
+                    }
+                }, // Effective sort price: ERC1155 by unit price, others by total price
                 sortCreatedAt: '$createdAt',
                 sortViewCount: { $ifNull: ['$statsData.viewCount', 0] },
                 sortLikeCount: { $ifNull: ['$statsData.likeCount', 0] },
@@ -361,7 +421,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
     // Enhanced search across multiple fields
     if (search) {
-        const searchRegex = { $regex: search, $options: 'i' };
+        const searchRegex = { $regex: escapeRegex(search), $options: 'i' };
         metadataFilters.$or = [
             // NFT Metadata
             { 'metadata.name': searchRegex },
@@ -376,46 +436,15 @@ export const GET = apiHandler(async (request: NextRequest) => {
             { 'insights.title': searchRegex },
             { 'insights.category': searchRegex },
             { 'insights.rarity': searchRegex },
-            { 'insights.projectWebsite': searchRegex },
-            { 'insights.projectTwitter': searchRegex },
-            { 'insights.projectDiscord': searchRegex },
 
-            // Tags (array search - use elemMatch instead of $in with $regex)
+            // Tags and short card descriptions
             { 'insights.tags': searchRegex },
-
-            // Descriptions (array search - use elemMatch for arrays)
-            { 'insights.descriptions': searchRegex },
             { 'insights.cardDescriptions': searchRegex },
-            {
-                'insights.projectDescriptions.titleDescriptionPairs': {
-                    $elemMatch: {
-                        $or: [
-                            { title: searchRegex },
-                            { descriptions: searchRegex }
-                        ]
-                    }
-                }
-            },
-            {
-                'insights.functionalitiesDescriptions.titleDescriptionPairs': {
-                    $elemMatch: {
-                        $or: [
-                            { title: searchRegex },
-                            { descriptions: searchRegex }
-                        ]
-                    }
-                }
-            },
-            {
-                'insights.specificDescriptions.titleDescriptionPairs': {
-                    $elemMatch: {
-                        $or: [
-                            { title: searchRegex },
-                            { descriptions: searchRegex }
-                        ]
-                    }
-                }
-            }
+
+            // Listing identifiers
+            { contractAddress: searchRegex },
+            { resolvedContractAddress: searchRegex },
+            { tokenId: searchRegex }
         ];
     }
 
@@ -483,23 +512,27 @@ export const GET = apiHandler(async (request: NextRequest) => {
         { $limit: limit }
     );
 
-    // Debug: Check BEFORE cleaning up temporary fields
-    const itemsBeforeCleanup = await collection.aggregate(pipeline).toArray();
-    if (itemsBeforeCleanup.length > 0) {
-        const firstItem: any = itemsBeforeCleanup[0];
-        devLog.debug('\n🔍 [API Debug] BEFORE $project cleanup:');
-        devLog.debug('  - contractAddress:', firstItem.contractAddress);
-        devLog.debug('  - tokenId:', firstItem.tokenId);
-        devLog.debug('  - Debug lookup keys:', firstItem._debug_lookupKeys);
-        devLog.debug('  - nftData array length:', firstItem.nftData?.length || 0);
-        if (firstItem.nftData?.[0]) {
-            devLog.debug('  - nftData[0] exists with metadata?', !!firstItem.nftData[0].metadata);
+    const isDebugMode = process.env.NODE_ENV === 'development';
+
+    // Debug-only snapshot BEFORE cleaning up temporary fields
+    if (isDebugMode) {
+        const itemsBeforeCleanup = await collection.aggregate(pipeline).toArray();
+        if (itemsBeforeCleanup.length > 0) {
+            const firstItem: any = itemsBeforeCleanup[0];
+            devLog.debug('\n🔍 [API Debug] BEFORE $project cleanup:');
+            devLog.debug('  - contractAddress:', firstItem.contractAddress);
+            devLog.debug('  - tokenId:', firstItem.tokenId);
+            devLog.debug('  - Debug lookup keys:', firstItem._debug_lookupKeys);
+            devLog.debug('  - nftData array length:', firstItem.nftData?.length || 0);
+            if (firstItem.nftData?.[0]) {
+                devLog.debug('  - nftData[0] exists with metadata?', !!firstItem.nftData[0].metadata);
+            }
+            devLog.debug('  - Has insightsData field?', 'insightsData' in firstItem);
+            devLog.debug('  - insightsData value:', firstItem.insightsData);
+            devLog.debug('  - Has insights field?', 'insights' in firstItem);
+            devLog.debug('  - insights value:', firstItem.insights);
+            devLog.debug('');
         }
-        devLog.debug('  - Has insightsData field?', 'insightsData' in firstItem);
-        devLog.debug('  - insightsData value:', firstItem.insightsData);
-        devLog.debug('  - Has insights field?', 'insights' in firstItem);
-        devLog.debug('  - insights value:', firstItem.insights);
-        devLog.debug('');
     }
 
     // Clean up temporary fields but keep everything else
@@ -565,29 +598,38 @@ export const GET = apiHandler(async (request: NextRequest) => {
         devLog.debug('🏷️ [API] Unique categories in filtered results:', Array.from(uniqueCategories));
     }
 
-    // Get filter options (available categories, rarities, price range)
-    // Use admin_nft_insights collection for insights-based filters
-    const insightsCollection = db.collection('admin_nft_insights');
-    const [categories, rarities, priceStats] = await Promise.all([
-        insightsCollection.distinct('category'),
-        insightsCollection.distinct('rarity'),
-        collection.aggregate([
-            { $match: { isListed: true, price: { $ne: null } } },
-            {
-                $group: {
-                    _id: null,
-                    minPrice: { $min: { $toDecimal: { $ifNull: ['$price', '0'] } } },
-                    maxPrice: { $max: { $toDecimal: { $ifNull: ['$price', '0'] } } }
+    // Get filter options (available categories, rarities, price range) only when requested
+    let categories: any[] = [];
+    let rarities: any[] = [];
+    let priceMin = '0';
+    let priceMax = '0';
+
+    if (includeFilters) {
+        // Use admin_nft_insights collection for insights-based filters
+        const insightsCollection = db.collection('admin_nft_insights');
+        const [resolvedCategories, resolvedRarities, priceStats] = await Promise.all([
+            insightsCollection.distinct('category'),
+            insightsCollection.distinct('rarity'),
+            collection.aggregate([
+                { $match: { isListed: true, price: { $ne: null } } },
+                {
+                    $group: {
+                        _id: null,
+                        minPrice: { $min: { $toDecimal: { $ifNull: ['$price', '0'] } } },
+                        maxPrice: { $max: { $toDecimal: { $ifNull: ['$price', '0'] } } }
+                    }
                 }
-            }
-        ]).toArray()
-    ]);
+            ]).toArray()
+        ]);
 
-    // Debug: Log all available categories from insights
-    devLog.debug('🏷️ [API] Available categories in admin_nft_insights:', categories);
+        categories = resolvedCategories;
+        rarities = resolvedRarities;
+        priceMin = priceStats[0]?.minPrice ? priceStats[0].minPrice.toString() : '0';
+        priceMax = priceStats[0]?.maxPrice ? priceStats[0].maxPrice.toString() : '0';
 
-    const priceMin = priceStats[0]?.minPrice ? priceStats[0].minPrice.toString() : '0';
-    const priceMax = priceStats[0]?.maxPrice ? priceStats[0].maxPrice.toString() : '0';
+        // Debug: Log all available categories from insights
+        devLog.debug('🏷️ [API] Available categories in admin_nft_insights:', categories);
+    }
 
     const response: MarketplaceItemsResponse['data'] = {
         items: items as any[],

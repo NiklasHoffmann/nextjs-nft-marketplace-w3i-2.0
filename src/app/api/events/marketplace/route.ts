@@ -33,7 +33,9 @@ export const POST = apiHandler(async (request: NextRequest) => {
         }
 
         // Deduplication check
-        const dedupKey = `${event.txHash}-${event.eventName}`;
+        const txHash = event.transactionHash || event.txHash || event.hash || 'unknown-tx';
+        const logIndex = event.logIndex ?? 'unknown-log';
+        const dedupKey = `${txHash}-${logIndex}-${event.eventName}`;
         const now = Date.now();
         const lastProcessed = processedEvents.get(dedupKey);
         

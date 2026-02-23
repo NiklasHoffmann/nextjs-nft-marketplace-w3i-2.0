@@ -48,6 +48,7 @@ export function WalletHeader({
                     ethPriceLoading={ethPriceLoading}
                 />
             }
+            hasSidebar={true}
         />
     );
 }

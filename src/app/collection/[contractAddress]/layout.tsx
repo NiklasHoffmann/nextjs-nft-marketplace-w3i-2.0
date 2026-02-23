@@ -30,6 +30,7 @@ export default function CollectionLayout({
     // Filter and Sort State
     const [filters, setFilters] = useState<NFTFilters>({
         categories: [],
+        tokenStandards: [],
         rarities: [],
         searchTerm: '',
     });

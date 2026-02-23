@@ -235,21 +235,67 @@ export const GET = apiHandler(async (request: NextRequest) => {
             });
         }
 
-        // Get up to 4 images per collection for preview
+        // Get up to 4 images per collection for preview (BATCHED: avoids N+1 queries)
+        const previewTokenIdsByContract = new Map<string, string[]>();
         for (const collection of collections) {
-            const tokenIds = collection.tokenIds?.slice(0, 4) || [];
             const normalizedContractAddress = String(collection.contractAddress || '').toLowerCase();
-            if (tokenIds.length > 0) {
-                const nfts = await nftMetadata.find({
-                    contractAddress: { $regex: `^${escapeRegex(normalizedContractAddress)}$`, $options: 'i' },
-                    tokenId: { $in: tokenIds.map(String) }
-                }).limit(4).toArray();
+            const tokenIds = (collection.tokenIds || [])
+                .slice(0, 4)
+                .map((tokenId: unknown) => String(tokenId));
 
-                const images = nfts
-                    .map((nft: any) => nft.metadata?.image)
-                    .filter((img: any) => img && typeof img === 'string');
+            if (normalizedContractAddress && tokenIds.length > 0) {
+                previewTokenIdsByContract.set(normalizedContractAddress, tokenIds);
+            }
+        }
 
-                metadataMap.set(normalizedContractAddress, images);
+        const previewMetadataClauses = Array.from(previewTokenIdsByContract.entries()).map(([contractAddress, tokenIds]) => ({
+            $and: [
+                { contractAddress: { $regex: `^${escapeRegex(contractAddress)}$`, $options: 'i' } },
+                { tokenId: { $in: tokenIds } }
+            ]
+        }));
+
+        if (previewMetadataClauses.length > 0) {
+            const previewDocs = await nftMetadata.find(
+                { $or: previewMetadataClauses },
+                {
+                    projection: {
+                        contractAddress: 1,
+                        tokenId: 1,
+                        'metadata.image': 1
+                    }
+                }
+            ).toArray();
+
+            const previewDocLookup = new Map<string, Map<string, string>>();
+            for (const doc of previewDocs) {
+                const normalizedContractAddress = String((doc as any).contractAddress || '').toLowerCase();
+                const tokenId = String((doc as any).tokenId || '');
+                const image = (doc as any).metadata?.image;
+
+                if (!normalizedContractAddress || !tokenId || !image || typeof image !== 'string') {
+                    continue;
+                }
+
+                const contractBucket = previewDocLookup.get(normalizedContractAddress) || new Map<string, string>();
+                // Keep first valid image for token (stable)
+                if (!contractBucket.has(tokenId)) {
+                    contractBucket.set(tokenId, image);
+                }
+                previewDocLookup.set(normalizedContractAddress, contractBucket);
+            }
+
+            for (const [contractAddress, tokenIds] of previewTokenIdsByContract.entries()) {
+                const contractBucket = previewDocLookup.get(contractAddress);
+                if (!contractBucket) {
+                    continue;
+                }
+
+                const orderedImages = tokenIds
+                    .map(tokenId => contractBucket.get(tokenId))
+                    .filter((image): image is string => Boolean(image));
+
+                metadataMap.set(contractAddress, orderedImages.slice(0, 4));
             }
         }
 

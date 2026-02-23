@@ -92,7 +92,7 @@ export function CollectionNFTsList({
                 icon="🖼️"
                 title="No NFTs Found"
                 description={
-                    filters.searchTerm || filters.categories.length > 0 || filters.rarities.length > 0
+                    filters.searchTerm || filters.categories.length > 0 || (filters.tokenStandards?.length || 0) > 0 || filters.rarities.length > 0
                         ? 'Try adjusting your filters'
                         : 'No items listed in this collection'
                 }

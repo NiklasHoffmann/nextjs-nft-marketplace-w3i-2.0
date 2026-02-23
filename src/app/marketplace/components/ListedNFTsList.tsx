@@ -60,6 +60,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
     // Filter and sort state
     const [localFilters, setLocalFilters] = useState<NFTFilters>({
         categories: [],
+        tokenStandards: [],
         rarities: [],
         searchTerm: urlSearchTerm,
     });
@@ -73,6 +74,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
 
     const hasActiveFilters = Boolean(
         filters.searchTerm ||
+        (filters.tokenStandards && filters.tokenStandards.length > 0) ||
         (filters.rarities && filters.rarities.length > 0) ||
         (filters.priceMin && filters.priceMin > 0) ||
         (filters.priceMax && filters.priceMax > 0) ||
@@ -131,6 +133,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
         minPrice: filters.priceMin?.toString(),
         maxPrice: filters.priceMax?.toString(),
         category: filters.categories.length > 0 ? filters.categories : undefined,
+        tokenStandard: filters.tokenStandards && filters.tokenStandards.length > 0 ? filters.tokenStandards : undefined,
         rarity: filters.rarities.length > 0 ? filters.rarities : undefined,
         minRating: filters.minRating,
         minViews: filters.minViews,
@@ -140,6 +143,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
         sortOrder: sort.direction,
         limit: 50, // Increased from 20 to 50 for faster initial load (matches Collections)
         autoFetch: true,
+        includeFilters: false,
     });
 
     // Events are handled by MarketplaceItemsContext automatically

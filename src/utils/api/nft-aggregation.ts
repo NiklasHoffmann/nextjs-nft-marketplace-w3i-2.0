@@ -198,8 +198,21 @@ export function sortNFTs(nfts: AggregatedNFT[], sortBy: 'price' | 'name' | 'rece
     return [...nfts].sort((a, b) => {
         switch (sortBy) {
             case 'price':
-                const priceA = parseFloat(a.listing?.price || '0');
-                const priceB = parseFloat(b.listing?.price || '0');
+                const getEffectivePrice = (nft: AggregatedNFT): number => {
+                    if (!nft.listing) return 0;
+
+                    const tokenStandard = nft.listing.tokenStandard;
+                    const totalPrice = parseFloat(nft.listing.price || '0');
+
+                    if (tokenStandard === 'ERC1155' && nft.listing.unitPrice) {
+                        return parseFloat(nft.listing.unitPrice || '0');
+                    }
+
+                    return totalPrice;
+                };
+
+                const priceA = getEffectivePrice(a);
+                const priceB = getEffectivePrice(b);
                 return priceB - priceA;
 
             case 'name':

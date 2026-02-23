@@ -21,5 +21,5 @@ export const GET = apiHandler(async (request: NextRequest) => {
     response.headers.set('Cache-Control', 'no-store, max-age=0');
     return response;
 }, {
-    rateLimit: RATE_LIMIT_CONFIG.STRICT,
+    rateLimit: RATE_LIMIT_CONFIG.STANDARD,
 });

@@ -231,6 +231,7 @@ export function MarketplaceItemsProvider({ children }: { children: React.ReactNo
                         devLog.info('marketplace-items', `🗑️ Removing NFT after cancel`);
                         service.removeNFT(detail.contractAddress, detail.tokenId);
                     }
+                    setRefreshTrigger(prev => prev + 1);
                     break;
 
                 case 'nft-purchased':
@@ -239,6 +240,7 @@ export function MarketplaceItemsProvider({ children }: { children: React.ReactNo
                         devLog.info('marketplace-items', `🗑️ Removing NFT after purchase`);
                         service.removeNFT(detail.contractAddress, detail.tokenId);
                     }
+                    setRefreshTrigger(prev => prev + 1);
                     break;
 
                 case 'nft-transferred':
@@ -247,6 +249,7 @@ export function MarketplaceItemsProvider({ children }: { children: React.ReactNo
                         devLog.info('marketplace-items', `🔄 Refreshing after transfer`);
                         service.removeNFT(detail.contractAddress, detail.tokenId);
                     }
+                    setRefreshTrigger(prev => prev + 1);
                     break;
 
                 case 'graph-update':
@@ -254,6 +257,7 @@ export function MarketplaceItemsProvider({ children }: { children: React.ReactNo
                     // Full refresh
                     devLog.info('marketplace-items', `🔄 Full invalidation after ${detail.type}`);
                     service.invalidate();
+                    setRefreshTrigger(prev => prev + 1);
                     break;
             }
         });

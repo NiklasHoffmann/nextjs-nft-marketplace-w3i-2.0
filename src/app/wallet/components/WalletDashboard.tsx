@@ -4,11 +4,13 @@ import React from 'react';
 import { useAccount } from 'wagmi';
 import Link from 'next/link';
 import { WalletNFTsList } from './WalletNFTsList';
+import { useWalletLayout } from '../context';
 import { useWalletNFTsV2 } from '@/hooks/wallet/useWalletNFTsV2';
 import { LoadingState } from '@/components/core/Loading';
 
 export function WalletDashboard() {
     const { address, isConnected, isConnecting, isReconnecting } = useAccount();
+    const { filters, sort, setFilteredCount } = useWalletLayout();
 
     // Simple data fetching without filters
     const { nfts, loading, error } = useWalletNFTsV2({
@@ -43,13 +45,16 @@ export function WalletDashboard() {
     }
 
     return (
-        <div className="py-8">
+        <div className="md:pl-16 py-8">
             <WalletNFTsList
                 nfts={nfts}
                 loading={loading || isConnecting || isReconnecting}
                 error={error}
                 title="Your NFT Collection"
                 separateSections={true}
+                filters={filters}
+                sort={sort}
+                onFilteredCountChange={setFilteredCount}
             />
         </div>
     );

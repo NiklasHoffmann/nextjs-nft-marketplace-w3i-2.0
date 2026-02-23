@@ -12,14 +12,45 @@ export function useNFTFilters(
     sort: NFTSortOptions
 ) {
     const filteredAndSortedItems = useMemo(() => {
+        const parseBigIntValue = (value: string | bigint | null | undefined): bigint | null => {
+            if (value === null || value === undefined) return null;
+            if (typeof value === 'bigint') return value;
+            if (typeof value !== 'string' || value.trim() === '') return null;
+
+            try {
+                return BigInt(value);
+            } catch {
+                return null;
+            }
+        };
+
+        const getEffectivePriceWei = (item: FilterableNFTItem): bigint | null => {
+            if (!item.isListed) return null;
+
+            const tokenStandard = item.tokenStandard || null;
+            const totalPrice = parseBigIntValue(item.price);
+
+            if (tokenStandard === 'ERC1155') {
+                const unitPrice = parseBigIntValue(item.unitPrice);
+                if (unitPrice !== null) return unitPrice;
+
+                const quantity = parseBigIntValue(item.erc1155QuantityListed);
+                if (totalPrice !== null && quantity !== null && quantity > BigInt(0)) {
+                    return totalPrice / quantity;
+                }
+            }
+
+            return totalPrice;
+        };
+
         const getItemPrice = (item: FilterableNFTItem): number => {
-            if (!item.isListed || !item.price) return -Infinity;
+            const effectiveWeiPrice = getEffectivePriceWei(item);
+            if (effectiveWeiPrice === null) return -Infinity;
 
             const chainId = item.chainId || 11155111;
             const tokenDecimals = getTokenDecimalsByAddress(chainId, item.currency || null);
-            const price = typeof item.price === 'string' ? BigInt(item.price) : item.price;
 
-            return parseFloat(formatUnits(price, tokenDecimals));
+            return parseFloat(formatUnits(effectiveWeiPrice, tokenDecimals));
         };
 
         let result = [...items];
@@ -54,6 +85,13 @@ export function useNFTFilters(
             // Rarity filter
             if (filters.rarities.length > 0) {
                 if (!item.rarity || !filters.rarities.includes(item.rarity)) {
+                    return false;
+                }
+            }
+
+            // Token standard filter
+            if (filters.tokenStandards && filters.tokenStandards.length > 0) {
+                if (!item.tokenStandard || !filters.tokenStandards.includes(item.tokenStandard)) {
                     return false;
                 }
             }

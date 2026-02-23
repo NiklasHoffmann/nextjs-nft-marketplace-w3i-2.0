@@ -22,8 +22,20 @@ export function sortNFTs(
                 bValue = b.core.name || b.meta?.name || `NFT #${b.tokenId}`;
                 break;
             case 'price':
-                aValue = a.listed && a.listing?.price ? parseFloat(a.listing.price) : 0;
-                bValue = b.listed && b.listing?.price ? parseFloat(b.listing.price) : 0;
+                aValue = a.listed
+                    ? parseFloat(
+                        a.listing?.tokenStandard === 'ERC1155'
+                            ? (a.listing?.unitPrice || a.listing?.price || '0')
+                            : (a.listing?.price || '0')
+                    )
+                    : 0;
+                bValue = b.listed
+                    ? parseFloat(
+                        b.listing?.tokenStandard === 'ERC1155'
+                            ? (b.listing?.unitPrice || b.listing?.price || '0')
+                            : (b.listing?.price || '0')
+                    )
+                    : 0;
                 break;
             case 'likes':
                 aValue = a.social?.likeCount || 0;

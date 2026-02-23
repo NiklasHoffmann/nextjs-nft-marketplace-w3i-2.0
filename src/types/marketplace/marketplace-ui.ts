@@ -23,6 +23,9 @@ export interface NFTFilters {
     /** Kategorie-Filter (Art, Gaming, Music, etc.) */
     categories: string[];
 
+    /** Token Standard Filter (ERC721 / ERC1155) */
+    tokenStandards?: Array<'ERC721' | 'ERC1155'>;
+
     /** Preis-Filter (Min/Max in ETH) */
     priceMin?: number;
     priceMax?: number;

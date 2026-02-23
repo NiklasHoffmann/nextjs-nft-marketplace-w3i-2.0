@@ -149,6 +149,7 @@ export function mapWalletNFTToScrollItem(nft: WalletNFT, connectedWallet?: strin
         tags: [],
         averageRating: nft.stats?.averageRating ?? undefined,
         ratingCount: nft.stats?.ratingCount ?? undefined,
+        likeCount: nft.stats?.likeCount ?? undefined,
         viewCount: nft.stats?.viewCount ?? undefined,
         favoriteCount: nft.stats?.likeCount ?? undefined,
         watchlistCount: nft.stats?.watchlistCount ?? undefined,
@@ -182,5 +183,27 @@ export function mapWalletNFTToScrollItem(nft: WalletNFT, connectedWallet?: strin
             approved: nft.approved || null,
             ownerBalance: nft.ownerBalance || null,
         },
+    };
+}
+
+export function mapWalletNFTToFilterableItem(nft: WalletNFT, connectedWallet?: string | null): FilterableNFTItem {
+    const scrollItem = mapWalletNFTToScrollItem(nft, connectedWallet);
+
+    return {
+        ...scrollItem,
+        contractAddress: nft.contractAddress,
+        isListed: !!nft.isListed,
+        name: nft.name || scrollItem.name || null,
+        symbol: nft.contractSymbol || scrollItem.symbol || null,
+        category: nft.insights?.category || nft.category || scrollItem.category || null,
+        rarity: nft.insights?.rarity || nft.rarity || scrollItem.rarity || null,
+        averageRating: nft.stats?.averageRating ?? scrollItem.averageRating ?? null,
+        ratingCount: nft.stats?.ratingCount ?? scrollItem.ratingCount ?? null,
+        likeCount: nft.stats?.likeCount ?? (scrollItem as any).likeCount ?? null,
+        watchlistCount: nft.stats?.watchlistCount ?? scrollItem.watchlistCount ?? null,
+        viewCount: nft.stats?.viewCount ?? scrollItem.viewCount ?? null,
+        customTitle: nft.insights?.customTitle || scrollItem.customTitle || null,
+        cardDescriptions: nft.insights?.cardDescriptions || scrollItem.cardDescriptions || null,
+        imageUrl: nft.image || scrollItem.imageUrl || null,
     };
 }

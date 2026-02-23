@@ -12,6 +12,7 @@ export default function MarketplaceLayout({ children }: { children: ReactNode })
 
     const [filters, setFilters] = useState<NFTFilters>({
         categories: [],
+        tokenStandards: [],
         rarities: [],
         searchTerm: urlSearchTerm,
     });
