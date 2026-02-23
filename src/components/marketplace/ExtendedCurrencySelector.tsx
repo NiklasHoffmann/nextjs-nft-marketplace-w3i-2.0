@@ -7,17 +7,17 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useChainId } from 'wagmi';
+import { useChainId, useReadContract } from 'wagmi';
 import {
     ZERO_ADDRESS,
     getAvailableTokens,
-    getCurrencySymbolByAddress,
     getAllExtendedTokens,
-    getTokensByCategory,
     CATEGORY_NAMES,
     type TokenCategory,
     type ExtendedTokenConfig
 } from '@/config/tokens';
+import { getMarketplaceAddress } from '@/config';
+import { GETTER_FACET_ABI } from '@/config/abis/getter-facet';
 
 interface ExtendedCurrencySelectorProps {
     value: string; // currency address
@@ -39,6 +39,28 @@ export function ExtendedCurrencySelector({
     const chainId = useChainId();
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+
+    const marketplaceAddress = useMemo(() => {
+        if (chainId) {
+            const fromConfig = getMarketplaceAddress(chainId);
+            if (fromConfig) return fromConfig;
+        }
+        return process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS || '';
+    }, [chainId]);
+
+    const hasMarketplaceAddress = Boolean(marketplaceAddress);
+
+    const { data: allowedCurrencies } = useReadContract({
+        address: marketplaceAddress as `0x${string}`,
+        abi: GETTER_FACET_ABI,
+        functionName: 'getAllowedCurrencies',
+        query: { enabled: hasMarketplaceAddress },
+    });
+
+    const allowedCurrencySet = useMemo(() => {
+        if (!Array.isArray(allowedCurrencies)) return new Set<string>();
+        return new Set(allowedCurrencies.map((currency) => String(currency).toLowerCase()));
+    }, [allowedCurrencies]);
 
     // Get tokens - show ALL extended tokens on all networks for preview
     const isMainnet = chainId === 1;
@@ -129,8 +151,16 @@ export function ExtendedCurrencySelector({
             name: string;
             icon: string;
             category: string;
+            isAllowed: boolean;
         }> = [
-                { address: ZERO_ADDRESS, symbol: 'ETH', name: 'Ether', icon: 'Ξ', category: 'ETH_WRAPPERS' }
+                {
+                    address: ZERO_ADDRESS,
+                    symbol: 'ETH',
+                    name: 'Ether',
+                    icon: 'Ξ',
+                    category: 'ETH_WRAPPERS',
+                    isAllowed: allowedCurrencySet.has(ZERO_ADDRESS.toLowerCase())
+                }
             ];
 
         filteredTokens.forEach(token => {
@@ -141,12 +171,13 @@ export function ExtendedCurrencySelector({
                 symbol: token.symbol,
                 name: token.name,
                 icon: icon,
-                category: token.category || 'OTHER'
+                category: token.category || 'OTHER',
+                isAllowed: allowedCurrencySet.has(token.address.toLowerCase())
             });
         });
 
         return opts;
-    }, [filteredTokens]);
+    }, [filteredTokens, allowedCurrencySet]);
 
     const selectedOption = options.find(opt =>
         opt.address.toLowerCase() === (value || ZERO_ADDRESS).toLowerCase()
@@ -166,6 +197,11 @@ export function ExtendedCurrencySelector({
                         <span className="text-lg font-semibold">{selectedOption.icon}</span>
                         <span className="font-medium">{selectedOption.symbol}</span>
                         <span className="text-sm text-gray-500">({selectedOption.name})</span>
+                        {selectedOption.isAllowed && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                ✓ Allowed
+                            </span>
+                        )}
                     </div>
                     <svg
                         className={`w-5 h-5 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -242,6 +278,7 @@ export function ExtendedCurrencySelector({
                                                                 key={token.address}
                                                                 token={token}
                                                                 isSelected={isSelected}
+                                                                isAllowed={allowedCurrencySet.has(token.address.toLowerCase())}
                                                                 onClick={() => {
                                                                     onChange(token.address);
                                                                     setIsOpen(false);
@@ -278,6 +315,9 @@ export function ExtendedCurrencySelector({
                                                     <div className="font-bold text-sm">{option.symbol}</div>
                                                     <div className="text-xs text-gray-500 truncate max-w-full">{option.name}</div>
                                                 </div>
+                                                {option.isAllowed && (
+                                                    <span className="absolute left-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px]">✓</span>
+                                                )}
                                                 {isSelected && (
                                                     <svg className="w-4 h-4 text-blue-600 absolute top-1 right-1" fill="currentColor" viewBox="0 0 20 20">
                                                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -305,10 +345,11 @@ export function ExtendedCurrencySelector({
 interface TokenOptionProps {
     token: ExtendedTokenConfig;
     isSelected: boolean;
+    isAllowed: boolean;
     onClick: () => void;
 }
 
-function TokenGridOption({ token, isSelected, onClick }: TokenOptionProps) {
+function TokenGridOption({ token, isSelected, isAllowed, onClick }: TokenOptionProps) {
     const icon = token.icon || 'T';
 
     return (
@@ -325,6 +366,9 @@ function TokenGridOption({ token, isSelected, onClick }: TokenOptionProps) {
                 <div className="font-bold text-sm">{token.symbol}</div>
                 <div className="text-xs text-gray-500 truncate max-w-full">{token.name}</div>
             </div>
+            {isAllowed && (
+                <span className="absolute left-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px]">✓</span>
+            )}
             {isSelected && (
                 <svg className="w-4 h-4 text-blue-600 absolute top-1 right-1" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />

@@ -96,6 +96,13 @@ export function MarketplaceGovernanceSidebar({ diamondAddress }: MarketplaceGove
         });
     }, [availableTokens, chainId, currencyList]);
 
+    const currentAllowedCurrencySummary = useMemo(() => {
+        if (!currencyDisplay.length) return '—';
+        const visible = currencyDisplay.slice(0, 3).map((currency) => currency.symbol);
+        const hiddenCount = currencyDisplay.length - visible.length;
+        return hiddenCount > 0 ? `${visible.join(', ')} +${hiddenCount}` : visible.join(', ');
+    }, [currencyDisplay]);
+
     const visibleCollections = whitelistedList.slice(0, 6);
     const visibleCurrencies = currencyDisplay.slice(0, 6);
 
@@ -170,6 +177,10 @@ export function MarketplaceGovernanceSidebar({ diamondAddress }: MarketplaceGove
                                     : currencyList.length}
                         </span>
                     </div>
+                    <div className="flex items-start justify-between gap-3">
+                        <span>Allowed (on-chain)</span>
+                        <span className="text-right font-semibold text-gray-900 break-words">{isCurrenciesLoading ? 'Loading...' : currentAllowedCurrencySummary}</span>
+                    </div>
                 </div>
             </div>
 
@@ -211,7 +222,10 @@ export function MarketplaceGovernanceSidebar({ diamondAddress }: MarketplaceGove
                                 key={currency.address}
                                 className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700"
                             >
-                                <span className="font-semibold">{currency.symbol}</span> <span className="text-gray-500">·</span> {currency.name}
+                                <span className="font-semibold">{currency.symbol}</span>
+                                <span className="text-gray-500"> · </span>
+                                {currency.name}
+                                <span className="text-gray-400"> ({currency.address.slice(0, 6)}...{currency.address.slice(-4)})</span>
                             </span>
                         ))}
                         {currencyList.length > visibleCurrencies.length && (
