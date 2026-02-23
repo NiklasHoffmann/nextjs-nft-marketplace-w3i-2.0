@@ -36,34 +36,46 @@ function getAdminSessionToken(req: NextRequest): string | null {
 /**
  * Extract wallet address from request (session cookie or header)
  */
-function extractWalletAddress(req: NextRequest): string | null {
-    // 1. Check session cookie (preferred for admin routes)
-    const authToken = getAdminSessionToken(req);
-    if (authToken) {
-        const verified = verifyAdminSessionToken(authToken);
-        if (verified) {
-            return verified.address.toLowerCase();
+function extractWalletAddress(
+    req: NextRequest,
+    options: { preferExplicitWallet?: boolean } = {}
+): string | null {
+    const { preferExplicitWallet = false } = options;
+
+    const resolveFromExplicitWallet = (): string | null => {
+        const walletHeader = req.headers.get('x-wallet-address');
+        if (walletHeader && /^0x[a-fA-F0-9]{40}$/.test(walletHeader)) {
+            return walletHeader.toLowerCase();
         }
+
+        const walletAddress = req.nextUrl.searchParams.get('walletAddress');
+        if (walletAddress && /^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+            return walletAddress.toLowerCase();
+        }
+
+        const userId = req.nextUrl.searchParams.get('userId');
+        if (userId && /^0x[a-fA-F0-9]{40}$/.test(userId)) {
+            return userId.toLowerCase();
+        }
+
+        return null;
+    };
+
+    const resolveFromSession = (): string | null => {
+        const authToken = getAdminSessionToken(req);
+        if (!authToken) return null;
+
+        const verified = verifyAdminSessionToken(authToken);
+        if (!verified) return null;
+
+        return verified.address.toLowerCase();
+    };
+
+    if (preferExplicitWallet) {
+        return resolveFromExplicitWallet() || resolveFromSession();
     }
 
-    // 2. Check X-Wallet-Address header (for API calls with wallet)
-    const walletHeader = req.headers.get('x-wallet-address');
-    if (walletHeader && /^0x[a-fA-F0-9]{40}$/.test(walletHeader)) {
-        return walletHeader.toLowerCase();
-    }
-
-    // 3. Check query parameters (walletAddress or userId - mainly for testing and client-side calls)
-    const walletAddress = req.nextUrl.searchParams.get('walletAddress');
-    if (walletAddress && /^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
-        return walletAddress.toLowerCase();
-    }
-
-    const userId = req.nextUrl.searchParams.get('userId');
-    if (userId && /^0x[a-fA-F0-9]{40}$/.test(userId)) {
-        return userId.toLowerCase();
-    }
-
-    return null;
+    return resolveFromSession() || resolveFromExplicitWallet();
 }
 
 /**
@@ -77,7 +89,7 @@ export function isAdmin(address: string): boolean {
  * Middleware: Require any authenticated user
  */
 export async function withAuth(req: NextRequest): Promise<void> {
-    const address = extractWalletAddress(req);
+    const address = extractWalletAddress(req, { preferExplicitWallet: true });
 
     if (!address) {
         throw new UnauthorizedError('Authentication required. Please connect your wallet.');

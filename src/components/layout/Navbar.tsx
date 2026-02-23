@@ -209,22 +209,12 @@ export default function Navbar() {
                     </Link>
 
                     {/* Sell Link */}
-                    {isAdmin ? (
-                        <Link
-                            href="/sell"
-                            className="text-gray-700 hover:text-blue-600 font-medium transition-colors"
-                        >
-                            Sell
-                        </Link>
-                    ) : (
-                        <button
-                            disabled
-                            className="text-gray-400 font-medium cursor-not-allowed opacity-50"
-                            title="Bald verfügbar"
-                        >
-                            Sell
-                        </button>
-                    )}
+                    <Link
+                        href="/sell"
+                        className="text-gray-700 hover:text-blue-600 font-medium transition-colors"
+                    >
+                        Sell
+                    </Link>
 
                     {/* Game Link with Figure - ACTIVE */}
                     <Link
@@ -243,13 +233,7 @@ export default function Navbar() {
                     </Link>
 
                     {/* Currency Selector - TEMPORARILY DISABLED */}
-                    {isAdmin ? (
-                        <CurrencySelector />
-                    ) : (
-                        <div className="opacity-50 pointer-events-none">
-                            <CurrencySelector />
-                        </div>
-                    )}
+                    <CurrencySelector />
                     {/* Wallet Section */}
                     {mounted && isConnected && address ? (
                         /* Connected: Show Wallet Dropdown with same styling as Currency Selector */
@@ -315,29 +299,16 @@ export default function Navbar() {
 
                                             {/* Dashboard Link */}
                                             <div className="mb-3">
-                                                {isAdmin ? (
-                                                    <Link
-                                                        href="/wallet"
-                                                        onClick={() => setIsDropdownOpen(false)}
-                                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                                                    >
-                                                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                                        </svg>
-                                                        View Dashboard
-                                                    </Link>
-                                                ) : (
-                                                    <button
-                                                        disabled
-                                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-400 bg-gray-50 border border-gray-200 rounded-lg cursor-not-allowed opacity-50"
-                                                        title="Nur für Admins"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                                        </svg>
-                                                        View Dashboard
-                                                    </button>
-                                                )}
+                                                <Link
+                                                    href="/wallet"
+                                                    onClick={() => setIsDropdownOpen(false)}
+                                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                                                >
+                                                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                                    </svg>
+                                                    View Dashboard
+                                                </Link>
                                             </div>
 
                                             {/* Admin Link (only show for admins) */}
@@ -485,28 +456,16 @@ export default function Navbar() {
                             </button>
 
                             {/* Sell Link */}
-                            {isAdmin ? (
-                                <Link
-                                    href="/sell"
-                                    onClick={() => setIsMobileMenuOpen(false)}
-                                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors border border-blue-200"
-                                >
-                                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                                    </svg>
-                                    <span className="text-blue-700 font-medium">Sell</span>
-                                </Link>
-                            ) : (
-                                <button
-                                    disabled
-                                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg opacity-50 cursor-not-allowed"
-                                >
-                                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                                    </svg>
-                                    <span className="text-gray-400 font-medium">Sell (Bald verfügbar)</span>
-                                </button>
-                            )}
+                            <Link
+                                href="/sell"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors border border-blue-200"
+                            >
+                                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                <span className="text-blue-700 font-medium">Sell</span>
+                            </Link>
 
                             {/* Game Link with Figure */}
                             <Link
@@ -544,29 +503,16 @@ export default function Navbar() {
 
                                 {/* Wallet Actions */}
                                 <div className="space-y-2 mb-4">
-                                    {isAdmin ? (
-                                        <Link
-                                            href="/wallet"
-                                            onClick={() => setIsMobileMenuOpen(false)}
-                                            className="flex items-center gap-3 px-4 py-3 rounded-lg bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors"
-                                        >
-                                            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                            </svg>
-                                            <span className="text-blue-700 font-medium">View Dashboard</span>
-                                        </Link>
-                                    ) : (
-                                        <button
-                                            disabled
-                                            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-50 border border-gray-200 opacity-50 cursor-not-allowed"
-                                            title="Nur für Admins"
-                                        >
-                                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                            </svg>
-                                            <span className="text-gray-400 font-medium">View Dashboard</span>
-                                        </button>
-                                    )}
+                                    <Link
+                                        href="/wallet"
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                        className="flex items-center gap-3 px-4 py-3 rounded-lg bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors"
+                                    >
+                                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                        </svg>
+                                        <span className="text-blue-700 font-medium">View Dashboard</span>
+                                    </Link>
 
                                     {/* Admin Link (only show for admins) */}
                                     {isAdmin && (
@@ -587,13 +533,7 @@ export default function Navbar() {
                                 {/* Currency Selector */}
                                 <div className="mb-4">
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Currency</label>
-                                    {isAdmin ? (
-                                        <CurrencySelector />
-                                    ) : (
-                                        <div className="opacity-50 pointer-events-none">
-                                            <CurrencySelector />
-                                        </div>
-                                    )}
+                                    <CurrencySelector />
                                 </div>
 
                                 {/* Disconnect Button */}
@@ -604,9 +544,7 @@ export default function Navbar() {
                             <div className="p-6 border-t border-gray-200">
                                 <div className="mb-4">
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Currency</label>
-                                    <div className="opacity-50 pointer-events-none">
-                                        <CurrencySelector />
-                                    </div>
+                                    <CurrencySelector />
                                 </div>
                                 <Web3ConnectButton />
                             </div>
