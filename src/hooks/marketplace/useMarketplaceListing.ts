@@ -163,6 +163,18 @@ export function useMarketplaceListing(marketplaceAddress: string) {
           throw new Error('ERC1155 quantity must be greater than 0.');
         }
 
+        if (priceInUnits <= BigInt(0)) {
+          throw new Error('Ungültiger Stückpreis: Der Gesamtpreis muss größer als 0 sein.');
+        }
+
+        if (priceInUnits < listingQuantity) {
+          throw new Error('Ungültiger Stückpreis: Der Gesamtpreis ist für diese ERC1155-Menge zu klein. Bitte Preis erhöhen oder Menge reduzieren.');
+        }
+
+        if (priceInUnits % listingQuantity !== BigInt(0)) {
+          throw new Error('Ungültiger Stückpreis: Für ERC1155 muss der Gesamtpreis durch die Menge ohne Rest teilbar sein (exakter Stückpreis).');
+        }
+
         if (publicClient) {
           const availableBalance = await publicClient.readContract({
             address: checksummedTokenAddress as `0x${string}`,

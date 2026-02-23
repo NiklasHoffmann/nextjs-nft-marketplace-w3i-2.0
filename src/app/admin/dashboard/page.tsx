@@ -110,15 +110,28 @@ export default function AdminDashboard() {
                 setLoading(true);
                 setError(null);
                 devLog.info('[Dashboard] Fetching stats from /api/admin/dashboard/stats');
-                const response = await fetch('/api/admin/dashboard/stats');
-                const data = await response.json();
+                const response = await fetch('/api/admin/dashboard/stats', {
+                    credentials: 'include',
+                    cache: 'no-store'
+                });
+
+                let data: any = null;
+                try {
+                    data = await response.json();
+                } catch {
+                    data = null;
+                }
 
                 devLog.info('[Dashboard] Response status:', response.status);
                 devLog.info('[Dashboard] Response data:', data);
 
                 if (!response.ok) {
                     devLog.error('[Dashboard] API Error:', data);
-                    throw new Error(data.error?.message || data.message || 'Failed to fetch stats');
+                    const apiMessage = data?.error?.message || data?.message;
+                    const authHint = response.status === 401 || response.status === 403
+                        ? ' (Session abgelaufen? Bitte neu einloggen.)'
+                        : '';
+                    throw new Error(apiMessage || `Failed to fetch stats (HTTP ${response.status})${authHint}`);
                 }
 
                 devLog.info('[Dashboard] Stats loaded successfully:', data.data);

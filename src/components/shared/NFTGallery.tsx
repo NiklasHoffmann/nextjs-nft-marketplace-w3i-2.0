@@ -52,7 +52,7 @@ export function NFTGallery({
             : `${item.contractAddress}-${item.tokenId}-${index}`
     }, [])
 
-    const buildCardProps = useCallback((item: NFTScrollItem) => ({
+    const buildCardProps = useCallback((item: NFTScrollItem, cardPriority: boolean) => ({
         contractAddress: item.contractAddress,
         tokenId: item.tokenId,
         price: item.price as string | undefined,
@@ -72,11 +72,11 @@ export function NFTGallery({
         partialBuyEnabled: item.partialBuyEnabled,
         enableInsights,
         showStats,
-        priority,
+        priority: cardPriority,
         metadata: item.metadata,
         insights: item.insights,
         contract: item.contract
-    }), [enableInsights, showStats, priority])
+    }), [enableInsights, showStats])
 
 
 
@@ -128,15 +128,15 @@ export function NFTGallery({
 
     // Render card content - memoized to prevent unnecessary re-renders
     // MUST be declared before any conditional returns (Rules of Hooks)
-    const renderCard = useCallback((item: NFTScrollItem, cardBody?: React.ReactNode) => {
-        const cardProps = buildCardProps(item)
+    const renderCard = useCallback((item: NFTScrollItem, index: number, cardBody?: React.ReactNode) => {
+        const cardProps = buildCardProps(item, priority || index < 4)
         const content = renderCardShell(
             cardBody || <NFTCard {...cardProps} />,
             item
         )
 
         return renderCardWrapper(content, item)
-    }, [buildCardProps, renderCardShell, renderCardWrapper])
+    }, [buildCardProps, renderCardShell, renderCardWrapper, priority])
 
     // Scroll functions
     const updateScrollButtons = useCallback(() => {
@@ -303,7 +303,7 @@ export function NFTGallery({
                     style={{ paddingBottom: '50px' }} // Space for hover shadows (same as scroll view)
                 >
                     {items.map((item, index) => {
-                        const cardProps = buildCardProps(item)
+                        const cardProps = buildCardProps(item, priority || index < 6)
                         const cardContent = renderCardShell(
                             <LazyNFTCard {...cardProps} />,
                             item
@@ -340,7 +340,7 @@ export function NFTGallery({
                     >
                         {items.map((item, index) => (
                             <React.Fragment key={getCardKey(item, index)}>
-                                {renderCard(item)}
+                                {renderCard(item, index)}
                             </React.Fragment>
                         ))}
                     </div>

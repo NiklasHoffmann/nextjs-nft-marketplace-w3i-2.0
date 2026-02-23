@@ -9,6 +9,13 @@ import { apiHandler, apiSuccess } from '@/lib/api';
 async function handler(req: NextRequest) {
     const db = await getDatabase();
 
+    const normalizeAddress = (value: unknown): string | null => {
+        if (typeof value !== 'string') return null;
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+        return trimmed.toLowerCase();
+    };
+
     // 1. Total NFTs - alle jemals bezogenen NFTs aus nft_metadata
     const totalNFTs = await db.collection('nft_metadata').countDocuments();
 
@@ -27,7 +34,16 @@ async function handler(req: NextRequest) {
         {
             $group: {
                 _id: null,
-                totalVolume: { $sum: { $toDouble: "$price" } }
+                totalVolume: {
+                    $sum: {
+                        $convert: {
+                            input: '$price',
+                            to: 'double',
+                            onError: 0,
+                            onNull: 0
+                        }
+                    }
+                }
             }
         }
     ]).toArray();
@@ -44,7 +60,16 @@ async function handler(req: NextRequest) {
         {
             $group: {
                 _id: null,
-                totalVolume: { $sum: { $toDouble: "$price" } }
+                totalVolume: {
+                    $sum: {
+                        $convert: {
+                            input: '$price',
+                            to: 'double',
+                            onError: 0,
+                            onNull: 0
+                        }
+                    }
+                }
             }
         }
     ]).toArray();
@@ -97,12 +122,22 @@ async function handler(req: NextRequest) {
 
     // Add marketplace users
     if (marketplaceUsers.length > 0 && marketplaceUsers[0]?.allAddresses) {
-        marketplaceUsers[0].allAddresses.forEach((addr: string) => allUserAddresses.add(addr.toLowerCase()));
+        marketplaceUsers[0].allAddresses.forEach((addr: unknown) => {
+            const normalized = normalizeAddress(addr);
+            if (normalized) {
+                allUserAddresses.add(normalized);
+            }
+        });
     }
 
     // Add interaction users (likes, ratings, watchlist, notes)
     interactionUsers.forEach(userArray => {
-        userArray.forEach((addr: string) => allUserAddresses.add(addr.toLowerCase()));
+        userArray.forEach((addr: unknown) => {
+            const normalized = normalizeAddress(addr);
+            if (normalized) {
+                allUserAddresses.add(normalized);
+            }
+        });
     });
 
     const totalUsers = allUserAddresses.size;

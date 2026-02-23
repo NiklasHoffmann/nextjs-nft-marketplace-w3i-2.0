@@ -511,9 +511,11 @@ const OptimizedNFTImage = memo(({
         unoptimized: currentImageUrl.startsWith('data:') || currentImageUrl.startsWith('blob:'),
         // Optimized sizes for NFT cards - use consistent sizes for better cache hits
         sizes: fill ?
-            (tokenId.includes('-bg') ? "200px" : "(max-width: 640px) 160px, (max-width: 1024px) 200px, 256px") :
+            (tokenId.includes('-bg')
+                ? "(max-width: 640px) 45vw, (max-width: 1024px) 24vw, 256px"
+                : "(max-width: 640px) 45vw, (max-width: 1024px) 24vw, 256px") :
             `${width}px`,
-        quality: tokenId.includes('-bg') ? 40 : 75, // Lower quality for background images
+        quality: tokenId.includes('-bg') ? 35 : 72, // Lower quality for background images
         ...(fill ? { fill: true } : { width, height }),
     };
 

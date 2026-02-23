@@ -95,6 +95,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
         initialValues: {
             price: '',
             priceMode: 'gross' as 'gross' | 'net', // gross = Brutto (Käufer zahlt), net = Netto (Seller erhält)
+            erc1155PriceInputMode: 'total' as 'total' | 'unit',
             currency: ZERO_ADDRESS as string, // Default: ETH (zero address)
             tradeType: 'specific' as 'specific' | 'collection' | 'open',
             targetContractAddress: '',
@@ -163,10 +164,39 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                 return;
             }
 
+            const isSaleFlow = mode === 'sale' || mode === 'hybrid';
+            const rawInputPrice = isSaleFlow ? parseFloat(values.price || '0') : 0;
+
+            if (isSaleFlow && (!Number.isFinite(rawInputPrice) || rawInputPrice <= 0)) {
+                alert('Bitte geben Sie einen gültigen Preis ein');
+                return;
+            }
+
+            const quantity = isErc1155
+                ? parseInt(values.erc1155Quantity || '0', 10)
+                : 1;
+
+            const effectiveQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+
+            const totalInputPrice = isSaleFlow
+                ? (isErc1155 && values.erc1155PriceInputMode === 'unit'
+                    ? rawInputPrice * effectiveQuantity
+                    : rawInputPrice)
+                : 0;
+
+            const totalFeeRate = innovationFeePercentage + royaltyFeePercentage;
+            const grossPriceForListing = values.priceMode === 'net'
+                ? totalInputPrice / (1 - totalFeeRate)
+                : totalInputPrice;
+
+            const submissionPrice = isSaleFlow
+                ? grossPriceForListing.toString()
+                : undefined;
+
             // ERC20 Token Approval check (WETH, USDC, DAI)
             const isERC20 = values.currency !== ZERO_ADDRESS;
-            if (isERC20 && values.price) {
-                const needsApproval = !hasEnoughAllowance(values.price);
+            if (isERC20 && submissionPrice) {
+                const needsApproval = !hasEnoughAllowance(submissionPrice);
                 if (needsApproval) {
                     try {
                         await approve(); // Unlimited approval
@@ -181,10 +211,6 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
             }
 
             // Im Netto-Modus: Brutto-Preis für Contract verwenden
-            const submissionPrice = (mode === 'sale' || mode === 'hybrid')
-                ? (values.priceMode === 'net' ? fees.grossPrice.toString() : values.price)
-                : undefined;
-
             const rawAddresses = values.buyerWhitelistAddresses
                 .split(/[\s,]+/)
                 .map((value) => value.trim())
@@ -282,9 +308,23 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
 
     // Gebühren berechnen (nur für Verkauf/Hybrid) - dynamisch vom Contract
     // Unterstützt Brutto (Käufer zahlt) und Netto (Seller erhält) Modi
-    const fees = form.values.price && parseFloat(form.values.price) > 0
+    const parsedInputPrice = parseFloat(form.values.price || '0');
+    const parsedErc1155Quantity = parseInt(form.values.erc1155Quantity || '0', 10);
+    const effectiveQuantity = Number.isFinite(parsedErc1155Quantity) && parsedErc1155Quantity > 0
+        ? parsedErc1155Quantity
+        : 1;
+
+    const effectiveInputPrice = Number.isFinite(parsedInputPrice) && parsedInputPrice > 0
+        ? (isErc1155 && (mode === 'sale' || mode === 'hybrid') && form.values.erc1155PriceInputMode === 'unit'
+            ? parsedInputPrice * effectiveQuantity
+            : parsedInputPrice)
+        : 0;
+
+    const effectiveInputPriceString = effectiveInputPrice > 0 ? effectiveInputPrice.toString() : '0';
+
+    const fees = effectiveInputPrice > 0
         ? (() => {
-            const inputPrice = parseFloat(form.values.price);
+            const inputPrice = effectiveInputPrice;
             const totalFeeRate = innovationFeePercentage + royaltyFeePercentage;
 
             if (form.values.priceMode === 'net') {
@@ -501,6 +541,32 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     {form.values.priceMode === 'gross' ? 'Verkaufspreis (Brutto)' : 'Gewünschter Betrag (Netto)'} *
                                 </label>
+
+                                {isErc1155 && (mode === 'sale' || mode === 'hybrid') && (
+                                    <div className="mb-3 grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => form.setFieldValue('erc1155PriceInputMode', 'total')}
+                                            className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all ${form.values.erc1155PriceInputMode === 'total'
+                                                ? 'border-purple-500 bg-purple-50 text-purple-900'
+                                                : 'border-gray-300 bg-white text-gray-700 hover:border-purple-300'
+                                                }`}
+                                        >
+                                            Gesamtpreis
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => form.setFieldValue('erc1155PriceInputMode', 'unit')}
+                                            className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all ${form.values.erc1155PriceInputMode === 'unit'
+                                                ? 'border-purple-500 bg-purple-50 text-purple-900'
+                                                : 'border-gray-300 bg-white text-gray-700 hover:border-purple-300'
+                                                }`}
+                                        >
+                                            Preis pro Einheit
+                                        </button>
+                                    </div>
+                                )}
+
                                 <div className="relative">
                                     <input
                                         type="number"
@@ -517,8 +583,16 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                                     <p className="mt-1 text-sm text-red-600">{form.getFieldError('price')}</p>
                                 )}
 
+                                {isErc1155 && (mode === 'sale' || mode === 'hybrid') && form.values.price && parseFloat(form.values.price) > 0 && (
+                                    <p className="mt-2 text-xs text-purple-700">
+                                        {form.values.erc1155PriceInputMode === 'unit'
+                                            ? `Gesamtpreis (${effectiveQuantity} × ${form.values.price}): ${effectiveInputPrice.toFixed(4)} ${form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}`
+                                            : `Stückpreis (gesamt ÷ ${effectiveQuantity}): ${(effectiveInputPrice / effectiveQuantity).toFixed(4)} ${form.values.currency === ZERO_ADDRESS ? 'ETH' : (selectedTokenConfig?.symbol || 'WETH')}`}
+                                    </p>
+                                )}
+
                                 {/* ERC20 Token Approval Warning */}
-                                {form.values.currency !== ZERO_ADDRESS && form.values.price && parseFloat(form.values.price) > 0 && !hasEnoughAllowance(form.values.price) && (
+                                {form.values.currency !== ZERO_ADDRESS && effectiveInputPrice > 0 && !hasEnoughAllowance(effectiveInputPriceString) && (
                                     <div className="mt-2 flex items-start gap-2 text-xs text-orange-700 bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
                                         <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -528,7 +602,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                                 )}
 
                                 {/* Gebühren-Übersicht */}
-                                {form.values.price && parseFloat(form.values.price) > 0 && (
+                                {effectiveInputPrice > 0 && (
                                     <div className="mt-3 p-3 bg-white rounded-lg border border-blue-200 text-xs space-y-1">
                                         {form.values.priceMode === 'net' && (
                                             <div className="flex justify-between text-gray-900 font-semibold pb-1 mb-1 border-b border-gray-200">

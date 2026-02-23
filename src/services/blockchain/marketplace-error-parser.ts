@@ -11,7 +11,7 @@ const IDEATION_MARKET_ERROR_MESSAGES = {
     InsufficientSwapTokenBalance: 'Nicht genügend Swap-Token verfügbar. Bitte Guthaben erhöhen oder Menge reduzieren.',
     InvalidNoSwapParameters: 'Ungültige No-Swap-Parameter. Bitte Listing-Einstellungen prüfen.',
     InvalidPurchaseQuantity: 'Ungültige Kaufmenge angegeben.',
-    InvalidUnitPrice: 'Ungültiger Stückpreis. Bitte geben Sie einen gültigen Preis größer 0 an.',
+    InvalidUnitPrice: 'Ungültiger Stückpreis. Für ERC1155 muss der Gesamtpreis > 0 und durch die gelistete Menge ohne Rest teilbar sein.',
     ListingTermsChanged: 'Die Listing-Bedingungen haben sich geändert. Bitte Seite aktualisieren und erneut versuchen.',
     NoSwapForSameToken: 'Ein Swap auf denselben Token ist nicht erlaubt.',
     NotApprovedForMarketplace: 'NFT ist nicht für den Marketplace freigegeben. Bitte zuerst Approve/SetApprovalForAll ausführen.',
