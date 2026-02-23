@@ -9,13 +9,19 @@ import type { WalletNFT } from '@/contexts/wallet-nfts/WalletNFTsService';
  * Converts a WalletNFT to AggregatedNFT format for sell components
  */
 export function walletNFTToAggregatedNFT(nft: WalletNFT): AggregatedNFT {
+    const resolvedBalance =
+        nft.balance ??
+        (typeof nft.ownerBalance === 'number' && Number.isFinite(nft.ownerBalance)
+            ? String(nft.ownerBalance)
+            : undefined);
+
     return {
         key: `${nft.contractAddress}-${nft.tokenId}`,
         contractAddress: nft.contractAddress as `0x${string}`,
         tokenId: nft.tokenId,
         listed: nft.isListed || false,
         tokenStandard: nft.tokenType || 'ERC721',
-        balance: nft.balance,
+        balance: resolvedBalance,
         listing: nft.isListed ? {
             listingId: nft.listingId || '',
             contractAddress: nft.contractAddress as `0x${string}`,

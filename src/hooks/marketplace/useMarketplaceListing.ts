@@ -11,6 +11,7 @@ import { IDEATION_MARKET_FACET_ABI } from '@/config/abis/ideation-market-facet';
 import { GETTER_FACET_ABI } from '@/config/abis/getter-facet';
 import { getAvailableTokens, ZERO_ADDRESS } from '@/config/tokens';
 import { devLog } from '@/utils';
+import { detectIdeationMarketError, getIdeationMarketErrorMessage } from '@/services/blockchain/marketplace-error-parser';
 
 interface CreateListingParams {
   tokenAddress: string;
@@ -303,23 +304,60 @@ export function useMarketplaceListing(marketplaceAddress: string) {
         // Check error type first to reduce unnecessary logging
         const errorMessage = simError.message || '';
 
+        const ideationMarketError = detectIdeationMarketError(simError);
+
+        if (ideationMarketError) {
+          if (ideationMarketError === 'AlreadyListed') {
+            devLog.warn('?? NFT is already listed - will redirect to detail page');
+            const alreadyListedError = new Error('ALREADY_LISTED');
+            (alreadyListedError as any).code = 'ALREADY_LISTED';
+            throw alreadyListedError;
+          }
+
+          if (
+            ideationMarketError === 'CollectionNotWhitelisted' ||
+            ideationMarketError === 'BuyerNotWhitelisted' ||
+            ideationMarketError === 'WhitelistDisabled'
+          ) {
+            devLog.warn('?? Whitelist simulation error detected');
+            devLog.warn('?? Verifying whitelist status with contract...');
+
+            if (!publicClient) {
+              throw new Error('Public client not available');
+            }
+
+            try {
+              const whitelistStatus = await publicClient.readContract({
+                address: marketplaceAddress as `0x${string}`,
+                abi: GETTER_FACET_ABI,
+                functionName: 'isCollectionWhitelisted',
+                args: [checksummedTokenAddress as `0x${string}`]
+              });
+
+              devLog.info('?? Direct contract check - isWhitelisted:', whitelistStatus);
+
+              if (!whitelistStatus) {
+                throw new Error(getIdeationMarketErrorMessage('CollectionNotWhitelisted'));
+              }
+
+              devLog.info('? Collection IS whitelisted - simulation error was false positive');
+              devLog.info('?? Proceeding with transaction...');
+            } catch (whitelistCheckError) {
+              devLog.error('? Failed to verify whitelist status:', whitelistCheckError);
+              throw new Error(getIdeationMarketErrorMessage(ideationMarketError));
+            }
+          }
+
+          devLog.error('❌ Marketplace simulation error:', errorMessage);
+          throw new Error(getIdeationMarketErrorMessage(ideationMarketError));
+        }
+
         const isInsufficientBalanceError = errorMessage.includes('IdeationMarket__SellerInsufficientTokenBalance') ||
           errorMessage.includes('SellerInsufficientTokenBalance');
 
         if (isInsufficientBalanceError) {
           devLog.error('❌ ERC1155 balance simulation error:', errorMessage);
           throw new Error('Insufficient ERC1155 balance for listing quantity. Please reduce the quantity to your current wallet balance.');
-        }
-
-        // Check for already listed error - silent handling
-        const isAlreadyListedError = errorMessage.includes('IdeationMarket__AlreadyListed') ||
-          errorMessage.includes('AlreadyListed');
-
-        if (isAlreadyListedError) {
-          devLog.warn('?? NFT is already listed - will redirect to detail page');
-          const alreadyListedError = new Error('ALREADY_LISTED');
-          (alreadyListedError as any).code = 'ALREADY_LISTED';
-          throw alreadyListedError;
         }
 
         // For other errors, log details
@@ -335,45 +373,9 @@ export function useMarketplaceListing(marketplaceAddress: string) {
           throw new Error('NFT is not approved for the marketplace. Please approve it first.');
         }
 
-        // Check for whitelist errors
-        const isWhitelistError = errorMessage.includes('0x529266cb') ||
-          errorMessage.includes('NotWhitelisted') ||
-          errorMessage.includes('CollectionWhitelist');
 
-        if (isWhitelistError) {
-          devLog.warn('?? Whitelist simulation error detected');
-          devLog.warn('?? Verifying whitelist status with contract...');
-
-          // Double-check whitelist status directly from contract
-          if (!publicClient) {
-            throw new Error('Public client not available');
-          }
-
-          try {
-            const whitelistStatus = await publicClient.readContract({
-              address: marketplaceAddress as `0x${string}`,
-              abi: GETTER_FACET_ABI,
-              functionName: 'isCollectionWhitelisted',
-              args: [checksummedTokenAddress as `0x${string}`]
-            });
-
-            devLog.info('?? Direct contract check - isWhitelisted:', whitelistStatus);
-
-            if (!whitelistStatus) {
-              devLog.error('?? WHITELIST ERROR - Collection is NOT whitelisted!');
-              throw new Error(`Collection ${checksummedTokenAddress} is not whitelisted on this marketplace`);
-            }
-
-            devLog.info('? Collection IS whitelisted - simulation error was false positive');
-            devLog.info('?? Proceeding with transaction...');
-          } catch (whitelistCheckError) {
-            devLog.error('? Failed to verify whitelist status:', whitelistCheckError);
-            throw new Error('Failed to verify collection whitelist status');
-          }
-        } else {
-          // For other errors, just warn but continue
-          devLog.warn('?? Proceeding with transaction despite simulation failure...');
-        }
+        // For unknown simulation errors, just warn but continue
+        devLog.warn('?? Proceeding with transaction despite simulation failure...');
       }
 
       devLog.info('? Setting gas limit to 800,000 to avoid estimation issues');

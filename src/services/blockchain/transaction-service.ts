@@ -46,6 +46,7 @@ import { useNotifications } from '@/contexts/notifications';
 import { formatEther } from 'viem';
 import { usePublicClient } from 'wagmi';
 import { devLog } from '@/utils';
+import { parseIdeationMarketError } from '@/services/blockchain/marketplace-error-parser';
 import {
     invalidateAfterPurchase,
     invalidateAfterCancelListing,
@@ -144,6 +145,11 @@ function parseTransactionError(error: any): string {
 
     const message = error.message || error.toString();
 
+    const ideationMarketErrorMessage = parseIdeationMarketError(error);
+    if (ideationMarketErrorMessage) {
+        return ideationMarketErrorMessage;
+    }
+
     // User rejected transaction
     if (message.includes('User rejected') || message.includes('user rejected')) {
         return 'Transaction was rejected in your wallet';
@@ -164,25 +170,9 @@ function parseTransactionError(error: any): string {
         return 'Network error - please try again';
     }
 
-    // Contract-specific errors
-    if (message.includes('NotListed')) {
-        return 'This NFT is no longer listed';
-    }
-
+    // Contract-specific errors (non-IdeationMarket)
     if (message.includes('PriceChanged')) {
         return 'The price has changed since you started';
-    }
-
-    if (message.includes('InvalidPurchaseQuantity') || message.includes('WrongQuantityParameter')) {
-        return 'Invalid ERC1155 quantity selected';
-    }
-
-    if (message.includes('PartialBuyNotPossible')) {
-        return 'Partial buy is not allowed for this listing';
-    }
-
-    if (message.includes('SellerInsufficientTokenBalance')) {
-        return 'Listing quantity is no longer available in full. Please refresh and try a lower quantity.';
     }
 
     if (message.includes('NotOwner')) {
@@ -191,10 +181,6 @@ function parseTransactionError(error: any): string {
 
     if (message.includes('NotApproved')) {
         return 'NFT is not approved for marketplace';
-    }
-
-    if (message.includes('AlreadyListed')) {
-        return 'This NFT is already listed';
     }
 
     // Generic fallback

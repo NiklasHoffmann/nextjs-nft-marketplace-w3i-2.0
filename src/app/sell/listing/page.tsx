@@ -65,6 +65,7 @@ export default function ListingPage() {
 
         const startSingleListing = async () => {
             setIsProcessing(true);
+            setProgressError(undefined);
             setProgressStep('listing', 'signing');
 
             try {
@@ -131,6 +132,7 @@ export default function ListingPage() {
                         } else if (step === 'error') {
                             devLog.error('❌ Transaction error!');
                             setProgressStep('listing', 'error');
+                            setIsProcessing(false);
                         }
                     },
                     onError: (error: string) => {
@@ -138,6 +140,7 @@ export default function ListingPage() {
                         setProgressError(error);
                         setError(error);
                         setProgressStep('listing', 'error');
+                        setIsProcessing(false);
                     },
                     onSuccess: (result: { txHash?: string }) => {
                         devLog.info('🎉 onSuccess callback triggered!', result);
@@ -190,6 +193,7 @@ export default function ListingPage() {
                 setProgressStep('listing', 'error');
                 setProgressError(error.message || 'Transaction failed');
                 setError(error.message || 'Transaction failed');
+                setIsProcessing(false);
             }
         };
 
@@ -197,6 +201,7 @@ export default function ListingPage() {
             if (batchNFTs.length === 0) return;
 
             setIsProcessing(true);
+            setProgressError(undefined);
             setProgressStep('listing', 'signing');
 
             try {
@@ -240,6 +245,7 @@ export default function ListingPage() {
                                 setProgressStep('listing', 'pending');
                             } else if (step === 'error') {
                                 setProgressStep('listing', 'error');
+                                setIsProcessing(false);
                             }
                         },
                         onSuccess: (result: { txHash?: string }) => {
@@ -252,6 +258,7 @@ export default function ListingPage() {
                         onError: (errorMessage: string) => {
                             setProgressError(errorMessage);
                             setError(errorMessage);
+                            setIsProcessing(false);
                         }
                     });
                 }
@@ -271,6 +278,7 @@ export default function ListingPage() {
                 setProgressStep('listing', 'error');
                 setProgressError(error.message || 'Batch transaction failed');
                 setError(error.message || 'Batch transaction failed');
+                setIsProcessing(false);
             }
         };
 
@@ -363,12 +371,20 @@ export default function ListingPage() {
                             </div>
                         </div>
 
-                        <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl border border-yellow-200 p-6">
+                        <div className={`${progressError ? 'bg-gradient-to-br from-red-50 to-rose-50 border-red-200' : 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200'} rounded-xl border p-6`}>
                             <div className="flex items-center gap-3">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
+                                {progressError ? (
+                                    <div className="rounded-full h-8 w-8 bg-red-100 flex items-center justify-center">
+                                        <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                ) : (
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
+                                )}
                                 <div>
-                                    <p className="font-semibold text-gray-900">Batch-Transaktionen laufen</p>
-                                    <p className="text-sm text-gray-600">Bitte bestaetige jede Transaktion in deiner Wallet.</p>
+                                    <p className="font-semibold text-gray-900">{progressError ? 'Batch-Transaktion fehlgeschlagen' : 'Batch-Transaktionen laufen'}</p>
+                                    <p className="text-sm text-gray-600">{progressError ? 'Bitte prüfen Sie die Fehlermeldung und starten Sie den Vorgang erneut.' : 'Bitte bestaetige jede Transaktion in deiner Wallet.'}</p>
                                 </div>
                             </div>
                             {progressTxHash && (
@@ -543,12 +559,20 @@ export default function ListingPage() {
                     </div>
 
                     {/* Status-Anzeige */}
-                    <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl border border-yellow-200 p-6">
+                    <div className={`${progressError ? 'bg-gradient-to-br from-red-50 to-rose-50 border-red-200' : 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200'} rounded-xl border p-6`}>
                         <div className="flex items-center gap-3">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
+                            {progressError ? (
+                                <div className="rounded-full h-8 w-8 bg-red-100 flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                            ) : (
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
+                            )}
                             <div>
-                                <p className="font-semibold text-gray-900">Transaktion wird ausgeführt</p>
-                                <p className="text-sm text-gray-600">Bitte bestätige die Transaktion in deinem Wallet...</p>
+                                <p className="font-semibold text-gray-900">{progressError ? 'Transaktion fehlgeschlagen' : 'Transaktion wird ausgeführt'}</p>
+                                <p className="text-sm text-gray-600">{progressError ? 'Bitte prüfen Sie die Fehlermeldung und starten Sie den Vorgang erneut.' : 'Bitte bestätige die Transaktion in deinem Wallet...'}</p>
                             </div>
                         </div>
                         {progressTxHash && (

@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatCard } from '@/components/ui';
 import { formatUnits } from 'viem';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
 import { useChainId } from 'wagmi';
-import { useCurrency } from '@/contexts/CurrencyContext';
 import { formatTokenDisplay } from '@/utils';
 
 interface CollectionHeaderProps {
@@ -42,17 +41,10 @@ function CollectionStats({
     isCompact = false
 }: CollectionStatsProps) {
     const chainId = useChainId();
-    const { convertTokenToUSD, convertUSDToETH } = useCurrency();
     const currencySymbol = floorPriceCurrency 
         ? getCurrencySymbolByAddress(chainId, floorPriceCurrency)
         : 'ETH';
     const tokenDecimals = getTokenDecimalsByAddress(chainId, floorPriceCurrency);
-    const [convertedFloorEth, setConvertedFloorEth] = useState<string | null>(null);
-
-    const isEthLike = useMemo(() => {
-        const symbol = currencySymbol?.toUpperCase();
-        return symbol === 'ETH' || symbol === 'WETH';
-    }, [currencySymbol]);
 
     const formattedFloorPrice = floorPrice !== null && floorPrice !== undefined
         ? formatTokenDisplay(
@@ -62,53 +54,9 @@ function CollectionStats({
         )
         : null;
 
-    useEffect(() => {
-        let isMounted = true;
-
-        const convertFloor = async () => {
-            if (floorPrice === null || floorPrice === undefined || isEthLike) {
-                if (isMounted) setConvertedFloorEth(null);
-                return;
-            }
-
-            try {
-                const tokenAmount = parseFloat(formatUnits(BigInt(floorPrice.toString()), tokenDecimals));
-                if (!tokenAmount) {
-                    if (isMounted) setConvertedFloorEth(null);
-                    return;
-                }
-
-                const usdValue = await convertTokenToUSD(tokenAmount, currencySymbol, floorPriceCurrency, chainId);
-                if (!usdValue) {
-                    if (isMounted) setConvertedFloorEth(null);
-                    return;
-                }
-
-                const ethAmount = await convertUSDToETH(usdValue);
-                if (!ethAmount) {
-                    if (isMounted) setConvertedFloorEth(null);
-                    return;
-                }
-
-                const formatted = formatTokenDisplay(ethAmount.toFixed(4), 4, 4);
-                if (isMounted) setConvertedFloorEth(formatted);
-            } catch {
-                if (isMounted) setConvertedFloorEth(null);
-            }
-        };
-
-        void convertFloor();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [floorPrice, tokenDecimals, currencySymbol, isEthLike, convertTokenToUSD, convertUSDToETH]);
-
-    const floorDisplayValue = convertedFloorEth
-        ? `${convertedFloorEth} ETH`
-        : formattedFloorPrice
-            ? `${formattedFloorPrice} ${currencySymbol}`
-            : '—';
+    const floorDisplayValue = formattedFloorPrice
+        ? `${formattedFloorPrice} ${currencySymbol}`
+        : '—';
 
     return (
         <div className={isCompact ? "flex flex-wrap gap-2 justify-end" : "grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4"}>
