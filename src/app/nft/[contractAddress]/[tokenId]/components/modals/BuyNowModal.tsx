@@ -279,6 +279,9 @@ function BuyNowModal({
         }
 
         return {
+            src: wethAddress,
+            dst: currency,
+            from: buyer,
             amountInBaseUnits: parseUnits(swapSourceAmount, 18).toString(),
             slippageNumeric,
         };
@@ -326,16 +329,16 @@ function BuyNowModal({
 
     const handlePrepareSwap = useCallback(async () => {
         try {
-            const { amountInBaseUnits, slippageNumeric } = parseSwapFlowInputs();
+            const { src, dst, from, amountInBaseUnits, slippageNumeric } = parseSwapFlowInputs();
 
             setErrorMessage(null);
 
             return await prepareSwap({
                 chainId,
-                src: wethAddress,
-                dst: currency,
+                src,
+                dst,
                 amount: amountInBaseUnits,
-                from: buyer,
+                from,
                 slippage: slippageNumeric,
                 includeTokensInfo: true,
                 includeProtocols: false,
@@ -346,7 +349,7 @@ function BuyNowModal({
             setErrorMessage(error instanceof Error ? error.message : 'Failed to prepare 1inch swap');
             return null;
         }
-    }, [wethAddress, currency, buyer, parseSwapFlowInputs, prepareSwap, chainId]);
+    }, [parseSwapFlowInputs, prepareSwap, chainId]);
 
     const handleSwapAndContinue = useCallback(async () => {
         if (!isSwapNeeded) return;

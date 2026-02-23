@@ -18,8 +18,8 @@ import { createSuccessResponse } from '@/lib/api';
 import { getCurrencyFixSync } from '@/services/nft-sync/currency-fix-sync';
 
 export const POST = apiHandler(async (request: NextRequest) => {
-    const body = await parseJsonBody<{ listingId?: string }>(request).catch(() => ({}));
-    const { listingId } = body;
+    const body = await parseJsonBody<{ listingId?: string }>(request).catch(() => null);
+    const listingId = body?.listingId;
 
     if (listingId !== undefined && (typeof listingId !== 'string' || listingId.trim().length === 0)) {
         throw new BadRequestError('listingId must be a non-empty string when provided');

@@ -15,6 +15,12 @@ import { DB_SYNC_DELAY_MS, MARKETPLACE_INVALIDATION_TYPES } from '@/services/val
 import type { InvalidationEventDetail } from '@/services/validation';
 import { devLog } from '@/utils';
 
+function parseFloorPrice(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const numericValue = Number.parseFloat(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
+}
+
 interface UseMarketplaceItemsOptions {
   // Pagination
   page?: number;
@@ -520,14 +526,20 @@ export function useMarketplaceCollections(options: UseMarketplaceCollectionsOpti
     if (minFloorPrice) {
       const minPrice = parseFloat(minFloorPrice);
       filtered = filtered.filter(c =>
-        c.floorPrice && c.floorPrice >= minPrice
+        (() => {
+          const floorPrice = parseFloorPrice(c.floorPrice);
+          return floorPrice !== null && floorPrice >= minPrice;
+        })()
       );
     }
 
     if (maxFloorPrice) {
       const maxPrice = parseFloat(maxFloorPrice);
       filtered = filtered.filter(c =>
-        c.floorPrice && c.floorPrice <= maxPrice
+        (() => {
+          const floorPrice = parseFloorPrice(c.floorPrice);
+          return floorPrice !== null && floorPrice <= maxPrice;
+        })()
       );
     }
 
@@ -541,8 +553,8 @@ export function useMarketplaceCollections(options: UseMarketplaceCollectionsOpti
 
       switch (sortBy) {
         case 'floorPrice':
-          aValue = a.floorPrice ? a.floorPrice : Infinity;
-          bValue = b.floorPrice ? b.floorPrice : Infinity;
+          aValue = parseFloorPrice(a.floorPrice) ?? Infinity;
+          bValue = parseFloorPrice(b.floorPrice) ?? Infinity;
           break;
         case 'totalValue':
           aValue = a.totalValue || 0;

@@ -7,7 +7,7 @@
 
 import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess, parseJsonBody, BadRequestError } from '@/lib/api';
-import { MultisigProposal, CreateProposalRequest, ProposalStatus } from '@/types';
+import { MultisigProposal, CreateProposalRequest, ProposalStatus, ProposalType } from '@/types';
 import { randomUUID } from 'crypto';
 import { getMultisigProposalCollection, serializeProposal } from '@/lib/admin/multisig-proposals';
 
@@ -88,6 +88,28 @@ export const GET = apiHandler(async (request: NextRequest) => {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') as ProposalStatus | null;
     const type = searchParams.get('type');
+        const isProposalType = (value: string): value is ProposalType => {
+            const validTypes: ProposalType[] = [
+                'TRANSFER_OWNERSHIP',
+                'ACCEPT_OWNERSHIP',
+                'SET_INNOVATION_FEE',
+                'ADD_WHITELISTED_COLLECTION',
+                'REMOVE_WHITELISTED_COLLECTION',
+                'BATCH_ADD_COLLECTIONS',
+                'BATCH_REMOVE_COLLECTIONS',
+                'PAUSE_CONTRACT',
+                'UNPAUSE_CONTRACT',
+                'DIAMOND_CUT',
+                'UPGRADE_FACET',
+                'ADD_FACET',
+                'REMOVE_FACET',
+                'REPLACE_FACET',
+                'CLEAN_LISTING',
+                'CUSTOM'
+            ];
+            return validTypes.includes(value as ProposalType);
+        };
+
     const rawLimit = Number.parseInt(searchParams.get('limit') || '50', 10);
     const rawSkip = Number.parseInt(searchParams.get('skip') || '0', 10);
     const limit = Number.isNaN(rawLimit) ? 50 : Math.min(Math.max(rawLimit, 1), 100);
@@ -98,7 +120,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
     // Build filter
     const filter: Partial<Pick<MultisigProposal, 'status' | 'type'>> = {};
     if (status) filter.status = status;
-    if (type) filter.type = type;
+    if (type && isProposalType(type)) filter.type = type;
 
     // Fetch proposals
     const proposals = await collection

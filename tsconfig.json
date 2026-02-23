@@ -7,7 +7,7 @@
 
     // ===== STRICT MODE =====
     "strict": true,
-    "ignoreDeprecations": "6.0",
+    "ignoreDeprecations": "5.0",
     "noUncheckedIndexedAccess": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
