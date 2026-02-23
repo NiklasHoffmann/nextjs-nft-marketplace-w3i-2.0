@@ -508,8 +508,14 @@ const OptimizedNFTImage = memo(({
         blurDataURL,
         priority,
         // Use Next.js image optimization for caching (30 day TTL in next.config.ts)
-        // Only use unoptimized for data: URLs or blob: URLs
-        unoptimized: currentImageUrl.startsWith('data:') || currentImageUrl.startsWith('blob:'),
+        // Only use optimizer for local/proxied images.
+        // External IPFS gateway fallbacks can return 400 in /_next/image (invalid upstream image response),
+        // so load them directly.
+        unoptimized:
+            currentImageUrl.startsWith('data:') ||
+            currentImageUrl.startsWith('blob:') ||
+            currentImageUrl.startsWith('http://') ||
+            currentImageUrl.startsWith('https://'),
         // Optimized sizes for NFT cards - use consistent sizes for better cache hits
         sizes: fill ?
             (normalizedTokenId.includes('-bg')
