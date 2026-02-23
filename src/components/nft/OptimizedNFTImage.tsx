@@ -17,6 +17,7 @@ const ImageSkeleton = memo(({ className, width, height, fill }: {
         <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
     </div>
 ));
+ImageSkeleton.displayName = 'ImageSkeleton';
 
 interface OptimizedNFTImageProps {
     imageUrl: string;
@@ -30,17 +31,6 @@ interface OptimizedNFTImageProps {
     // New prop for glitter effect synchronization
     tiltRotation?: { rotateX: number; rotateY: number };
 }
-
-// IPFS Gateway fallbacks - reordered by speed and reliability
-const IPFS_GATEWAYS = [
-    'https://cloudflare-ipfs.com/ipfs/',
-    'https://gateway.pinata.cloud/ipfs/',
-    'https://dweb.link/ipfs/',
-    'https://ipfs.io/ipfs/'
-];
-
-// Cache for tested gateways to avoid repeated testing
-const gatewayPerformanceCache = new Map<string, number>();
 
 // Cache with timestamp for expired retry logic
 interface CacheEntry {
@@ -162,12 +152,6 @@ const extractIPFSInfo = (url: string): { hash: string; path: string } | null => 
     return null;
 };
 
-// Legacy function for backward compatibility
-const extractIPFSHash = (url: string): string | null => {
-    const info = extractIPFSInfo(url);
-    return info?.hash || null;
-};
-
 // Convert IPFS URLs to use our server-side cache first, then fallback to gateways
 const optimizeImageUrl = (url: string): string[] => {
     if (!url) return [];
@@ -212,20 +196,10 @@ const OptimizedNFTImage = memo(({
     priority = false,
     tiltRotation = { rotateX: 0, rotateY: 0 },
 }: OptimizedNFTImageProps) => {
-    // Early return if no valid imageUrl
-    if (!imageUrl || imageUrl.trim() === '') {
-        return (
-            <ImageSkeleton
-                className={className}
-                width={width}
-                height={height}
-                fill={fill}
-            />
-        );
-    }
+    const normalizedImageUrl = imageUrl?.trim() || '';
 
-    // Get all possible URLs for this image
-    const imageUrls = optimizeImageUrl(imageUrl);
+    // Get all possible URLs for this image (memoized to keep effect dependencies stable)
+    const imageUrls = useMemo(() => optimizeImageUrl(normalizedImageUrl), [normalizedImageUrl]);
 
     // Check if image is likely cached BEFORE setting initial loading state ⚡
     const isCachedInitially = useMemo(() => {
@@ -237,7 +211,7 @@ const OptimizedNFTImage = memo(({
 
     const [isLoading, setIsLoading] = useState(!isCachedInitially); // Start as loaded if cached!
     const [hasError, setHasError] = useState(false);
-    const [currentImageUrl, setCurrentImageUrl] = useState(() => imageUrls[0] || imageUrl);
+    const [currentImageUrl, setCurrentImageUrl] = useState(() => imageUrls[0] || normalizedImageUrl);
     const [fallbackIndex, setFallbackIndex] = useState(0);
     const [aspectRatio, setAspectRatio] = useState<number | null>(null);
     const [isIntersecting, setIsIntersecting] = useState(priority || isCachedInitially);
@@ -334,20 +308,20 @@ const OptimizedNFTImage = memo(({
 
     // Update current image URL when imageUrl prop changes - OPTIMIZED FOR CACHE
     useEffect(() => {
-        const newUrls = optimizeImageUrl(imageUrl);
+        const newUrls = optimizeImageUrl(normalizedImageUrl);
         const firstUrl = newUrls[0];
         const isCached = firstUrl && imageLoadCache.get(firstUrl) === true;
 
         // Use the optimized URL (e.g., /api/nft/image/{hash}) instead of raw IPFS URL
-        setCurrentImageUrl(firstUrl || imageUrl);
+        setCurrentImageUrl(firstUrl || normalizedImageUrl);
         setFallbackIndex(0);
         setHasError(false);
 
-        // Don't set loading state if image is already cached! âš¡
+        // Don't set loading state if image is already cached!
         if (!isCached) {
             setIsLoading(true);
         }
-    }, [imageUrl]);
+    }, [normalizedImageUrl]);
 
     const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
         const img = e.currentTarget;
@@ -461,6 +435,18 @@ const OptimizedNFTImage = memo(({
         };
     }, [isSharpImage, glitterOpacity, tiltRotation.rotateX, tiltRotation.rotateY]);
 
+    // Render skeleton if no valid image URL
+    if (!normalizedImageUrl) {
+        return (
+            <ImageSkeleton
+                className={className}
+                width={width}
+                height={height}
+                fill={fill}
+            />
+        );
+    }
+
     // Don't render image until it's in viewport (unless priority or previously cached)
     if (!isIntersecting && !hasBeenVisible) {
         return (
@@ -499,7 +485,6 @@ const OptimizedNFTImage = memo(({
 
     const imageProps = {
         src: currentImageUrl,
-        alt: alt || `NFT ${tokenId}`,
         className: `transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'
             } ${getObjectFit()} ${className}`,
         onLoad: handleImageLoad,
@@ -531,7 +516,7 @@ const OptimizedNFTImage = memo(({
             ref={imgRef}
             className={`relative overflow-hidden ${fill ? 'w-full h-full' : ''} ${aspectRatio && Math.abs(aspectRatio - 1) < 0.1 ? 'bg-transparent' : ''} ${className}`}
         >
-            <Image key={currentImageUrl} {...imageProps} />
+            <Image key={currentImageUrl} alt={alt || `NFT ${tokenId}`} {...imageProps} />
 
             {/* Optimized single-layer glitter effect for sharp images */}
             {isSharpImage && displayGlitter && (
