@@ -14,7 +14,7 @@ interface CollectionHeaderProps {
     totalListings: number;
     totalVolume?: number;
     avgPrice?: number;
-    floorPrice?: number;
+    floorPrice?: string | null;
     floorPriceCurrency?: string | null;
     totalSupplyItems?: number;
     totalSupplyUnits?: number;
@@ -24,7 +24,7 @@ interface CollectionStatsProps {
     totalListings: number;
     totalVolume?: number;
     avgPrice?: number;
-    floorPrice?: number;
+    floorPrice?: string | null;
     floorPriceCurrency?: string | null;
     totalSupplyItems?: number;
     totalSupplyUnits?: number;

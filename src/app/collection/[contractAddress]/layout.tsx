@@ -53,7 +53,7 @@ export default function CollectionLayout({
         totalListings: collection?.itemCount || 0,
         totalVolume: collection?.totalValue || 0,
         avgPrice: collection?.averagePrice || 0,
-        floorPrice: collection?.floorPrice || 0,
+        floorPrice: collection?.floorPrice ?? null,
         floorPriceCurrency: collection?.floorPriceCurrency || null,
         totalSupplyItems: collection?.totalSupply || 0,
         totalSupplyUnits: collection?.totalSupplyUnits || 0,
