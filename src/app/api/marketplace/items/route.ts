@@ -28,11 +28,77 @@
 
 import { NextRequest } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
+import { getSharedCacheValue, setSharedCacheValue } from '@/lib/redis/shared-cache';
 import { apiHandler, apiSuccess } from '@/lib/api';
 import type { MarketplaceItemsResponse } from '@/types/marketplace/enriched-nft';
 import { devLog } from '@/utils';
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const FILTER_OPTIONS_TTL_MS = 30_000;
+const FILTER_OPTIONS_TTL_SECONDS = Math.ceil(FILTER_OPTIONS_TTL_MS / 1000);
+const FILTER_OPTIONS_CACHE_KEY = 'marketplace:items:filter-options:v1';
+
+interface FilterOptionsCacheEntry {
+    categories: string[];
+    rarities: string[];
+    priceMin: string;
+    priceMax: string;
+    expiresAt: number;
+}
+
+let filterOptionsCache: FilterOptionsCacheEntry | null = null;
+
+async function getMarketplaceFilterOptionsCached(db: Awaited<ReturnType<typeof getDatabase>>) {
+    const now = Date.now();
+    if (filterOptionsCache && filterOptionsCache.expiresAt > now) {
+        return filterOptionsCache;
+    }
+
+    const sharedCachedOptions = await getSharedCacheValue<Omit<FilterOptionsCacheEntry, 'expiresAt'>>(FILTER_OPTIONS_CACHE_KEY);
+    if (sharedCachedOptions) {
+        filterOptionsCache = {
+            ...sharedCachedOptions,
+            expiresAt: now + FILTER_OPTIONS_TTL_MS,
+        };
+        return filterOptionsCache;
+    }
+
+    const collection = db.collection('marketplace_items');
+    const insightsCollection = db.collection('admin_nft_insights');
+
+    const [resolvedCategories, resolvedRarities, priceStats] = await Promise.all([
+        insightsCollection.distinct('category'),
+        insightsCollection.distinct('rarity'),
+        collection.aggregate([
+            { $match: { isListed: true, price: { $ne: null } } },
+            {
+                $group: {
+                    _id: null,
+                    minPrice: { $min: { $toDecimal: { $ifNull: ['$price', '0'] } } },
+                    maxPrice: { $max: { $toDecimal: { $ifNull: ['$price', '0'] } } }
+                }
+            }
+        ]).toArray()
+    ]);
+
+    filterOptionsCache = {
+        categories: (resolvedCategories ?? []).filter(Boolean),
+        rarities: (resolvedRarities ?? []).filter(Boolean),
+        priceMin: priceStats[0]?.minPrice ? priceStats[0].minPrice.toString() : '0',
+        priceMax: priceStats[0]?.maxPrice ? priceStats[0].maxPrice.toString() : '0',
+        expiresAt: now + FILTER_OPTIONS_TTL_MS,
+    };
+
+    await setSharedCacheValue(FILTER_OPTIONS_CACHE_KEY, {
+        categories: filterOptionsCache.categories,
+        rarities: filterOptionsCache.rarities,
+        priceMin: filterOptionsCache.priceMin,
+        priceMax: filterOptionsCache.priceMax,
+    }, FILTER_OPTIONS_TTL_SECONDS);
+
+    return filterOptionsCache;
+}
 
 // Auto-start sync service in dev mode
 import '@/lib/dev-services-auto-start';
@@ -605,27 +671,11 @@ export const GET = apiHandler(async (request: NextRequest) => {
     let priceMax = '0';
 
     if (includeFilters) {
-        // Use admin_nft_insights collection for insights-based filters
-        const insightsCollection = db.collection('admin_nft_insights');
-        const [resolvedCategories, resolvedRarities, priceStats] = await Promise.all([
-            insightsCollection.distinct('category'),
-            insightsCollection.distinct('rarity'),
-            collection.aggregate([
-                { $match: { isListed: true, price: { $ne: null } } },
-                {
-                    $group: {
-                        _id: null,
-                        minPrice: { $min: { $toDecimal: { $ifNull: ['$price', '0'] } } },
-                        maxPrice: { $max: { $toDecimal: { $ifNull: ['$price', '0'] } } }
-                    }
-                }
-            ]).toArray()
-        ]);
-
-        categories = resolvedCategories;
-        rarities = resolvedRarities;
-        priceMin = priceStats[0]?.minPrice ? priceStats[0].minPrice.toString() : '0';
-        priceMax = priceStats[0]?.maxPrice ? priceStats[0].maxPrice.toString() : '0';
+        const filterOptions = await getMarketplaceFilterOptionsCached(db);
+        categories = filterOptions.categories;
+        rarities = filterOptions.rarities;
+        priceMin = filterOptions.priceMin;
+        priceMax = filterOptions.priceMax;
 
         // Debug: Log all available categories from insights
         devLog.debug('🏷️ [API] Available categories in admin_nft_insights:', categories);
@@ -672,5 +722,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
     const duration = Date.now() - startTime;
     devLog.info(`✅ Marketplace query completed in ${duration}ms (${total} total, ${items.length} returned)`);
 
-    return apiSuccess(response);
+    const apiResponse = apiSuccess(response);
+    apiResponse.headers.set('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30');
+    return apiResponse;
 });

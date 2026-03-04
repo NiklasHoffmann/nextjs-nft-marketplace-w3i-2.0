@@ -31,6 +31,7 @@ export const NFTCardImage = memo<NFTCardImageProps>(({
                         tokenId={tokenId}
                         className="object-cover h-full w-full"
                         fill={true}
+                        sizes="(max-width: 640px) 86vw, (max-width: 1024px) 36vw, 220px"
                         priority={priority}
                     />
                     <div className="absolute inset-0 rounded-md ring-1 ring-white/20 pointer-events-none"></div>
@@ -65,6 +66,7 @@ export const NFTCardImage = memo<NFTCardImageProps>(({
                         tokenId={tokenId}
                         className="object-cover h-full w-full"
                         fill={true}
+                        sizes="(max-width: 640px) 44vw, (max-width: 1024px) 18vw, 140px"
                         priority={priority}
                     />
                     <div className="absolute inset-0 rounded-md ring-1 ring-white/20 pointer-events-none"></div>

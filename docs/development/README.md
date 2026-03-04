@@ -33,6 +33,28 @@ Required environment variables and configuration.
 - API keys (CoinGecko, etc.)
 - Development vs Production settings
 
+### [Scaling & Load Test Checklist](./SCALING_LOAD_TEST_CHECKLIST.md)
+
+Konkrete Lasttest-Runbook mit Zielwerten für API-Latenz, Redis, SSE und Failover.
+
+**Topics:**
+
+- Health-Precheck (Redis/SSE)
+- Lastszenarien (Marketplace, Wallet, Realtime)
+- Pass/Fail-Kriterien
+- Schnell-Diagnose bei Engpässen
+
+### [1inch Swap E2E Sanity](./ONEINCH_SWAP_E2E_SANITY.md)
+
+Kurzer manueller Testplan für ETH→Token, Token→ETH und Token→Token in `/cart` und Buy-Now-Modal.
+
+**Topics:**
+
+- BuyNowModal Flow Checks
+- Cart Flow Checks
+- Approval/Swap Reihenfolge
+- Edge Cases (invalid amount, rejected tx)
+
 ## Quick Start
 
 ```bash

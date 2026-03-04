@@ -8,7 +8,9 @@
  */
 
 import { apiHandler, apiSuccess, createErrorResponse } from '@/lib/api';
+import { getRedisHealthStatus } from '@/lib/redis/client';
 import { getNFTSyncService } from '@/services/nft-sync';
+import { getSSEHealthStatus } from '@/services/sse/broadcast';
 import { devLog } from '@/utils';
 
 // Track if services were auto-started
@@ -18,6 +20,20 @@ export const GET = apiHandler(async () => {
     try {
         const syncService = getNFTSyncService();
         const status = syncService.getStatus();
+        const [redis, sse] = await Promise.all([
+            getRedisHealthStatus(),
+            Promise.resolve(getSSEHealthStatus())
+        ]);
+
+        const infrastructure = {
+            redis,
+            sse,
+            process: {
+                pid: process.pid,
+                uptimeSec: Math.floor(process.uptime()),
+            },
+            timestamp: Date.now(),
+        };
 
         // Auto-start services if not running (fallback for dev mode)
         if (!status.isRunning && !autoStarted) {
@@ -28,13 +44,15 @@ export const GET = apiHandler(async () => {
             return apiSuccess({
                 status: 'started',
                 message: 'Background services auto-started',
-                services: syncService.getStatus()
+                services: syncService.getStatus(),
+                infrastructure
             });
         }
 
         return apiSuccess({
             status: status.isRunning ? 'running' : 'stopped',
-            services: status
+            services: status,
+            infrastructure
         });
     } catch (error) {
         devLog.error('❌ [Health Check] Error:', error);

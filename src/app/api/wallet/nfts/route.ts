@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { apiBadRequest, apiHandler, apiSuccess } from '@/lib/api';
 import { getWalletNFTsFromBlockchain, getKnownContractAddresses } from '@/lib/blockchain';
+import { getSharedCacheValue, setSharedCacheValue } from '@/lib/redis/shared-cache';
 import type { Address } from 'viem';
 import { devLog } from '@/utils';
 
@@ -30,12 +31,57 @@ interface WalletNFTsResponse {
     source?: 'alchemy' | 'moralis' | 'blockchain' | 'hybrid';
 }
 
+interface WalletNFTsCacheEntry {
+    expiresAt: number;
+    payload: WalletNFTsResponse;
+}
+
 
 
 // Lightweight NFT discovery interface
 interface NFTIdentifier {
     contractAddress: string;
     tokenId: string;
+}
+
+const WALLET_NFTS_CACHE_TTL_MS = 15_000;
+const WALLET_NFTS_SHARED_CACHE_TTL_SECONDS = Math.ceil(WALLET_NFTS_CACHE_TTL_MS / 1000);
+const WALLET_NFTS_MAX_CACHE_ENTRIES = 500;
+
+const walletNftsResponseCache = new Map<string, WalletNFTsCacheEntry>();
+const walletNftsInFlight = new Map<string, Promise<WalletNFTsResponse>>();
+
+function buildWalletCacheKey(walletAddress: string, source: string): string {
+    return `${walletAddress.toLowerCase()}:${source}`;
+}
+
+function buildSharedWalletCacheKey(cacheKey: string): string {
+    return `wallet-nfts:${cacheKey}`;
+}
+
+function cleanupWalletNftsCache(): void {
+    const now = Date.now();
+
+    for (const [key, entry] of walletNftsResponseCache.entries()) {
+        if (entry.expiresAt <= now) {
+            walletNftsResponseCache.delete(key);
+        }
+    }
+
+    if (walletNftsResponseCache.size <= WALLET_NFTS_MAX_CACHE_ENTRIES) {
+        return;
+    }
+
+    const entries = Array.from(walletNftsResponseCache.entries())
+        .sort((a, b) => a[1].expiresAt - b[1].expiresAt);
+
+    const toRemove = walletNftsResponseCache.size - WALLET_NFTS_MAX_CACHE_ENTRIES;
+    for (let i = 0; i < toRemove; i++) {
+        const entry = entries[i];
+        if (entry) {
+            walletNftsResponseCache.delete(entry[0]);
+        }
+    }
 }
 
 /**
@@ -239,88 +285,72 @@ export const GET = apiHandler(async (request: NextRequest) => {
         return apiBadRequest('Invalid wallet address format');
     }
 
-    let nfts: ExternalNFT[] = [];
-    let usedSource: 'alchemy' | 'moralis' | 'blockchain' | 'hybrid' = 'blockchain';
+    cleanupWalletNftsCache();
 
-    try {
-        const startTime = Date.now();
+    const cacheKey = buildWalletCacheKey(walletAddress, source);
+    const now = Date.now();
 
-        // Strategy: Parallel execution for 'auto' mode (best performance)
-        // - Blockchain: Known marketplace contracts (fast, no rate limits)
-        // - Alchemy: Complete wallet inventory (1 API call)
+    const cachedEntry = walletNftsResponseCache.get(cacheKey);
+    if (cachedEntry && cachedEntry.expiresAt > now) {
+        const cachedResponse = apiSuccess(cachedEntry.payload);
+        cachedResponse.headers.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=20');
+        cachedResponse.headers.set('X-Cache', 'HIT');
+        return cachedResponse;
+    }
 
-        let blockchainNFTs: ExternalNFT[] = [];
-        let alchemyNFTs: ExternalNFT[] = [];
+    const sharedCacheKey = buildSharedWalletCacheKey(cacheKey);
+    const sharedPayload = await getSharedCacheValue<WalletNFTsResponse>(sharedCacheKey);
+    if (sharedPayload) {
+        walletNftsResponseCache.set(cacheKey, {
+            expiresAt: Date.now() + WALLET_NFTS_CACHE_TTL_MS,
+            payload: sharedPayload,
+        });
 
-        // PARALLEL execution in auto mode for best performance
-        if (source === 'auto') {
-            devLog.info('?? [Hybrid] Starting parallel fetch: Blockchain + Alchemy Discovery');
+        const sharedResponse = apiSuccess(sharedPayload);
+        sharedResponse.headers.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=20');
+        sharedResponse.headers.set('X-Cache', 'HIT-SHARED');
+        return sharedResponse;
+    }
 
-            const [blockchainResult, alchemyDiscoveryResult] = await Promise.allSettled([
-                // Step 1: Blockchain query (known contracts with full metadata)
-                (async () => {
-                    const contracts = await getKnownContractAddresses();
-                    devLog.info(`  ? Found ${contracts.length} known contracts in marketplace`);
-                    if (contracts.length === 0) return [];
+    const inFlightRequest = walletNftsInFlight.get(cacheKey);
+    if (inFlightRequest) {
+        const inFlightPayload = await inFlightRequest;
+        const inFlightResponse = apiSuccess(inFlightPayload);
+        inFlightResponse.headers.set('Cache-Control', 'private, max-age=5, stale-while-revalidate=15');
+        inFlightResponse.headers.set('X-Cache', 'HIT-INFLIGHT');
+        return inFlightResponse;
+    }
 
-                    const bcNFTs = await getWalletNFTsFromBlockchain(
-                        walletAddress as Address,
-                        contracts
-                    );
-                    return bcNFTs.map(nft => ({
-                        contractAddress: nft.contractAddress,
-                        tokenId: nft.tokenId,
-                        name: nft.name,
-                        description: nft.description,
-                        image: nft.image,
-                        animationUrl: undefined,
-                        attributes: [],
-                        contractName: nft.contractName,
-                        contractSymbol: nft.contractSymbol,
-                        tokenType: 'ERC721' as const,
-                    }));
-                })(),
-                // Step 2: Alchemy discovery (lightweight - only contract+tokenId)
-                discoverNFTsViaAlchemy(walletAddress)
-            ]);
+    const requestPromise = (async (): Promise<WalletNFTsResponse> => {
+        let nfts: ExternalNFT[] = [];
+        let usedSource: 'alchemy' | 'moralis' | 'blockchain' | 'hybrid' = 'blockchain';
 
-            // Process blockchain result (known contracts)
-            if (blockchainResult.status === 'fulfilled') {
-                blockchainNFTs = blockchainResult.value;
-                devLog.info(`? Blockchain: ${blockchainNFTs.length} NFTs from known contracts (${Date.now() - startTime}ms)`);
-            } else {
-                devLog.warn('?? Blockchain query failed:', blockchainResult.reason);
-            }
+        try {
+            const startTime = Date.now();
 
-            // Process Alchemy discovery result
-            if (alchemyDiscoveryResult.status === 'fulfilled') {
-                const discoveredNFTs = alchemyDiscoveryResult.value;
-                devLog.info(`? Alchemy Discovery: ${discoveredNFTs.length} NFTs found`);
+            // Strategy: Parallel execution for 'auto' mode (best performance)
+            // - Blockchain: Known marketplace contracts (fast, no rate limits)
+            // - Alchemy: Complete wallet inventory (1 API call)
 
-                // Step 3: Filter out already-fetched NFTs
-                const knownKeys = new Set(
-                    blockchainNFTs.map(nft => `${nft.contractAddress.toLowerCase()}-${nft.tokenId}`)
-                );
+            let blockchainNFTs: ExternalNFT[] = [];
+            let alchemyNFTs: ExternalNFT[] = [];
 
-                const unknownNFTs = discoveredNFTs.filter(nft => {
-                    const key = `${nft.contractAddress.toLowerCase()}-${nft.tokenId}`;
-                    return !knownKeys.has(key);
-                });
+            // PARALLEL execution in auto mode for best performance
+            if (source === 'auto') {
+                devLog.info('?? [Hybrid] Starting parallel fetch: Blockchain + Alchemy Discovery');
 
-                devLog.info(`  ? ${unknownNFTs.length} unknown NFTs (not in marketplace contracts)`);
+                const [blockchainResult, alchemyDiscoveryResult] = await Promise.allSettled([
+                    // Step 1: Blockchain query (known contracts with full metadata)
+                    (async () => {
+                        const contracts = await getKnownContractAddresses();
+                        devLog.info(`  ? Found ${contracts.length} known contracts in marketplace`);
+                        if (contracts.length === 0) return [];
 
-                // Step 4: Fetch metadata for unknown NFTs via blockchain + IPFS
-                if (unknownNFTs.length > 0) {
-                    const unknownContracts = [...new Set(unknownNFTs.map(n => n.contractAddress))] as Address[];
-                    devLog.info(`  ? Fetching metadata from ${unknownContracts.length} additional contracts...`);
-
-                    try {
-                        const additionalNFTs = await getWalletNFTsFromBlockchain(
+                        const bcNFTs = await getWalletNFTsFromBlockchain(
                             walletAddress as Address,
-                            unknownContracts
+                            contracts
                         );
-
-                        alchemyNFTs = additionalNFTs.map(nft => ({
+                        return bcNFTs.map(nft => ({
                             contractAddress: nft.contractAddress,
                             tokenId: nft.tokenId,
                             name: nft.name,
@@ -332,87 +362,164 @@ export const GET = apiHandler(async (request: NextRequest) => {
                             contractSymbol: nft.contractSymbol,
                             tokenType: 'ERC721' as const,
                         }));
+                    })(),
+                    // Step 2: Alchemy discovery (lightweight - only contract+tokenId)
+                    discoverNFTsViaAlchemy(walletAddress)
+                ]);
 
-                        devLog.info(`? Additional NFTs: ${alchemyNFTs.length} NFTs fetched via blockchain+IPFS`);
-                    } catch (fetchError) {
-                        devLog.error('? Failed to fetch additional NFTs:', fetchError);
-                        alchemyNFTs = [];
-                    }
+                // Process blockchain result (known contracts)
+                if (blockchainResult.status === 'fulfilled') {
+                    blockchainNFTs = blockchainResult.value;
+                    devLog.info(`? Blockchain: ${blockchainNFTs.length} NFTs from known contracts (${Date.now() - startTime}ms)`);
+                } else {
+                    devLog.warn('?? Blockchain query failed:', blockchainResult.reason);
                 }
-            } else {
-                devLog.error('? Alchemy discovery failed:', alchemyDiscoveryResult.reason);
-                devLog.error('   Error details:', JSON.stringify(alchemyDiscoveryResult.reason, null, 2));
-                // No fallback - blockchain-only mode is fine
+
+                // Process Alchemy discovery result
+                if (alchemyDiscoveryResult.status === 'fulfilled') {
+                    const discoveredNFTs = alchemyDiscoveryResult.value;
+                    devLog.info(`? Alchemy Discovery: ${discoveredNFTs.length} NFTs found`);
+
+                    // Step 3: Filter out already-fetched NFTs
+                    const knownKeys = new Set(
+                        blockchainNFTs.map(nft => `${nft.contractAddress.toLowerCase()}-${nft.tokenId}`)
+                    );
+
+                    const unknownNFTs = discoveredNFTs.filter(nft => {
+                        const key = `${nft.contractAddress.toLowerCase()}-${nft.tokenId}`;
+                        return !knownKeys.has(key);
+                    });
+
+                    devLog.info(`  ? ${unknownNFTs.length} unknown NFTs (not in marketplace contracts)`);
+
+                    // Step 4: Fetch metadata for unknown NFTs via blockchain + IPFS
+                    if (unknownNFTs.length > 0) {
+                        const unknownContracts = [...new Set(unknownNFTs.map(n => n.contractAddress))] as Address[];
+                        devLog.info(`  ? Fetching metadata from ${unknownContracts.length} additional contracts...`);
+
+                        try {
+                            const additionalNFTs = await getWalletNFTsFromBlockchain(
+                                walletAddress as Address,
+                                unknownContracts
+                            );
+
+                            alchemyNFTs = additionalNFTs.map(nft => ({
+                                contractAddress: nft.contractAddress,
+                                tokenId: nft.tokenId,
+                                name: nft.name,
+                                description: nft.description,
+                                image: nft.image,
+                                animationUrl: undefined,
+                                attributes: [],
+                                contractName: nft.contractName,
+                                contractSymbol: nft.contractSymbol,
+                                tokenType: 'ERC721' as const,
+                            }));
+
+                            devLog.info(`? Additional NFTs: ${alchemyNFTs.length} NFTs fetched via blockchain+IPFS`);
+                        } catch (fetchError) {
+                            devLog.error('? Failed to fetch additional NFTs:', fetchError);
+                            alchemyNFTs = [];
+                        }
+                    }
+                } else {
+                    devLog.error('? Alchemy discovery failed:', alchemyDiscoveryResult.reason);
+                    devLog.error('   Error details:', JSON.stringify(alchemyDiscoveryResult.reason, null, 2));
+                    // No fallback - blockchain-only mode is fine
+                }
             }
-        }
-        // SEQUENTIAL execution for specific source modes
-        else if (source === 'blockchain') {
-            devLog.info('?? Using blockchain-only mode');
-            const contracts = await getKnownContractAddresses();
-            devLog.info(`  ? ${contracts.length} known contracts`);
+            // SEQUENTIAL execution for specific source modes
+            else if (source === 'blockchain') {
+                devLog.info('?? Using blockchain-only mode');
+                const contracts = await getKnownContractAddresses();
+                devLog.info(`  ? ${contracts.length} known contracts`);
 
-            if (contracts.length > 0) {
-                const bcNFTs = await getWalletNFTsFromBlockchain(
-                    walletAddress as Address,
-                    contracts
-                );
-                blockchainNFTs = bcNFTs.map(nft => ({
-                    contractAddress: nft.contractAddress,
-                    tokenId: nft.tokenId,
-                    name: nft.name,
-                    description: nft.description,
-                    image: nft.image,
-                    animationUrl: undefined,
-                    attributes: [],
-                    contractName: nft.contractName,
-                    contractSymbol: nft.contractSymbol,
-                    tokenType: 'ERC721' as const,
-                }));
-                devLog.info(`? Found ${blockchainNFTs.length} NFTs via blockchain`);
+                if (contracts.length > 0) {
+                    const bcNFTs = await getWalletNFTsFromBlockchain(
+                        walletAddress as Address,
+                        contracts
+                    );
+                    blockchainNFTs = bcNFTs.map(nft => ({
+                        contractAddress: nft.contractAddress,
+                        tokenId: nft.tokenId,
+                        name: nft.name,
+                        description: nft.description,
+                        image: nft.image,
+                        animationUrl: undefined,
+                        attributes: [],
+                        contractName: nft.contractName,
+                        contractSymbol: nft.contractSymbol,
+                        tokenType: 'ERC721' as const,
+                    }));
+                    devLog.info(`? Found ${blockchainNFTs.length} NFTs via blockchain`);
+                }
             }
-        }
-        else if (source === 'alchemy') {
-            alchemyNFTs = await fetchFromAlchemy(walletAddress);
-            devLog.info(`? Found ${alchemyNFTs.length} NFTs via Alchemy`);
-        }
-        else if (source === 'moralis') {
-            alchemyNFTs = await fetchFromMoralis(walletAddress);
-            devLog.info(`? Found ${alchemyNFTs.length} NFTs via Moralis`);
+            else if (source === 'alchemy') {
+                alchemyNFTs = await fetchFromAlchemy(walletAddress);
+                devLog.info(`? Found ${alchemyNFTs.length} NFTs via Alchemy`);
+            }
+            else if (source === 'moralis') {
+                alchemyNFTs = await fetchFromMoralis(walletAddress);
+                devLog.info(`? Found ${alchemyNFTs.length} NFTs via Moralis`);
+            }
+
+            // SIMPLE MERGE: Combine both lists (no deduplication needed now)
+            if (source === 'auto' && (blockchainNFTs.length > 0 || alchemyNFTs.length > 0)) {
+                // In new mode: blockchain + additional (non-overlapping)
+                nfts = [...blockchainNFTs, ...alchemyNFTs];
+                usedSource = 'hybrid';
+
+                const totalTime = Date.now() - startTime;
+                devLog.info(`? [Hybrid] ${nfts.length} total NFTs (${blockchainNFTs.length} known + ${alchemyNFTs.length} additional) in ${totalTime}ms`);
+            } else if (blockchainNFTs.length > 0) {
+                nfts = blockchainNFTs;
+                usedSource = 'blockchain';
+                devLog.info(`? Blockchain-only: ${nfts.length} NFTs in ${Date.now() - startTime}ms`);
+            } else if (alchemyNFTs.length > 0) {
+                nfts = alchemyNFTs;
+                usedSource = 'alchemy';
+                devLog.info(`? Alchemy-only: ${nfts.length} NFTs in ${Date.now() - startTime}ms`);
+            }
+
+            // Empty result is OK (wallet might be empty)
+
+        } catch (apiError) {
+            devLog.error('❌ API request failed:', apiError);
+            throw apiError;
         }
 
-        // SIMPLE MERGE: Combine both lists (no deduplication needed now)
-        if (source === 'auto' && (blockchainNFTs.length > 0 || alchemyNFTs.length > 0)) {
-            // In new mode: blockchain + additional (non-overlapping)
-            nfts = [...blockchainNFTs, ...alchemyNFTs];
-            usedSource = 'hybrid';
+        return {
+            success: true,
+            data: nfts,
+            total: nfts.length,
+            source: usedSource
+        };
+    })();
 
-            const totalTime = Date.now() - startTime;
-            devLog.info(`? [Hybrid] ${nfts.length} total NFTs (${blockchainNFTs.length} known + ${alchemyNFTs.length} additional) in ${totalTime}ms`);
-        } else if (blockchainNFTs.length > 0) {
-            nfts = blockchainNFTs;
-            usedSource = 'blockchain';
-            devLog.info(`? Blockchain-only: ${nfts.length} NFTs in ${Date.now() - startTime}ms`);
-        } else if (alchemyNFTs.length > 0) {
-            nfts = alchemyNFTs;
-            usedSource = 'alchemy';
-            devLog.info(`? Alchemy-only: ${nfts.length} NFTs in ${Date.now() - startTime}ms`);
-        }
+    walletNftsInFlight.set(cacheKey, requestPromise);
 
-        // Empty result is OK (wallet might be empty)
+    try {
+        const payload = await requestPromise;
 
-    } catch (apiError) {
-        devLog.error('❌ API request failed:', apiError);
-        throw apiError;
+        walletNftsResponseCache.set(cacheKey, {
+            expiresAt: Date.now() + WALLET_NFTS_CACHE_TTL_MS,
+            payload
+        });
+
+        await setSharedCacheValue(sharedCacheKey, payload, WALLET_NFTS_SHARED_CACHE_TTL_SECONDS);
+
+        const response = apiSuccess(payload);
+        response.headers.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=20');
+        response.headers.set('X-Cache', 'MISS');
+        return response;
+    } finally {
+        walletNftsInFlight.delete(cacheKey);
     }
-
-    const response: WalletNFTsResponse = {
-        success: true,
-        data: nfts,
-        total: nfts.length,
-        source: usedSource
-    };
-
-    return apiSuccess(response);
+}, {
+    rateLimit: {
+        maxRequests: 20,
+        windowSeconds: 60,
+    }
 });
 
 export { type ExternalNFT, type WalletNFTsResponse };

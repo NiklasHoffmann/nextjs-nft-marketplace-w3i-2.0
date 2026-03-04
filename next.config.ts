@@ -171,7 +171,7 @@ const nextConfig: import('next').NextConfig = {
     ],
     deviceSizes: [640, 768, 1024, 1280, 1600],
     imageSizes: [128, 256, 384, 512],
-    qualities: [40, 75, 85, 90, 95],
+    qualities: [35, 40, 72, 75, 85, 90, 95],
     formats: ['image/webp', 'image/avif'],
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
     dangerouslyAllowSVG: false,

@@ -1,8 +1,10 @@
 import { NextRequest } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
+import { getRedisHealthStatus } from '@/lib/redis/client';
 import { apiHandler, apiSuccess } from '@/lib/api';
 import { createPublicClient, http } from 'viem';
 import { mainnet, sepolia } from 'viem/chains';
+import { getSSEHealthStatus } from '@/services/sse/broadcast';
 import { devLog } from '@/utils';
 import '@/lib/dev-services-auto-start';
 
@@ -120,6 +122,11 @@ async function handler(req: NextRequest) {
         })
     ]);
 
+    const [redisHealth, sseHealth] = await Promise.all([
+        getRedisHealthStatus(),
+        Promise.resolve(getSSEHealthStatus())
+    ]);
+
     return apiSuccess({
         database: {
             status: 'online',
@@ -139,6 +146,15 @@ async function handler(req: NextRequest) {
             pending: pendingCount,
             cancelled: cancelledCount,
             stale: staleCount
+        },
+        infrastructure: {
+            redis: redisHealth,
+            sse: sseHealth,
+            process: {
+                pid: process.pid,
+                uptimeSec: Math.floor(process.uptime())
+            },
+            timestamp: Date.now()
         }
     });
 }

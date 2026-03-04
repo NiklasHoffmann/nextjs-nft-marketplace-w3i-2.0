@@ -300,6 +300,8 @@ export async function GET(
     { params }: { params: Promise<{ hash: string }> }
 ) {
     const { hash: ipfsHash } = await params;
+    const safeCacheKey = encodeURIComponent(ipfsHash);
+    const cacheFileName = `${safeCacheKey}.webp`;
 
     if (!ipfsHash || ipfsHash.length < 10) {
         return NextResponse.json({
@@ -311,7 +313,7 @@ export async function GET(
     await ensureCacheDir();
 
     // Check if already cached (with .webp extension for compressed files)
-    const cachedPath = path.join(CACHE_DIR, `${ipfsHash}.webp`);
+    const cachedPath = path.join(CACHE_DIR, cacheFileName);
     const legacyCachedPath = path.join(CACHE_DIR, ipfsHash); // Old format without extension
 
     try {
@@ -376,7 +378,7 @@ export async function GET(
         
         // Update metadata with compression stats
         const metadata = await loadMetadata();
-        metadata.files[path.basename(cachedPath)] = {
+        metadata.files[cacheFileName] = {
             hash: ipfsHash,
             size: compressedSize,
             originalSize,
@@ -421,6 +423,7 @@ export async function DELETE(
 ) {
     return apiHandler(async () => {
         const { hash: ipfsHash } = await context.params;
+        const safeCacheKey = encodeURIComponent(ipfsHash);
 
         if (ipfsHash === 'all') {
             // Clear all cached images (admin operation)
@@ -484,7 +487,7 @@ export async function DELETE(
         }
 
         // Delete specific image
-        const webpPath = path.join(CACHE_DIR, `${ipfsHash}.webp`);
+        const webpPath = path.join(CACHE_DIR, `${safeCacheKey}.webp`);
         const legacyPath = path.join(CACHE_DIR, ipfsHash);
 
         try {

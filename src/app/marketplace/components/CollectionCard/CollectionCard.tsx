@@ -89,6 +89,7 @@ export const CollectionCard = React.memo(({
                                     alt={`${collection.contractName || 'Collection'} background`}
                                     className="w-full h-full object-cover"
                                     fill
+                                    sizes="(max-width: 640px) 94vw, (max-width: 1024px) 44vw, 360px"
                                 />
                                 <div className="absolute inset-0 backdrop-blur-sm bg-white/35" />
                             </div>

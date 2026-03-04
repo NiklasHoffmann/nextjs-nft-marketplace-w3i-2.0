@@ -55,7 +55,7 @@ function NFTMediaSection({
                         width={800}
                         height={800}
                         className="w-full h-auto object-contain"
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 40vw, 33vw"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1280px) 78vw, 960px"
                         priority={true}
                         quality={90}
                         placeholder="blur"

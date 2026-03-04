@@ -137,7 +137,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
 
         // BROADCAST TO ALL CLIENTS: Send SSE notification
         devLog.info('📡 [Events API] Broadcasting to connected clients...');
-        broadcastMarketplaceEvent(event);
+        await broadcastMarketplaceEvent(event);
 
         devLog.info(`✅ [Events API] Event processed successfully`);
 

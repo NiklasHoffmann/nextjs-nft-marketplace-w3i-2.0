@@ -25,6 +25,7 @@ Setup guides and development workflows.
 
 - [Setup Guide](./development/setup.md) - Environment setup and installation
 - [Environment Variables](./development/environment.md) - Required configuration
+- [Scaling & Load Test Checklist](./development/SCALING_LOAD_TEST_CHECKLIST.md) - Runbook mit Zielwerten für Lasttests
 
 ### **[🏗️ Architecture](./architecture/)**
 
@@ -137,6 +138,7 @@ docs/
 | **MongoDB Issues**       | [database/quick-fix.md](./database/quick-fix.md)                   |
 | **Development Setup**    | [development/setup.md](./development/setup.md)                     |
 | **Environment Config**   | [development/environment.md](./development/environment.md)         |
+| **Scaling Load Tests**   | [development/SCALING_LOAD_TEST_CHECKLIST.md](./development/SCALING_LOAD_TEST_CHECKLIST.md) |
 | **TheGraph Setup**       | [integrations/thegraph-setup.md](./integrations/thegraph-setup.md) |
 | **Currency Exchange**    | [integrations/exchange-rates.md](./integrations/exchange-rates.md) |
 | **Cache System**         | [architecture/caching.md](./architecture/caching.md)               |

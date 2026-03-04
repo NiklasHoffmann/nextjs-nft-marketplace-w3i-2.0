@@ -16,7 +16,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMarketplaceItems } from '@/hooks';
 import { useMarketplaceLayout } from '@/app/marketplace/context';
-import { ImagePreloader } from '@/components/nft';
 import { NFTGallery } from '@/components/shared';
 import { RefreshButton } from '@/components/ui';
 import { SpinnerIcon } from '@/components/icons';
@@ -157,12 +156,6 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
             .map((item) => mapEnrichedNFTToScrollItem(item));
     }, [items]);
 
-    // Preload images
-    const imageUrls = useMemo(() => {
-        const safeItems = items ?? [];
-        return safeItems.map(item => item.metadata?.image).filter((url): url is string => !!url);
-    }, [items]);
-
     const gallerySubtitle = useMemo(() => {
         if ((items ?? []).length > 0) {
             return (
@@ -197,6 +190,58 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
         // Default: show current items (even if empty)
         return scrollItems;
     }, [scrollItems, loading, cachedItems]);
+
+    // Immediate client-side sort for smoother UX while server data revalidates
+    const sortedDisplayItems = useMemo(() => {
+        const toNumber = (value: unknown) => {
+            if (typeof value === 'number') return value;
+            if (typeof value === 'string') {
+                const parsed = Number.parseFloat(value);
+                return Number.isFinite(parsed) ? parsed : 0;
+            }
+            return 0;
+        };
+
+        const priceValue = (item: NFTScrollItem) => {
+            const raw = item.tokenStandard === 'ERC1155' ? (item.unitPrice ?? item.price) : item.price;
+            return toNumber(raw);
+        };
+
+        const valueByField = (item: NFTScrollItem) => {
+            switch (sort.field) {
+                case 'price':
+                    return priceValue(item);
+                case 'rating':
+                    return toNumber(item.averageRating);
+                case 'views':
+                    return toNumber(item.viewCount);
+                case 'likes':
+                    return toNumber(item.likeCount);
+                case 'watchlistCount':
+                    return toNumber(item.watchlistCount);
+                case 'name':
+                    return (item.customTitle || item.name || `NFT #${item.tokenId}`).toLowerCase();
+                case 'created':
+                default:
+                    return toNumber(item.tokenId);
+            }
+        };
+
+        const sorted = [...displayItems].sort((a, b) => {
+            const aValue = valueByField(a);
+            const bValue = valueByField(b);
+
+            if (typeof aValue === 'string' && typeof bValue === 'string') {
+                const cmp = aValue.localeCompare(bValue);
+                return sort.direction === 'asc' ? cmp : -cmp;
+            }
+
+            const cmp = toNumber(aValue) - toNumber(bValue);
+            return sort.direction === 'asc' ? cmp : -cmp;
+        });
+
+        return sorted;
+    }, [displayItems, sort.field, sort.direction]);
 
     // Track when first items arrive to hide initial loading state
     useEffect(() => {
@@ -328,8 +373,6 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
 
     return (
         <div className="w-full">
-            <ImagePreloader imageUrls={imageUrls} priority={true} />
-
             {/* New Listing Notification */}
             {showReloadNotification && (
                 <div className="fixed top-20 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in">
@@ -467,7 +510,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
             {/* NFT Gallery */}
             <div className="min-h-[288px] md:pl-16 pl-10">
                 <NFTGallery
-                    items={displayItems}
+                    items={sortedDisplayItems}
                     title="Utilities"
                     largeTitle={true}
                     subtitle={

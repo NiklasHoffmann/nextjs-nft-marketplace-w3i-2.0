@@ -27,6 +27,7 @@ interface OptimizedNFTImageProps {
     fill?: boolean;
     width?: number;
     height?: number;
+    sizes?: string;
     priority?: boolean;
     // New prop for glitter effect synchronization
     tiltRotation?: { rotateX: number; rotateY: number };
@@ -54,11 +55,12 @@ class ImageCache {
                 const stored = localStorage.getItem(STORAGE_KEY);
                 if (stored) {
                     const parsed = JSON.parse(stored) as [string, CacheEntry][];
-                    // Only load successful entries that are less than 24 hours old
+                    // Load successful entries (<24h) and recent failed entries (<failureRetryTime)
                     const now = Date.now();
                     const maxAge = 24 * 60 * 60 * 1000; // 24 hours
                     parsed.forEach(([key, entry]) => {
-                        if (entry.success && (now - entry.timestamp) < maxAge) {
+                        const age = now - entry.timestamp;
+                        if ((entry.success && age < maxAge) || (!entry.success && age < this.failureRetryTime)) {
                             this.cache.set(key, entry);
                         }
                     });
@@ -79,9 +81,14 @@ class ImageCache {
 
         this.saveDebounceTimer = setTimeout(() => {
             try {
-                // Only save successful entries
+                // Save successful entries and recent failed entries
+                const now = Date.now();
+                const maxAge = 24 * 60 * 60 * 1000; // 24 hours
                 const entries = Array.from(this.cache.entries())
-                    .filter(([_, entry]) => entry.success)
+                    .filter(([_, entry]) => {
+                        const age = now - entry.timestamp;
+                        return (entry.success && age < maxAge) || (!entry.success && age < this.failureRetryTime);
+                    })
                     .slice(-this.maxSize); // Keep latest entries
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
             } catch (e) {
@@ -100,10 +107,7 @@ class ImageCache {
         }
         this.cache.set(key, { success: value, timestamp: Date.now() });
 
-        // Persist successful loads
-        if (value) {
-            this.saveToStorage();
-        }
+        this.saveToStorage();
     }
 
     get(key: string): boolean | undefined {
@@ -185,6 +189,28 @@ const optimizeImageUrl = (url: string): string[] => {
     return [url];
 };
 
+const selectInitialImageIndex = (urls: string[]): number => {
+    if (urls.length === 0) return 0;
+
+    for (let index = 0; index < urls.length; index++) {
+        const url = urls[index];
+        if (!url) continue;
+        if (imageLoadCache.get(url) === true) {
+            return index;
+        }
+    }
+
+    for (let index = 0; index < urls.length; index++) {
+        const url = urls[index];
+        if (!url) continue;
+        if (imageLoadCache.get(url) !== false) {
+            return index;
+        }
+    }
+
+    return 0;
+};
+
 const OptimizedNFTImage = memo(({
     imageUrl,
     tokenId,
@@ -193,6 +219,7 @@ const OptimizedNFTImage = memo(({
     fill = false,
     width = 256,
     height = 256,
+    sizes,
     priority = false,
     tiltRotation = { rotateX: 0, rotateY: 0 },
 }: OptimizedNFTImageProps) => {
@@ -204,15 +231,17 @@ const OptimizedNFTImage = memo(({
     // Check if image is likely cached BEFORE setting initial loading state ⚡
     const isCachedInitially = useMemo(() => {
         if (typeof window === 'undefined' || imageUrls.length === 0) return false;
-        const cacheKey = imageUrls[0];
+        const cacheKey = imageUrls[selectInitialImageIndex(imageUrls)];
         if (!cacheKey) return false;
         return imageLoadCache.get(cacheKey) === true;
     }, [imageUrls]);
 
+    const initialFallbackIndex = useMemo(() => selectInitialImageIndex(imageUrls), [imageUrls]);
+
     const [isLoading, setIsLoading] = useState(!isCachedInitially); // Start as loaded if cached!
     const [hasError, setHasError] = useState(false);
-    const [currentImageUrl, setCurrentImageUrl] = useState(() => imageUrls[0] || normalizedImageUrl);
-    const [fallbackIndex, setFallbackIndex] = useState(0);
+    const [currentImageUrl, setCurrentImageUrl] = useState(() => imageUrls[initialFallbackIndex] || normalizedImageUrl);
+    const [fallbackIndex, setFallbackIndex] = useState(initialFallbackIndex);
     const [aspectRatio, setAspectRatio] = useState<number | null>(null);
     const [isIntersecting, setIsIntersecting] = useState(priority || isCachedInitially);
     const [hasBeenVisible, setHasBeenVisible] = useState(isCachedInitially);
@@ -227,7 +256,7 @@ const OptimizedNFTImage = memo(({
     useEffect(() => {
         if (typeof window === 'undefined' || imageUrls.length === 0) return;
 
-        const cacheKey = imageUrls[0];
+        const cacheKey = imageUrls[selectInitialImageIndex(imageUrls)];
         if (!cacheKey) return;
 
         const cachedResult = imageLoadCache.get(cacheKey);
@@ -236,6 +265,11 @@ const OptimizedNFTImage = memo(({
         if (cachedResult) {
             setHasBeenVisible(true);
             setIsIntersecting(true);
+            setIsLoading(false);
+            return;
+        }
+
+        if (cachedResult === false) {
             setIsLoading(false);
             return;
         }
@@ -288,33 +322,16 @@ const OptimizedNFTImage = memo(({
         return () => observer.disconnect();
     }, [priority, hasBeenVisible]);
 
-    // Browser-level preload when in viewport
-    useEffect(() => {
-        if (!(isIntersecting || priority) || imageUrls.length === 0 || typeof window === 'undefined') return;
-
-        const imageUrl = imageUrls[0];
-        if (!imageUrl) return;
-
-        const existingPreload = document.querySelector(`link[href="${imageUrl}"]`);
-
-        if (!existingPreload) {
-            const link = document.createElement('link');
-            link.rel = 'preload';
-            link.as = 'image';
-            link.href = imageUrl;
-            document.head.appendChild(link);
-        }
-    }, [isIntersecting, imageUrls, priority]);
-
     // Update current image URL when imageUrl prop changes - OPTIMIZED FOR CACHE
     useEffect(() => {
         const newUrls = optimizeImageUrl(normalizedImageUrl);
-        const firstUrl = newUrls[0];
-        const isCached = firstUrl && imageLoadCache.get(firstUrl) === true;
+        const nextIndex = selectInitialImageIndex(newUrls);
+        const selectedUrl = newUrls[nextIndex];
+        const isCached = selectedUrl && imageLoadCache.get(selectedUrl) === true;
 
         // Use the optimized URL (e.g., /api/nft/image/{hash}) instead of raw IPFS URL
-        setCurrentImageUrl(firstUrl || normalizedImageUrl);
-        setFallbackIndex(0);
+        setCurrentImageUrl(selectedUrl || normalizedImageUrl);
+        setFallbackIndex(nextIndex);
         setHasError(false);
 
         // Don't set loading state if image is already cached!
@@ -326,11 +343,14 @@ const OptimizedNFTImage = memo(({
     const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
         const img = e.currentTarget;
         const ratio = img.naturalWidth / img.naturalHeight;
+        imageLoadCache.set(currentImageUrl, true);
         setAspectRatio(ratio);
         setIsLoading(false);
-    }, []);
+    }, [currentImageUrl]);
 
     const handleImageError = useCallback(() => {
+        imageLoadCache.set(currentImageUrl, false);
+
         // Try next fallback URL if available
         if (fallbackIndex < imageUrls.length - 1) {
             const nextIndex = fallbackIndex + 1;
@@ -502,11 +522,11 @@ const OptimizedNFTImage = memo(({
             currentImageUrl.startsWith('http://') ||
             currentImageUrl.startsWith('https://'),
         // Optimized sizes for NFT cards - use consistent sizes for better cache hits
-        sizes: fill ?
+        sizes: sizes ?? (fill ?
             (normalizedTokenId.includes('-bg')
                 ? "(max-width: 640px) 45vw, (max-width: 1024px) 24vw, 256px"
                 : "(max-width: 640px) 45vw, (max-width: 1024px) 24vw, 256px") :
-            `${width}px`,
+            `${width}px`),
         quality: normalizedTokenId.includes('-bg') ? 35 : 72, // Lower quality for background images
         ...(fill ? { fill: true } : { width, height }),
     };

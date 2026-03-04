@@ -43,7 +43,12 @@ declare global {
 export function useContextDevtools(contextName: string, state: any): void {
     const renderCountRef = useRef(0);
     const renderTimesRef = useRef<number[]>([]);
-    const lastRenderStartRef = useRef(0);
+    const renderStartRef = useRef(0);
+
+    // Mark render start for this commit cycle (development diagnostics only)
+    if (process.env.NODE_ENV === 'development') {
+        renderStartRef.current = performance.now();
+    }
 
     useEffect(() => {
         // Only in development mode
@@ -74,19 +79,13 @@ export function useContextDevtools(contextName: string, state: any): void {
                 devLog.log('🗑️ Use window.__clearContexts() to clear');
             }
 
-            // Track render time
-            const renderStart = performance.now();
-            const renderTime = renderStart - lastRenderStartRef.current;
-
-            if (lastRenderStartRef.current > 0) {
-                renderTimesRef.current.push(renderTime);
-                // Keep only last 100 renders
-                if (renderTimesRef.current.length > 100) {
-                    renderTimesRef.current.shift();
-                }
+            // Track actual render+commit duration for this cycle
+            const renderTime = performance.now() - renderStartRef.current;
+            renderTimesRef.current.push(renderTime);
+            // Keep only last 100 renders
+            if (renderTimesRef.current.length > 100) {
+                renderTimesRef.current.shift();
             }
-
-            lastRenderStartRef.current = renderStart;
             renderCountRef.current++;
 
             // Calculate metrics
@@ -107,11 +106,15 @@ export function useContextDevtools(contextName: string, state: any): void {
                 maxRenderTime: Math.round(maxRenderTime * 100) / 100
             };
 
-            // Log slow renders (> 16ms = below 60fps)
-            if (renderTime > 16 && renderCountRef.current > 1) {
+            // Log slow commits (> 50ms) without dumping huge state objects into console
+            if (renderTime > 50 && renderCountRef.current > 1) {
                 devLog.warn(
                     `⚠️ Slow render in ${contextName}: ${renderTime.toFixed(2)}ms`,
-                    { renders: renderCountRef.current, state }
+                    {
+                        renders: renderCountRef.current,
+                        avgRenderTime: Math.round(avgRenderTime * 100) / 100,
+                        maxRenderTime: Math.round(maxRenderTime * 100) / 100,
+                    }
                 );
             }
         }

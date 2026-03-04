@@ -363,6 +363,7 @@ export function NFTCard(props: NFTCardAllProps) {
                 tokenId={`${tokenId}-bg`}
                 className="object-cover will-change-transform rounded-md"
                 fill={true}
+                sizes="(max-width: 640px) 92vw, (max-width: 1024px) 42vw, 320px"
                 priority={priority}
                 width={200}
                 height={200}

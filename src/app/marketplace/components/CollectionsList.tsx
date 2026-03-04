@@ -184,7 +184,7 @@ export function CollectionsList({ currentSort, onSortChange, filters }: Collecti
                 >
                     {filteredCollections.map((collection, index) => (
                         <CollectionCard
-                            key={`${collection.contractAddress}-${currentSort.field}-${currentSort.direction}`}
+                            key={collection.contractAddress || `collection-${index}`}
                             collection={collection}
                             onClick={handleCollectionClick}
                         />

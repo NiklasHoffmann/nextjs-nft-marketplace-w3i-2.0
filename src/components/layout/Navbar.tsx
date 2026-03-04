@@ -157,7 +157,7 @@ export default function Navbar() {
                 {/* Left Logo - hidden on mobile */}
                 <div className="hidden md:flex items-center flex-shrink-0 mr-6">
                     <Link href="/" className="flex items-center">
-                        <Image src="/media/Logo-w3i-marketplace.png" alt="Logo" className="h-10 w-auto" width={256} height={64} />
+                        <Image src="/media/Logo-w3i-marketplace.png" alt="Logo" className="h-10 w-40" width={160} height={40} priority />
                     </Link>
                 </div>
 
@@ -227,7 +227,7 @@ export default function Navbar() {
                             alt="Zum Spiel"
                             width={32}
                             height={32}
-                            className="h-8 w-auto transition-transform group-hover:scale-110"
+                            className="h-8 w-8 transition-transform group-hover:scale-110"
                         />
                         <span className="text-gray-700 group-hover:text-blue-600 font-medium">Spiel</span>
                     </Link>
@@ -362,7 +362,7 @@ export default function Navbar() {
                         alt="Menu"
                         width={40}
                         height={40}
-                        className="h-10 w-auto object-contain pointer-events-none"
+                        className="h-10 w-10 object-contain pointer-events-none"
                     />
                 </button>
             </header>
@@ -397,7 +397,7 @@ export default function Navbar() {
                                 alt="Menu"
                                 width={40}
                                 height={40}
-                                className="h-8 w-auto object-contain"
+                                className="h-8 w-8 object-contain"
                             />
                             <h2 className="text-xl font-bold text-gray-800">Menu</h2>
                         </div>

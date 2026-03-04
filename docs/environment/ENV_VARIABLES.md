@@ -59,6 +59,38 @@ This document explains all environment variables used in the NFT Marketplace app
 - **Default:** `Ideationmarket_v2`
 - **Example:** `IdeationMarket_Production`
 
+### 1️⃣b Redis Configuration (Optional, empfohlen für Skalierung)
+
+#### `REDIS_URL` (Server-Side)
+
+- **Purpose:** Redis connection string for shared cache + distributed rate limiting
+- **Type:** Secret
+- **Required:** No (fallback to in-memory when unset)
+- **Format:** `redis://...` or `rediss://...`
+- **Example:** `rediss://default:password@your-redis-host:6379`
+- **Notes:**
+   - Strongly recommended for multi-instance deployments
+   - Enables cross-instance cache hits and global API throttling
+   - Keep credentials server-side only
+
+#### `REDIS_DISABLED` (Server-Side)
+
+- **Purpose:** Force-disable Redis integration without removing `REDIS_URL`
+- **Type:** Feature flag
+- **Required:** No
+- **Options:** `true`, `false`
+- **Default:** `false`
+
+#### `REDIS_SSE_CHANNEL` (Server-Side)
+
+- **Purpose:** Redis Pub/Sub channel for marketplace SSE fanout
+- **Type:** Configuration
+- **Required:** No
+- **Default:** `marketplace:sse:events`
+- **Notes:**
+   - Useful when multiple environments share one Redis cluster
+   - Keep different channel names for staging/production isolation
+
 ---
 
 ### 2️⃣ Authentication & Security

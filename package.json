@@ -50,6 +50,7 @@
     "clsx": "^2.1.1",
     "graphql": "^16.12.0",
     "graphql-ws": "^6.0.6",
+    "ioredis": "^5.9.3",
     "lru-cache": "^11.2.1",
     "mongodb": "^6.19.0",
     "next": "^15.5.9",

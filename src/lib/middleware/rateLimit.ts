@@ -6,6 +6,7 @@
 
 import { NextRequest } from 'next/server';
 import { RateLimitError } from '../api/errors';
+import { getRedisClientIfAvailable } from '../redis/client';
 
 // ===== RATE LIMIT STORE =====
 
@@ -15,6 +16,16 @@ interface RateLimitEntry {
 }
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
+const MAX_RATE_LIMIT_ENTRIES = 20_000;
+
+function cleanupExpiredEntries(): void {
+    const now = Date.now();
+    for (const [key, entry] of rateLimitStore.entries()) {
+        if (entry.resetTime < now) {
+            rateLimitStore.delete(key);
+        }
+    }
+}
 
 // Cleanup alte Einträge alle 5 Minuten
 setInterval(() => {
@@ -55,12 +66,42 @@ export const RATE_LIMITS = {
  */
 function getDefaultKey(request: NextRequest): string {
     const headers = request.headers;
-    const ip = headers?.get('x-forwarded-for') ||
+    const rawForwardedFor = headers?.get('x-forwarded-for');
+    const ip = rawForwardedFor?.split(',')[0]?.trim() ||
         headers?.get('x-real-ip') ||
         'unknown';
 
     const userAgent = headers?.get('user-agent') || 'unknown';
     return `${ip}-${userAgent}`;
+}
+
+async function tryRedisRateLimit(
+    request: NextRequest,
+    key: string,
+    config: RateLimitConfig
+): Promise<boolean> {
+    const redis = await getRedisClientIfAvailable();
+    if (!redis) {
+        return false;
+    }
+
+    const routePath = request.nextUrl.pathname;
+    const redisKey = `rate-limit:${routePath}:${config.windowSeconds}:${config.maxRequests}:${key}`;
+
+    const currentCount = await redis.incr(redisKey);
+    if (currentCount === 1) {
+        await redis.expire(redisKey, config.windowSeconds);
+    }
+
+    if (currentCount > config.maxRequests) {
+        const ttlSeconds = await redis.ttl(redisKey);
+        throw new RateLimitError(
+            `Rate limit exceeded. Try again in ${Math.max(ttlSeconds, 1)} seconds.`,
+            Math.max(ttlSeconds, 1)
+        );
+    }
+
+    return true;
 }
 
 /**
@@ -75,6 +116,27 @@ export async function rateLimit(
     config: RateLimitConfig = RATE_LIMITS.STANDARD
 ): Promise<void> {
     const key = config.keyGenerator?.(request) || getDefaultKey(request);
+
+    const redisHandled = await tryRedisRateLimit(request, key, config);
+    if (redisHandled) {
+        return;
+    }
+
+    cleanupExpiredEntries();
+
+    if (rateLimitStore.size > MAX_RATE_LIMIT_ENTRIES) {
+        // Defensive fallback: clear oldest-expiring entries first
+        const sortedEntries = Array.from(rateLimitStore.entries())
+            .sort((a, b) => a[1].resetTime - b[1].resetTime);
+        const toRemove = rateLimitStore.size - MAX_RATE_LIMIT_ENTRIES;
+        for (let i = 0; i < toRemove; i++) {
+            const entry = sortedEntries[i];
+            if (entry) {
+                rateLimitStore.delete(entry[0]);
+            }
+        }
+    }
+
     const now = Date.now();
     const windowMs = config.windowSeconds * 1000;
 
