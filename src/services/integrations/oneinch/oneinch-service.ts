@@ -1,6 +1,8 @@
 import { InternalError, BadRequestError } from '@/lib/api';
 
 const ONEINCH_BASE_URL = 'https://api.1inch.dev/swap/v6.0';
+export const ONEINCH_NATIVE_TOKEN_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 export interface OneInchQuoteRequest {
   chainId: number;
@@ -60,6 +62,21 @@ export interface OneInchSwapResponse {
   protocols?: unknown;
 }
 
+export interface OneInchApprovalSpenderResponse {
+  address: string;
+}
+
+export interface OneInchApprovalAllowanceResponse {
+  allowance: string;
+}
+
+export interface OneInchApprovalTransactionResponse {
+  data: string;
+  gasPrice?: string;
+  to: string;
+  value: string;
+}
+
 function toBooleanParam(value: boolean | undefined): string | undefined {
   if (value === undefined) return undefined;
   return value ? 'true' : 'false';
@@ -69,6 +86,15 @@ function validateAddress(address: string, field: string): void {
   if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
     throw new BadRequestError(`${field} must be a valid address`);
   }
+}
+
+function normalizeOneInchTokenAddress(address: string): string {
+  const normalized = address.trim().toLowerCase();
+  if (normalized === ZERO_ADDRESS) {
+    return ONEINCH_NATIVE_TOKEN_ADDRESS;
+  }
+
+  return address;
 }
 
 function validateAmount(amount: string): void {
@@ -105,9 +131,12 @@ export class OneInchService {
     validateAddress(dst, 'dst');
     validateAmount(amount);
 
+    const srcTokenAddress = normalizeOneInchTokenAddress(src);
+    const dstTokenAddress = normalizeOneInchTokenAddress(dst);
+
     const query = new URLSearchParams({
-      src,
-      dst,
+      src: srcTokenAddress,
+      dst: dstTokenAddress,
       amount,
     });
 
@@ -165,9 +194,12 @@ export class OneInchService {
     validateAmount(amount);
     validateSlippage(slippage);
 
+    const srcTokenAddress = normalizeOneInchTokenAddress(src);
+    const dstTokenAddress = normalizeOneInchTokenAddress(dst);
+
     const query = new URLSearchParams({
-      src,
-      dst,
+      src: srcTokenAddress,
+      dst: dstTokenAddress,
       amount,
       from,
       slippage: String(slippage),
@@ -205,6 +237,99 @@ export class OneInchService {
     }
 
     return (await response.json()) as OneInchSwapResponse;
+  }
+
+  async getApprovalSpender(chainId: number): Promise<OneInchApprovalSpenderResponse> {
+    if (!Number.isFinite(chainId) || chainId <= 0) {
+      throw new BadRequestError('chainId must be a positive integer');
+    }
+
+    const url = `${ONEINCH_BASE_URL}/${chainId}/approve/spender`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        Accept: 'application/json',
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const details = await response.text().catch(() => '');
+      throw new BadRequestError(`1inch approval spender failed (${response.status}): ${details || response.statusText}`);
+    }
+
+    return (await response.json()) as OneInchApprovalSpenderResponse;
+  }
+
+  async getApprovalAllowance(chainId: number, tokenAddress: string, walletAddress: string): Promise<OneInchApprovalAllowanceResponse> {
+    if (!Number.isFinite(chainId) || chainId <= 0) {
+      throw new BadRequestError('chainId must be a positive integer');
+    }
+
+    validateAddress(tokenAddress, 'tokenAddress');
+    validateAddress(walletAddress, 'walletAddress');
+
+    const query = new URLSearchParams({
+      tokenAddress: normalizeOneInchTokenAddress(tokenAddress),
+      walletAddress,
+    });
+
+    const url = `${ONEINCH_BASE_URL}/${chainId}/approve/allowance?${query.toString()}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        Accept: 'application/json',
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const details = await response.text().catch(() => '');
+      throw new BadRequestError(`1inch approval allowance failed (${response.status}): ${details || response.statusText}`);
+    }
+
+    return (await response.json()) as OneInchApprovalAllowanceResponse;
+  }
+
+  async getApprovalTransaction(chainId: number, tokenAddress: string, amount?: string): Promise<OneInchApprovalTransactionResponse> {
+    if (!Number.isFinite(chainId) || chainId <= 0) {
+      throw new BadRequestError('chainId must be a positive integer');
+    }
+
+    validateAddress(tokenAddress, 'tokenAddress');
+    if (amount !== undefined) {
+      validateAmount(amount);
+    }
+
+    const query = new URLSearchParams({
+      tokenAddress: normalizeOneInchTokenAddress(tokenAddress),
+    });
+
+    if (amount !== undefined) {
+      query.set('amount', amount);
+    }
+
+    const url = `${ONEINCH_BASE_URL}/${chainId}/approve/transaction?${query.toString()}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        Accept: 'application/json',
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const details = await response.text().catch(() => '');
+      throw new BadRequestError(`1inch approval transaction failed (${response.status}): ${details || response.statusText}`);
+    }
+
+    return (await response.json()) as OneInchApprovalTransactionResponse;
   }
 }
 

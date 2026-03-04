@@ -15,7 +15,7 @@ import Link from 'next/link';
 import { ButtonSpinner } from '@/components/core/Loading';
 import { EmptyState } from '@/components/core/Empty';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
-import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, getWETHAddress, isNativeETH, ZERO_ADDRESS } from '@/config/tokens';
+import { getAvailableTokens, getCurrencySymbolByAddress, getTokenDecimalsByAddress, isNativeETH, ZERO_ADDRESS } from '@/config/tokens';
 import { useTransactionService } from '@/services/blockchain';
 import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
 import { devLog, formatTokenDisplay } from '@/utils';
@@ -87,13 +87,13 @@ export function CartPage() {
     const [erc1155PurchaseQuantities, setErc1155PurchaseQuantities] = useState<Record<string, string>>({});
     const [royaltyPercentageByListingId, setRoyaltyPercentageByListingId] = useState<Record<string, number>>({});
     const [tokenBalanceBySymbol, setTokenBalanceBySymbol] = useState<Record<string, number>>({});
-    const [oneWethRateBySymbol, setOneWethRateBySymbol] = useState<Record<string, number>>({});
+    const [swapReferenceRateBySymbol, setSwapReferenceRateBySymbol] = useState<Record<string, number>>({});
+    const [swapSourceTokenBySymbol, setSwapSourceTokenBySymbol] = useState<Record<string, string>>({});
+    const [swapSourceBalanceBySymbol, setSwapSourceBalanceBySymbol] = useState<Record<string, number>>({});
     const [swapSourceAmountBySymbol, setSwapSourceAmountBySymbol] = useState<Record<string, string>>({});
     const [swapSlippageBySymbol, setSwapSlippageBySymbol] = useState<Record<string, string>>({});
     const [swapStatusBySymbol, setSwapStatusBySymbol] = useState<Record<string, { state: 'idle' | 'processing' | 'success' | 'error'; message?: string; txHash?: string }>>({});
     const [activeSwapSymbol, setActiveSwapSymbol] = useState<string | null>(null);
-
-    const wethAddress = getWETHAddress(chainId || 11155111);
 
     const quantityByListingId = useMemo(() => {
         const map = new Map<string, number>();
@@ -483,13 +483,42 @@ export function CartPage() {
         return 'Varies by number of individual purchase confirmations';
     }, [itemCount]);
 
+    const swapSourceOptions = useMemo(() => {
+        const nativeOption = { address: ZERO_ADDRESS, symbol: 'ETH', name: 'Ethereum' };
+        const tokenOptions = getAvailableTokens(chainId || 11155111).map((token) => ({
+            address: token.address,
+            symbol: token.symbol,
+            name: token.name,
+        }));
+
+        return [nativeOption, ...tokenOptions];
+    }, [chainId]);
+
     const swapRelevantCurrencies = useMemo(() => {
-        if (!wethAddress) return [] as CurrencyRequirement[];
-        return cartCurrencyRequirements.filter((entry) => {
-            if (isNativeETH(entry.currencyAddress)) return false;
-            return entry.currencyAddress.toLowerCase() !== wethAddress.toLowerCase();
+        return cartCurrencyRequirements;
+    }, [cartCurrencyRequirements]);
+
+    useEffect(() => {
+        setSwapSourceTokenBySymbol((prev) => {
+            const next = { ...prev };
+
+            for (const entry of swapRelevantCurrencies) {
+                if (next[entry.symbol]) continue;
+
+                const destination = entry.currencyAddress.toLowerCase();
+                const defaultSource = swapSourceOptions.find((option) => option.address.toLowerCase() !== destination);
+                next[entry.symbol] = defaultSource?.address || ZERO_ADDRESS;
+            }
+
+            for (const key of Object.keys(next)) {
+                if (!swapRelevantCurrencies.some((entry) => entry.symbol === key)) {
+                    delete next[key];
+                }
+            }
+
+            return next;
         });
-    }, [cartCurrencyRequirements, wethAddress]);
+    }, [swapRelevantCurrencies, swapSourceOptions]);
 
     const currencyDeficitBySymbol = useMemo(() => {
         const map: Record<string, number> = {};
@@ -516,6 +545,12 @@ export function CartPage() {
             const entries = await Promise.all(
                 swapRelevantCurrencies.map(async (entry) => {
                     try {
+                        if (isNativeETH(entry.currencyAddress)) {
+                            const nativeBalance = await publicClient.getBalance({ address });
+                            const parsed = parseFloat(formatUnits(nativeBalance, 18));
+                            return [entry.symbol, Number.isFinite(parsed) ? parsed : 0] as const;
+                        }
+
                         const balanceRaw = await publicClient.readContract({
                             address: entry.currencyAddress as `0x${string}`,
                             abi: ERC20_BALANCE_ABI,
@@ -542,19 +577,25 @@ export function CartPage() {
     useEffect(() => {
         let cancelled = false;
 
-        const fetchOneWethRates = async () => {
-            if (!wethAddress || swapRelevantCurrencies.length === 0) {
-                if (!cancelled) setOneWethRateBySymbol({});
+        const fetchReferenceRates = async () => {
+            if (swapRelevantCurrencies.length === 0) {
+                if (!cancelled) setSwapReferenceRateBySymbol({});
                 return;
             }
 
             const entries = await Promise.all(
                 swapRelevantCurrencies.map(async (entry) => {
                     try {
-                        const amount = parseUnits('1', 18).toString();
+                        const sourceAddress = swapSourceTokenBySymbol[entry.symbol] || ZERO_ADDRESS;
+                        if (sourceAddress.toLowerCase() === entry.currencyAddress.toLowerCase()) {
+                            return [entry.symbol, 1] as const;
+                        }
+
+                        const sourceDecimals = getTokenDecimalsByAddress(chainId || 11155111, sourceAddress);
+                        const amount = parseUnits('1', sourceDecimals).toString();
                         const params = new URLSearchParams({
                             chainId: String(chainId || 11155111),
-                            src: wethAddress,
+                            src: sourceAddress,
                             dst: entry.currencyAddress,
                             amount,
                             includeTokensInfo: 'true',
@@ -581,13 +622,57 @@ export function CartPage() {
             );
 
             if (!cancelled) {
-                setOneWethRateBySymbol(Object.fromEntries(entries));
+                setSwapReferenceRateBySymbol(Object.fromEntries(entries));
             }
         };
 
-        void fetchOneWethRates();
+        void fetchReferenceRates();
         return () => { cancelled = true; };
-    }, [swapRelevantCurrencies, wethAddress, chainId]);
+    }, [swapRelevantCurrencies, swapSourceTokenBySymbol, chainId]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const fetchSourceBalances = async () => {
+            if (!publicClient || !address || swapRelevantCurrencies.length === 0) {
+                if (!cancelled) setSwapSourceBalanceBySymbol({});
+                return;
+            }
+
+            const entries = await Promise.all(
+                swapRelevantCurrencies.map(async (entry) => {
+                    try {
+                        const sourceAddress = swapSourceTokenBySymbol[entry.symbol] || ZERO_ADDRESS;
+                        if (isNativeETH(sourceAddress)) {
+                            const nativeBalance = await publicClient.getBalance({ address });
+                            const parsed = parseFloat(formatUnits(nativeBalance, 18));
+                            return [entry.symbol, Number.isFinite(parsed) ? parsed : 0] as const;
+                        }
+
+                        const sourceDecimals = getTokenDecimalsByAddress(chainId || 11155111, sourceAddress);
+                        const balanceRaw = await publicClient.readContract({
+                            address: sourceAddress as `0x${string}`,
+                            abi: ERC20_BALANCE_ABI,
+                            functionName: 'balanceOf',
+                            args: [address],
+                        });
+
+                        const parsed = parseFloat(formatUnits(balanceRaw, sourceDecimals));
+                        return [entry.symbol, Number.isFinite(parsed) ? parsed : 0] as const;
+                    } catch {
+                        return [entry.symbol, 0] as const;
+                    }
+                })
+            );
+
+            if (!cancelled) {
+                setSwapSourceBalanceBySymbol(Object.fromEntries(entries));
+            }
+        };
+
+        void fetchSourceBalances();
+        return () => { cancelled = true; };
+    }, [publicClient, address, swapRelevantCurrencies, swapSourceTokenBySymbol, chainId]);
 
     useEffect(() => {
         setSwapSlippageBySymbol((prev) => {
@@ -604,23 +689,26 @@ export function CartPage() {
             const next = { ...prev };
             for (const entry of swapRelevantCurrencies) {
                 const deficit = currencyDeficitBySymbol[entry.symbol] || 0;
-                const oneWethOutput = oneWethRateBySymbol[entry.symbol] || 0;
-                if (oneWethOutput <= 0) continue;
+                const oneSourceOutput = swapReferenceRateBySymbol[entry.symbol] || 0;
+                if (oneSourceOutput <= 0) continue;
                 const currentAmount = next[entry.symbol];
                 if (currentAmount && parseFloat(currentAmount) > 0) continue;
 
-                const requiredWeth = deficit > 0 ? (deficit / oneWethOutput) * 1.02 : 0.01;
-                next[entry.symbol] = Math.max(requiredWeth, 0.01).toFixed(4);
+                const requiredSource = deficit > 0 ? (deficit / oneSourceOutput) * 1.02 : 0.01;
+                next[entry.symbol] = Math.max(requiredSource, 0.01).toFixed(4);
             }
             return next;
         });
-    }, [swapRelevantCurrencies, currencyDeficitBySymbol, oneWethRateBySymbol]);
+    }, [swapRelevantCurrencies, currencyDeficitBySymbol, swapReferenceRateBySymbol]);
 
     const handlePrepareAndExecuteCurrencySwap = async (entry: CurrencyRequirement) => {
-        if (!address || !wethAddress) return;
+        if (!address || !publicClient) return;
 
+        const sourceTokenAddress = swapSourceTokenBySymbol[entry.symbol] || ZERO_ADDRESS;
         const sourceAmount = swapSourceAmountBySymbol[entry.symbol] || '0';
         const slippage = swapSlippageBySymbol[entry.symbol] || '1';
+        const sourceDecimals = getTokenDecimalsByAddress(chainId || 11155111, sourceTokenAddress);
+        const sourceSymbol = getCurrencySymbolByAddress(chainId || 11155111, sourceTokenAddress);
 
         try {
             setActiveSwapSymbol(entry.symbol);
@@ -628,25 +716,87 @@ export function CartPage() {
             const slippageNum = parseFloat(slippage);
 
             if (!Number.isFinite(sourceAmountNum) || sourceAmountNum <= 0) {
-                throw new Error('Enter a valid WETH amount');
+                throw new Error(`Enter a valid ${sourceSymbol} amount`);
             }
             if (!Number.isFinite(slippageNum) || slippageNum <= 0 || slippageNum > 50) {
                 throw new Error('Slippage must be between 0 and 50');
             }
+
+            if (sourceTokenAddress.toLowerCase() === entry.currencyAddress.toLowerCase()) {
+                throw new Error('Source and destination token cannot be the same');
+            }
+
+            const sourceAmountBaseUnits = parseUnits(sourceAmount, sourceDecimals).toString();
 
             setSwapStatusBySymbol((prev) => ({
                 ...prev,
                 [entry.symbol]: { state: 'processing', message: 'Preparing 1inch route...' },
             }));
 
+            if (!isNativeETH(sourceTokenAddress)) {
+                const allowanceParams = new URLSearchParams({
+                    chainId: String(chainId || 11155111),
+                    tokenAddress: sourceTokenAddress,
+                    walletAddress: address,
+                });
+
+                const allowanceResponse = await fetch(`/api/integrations/1inch/approve/allowance?${allowanceParams.toString()}`, {
+                    method: 'GET',
+                    cache: 'no-store',
+                });
+
+                const allowanceJson = await allowanceResponse.json();
+                if (!allowanceResponse.ok || !allowanceJson?.success) {
+                    throw new Error(allowanceJson?.error || 'Failed to check 1inch allowance');
+                }
+
+                const allowance = BigInt(String(allowanceJson.data?.allowance?.allowance || '0'));
+                const required = BigInt(sourceAmountBaseUnits);
+
+                if (allowance < required) {
+                    setSwapStatusBySymbol((prev) => ({
+                        ...prev,
+                        [entry.symbol]: { state: 'processing', message: `Approving ${sourceSymbol} for 1inch...` },
+                    }));
+
+                    const approveParams = new URLSearchParams({
+                        chainId: String(chainId || 11155111),
+                        tokenAddress: sourceTokenAddress,
+                        amount: sourceAmountBaseUnits,
+                    });
+
+                    const approveResponse = await fetch(`/api/integrations/1inch/approve/transaction?${approveParams.toString()}`, {
+                        method: 'GET',
+                        cache: 'no-store',
+                    });
+
+                    const approveJson = await approveResponse.json();
+                    if (!approveResponse.ok || !approveJson?.success || !approveJson?.data?.transaction) {
+                        throw new Error(approveJson?.error || 'Failed to prepare approval transaction');
+                    }
+
+                    const approveTx = approveJson.data.transaction as { to: string; data: string; value: string };
+                    const approveHash = await sendTransactionAsync({
+                        to: approveTx.to as `0x${string}`,
+                        data: approveTx.data as `0x${string}`,
+                        value: BigInt(approveTx.value || '0'),
+                    });
+
+                    const approveReceipt = await publicClient.waitForTransactionReceipt({ hash: approveHash });
+                    if (!approveReceipt || approveReceipt.status !== 'success') {
+                        throw new Error('Approval transaction failed');
+                    }
+                }
+            }
+
             const response = await fetch('/api/integrations/1inch/swap', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    chainId,
-                    src: wethAddress,
+                    chainId: chainId || 11155111,
+                    src: sourceTokenAddress,
                     dst: entry.currencyAddress,
-                    amount: parseUnits(sourceAmount, 18).toString(),
+                    amount: sourceAmountBaseUnits,
                     from: address,
                     slippage: slippageNum,
                     includeTokensInfo: true,
@@ -699,6 +849,21 @@ export function CartPage() {
             if (updatedBalanceRaw !== undefined) {
                 const updatedBalance = parseFloat(formatUnits(updatedBalanceRaw, entry.decimals));
                 setTokenBalanceBySymbol((prev) => ({ ...prev, [entry.symbol]: updatedBalance }));
+            }
+
+            if (isNativeETH(sourceTokenAddress)) {
+                const sourceUpdated = await publicClient.getBalance({ address });
+                const sourceParsed = parseFloat(formatUnits(sourceUpdated, 18));
+                setSwapSourceBalanceBySymbol((prev) => ({ ...prev, [entry.symbol]: Number.isFinite(sourceParsed) ? sourceParsed : 0 }));
+            } else {
+                const sourceUpdated = await publicClient.readContract({
+                    address: sourceTokenAddress as `0x${string}`,
+                    abi: ERC20_BALANCE_ABI,
+                    functionName: 'balanceOf',
+                    args: [address],
+                });
+                const sourceParsed = parseFloat(formatUnits(sourceUpdated, sourceDecimals));
+                setSwapSourceBalanceBySymbol((prev) => ({ ...prev, [entry.symbol]: Number.isFinite(sourceParsed) ? sourceParsed : 0 }));
             }
         } catch (error) {
             setSwapStatusBySymbol((prev) => ({
@@ -1083,11 +1248,15 @@ export function CartPage() {
                                         {swapRelevantCurrencies.map((entry) => {
                                             const deficit = currencyDeficitBySymbol[entry.symbol] || 0;
                                             const balance = tokenBalanceBySymbol[entry.symbol] || 0;
-                                            const oneWethRate = oneWethRateBySymbol[entry.symbol] || 0;
+                                            const sourceAddress = swapSourceTokenBySymbol[entry.symbol] || ZERO_ADDRESS;
+                                            const sourceSymbol = getCurrencySymbolByAddress(chainId || 11155111, sourceAddress);
+                                            const sourceBalance = swapSourceBalanceBySymbol[entry.symbol] || 0;
+                                            const referenceRate = swapReferenceRateBySymbol[entry.symbol] || 0;
                                             const status = swapStatusBySymbol[entry.symbol];
                                             const isReady = deficit <= 0.000001;
                                             const isActive = activeSwapSymbol === entry.symbol;
                                             const slippageValue = swapSlippageBySymbol[entry.symbol] || '1';
+                                            const sourceEqualsDestination = sourceAddress.toLowerCase() === entry.currencyAddress.toLowerCase();
 
                                             return (
                                                 <div key={entry.symbol} className="bg-white border border-indigo-200 rounded-md p-3">
@@ -1108,22 +1277,40 @@ export function CartPage() {
                                                             <span className="font-medium">{balance.toFixed(4)} {entry.symbol}</span>
                                                         </div>
                                                         <div className="flex justify-between">
-                                                            <span>3. Swap status</span>
+                                                            <span>3. Source balance</span>
+                                                            <span className="font-medium">{sourceBalance.toFixed(4)} {sourceSymbol}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span>4. Swap status</span>
                                                             <span className={`font-medium ${isReady || status?.state === 'success' ? 'text-green-700' : 'text-orange-700'}`}>
                                                                 {isReady || status?.state === 'success' ? 'Done' : 'Needed'}
                                                             </span>
                                                         </div>
-                                                        {oneWethRate > 0 && (
+                                                        {referenceRate > 0 && (
                                                             <div className="flex justify-between">
                                                                 <span>Reference rate</span>
-                                                                <span className="font-medium">1 WETH ≈ {oneWethRate.toFixed(4)} {entry.symbol}</span>
+                                                                <span className="font-medium">1 {sourceSymbol} ≈ {referenceRate.toFixed(4)} {entry.symbol}</span>
                                                             </div>
                                                         )}
                                                     </div>
 
                                                     <div className="grid grid-cols-2 gap-2 mb-2">
                                                         <div>
-                                                            <label className="block text-[11px] text-indigo-700 mb-1">Source (WETH)</label>
+                                                            <label className="block text-[11px] text-indigo-700 mb-1">Source Token</label>
+                                                            <select
+                                                                value={sourceAddress}
+                                                                onChange={(event) => setSwapSourceTokenBySymbol((prev) => ({ ...prev, [entry.symbol]: event.target.value }))}
+                                                                className="w-full rounded border border-indigo-300 px-2 py-1.5 text-xs bg-white"
+                                                            >
+                                                                {swapSourceOptions.map((option) => (
+                                                                    <option key={option.address} value={option.address}>
+                                                                        {option.symbol}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[11px] text-indigo-700 mb-1">Source Amount ({sourceSymbol})</label>
                                                             <input
                                                                 type="number"
                                                                 min="0"
@@ -1131,9 +1318,11 @@ export function CartPage() {
                                                                 value={swapSourceAmountBySymbol[entry.symbol] || '0.01'}
                                                                 onChange={(event) => setSwapSourceAmountBySymbol((prev) => ({ ...prev, [entry.symbol]: event.target.value }))}
                                                                 className="w-full rounded border border-indigo-300 px-2 py-1.5 text-xs"
-                                                                placeholder="WETH amount"
+                                                                placeholder={`${sourceSymbol} amount`}
                                                             />
                                                         </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-2 mb-2">
                                                         <div>
                                                             <label className="block text-[11px] text-indigo-700 mb-1">Slippage (%)</label>
                                                             <input
@@ -1149,6 +1338,10 @@ export function CartPage() {
                                                         </div>
                                                     </div>
 
+                                                    {sourceEqualsDestination && !isReady && (
+                                                        <p className="text-[11px] text-orange-700 mb-2">Source and destination token are the same. Select another source token.</p>
+                                                    )}
+
                                                     <div className="flex gap-1.5 mb-2">
                                                         <button type="button" onClick={() => setSwapSlippageBySymbol((prev) => ({ ...prev, [entry.symbol]: '0.5' }))} className="px-2 py-0.5 rounded border border-indigo-300 text-indigo-700 text-[11px]">Safe</button>
                                                         <button type="button" onClick={() => setSwapSlippageBySymbol((prev) => ({ ...prev, [entry.symbol]: '1' }))} className="px-2 py-0.5 rounded border border-indigo-300 text-indigo-700 text-[11px]">Auto</button>
@@ -1158,7 +1351,7 @@ export function CartPage() {
                                                     <button
                                                         type="button"
                                                         onClick={() => handlePrepareAndExecuteCurrencySwap(entry)}
-                                                        disabled={isSigningSwapTx || isActive || isReady}
+                                                        disabled={isSigningSwapTx || isActive || isReady || sourceEqualsDestination}
                                                         className="w-full px-3 py-2 bg-indigo-600 text-white text-xs font-semibold rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                         {isActive && 'Processing...'}
