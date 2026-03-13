@@ -6,10 +6,12 @@ import { useChainId } from 'wagmi';
 import { useListingFlow } from '../contexts/ListingFlowContext';
 import NFTCard from '@/components/nft/NFTCard';
 import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
+import { FEATURES } from '@/config';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
 import { parseUnits } from 'viem';
 import { BatchTransactionPreview } from '../components/preview';
 import { formatTokenDisplay } from '../utils';
+import { convertIpfsToHttp } from '@/utils';
 
 export default function CheckListingPage() {
     const router = useRouter();
@@ -29,16 +31,25 @@ export default function CheckListingPage() {
     );
 
     const isBatch = !!formData.selectedNFTs?.length && !formData.selectedNFT;
+    const isBatchListingEnabled = FEATURES.SELL_BATCH_LISTING;
 
     // Guard: Redirect if no NFT selected
     useEffect(() => {
         if (!formData.selectedNFT && !formData.selectedNFTs?.length) {
             router.replace('/sell');
+        } else if ((formData.mode === 'trade' || formData.mode === 'hybrid') && !formData.targetNFT) {
+            router.replace('/sell');
+        } else if (isBatch && !isBatchListingEnabled) {
+            router.replace('/sell');
         } else {
             // Only set progressStep once when component mounts
             setProgressStep('preview');
         }
-    }, [formData.selectedNFT, formData.selectedNFTs, router, setProgressStep]);
+    }, [formData.mode, formData.selectedNFT, formData.selectedNFTs, formData.targetNFT, isBatch, isBatchListingEnabled, router, setProgressStep]);
+
+    if (isBatch && !isBatchListingEnabled) {
+        return null;
+    }
 
     const handleConfirm = () => {
         router.push('/sell/listing');
@@ -129,6 +140,20 @@ export default function CheckListingPage() {
             desiredTokenId: formData.targetNFT?.tokenId || null
         }
     };
+
+    const targetNFTPreviewImage = useMemo(() => {
+        const rawImage =
+            formData.targetNFT?.meta?.image
+            || (formData.targetNFT as any)?.metadata?.image
+            || (formData.targetNFT as any)?.image
+            || '';
+
+        if (!rawImage) {
+            return '/media/custom-nft-3.jpg';
+        }
+
+        return convertIpfsToHttp(rawImage);
+    }, [formData.targetNFT]);
 
     return (
         <section className="space-y-6 bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
@@ -275,8 +300,12 @@ export default function CheckListingPage() {
                                         <p className="text-xs text-gray-600 mb-2">Gewünschter NFT:</p>
                                         <div className="flex gap-3">
                                             <img
-                                                src={formData.targetNFT.meta?.image || '/media/custom-nft-3.jpg'}
+                                                src={targetNFTPreviewImage}
                                                 alt={formData.targetNFT.core.name || `NFT #${formData.targetNFT.tokenId}`}
+                                                onError={(event) => {
+                                                    event.currentTarget.onerror = null;
+                                                    event.currentTarget.src = '/media/custom-nft-3.jpg';
+                                                }}
                                                 className="w-16 h-16 rounded-lg object-cover"
                                             />
                                             <div>

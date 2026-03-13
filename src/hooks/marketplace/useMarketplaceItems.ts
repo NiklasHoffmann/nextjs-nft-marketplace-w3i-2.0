@@ -107,6 +107,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
   const createFilterKey = useCallback(() => {
     return JSON.stringify({
       cacheVersion: CACHE_VERSION,
+      refreshSeed: cacheContext.refreshTrigger,
       search: filters.search || '',
       contractAddress: filters.contractAddress || '',
       minPrice: filters.minPrice || '',
@@ -126,6 +127,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
       includeFilters,
     });
   }, [
+    cacheContext.refreshTrigger,
     includeFilters,
     filters.search,
     filters.contractAddress,
@@ -167,38 +169,41 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     const filterKey = createFilterKey();
     devLog.info('🔍 [useMarketplaceItems] Checking cache for key:', filterKey);
 
+    let hasFreshCacheHit = false;
+
     if (!append && pageNum === 1) {
       const cached = cacheContext.getCached(filterKey);
 
       if (cached) {
-        devLog.info('✅ [useMarketplaceItems] Cache HIT - using cached data:', cached.data.items.length);
-        // Cache hit - set items immediately without clearing first
+        hasFreshCacheHit = true;
+        devLog.info('✅ [useMarketplaceItems] Cache HIT - using cached data and revalidating in background:', cached.data.items.length);
+        // Show cached data immediately, then continue with background API revalidation.
         setItems(cached.data.items);
         setPagination(cached.data.pagination);
         setAvailableFilters(cached.data.filters || null);
         setLoading(false);
         setInitialLoading(false);
-        abortControllerRef.current = null;
-        loadingRef.current = false;
-        return;
+      } else {
+        devLog.info('❌ [useMarketplaceItems] Cache MISS - fetching from API');
       }
-      devLog.info('❌ [useMarketplaceItems] Cache MISS - fetching from API');
     }
 
     // Clear items AFTER cache check (only if cache miss and not appending)
     // This prevents flickering when cache is available
     // FIXED: Don't clear items immediately - keep showing old data until new data arrives
     // Only clear on initial load or when explicitly needed
-    if (!append && items.length === 0) {
+    if (!append && !hasFreshCacheHit && items.length === 0) {
       devLog.info('🗑️ [useMarketplaceItems] Initial load - clearing items');
       setItems([]);
-    } else if (!append && items.length > 0) {
+    } else if (!append && !hasFreshCacheHit && items.length > 0) {
       devLog.info('♻️ [useMarketplaceItems] Keeping old items until new data arrives');
       // Keep old items displayed - they'll be replaced when new data arrives
     }
 
     loadingRef.current = true;
-    setLoading(true);
+    if (!hasFreshCacheHit) {
+      setLoading(true);
+    }
     setError(null);
 
     devLog.info('🌐 [useMarketplaceItems] Starting API request...');

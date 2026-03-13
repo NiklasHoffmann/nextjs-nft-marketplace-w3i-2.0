@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -82,58 +82,92 @@ export default function AdminNavbar() {
         }
     };
 
-    useEffect(() => {
-        const fetchSession = async () => {
-            if (!mounted || !isConnected || !address) {
+    const fetchSession = useCallback(async () => {
+        if (!mounted || !isConnected || !address) {
+            setSessionStatus('inactive');
+            setSessionExpiresAt(null);
+            return false;
+        }
+
+        try {
+            setIsSessionChecking(true);
+            const response = await fetch('/api/auth/session', {
+                credentials: 'include',
+                cache: 'no-store'
+            });
+
+            if (!response.ok) {
                 setSessionStatus('inactive');
                 setSessionExpiresAt(null);
-                return;
+                return false;
             }
 
-            try {
-                setIsSessionChecking(true);
-                const response = await fetch('/api/auth/session', {
-                    credentials: 'include',
-                    cache: 'no-store'
-                });
-
-                if (!response.ok) {
-                    setSessionStatus('inactive');
-                    setSessionExpiresAt(null);
-                    return;
-                }
-
-                const data = await response.json();
-                if (data.success && data.data?.isAuthenticated) {
-                    const sessionAddress = data.data?.address?.toLowerCase();
-                    const expiresAt = typeof data.data?.expiresAt === 'number' ? data.data.expiresAt : null;
-                    if (sessionAddress === address.toLowerCase()) {
-                        if (expiresAt && expiresAt <= Date.now()) {
-                            setSessionStatus('inactive');
-                            setSessionExpiresAt(null);
-                            return;
-                        }
-                        setSessionStatus('active');
-                        setSessionExpiresAt(expiresAt);
-                        return;
+            const data = await response.json();
+            if (data.success && data.data?.isAuthenticated) {
+                const sessionAddress = data.data?.address?.toLowerCase();
+                const expiresAt = typeof data.data?.expiresAt === 'number' ? data.data.expiresAt : null;
+                if (sessionAddress === address.toLowerCase()) {
+                    if (expiresAt && expiresAt <= Date.now()) {
+                        setSessionStatus('inactive');
+                        setSessionExpiresAt(null);
+                        return false;
                     }
+                    setSessionStatus('active');
+                    setSessionExpiresAt(expiresAt);
+                    return true;
                 }
+            }
 
-                setSessionStatus('inactive');
-                setSessionExpiresAt(null);
-            } catch {
-                setSessionStatus('inactive');
-                setSessionExpiresAt(null);
-            } finally {
-                setIsSessionChecking(false);
+            setSessionStatus('inactive');
+            setSessionExpiresAt(null);
+            return false;
+        } catch {
+            setSessionStatus('inactive');
+            setSessionExpiresAt(null);
+            return false;
+        } finally {
+            setIsSessionChecking(false);
+        }
+    }, [address, isConnected, mounted]);
+
+    useEffect(() => {
+        let retryOne: number | null = null;
+        let retryTwo: number | null = null;
+
+        const refreshWithRetry = async () => {
+            const activeNow = await fetchSession();
+            if (!activeNow) {
+                retryOne = window.setTimeout(() => {
+                    void fetchSession();
+                }, 350);
+
+                retryTwo = window.setTimeout(() => {
+                    void fetchSession();
+                }, 1200);
             }
         };
 
-        fetchSession();
-        const interval = window.setInterval(fetchSession, 60_000);
+        const handleSessionUpdated = () => {
+            void refreshWithRetry();
+        };
 
-        return () => window.clearInterval(interval);
-    }, [address, isConnected, mounted]);
+        void refreshWithRetry();
+        const interval = window.setInterval(() => {
+            void fetchSession();
+        }, 60_000);
+        window.addEventListener('admin-session-updated', handleSessionUpdated as EventListener);
+
+        return () => {
+            window.clearInterval(interval);
+            window.removeEventListener('admin-session-updated', handleSessionUpdated as EventListener);
+            if (retryOne) {
+                window.clearTimeout(retryOne);
+            }
+            if (retryTwo) {
+                window.clearTimeout(retryTwo);
+            }
+        };
+    }, [fetchSession]);
 
     const handleLogout = async () => {
         setIsLoggingOut(true);

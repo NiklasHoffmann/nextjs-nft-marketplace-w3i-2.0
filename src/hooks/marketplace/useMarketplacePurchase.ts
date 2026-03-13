@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, usePublicClient, useChainId } from 'wagmi';
 import { parseUnits } from 'viem';
 import { IDEATION_MARKET_FACET_ABI } from '@/config/abis/ideation-market-facet';
-import { getAvailableTokens, ZERO_ADDRESS } from '@/config/tokens';
+import { getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
 import { devLog } from '@/utils';
 
 interface PurchaseListingParams {
@@ -76,9 +76,7 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
       const isSwap = expectedDesiredTokenAddress !== ZERO_ADDRESS;
       const isNative = expectedCurrency === ZERO_ADDRESS;
 
-      const tokens = getAvailableTokens(chainId);
-      const match = tokens.find((token) => token.address.toLowerCase() === expectedCurrency.toLowerCase());
-      const priceDecimals = isNative ? 18 : (match?.decimals ?? 18);
+      const priceDecimals = isNative ? 18 : getTokenDecimalsByAddress(chainId, expectedCurrency);
       const expectedPriceUnits = parseUnits(expectedPrice, priceDecimals);
       
       // Only send ETH value if paying with native ETH (not WETH or swap)

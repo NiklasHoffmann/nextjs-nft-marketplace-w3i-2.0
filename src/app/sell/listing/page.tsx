@@ -6,6 +6,7 @@ import { useChainId } from 'wagmi';
 import { useListingFlow } from '../contexts/ListingFlowContext';
 import { useTransactionService } from '@/services/blockchain';
 import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
+import { FEATURES } from '@/config';
 import NFTCard from '@/components/nft/NFTCard';
 import Link from 'next/link';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
@@ -26,6 +27,7 @@ export default function ListingPage() {
 
     const isBatch = !!formData.selectedNFTs?.length && !formData.selectedNFT;
     const batchNFTs = formData.selectedNFTs || [];
+    const isBatchListingEnabled = FEATURES.SELL_BATCH_LISTING;
 
     // Get currency symbol for display (address → symbol)
     const currencySymbol = getCurrencySymbolByAddress(chainId, formData.currency || ZERO_ADDRESS);
@@ -39,10 +41,13 @@ export default function ListingPage() {
     useEffect(() => {
         if (!formData.selectedNFT && !formData.selectedNFTs?.length) {
             router.replace('/sell');
+        } else if (isBatch && !isBatchListingEnabled) {
+            setError('Batch-Listing ist aktuell deaktiviert.');
+            router.replace('/sell');
         } else {
             setProgressStep('listing', 'whitelist');
         }
-    }, [formData.selectedNFT, formData.selectedNFTs, router, setProgressStep]);
+    }, [formData.selectedNFT, formData.selectedNFTs, isBatch, isBatchListingEnabled, router, setError, setProgressStep]);
 
     const calculateBatchPrice = (index: number, total: number): string => {
         if (formData.pricingType === 'fixed') {
@@ -60,6 +65,7 @@ export default function ListingPage() {
         if (isProcessing || hasStartedRef.current) return;
 
         if (!formData.selectedNFT && !formData.selectedNFTs?.length) return;
+        if (isBatch && !isBatchListingEnabled) return;
 
         hasStartedRef.current = true;
 
@@ -93,6 +99,10 @@ export default function ListingPage() {
                     if (Number.isFinite(availableQty) && requestedQty > availableQty) {
                         throw new Error(`Nicht genügend ERC1155-Balance. Angefordert: ${requestedQty}, verfügbar: ${availableQty}.`);
                     }
+                }
+
+                if ((formData.mode === 'trade' || formData.mode === 'hybrid') && !formData.targetNFT) {
+                    throw new Error('Trade/Hybrid ohne konkreten Ziel-NFT wird aktuell nicht unterstützt. Bitte waehle einen bestimmten NFT.');
                 }
 
                 const listingParams = {
@@ -288,6 +298,10 @@ export default function ListingPage() {
             startSingleListing();
         }
     }, []); // Only run once on mount
+
+    if (isBatch && !isBatchListingEnabled) {
+        return null;
+    }
 
     if (!formData.selectedNFT && !formData.selectedNFTs?.length) {
         return (

@@ -276,8 +276,20 @@ export function NFTCard(props: NFTCardAllProps) {
     ? (props.price ?? nft.listing?.price ?? null)
     : (nft.listing?.price || null);
   const desiredContractAddress = isLegacy
-    ? (props.desiredContractAddress ?? nft.listing?.desiredContractAddress ?? null)
-    : (nft.listing?.desiredContractAddress || null);
+    ? (
+      props.desiredContractAddress
+      ?? nft.listing?.desiredContractAddress
+      ?? (nft.listing as any)?.desiredTokenAddress
+      ?? null
+    )
+    : (
+      nft.listing?.desiredContractAddress
+      || (nft.listing as any)?.desiredTokenAddress
+      || null
+    );
+  const desiredTokenId = isLegacy
+    ? (props.desiredTokenId ?? nft.listing?.desiredTokenId ?? null)
+    : (nft.listing?.desiredTokenId || null);
   const currency = isLegacy
     ? (props.currency ?? nft.listing?.currency ?? null)
     : (nft.listing?.currency || null);
@@ -414,6 +426,7 @@ export function NFTCard(props: NFTCardAllProps) {
                 price={price}
                 isListed={isListed}
                 desiredContractAddress={desiredContractAddress}
+                desiredTokenId={desiredTokenId}
                 currency={currency}
                 chainId={chainId}
                 listingType={listingType}

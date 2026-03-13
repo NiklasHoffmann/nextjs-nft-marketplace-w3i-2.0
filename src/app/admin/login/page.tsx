@@ -24,6 +24,33 @@ export default function AdminLoginPage() {
     const [showSuccess, setShowSuccess] = useState(false);
     const [isSwitchingWallet, setIsSwitchingWallet] = useState(false);
 
+    const confirmSession = useCallback(async (targetAddress: string): Promise<boolean> => {
+        const normalizedTarget = targetAddress.toLowerCase();
+
+        for (let attempt = 0; attempt < 5; attempt++) {
+            try {
+                const response = await fetch('/api/auth/session', {
+                    credentials: 'include',
+                    cache: 'no-store'
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const sessionAddress = data?.data?.address?.toLowerCase();
+                    if (data?.success && data?.data?.isAuthenticated && sessionAddress === normalizedTarget) {
+                        return true;
+                    }
+                }
+            } catch (error) {
+                devLog.warn('Session confirmation failed:', error);
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 250));
+        }
+
+        return false;
+    }, []);
+
     const rawRedirect = searchParams?.get('redirect');
     const redirectTo = rawRedirect?.startsWith('/admin') ? rawRedirect : '/admin';
 
@@ -65,6 +92,11 @@ export default function AdminLoginPage() {
                     const sessionAddress = data.data?.address?.toLowerCase();
                     if (sessionAddress === address.toLowerCase()) {
                         setShowSuccess(true);
+                        if (typeof window !== 'undefined') {
+                            window.dispatchEvent(new CustomEvent('admin-session-updated', {
+                                detail: { address: address.toLowerCase(), source: 'login-existing-session' }
+                            }));
+                        }
                         setTimeout(() => {
                             router.push(redirectTo as any);
                         }, 1000);
@@ -197,7 +229,18 @@ export default function AdminLoginPage() {
                 throw new Error(verifyData.error || verifyData.message || 'Verifikation fehlgeschlagen');
             }
 
+            const hasConfirmedSession = await confirmSession(address);
+            if (!hasConfirmedSession) {
+                throw new Error('Session konnte nicht bestaetigt werden. Bitte erneut versuchen.');
+            }
+
             setShowSuccess(true);
+
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('admin-session-updated', {
+                    detail: { address: address.toLowerCase(), source: 'login-verified' }
+                }));
+            }
 
             await new Promise(resolve => setTimeout(resolve, 500));
 

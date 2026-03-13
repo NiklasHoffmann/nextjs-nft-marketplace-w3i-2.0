@@ -6,6 +6,26 @@ import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { formatCardCurrencyAmount } from '@/utils';
 
+const getEffectiveDecimals = (rawValue: number, tokenDecimals: number): number => {
+    if (!Number.isFinite(rawValue) || rawValue <= 0 || tokenDecimals >= 18) {
+        return tokenDecimals;
+    }
+
+    const amountWithTokenDecimals = rawValue / Math.pow(10, tokenDecimals);
+    const amountWith18Decimals = rawValue / Math.pow(10, 18);
+
+    if (
+        Number.isFinite(amountWithTokenDecimals)
+        && Number.isFinite(amountWith18Decimals)
+        && amountWith18Decimals > 0
+        && amountWithTokenDecimals / amountWith18Decimals >= 1_000_000
+    ) {
+        return 18;
+    }
+
+    return tokenDecimals;
+};
+
 interface CollectionPriceDisplayProps {
     totalValue: number;
     displayTotalValue?: number;
@@ -65,9 +85,10 @@ export const CollectionPriceDisplay = React.memo(({
     );
 
     const valueAmount = useMemo(() => {
-        const divisor = Math.pow(10, valueDecimals);
-        if (!Number.isFinite(divisor) || divisor <= 0) return 0;
         const raw = typeof displayTotalValue === 'number' ? displayTotalValue : totalValue;
+        const effectiveValueDecimals = getEffectiveDecimals(raw, valueDecimals);
+        const divisor = Math.pow(10, effectiveValueDecimals);
+        if (!Number.isFinite(divisor) || divisor <= 0) return 0;
         return raw / divisor;
     }, [displayTotalValue, totalValue, valueDecimals]);
 
@@ -89,7 +110,8 @@ export const CollectionPriceDisplay = React.memo(({
         if (!floorPrice) return null;
         const parsed = Number.parseFloat(floorPrice);
         if (!Number.isFinite(parsed)) return null;
-        const divisor = Math.pow(10, floorDecimals);
+        const effectiveFloorDecimals = getEffectiveDecimals(parsed, floorDecimals);
+        const divisor = Math.pow(10, effectiveFloorDecimals);
         if (!Number.isFinite(divisor) || divisor <= 0) return null;
         return parsed / divisor;
     }, [floorPrice, floorDecimals]);
@@ -111,7 +133,8 @@ export const CollectionPriceDisplay = React.memo(({
                     const entryCurrency = entry.currency || valueCurrency;
                     const entrySymbol = getCurrencySymbolByAddress(effectiveChainId, entryCurrency);
                     const entryDecimals = getTokenDecimalsByAddress(effectiveChainId, entryCurrency);
-                    const divisor = Math.pow(10, entryDecimals);
+                    const effectiveEntryDecimals = getEffectiveDecimals(entry.totalValue || 0, entryDecimals);
+                    const divisor = Math.pow(10, effectiveEntryDecimals);
                     if (!Number.isFinite(divisor) || divisor <= 0) {
                         continue;
                     }

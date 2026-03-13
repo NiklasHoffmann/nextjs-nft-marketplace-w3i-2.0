@@ -54,6 +54,18 @@ export function convertToScrollItems(
     } = options;
 
     return items.map((item) => {
+        const normalizedDesiredContractAddress =
+            item.desiredContractAddress
+            ?? item.desiredTokenAddress
+            ?? item.marketplace?.desiredContractAddress
+            ?? item.marketplace?.desiredTokenAddress;
+        const normalizedDesiredTokenId =
+            item.desiredTokenId
+            ?? item.marketplace?.desiredTokenId;
+        const normalizedListingType =
+            item.listingType
+            ?? item.marketplace?.listingType;
+
         // Basis NFT Daten
         const scrollItem: NFTScrollItem = {
             contractAddress: item.contractAddress,
@@ -69,8 +81,9 @@ export function convertToScrollItems(
             scrollItem.listingId = item.listingId;
             scrollItem.seller = item.seller;
             scrollItem.buyer = item.buyer;
-            scrollItem.desiredContractAddress = item.desiredContractAddress;
-            scrollItem.desiredTokenId = item.desiredTokenId;
+            scrollItem.desiredContractAddress = normalizedDesiredContractAddress;
+            scrollItem.desiredTokenId = normalizedDesiredTokenId;
+            scrollItem.listingType = normalizedListingType;
             scrollItem.tokenStandard = item.tokenStandard ?? item.tokenType ?? item.marketplace?.tokenStandard ?? null;
             scrollItem.erc1155QuantityListed = item.erc1155QuantityListed ?? item.marketplace?.erc1155QuantityListed ?? null;
             scrollItem.remainingQuantity = item.remainingQuantity ?? item.marketplace?.remainingQuantity ?? null;
@@ -114,7 +127,7 @@ export function convertToFilterableItems(
         // Marketplace Daten
         price: item.price,
         currency: item.currency,
-        listingType: item.listingType,
+        listingType: (item.listingType ?? item.marketplace?.listingType),
         tokenStandard: item.tokenStandard ?? item.tokenType ?? item.marketplace?.tokenStandard ?? null,
         erc1155QuantityListed: item.erc1155QuantityListed ?? item.marketplace?.erc1155QuantityListed ?? null,
         remainingQuantity: item.remainingQuantity ?? item.marketplace?.remainingQuantity ?? null,
@@ -124,8 +137,11 @@ export function convertToFilterableItems(
         listingId: item.listingId,
         seller: item.seller,
         buyer: item.buyer,
-        desiredContractAddress: item.desiredContractAddress,
-        desiredTokenId: item.desiredTokenId,
+        desiredContractAddress: item.desiredContractAddress
+            ?? item.desiredTokenAddress
+            ?? item.marketplace?.desiredContractAddress
+            ?? item.marketplace?.desiredTokenAddress,
+        desiredTokenId: item.desiredTokenId ?? item.marketplace?.desiredTokenId,
 
         // NFT Metadata (flattened for filtering)
         name: item.name,

@@ -7,6 +7,7 @@ import { mainnet, sepolia } from 'viem/chains';
 import { getSSEHealthStatus } from '@/services/sse/broadcast';
 import { devLog } from '@/utils';
 import '@/lib/dev-services-auto-start';
+import { RATE_LIMIT_CONFIG } from '@/lib/middleware/rateLimit';
 
 /**
  * GET /api/admin/system/health
@@ -159,4 +160,7 @@ async function handler(req: NextRequest) {
     });
 }
 
-export const GET = apiHandler(handler, { admin: true });
+export const GET = apiHandler(handler, {
+    admin: true,
+    rateLimit: RATE_LIMIT_CONFIG.LENIENT
+});

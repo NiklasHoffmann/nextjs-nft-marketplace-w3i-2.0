@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useListingFlow } from '../contexts/ListingFlowContext';
 import NFTCard from '@/components/nft/NFTCard';
@@ -21,6 +21,7 @@ export default function SuccessPage() {
     const { formData, progressData, reset, setProgressStep, setNftDataLoaded } = useListingFlow();
     const { invalidateCache } = useMarketplaceItems();
     const { refresh: refreshWalletNFTs } = useWalletNFTs();
+    const forceSyncTriggeredRef = useRef(false);
 
     const [listedNFT, setListedNFT] = useState<AggregatedNFT | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -71,6 +72,30 @@ export default function SuccessPage() {
                     devLog.info('🔄 Manual refresh for stats update...');
                     await refreshWalletNFTs();
                     devLog.info('✅ Stats should be updated now');
+                }
+
+                // Force an immediate server-side marketplace sync so /marketplace_items has the fresh listing
+                if (!forceSyncTriggeredRef.current) {
+                    forceSyncTriggeredRef.current = true;
+
+                    const triggerForceSync = async (reason: string) => {
+                        try {
+                            devLog.info(`🔄 Triggering force sync (${reason})...`);
+                            await fetch('/api/marketplace/sync', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'force' })
+                            });
+                        } catch (syncError) {
+                            devLog.warn(`⚠️ Force sync failed (${reason})`, syncError);
+                        }
+                    };
+
+                    // Immediate + delayed pass to handle chain/indexing lag.
+                    void triggerForceSync('success-immediate');
+                    setTimeout(() => {
+                        void triggerForceSync('success-delayed');
+                    }, 2500);
                 }
 
                 devLog.info('📡 Querying TheGraph for fresh listing data...');
@@ -345,7 +370,7 @@ export default function SuccessPage() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
                             <Link
-                                href="/marketplace"
+                                href={`/marketplace?from=success&tx=${txHash || 'unknown'}`}
                                 className="flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg"
                             >
                                 Zum Marktplatz

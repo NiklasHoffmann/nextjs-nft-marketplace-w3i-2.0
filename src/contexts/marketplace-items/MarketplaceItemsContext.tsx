@@ -52,6 +52,7 @@ export function MarketplaceItemsProvider({ children }: { children: React.ReactNo
     const [cache] = useState(() => new MarketplaceItemsCache());
     const [service] = useState(() => new MarketplaceItemsService(cache));
     const refreshingRef = useRef<Set<string>>(new Set());
+    const deferredRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Refresh trigger: Increment to notify hooks about cache invalidation
     const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -68,6 +69,19 @@ export function MarketplaceItemsProvider({ children }: { children: React.ReactNo
     }) => {
         return `${detail.type}:${detail.contractAddress || ''}:${detail.tokenId || ''}:${detail.listingId || ''}`;
     };
+
+    const scheduleDeferredRefresh = useCallback((reason: string, delayMs: number = 2500) => {
+        if (deferredRefreshTimeoutRef.current) {
+            clearTimeout(deferredRefreshTimeoutRef.current);
+            deferredRefreshTimeoutRef.current = null;
+        }
+
+        deferredRefreshTimeoutRef.current = setTimeout(() => {
+            devLog.info('marketplace-items', `🔄 Deferred refresh pass (${reason})`);
+            setRefreshTrigger(prev => prev + 1);
+            deferredRefreshTimeoutRef.current = null;
+        }, delayMs);
+    }, []);
 
     /**
      * Get cached data if still valid
@@ -223,6 +237,8 @@ export function MarketplaceItemsProvider({ children }: { children: React.ReactNo
                     service.invalidate();
                     // Trigger immediate refetch in consuming hooks
                     setRefreshTrigger(prev => prev + 1);
+                    // Trigger a second pass after sync delay (DB/index eventual consistency)
+                    scheduleDeferredRefresh('listing-created');
                     break;
 
                 case 'listing-canceled':
@@ -263,7 +279,7 @@ export function MarketplaceItemsProvider({ children }: { children: React.ReactNo
         });
 
         return unsubscribe;
-    }, [service, DEDUP_WINDOW]);
+    }, [service, DEDUP_WINDOW, scheduleDeferredRefresh]);
 
     /**
      * Listen for Server-Sent Events (SSE) - real-time updates from OTHER clients
@@ -323,6 +339,11 @@ export function MarketplaceItemsProvider({ children }: { children: React.ReactNo
             // Trigger refetch in all consuming hooks
             setRefreshTrigger(prev => prev + 1);
 
+            // For new listings, run a second delayed pass to catch post-sync availability.
+            if (invalidationType === 'listing-created') {
+                scheduleDeferredRefresh('sse-listing-created');
+            }
+
             // ✅ PROPAGATE TO OTHER CONTEXTS via dataInvalidation event
             const detail = {
                 type: invalidationType,
@@ -338,6 +359,15 @@ export function MarketplaceItemsProvider({ children }: { children: React.ReactNo
             devLog.info('marketplace-items', `🔌 [SSE] Connection ${connected ? 'established' : 'lost'}`);
         }
     });
+
+    useEffect(() => {
+        return () => {
+            if (deferredRefreshTimeoutRef.current) {
+                clearTimeout(deferredRefreshTimeoutRef.current);
+                deferredRefreshTimeoutRef.current = null;
+            }
+        };
+    }, []);
 
     // DevTools (development only)
     useContextDevtools('MarketplaceItems', {

@@ -1,12 +1,14 @@
 ﻿"use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { devLog } from '@/utils';
 import Link from 'next/link';
 import { useAccount, useChainId } from 'wagmi';
 import { formatEther } from 'viem';
 import { AdminPageShell } from '@/app/admin/components/shared/AdminPageShell';
 import { AddressWithEns } from '@/app/admin/components/shared/AddressWithEns';
+import { formatUnits } from 'viem';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
 
 interface DashboardStats {
     totalNFTs: number;
@@ -18,10 +20,21 @@ interface DashboardStats {
     totalSales: number;
     pendingListings: number;
     cancelledListings: number;
+    listedVolumeByCurrency?: Array<{
+        currency: string;
+        totalRaw: string;
+        listings: number;
+    }>;
+    salesVolumeByCurrency?: Array<{
+        currency: string;
+        totalRaw: string;
+        sales: number;
+    }>;
     recentSales: Array<{
         nftAddress: string;
         tokenId: string;
         price: string;
+        currency?: string;
         seller: string;
         buyer: string;
         soldAt: string;
@@ -71,6 +84,7 @@ interface SystemMetrics {
 }
 
 export default function AdminDashboard() {
+    const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
     const [mounted, setMounted] = useState(false);
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [health, setHealth] = useState<SystemHealth | null>(null);
@@ -184,6 +198,34 @@ export default function AdminDashboard() {
         const formatted = formatEther(BigInt(volumeWei));
         return parseFloat(formatted).toFixed(4);
     };
+
+    const formatTokenAmount = useCallback((rawValue: string | number, currencyAddress?: string | null) => {
+        try {
+            const normalizedCurrency = (currencyAddress || ZERO_ADDRESS).toLowerCase();
+            const decimals = getTokenDecimalsByAddress(chainId, normalizedCurrency);
+            const symbol = getCurrencySymbolByAddress(chainId, normalizedCurrency);
+            const formatted = formatUnits(BigInt(String(rawValue || '0')), decimals);
+            const numeric = Number.parseFloat(formatted);
+            const amount = Number.isFinite(numeric)
+                ? numeric.toLocaleString('de-DE', {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: numeric >= 100 ? 2 : 4
+                })
+                : formatted;
+
+            return { amount, symbol };
+        } catch {
+            return {
+                amount: '0',
+                symbol: getCurrencySymbolByAddress(chainId, currencyAddress || ZERO_ADDRESS)
+            };
+        }
+    }, [ZERO_ADDRESS, chainId]);
+
+    const listedVolumes = useMemo(() => {
+        const entries = stats?.listedVolumeByCurrency || [];
+        return [...entries].sort((a, b) => b.listings - a.listings);
+    }, [stats?.listedVolumeByCurrency]);
 
     const getNetworkName = () => {
         if (!chainId) return 'Unknown';
@@ -309,8 +351,30 @@ export default function AdminDashboard() {
                                 <div className="h-8 bg-gray-200 animate-pulse rounded"></div>
                             ) : (
                                 <>
-                                    <div className="text-2xl font-bold text-gray-900">{formatVolume(stats?.listedVolume || 0)} ETH</div>
-                                    <div className="text-xs text-gray-500 mt-1">{stats?.activeListings || 0} aktive Listings</div>
+                                    {listedVolumes.length > 0 ? (
+                                        <div className="space-y-1.5">
+                                            {listedVolumes.slice(0, 3).map((entry) => {
+                                                const formatted = formatTokenAmount(entry.totalRaw, entry.currency);
+                                                return (
+                                                    <div key={entry.currency} className="flex items-baseline justify-between gap-3">
+                                                        <div className="text-lg font-bold text-gray-900 truncate">
+                                                            {formatted.amount} {formatted.symbol}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 whitespace-nowrap">
+                                                            {entry.listings} Listings
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="text-2xl font-bold text-gray-900">0</div>
+                                    )}
+                                    <div className="text-xs text-gray-500 mt-2">
+                                        {listedVolumes.length > 0
+                                            ? `${listedVolumes.length} Währungen · ${stats?.activeListings || 0} aktive Listings`
+                                            : `${stats?.activeListings || 0} aktive Listings`}
+                                    </div>
                                 </>
                             )}
                         </div>
@@ -539,7 +603,10 @@ export default function AdminDashboard() {
                                             </div>
                                             <div className="text-right ml-4">
                                                 <div className="text-sm font-semibold text-gray-900">
-                                                    {formatVolume(parseFloat(sale.price))} ETH
+                                                    {(() => {
+                                                        const formatted = formatTokenAmount(sale.price, sale.currency || ZERO_ADDRESS);
+                                                        return `${formatted.amount} ${formatted.symbol}`;
+                                                    })()}
                                                 </div>
                                                 <div className="text-xs text-gray-500">
                                                     {new Date(sale.soldAt).toLocaleDateString('de-DE')}

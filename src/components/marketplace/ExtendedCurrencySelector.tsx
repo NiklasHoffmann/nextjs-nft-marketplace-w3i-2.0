@@ -283,13 +283,15 @@ export function ExtendedCurrencySelector({
                                                 <div className="grid grid-cols-3 gap-2 p-3">
                                                     {filteredCategoryTokens.map((token) => {
                                                         const isSelected = token.address.toLowerCase() === (value || ZERO_ADDRESS).toLowerCase();
+                                                        const isDisallowed = hasAllowedCurrencyData && !allowedCurrencySet.has(token.address.toLowerCase());
                                                         return (
                                                             <TokenGridOption
                                                                 key={token.address}
                                                                 token={token}
                                                                 isSelected={isSelected}
                                                                 isAllowed={hasAllowedCurrencyData && allowedCurrencySet.has(token.address.toLowerCase())}
-                                                                isDisallowed={hasAllowedCurrencyData && !allowedCurrencySet.has(token.address.toLowerCase())}
+                                                                isDisallowed={isDisallowed}
+                                                                disabled={isDisallowed}
                                                                 onClick={() => {
                                                                     onChange(token.address);
                                                                     setIsOpen(false);
@@ -311,12 +313,16 @@ export function ExtendedCurrencySelector({
                                             <button
                                                 key={option.address}
                                                 type="button"
+                                                disabled={option.isDisallowed}
                                                 onClick={() => {
+                                                    if (option.isDisallowed) return;
                                                     onChange(option.address);
                                                     setIsOpen(false);
                                                     setSearchTerm('');
                                                 }}
-                                                className={`px-3 py-3 flex flex-col items-center gap-1 rounded-lg border-2 transition-all ${isSelected
+                                                className={`px-3 py-3 flex flex-col items-center gap-1 rounded-lg border-2 transition-all ${option.isDisallowed
+                                                        ? 'opacity-50 cursor-not-allowed border-gray-200 text-gray-400'
+                                                        : isSelected
                                                         ? 'bg-blue-50 border-blue-500 text-blue-700'
                                                         : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700'
                                                     }`}
@@ -361,17 +367,21 @@ interface TokenOptionProps {
     isSelected: boolean;
     isAllowed: boolean;
     isDisallowed: boolean;
+    disabled: boolean;
     onClick: () => void;
 }
 
-function TokenGridOption({ token, isSelected, isAllowed, isDisallowed, onClick }: TokenOptionProps) {
+function TokenGridOption({ token, isSelected, isAllowed, isDisallowed, disabled, onClick }: TokenOptionProps) {
     const icon = token.icon || 'T';
 
     return (
         <button
             type="button"
+            disabled={disabled}
             onClick={onClick}
-            className={`relative px-3 py-3 flex flex-col items-center gap-1 rounded-lg border-2 transition-all ${isSelected
+            className={`relative px-3 py-3 flex flex-col items-center gap-1 rounded-lg border-2 transition-all ${disabled
+                    ? 'opacity-50 cursor-not-allowed border-gray-200 text-gray-400'
+                    : isSelected
                     ? 'bg-blue-50 border-blue-500 text-blue-700'
                     : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700'
                 }`}

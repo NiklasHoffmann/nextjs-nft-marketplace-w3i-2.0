@@ -12,7 +12,26 @@ export function normalizePrice(value: unknown): string | undefined {
 }
 
 export function mapEnrichedNFTToScrollItem(nft: EnrichedNFTDocument): NFTScrollItem {
-    const price = normalizePrice((nft as any).price ?? nft.marketplace?.price);
+    const price = normalizePrice(
+        (nft as any).priceTotal
+        ?? nft.marketplace?.priceTotal
+        ?? (nft as any).price
+        ?? nft.marketplace?.price
+    );
+    const desiredContractAddress =
+        (nft as any).desiredContractAddress
+        || (nft as any).desiredTokenAddress
+        || nft.marketplace?.desiredContractAddress
+        || (nft.marketplace as any)?.desiredTokenAddress
+        || undefined;
+    const desiredTokenId =
+        (nft as any).desiredTokenId
+        || nft.marketplace?.desiredTokenId
+        || undefined;
+    const listingType =
+        (nft as any).listingType
+        || nft.marketplace?.listingType
+        || undefined;
 
     return {
         contractAddress: nft.contractAddress.toLowerCase(),
@@ -22,8 +41,10 @@ export function mapEnrichedNFTToScrollItem(nft: EnrichedNFTDocument): NFTScrollI
         listingId: (nft as any).listingId || nft.marketplace?.listingId || undefined,
         seller: (nft as any).seller || nft.marketplace?.seller || undefined,
         buyer: (nft as any).buyer || nft.marketplace?.buyer || undefined,
-        desiredContractAddress: (nft as any).desiredContractAddress || nft.marketplace?.desiredContractAddress || undefined,
-        desiredTokenId: (nft as any).desiredTokenId || nft.marketplace?.desiredTokenId || undefined,
+        desiredContractAddress,
+        desiredTokenId,
+        listingType,
+        chainId: (nft as any).chainId ?? nft.marketplace?.chainId ?? undefined,
         currency: (nft as any).currency || nft.marketplace?.currency || undefined,
         tokenStandard: (nft as any).tokenStandard || nft.marketplace?.tokenStandard || (nft as any).tokenType || null,
         erc1155QuantityListed: (nft as any).erc1155QuantityListed || nft.marketplace?.erc1155QuantityListed || null,
@@ -67,12 +88,27 @@ export function mapEnrichedNFTToFilterableItem(
     nft: EnrichedNFTDocument,
     fallbackChainId?: number
 ): FilterableNFTItem {
+    const desiredContractAddress =
+        (nft as any).desiredContractAddress
+        || (nft as any).desiredTokenAddress
+        || nft.marketplace?.desiredContractAddress
+        || (nft.marketplace as any)?.desiredTokenAddress
+        || undefined;
+    const desiredTokenId =
+        (nft as any).desiredTokenId
+        || nft.marketplace?.desiredTokenId
+        || undefined;
+    const listingType =
+        (nft as any).listingType
+        || nft.marketplace?.listingType
+        || undefined;
+
     return {
         contractAddress: nft.contractAddress,
         tokenId: nft.tokenId,
         price: nft.marketplace?.price || (nft as any).price || null,
         currency: nft.marketplace?.currency || (nft as any).currency || undefined,
-        listingType: nft.marketplace?.listingType || undefined,
+        listingType,
         tokenStandard: (nft as any).tokenStandard || nft.marketplace?.tokenStandard || (nft as any).tokenType || null,
         erc1155QuantityListed: (nft as any).erc1155QuantityListed || nft.marketplace?.erc1155QuantityListed || null,
         remainingQuantity: (nft as any).remainingQuantity || nft.marketplace?.remainingQuantity || null,
@@ -83,8 +119,8 @@ export function mapEnrichedNFTToFilterableItem(
         listingId: nft.listingId || undefined,
         seller: nft.marketplace?.seller || undefined,
         buyer: nft.marketplace?.buyer || undefined,
-        desiredContractAddress: nft.marketplace?.desiredContractAddress || undefined,
-        desiredTokenId: nft.marketplace?.desiredTokenId || undefined,
+        desiredContractAddress,
+        desiredTokenId,
         metadata: nft.metadata ? {
             name: nft.metadata.name || null,
             description: nft.metadata.description || null,
@@ -120,6 +156,14 @@ export function mapEnrichedNFTToFilterableItem(
 }
 
 export function mapWalletNFTToScrollItem(nft: WalletNFT, connectedWallet?: string | null): NFTScrollItem {
+    const desiredContractAddress =
+        (nft as any).desiredContractAddress
+        || (nft as any).desiredTokenAddress
+        || undefined;
+    const desiredTokenId =
+        (nft as any).desiredTokenId
+        || undefined;
+
     return {
         contractAddress: nft.contractAddress,
         tokenId: nft.tokenId,
@@ -127,6 +171,7 @@ export function mapWalletNFTToScrollItem(nft: WalletNFT, connectedWallet?: strin
         isListed: nft.isListed || false,
         listingId: nft.listingId,
         seller: nft.seller,
+        chainId: (nft as any).chainId,
         currency: nft.currency,
         listingType: nft.listingType,
         tokenStandard: (nft as any).listingTokenStandard ?? (nft as any).tokenType ?? null,
@@ -135,8 +180,8 @@ export function mapWalletNFTToScrollItem(nft: WalletNFT, connectedWallet?: strin
         unitPrice: (nft as any).unitPrice ?? null,
         partialBuyEnabled: (nft as any).partialBuyEnabled ?? false,
         buyer: undefined,
-        desiredContractAddress: undefined,
-        desiredTokenId: undefined,
+        desiredContractAddress,
+        desiredTokenId,
         name: nft.name || `NFT #${nft.tokenId}`,
         symbol: nft.contractSymbol || undefined,
         category: nft.insights?.category || nft.category || null,

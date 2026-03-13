@@ -9,7 +9,7 @@ import { useWriteContract, useWaitForTransactionReceipt, usePublicClient, useAcc
 import { parseUnits, getAddress, erc721Abi, erc1155Abi } from 'viem';
 import { IDEATION_MARKET_FACET_ABI } from '@/config/abis/ideation-market-facet';
 import { GETTER_FACET_ABI } from '@/config/abis/getter-facet';
-import { getAvailableTokens, ZERO_ADDRESS } from '@/config/tokens';
+import { getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
 import { devLog } from '@/utils';
 import { detectIdeationMarketError, getIdeationMarketErrorMessage } from '@/services/blockchain/marketplace-error-parser';
 
@@ -79,9 +79,7 @@ export function useMarketplaceListing(marketplaceAddress: string) {
       return 18;
     }
 
-    const tokens = getAvailableTokens(chainId);
-    const match = tokens.find((token) => token.address.toLowerCase() === currencyAddress.toLowerCase());
-    return match?.decimals ?? 18;
+    return getTokenDecimalsByAddress(chainId, currencyAddress);
   };
 
   const createListing = async ({

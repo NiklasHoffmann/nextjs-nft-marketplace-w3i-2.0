@@ -34,6 +34,9 @@ export const FEATURES = {
     /** Marketplace Features aktiviert */
     MARKETPLACE_ENABLED: true,
 
+    /** Batch-Listing im Sell-Flow (temporarily disabled, set to true to re-enable) */
+    SELL_BATCH_LISTING: false,
+
     /** History Towers Spiel aktiviert */
     GAME_ENABLED: true,
 

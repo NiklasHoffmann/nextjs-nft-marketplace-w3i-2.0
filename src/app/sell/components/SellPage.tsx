@@ -22,6 +22,7 @@ import { useListingFlow } from '../contexts/ListingFlowContext';
 import { useMarketplaceContracts, useMarketplaceData } from '@/hooks/marketplace';
 import { useNFTApproval } from '@/hooks/nfts';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
+import { FEATURES } from '@/config';
 import { walletNFTToAggregatedNFT, sortNFTs, filterNFTs } from '../utils';
 import type { StepStatus, ListingType, NFTFilterOptions } from '../types';
 import { devLog } from '@/utils';
@@ -48,6 +49,7 @@ export function SellPage() {
 
     const urlContract = searchParams?.get('contract');
     const urlTokenId = searchParams?.get('tokenId');
+    const isBatchListingEnabled = FEATURES.SELL_BATCH_LISTING;
 
     // Direct context usage instead of wrapper hook
     const walletNFTsContext = useWalletNFTs();
@@ -105,6 +107,16 @@ export function SellPage() {
     const [approvalStatus, setApprovalStatus] = useState<StepStatus>('not-started');
     const [showApprovalDialog, setShowApprovalDialog] = useState(false);
     const [unapprovedContracts, setUnapprovedContracts] = useState<string[]>([]);
+
+    useEffect(() => {
+        if (isBatchListingEnabled || listingType !== 'batch') return;
+
+        setListingType('single');
+        setBatchSelectedNFTs(new Set());
+        setFormData({ selectedNFTs: undefined });
+        setWhitelistStatus('not-started');
+        setApprovalStatus('not-started');
+    }, [isBatchListingEnabled, listingType, setFormData]);
 
     const approvalNFT = useMemo(() => {
         if (unapprovedContracts.length > 0) {
@@ -534,16 +546,21 @@ export function SellPage() {
                                     setWhitelistStatus('not-started');
                                     setApprovalStatus('not-started');
                                 }}
+                                disabled={!isBatchListingEnabled}
                                 className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${listingType === 'batch'
                                     ? 'bg-purple-600 text-white'
-                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                    : isBatchListingEnabled
+                                        ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                        : 'text-gray-400 bg-gray-50 cursor-not-allowed'
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                 </svg>
                                 Batch
-                                <span className="ml-1 px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">Neu</span>
+                                <span className={`ml-1 px-1.5 py-0.5 text-xs rounded-full ${isBatchListingEnabled ? 'bg-purple-100 text-purple-700' : 'bg-gray-200 text-gray-500'}`}>
+                                    {isBatchListingEnabled ? 'Neu' : 'Deaktiviert'}
+                                </span>
                             </button>
                         </div>
                     </div>

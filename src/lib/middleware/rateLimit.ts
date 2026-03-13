@@ -72,7 +72,8 @@ function getDefaultKey(request: NextRequest): string {
         'unknown';
 
     const userAgent = headers?.get('user-agent') || 'unknown';
-    return `${ip}-${userAgent}`;
+    const routePath = request.nextUrl.pathname || 'unknown-route';
+    return `${routePath}-${ip}-${userAgent}`;
 }
 
 async function tryRedisRateLimit(

@@ -228,6 +228,19 @@ export const GET = apiHandler(async (request: NextRequest) => {
                 seller: { $arrayElemAt: ['$listings.seller', 0] },
                 currency: { $arrayElemAt: ['$listings.currency', 0] },
                 listingType: { $arrayElemAt: ['$listings.listingType', 0] },
+                desiredContractAddress: {
+                    $ifNull: [
+                        { $arrayElemAt: ['$listings.desiredContractAddress', 0] },
+                        { $arrayElemAt: ['$listings.desiredTokenAddress', 0] }
+                    ]
+                },
+                desiredTokenAddress: {
+                    $ifNull: [
+                        { $arrayElemAt: ['$listings.desiredTokenAddress', 0] },
+                        { $arrayElemAt: ['$listings.desiredContractAddress', 0] }
+                    ]
+                },
+                desiredTokenId: { $arrayElemAt: ['$listings.desiredTokenId', 0] },
                 listingStatus: { $arrayElemAt: ['$listings.status', 0] },
                 listingTokenStandard: { $arrayElemAt: ['$listings.tokenStandard', 0] },
                 erc1155QuantityListed: { $arrayElemAt: ['$listings.erc1155QuantityListed', 0] },

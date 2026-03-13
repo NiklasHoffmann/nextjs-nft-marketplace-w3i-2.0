@@ -3,7 +3,7 @@ import { formatUnits } from 'viem';
 import { NFTPriceCardProps } from '@/types';
 import { AddToCartButton } from '@/components/ui';
 import type { ActiveItem } from '@/types';
-import { getAvailableTokens, getCurrencySymbolByAddress, ZERO_ADDRESS } from '@/config/tokens';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
 import { useChainId } from 'wagmi';
 import {
     BuyNowModal,
@@ -45,15 +45,7 @@ function NFTPriceCard({
     // Get chainId for currency lookup
     const chainId = useChainId();
 
-    const currencyDecimals = useMemo(() => {
-        if (!currency || currency === ZERO_ADDRESS) {
-            return 18;
-        }
-
-        const tokens = getAvailableTokens(chainId);
-        const match = tokens.find((token) => token.address.toLowerCase() === currency.toLowerCase());
-        return match?.decimals ?? 18;
-    }, [chainId, currency]);
+    const currencyDecimals = useMemo(() => getTokenDecimalsByAddress(chainId, currency), [chainId, currency]);
 
     const isErc1155 = tokenStandard === 'ERC1155';
     const displayPriceWei = useMemo(() => {
@@ -63,28 +55,50 @@ function NFTPriceCard({
         return price;
     }, [isErc1155, unitPrice, price]);
 
+    const effectiveCurrencyDecimals = useMemo(() => {
+        if (!displayPriceWei || currencyDecimals >= 18) return currencyDecimals;
+
+        try {
+            const parsedWithTokenDecimals = parseFloat(formatUnits(BigInt(displayPriceWei), currencyDecimals));
+            const parsedWith18Decimals = parseFloat(formatUnits(BigInt(displayPriceWei), 18));
+
+            if (
+                Number.isFinite(parsedWithTokenDecimals)
+                && Number.isFinite(parsedWith18Decimals)
+                && parsedWith18Decimals > 0
+                && parsedWithTokenDecimals / parsedWith18Decimals >= 1_000_000
+            ) {
+                return 18;
+            }
+        } catch {
+            return currencyDecimals;
+        }
+
+        return currencyDecimals;
+    }, [displayPriceWei, currencyDecimals]);
+
     const formattedPrice = useMemo(() => {
         if (!displayPriceWei) {
             return '0';
         }
 
         try {
-            return formatUnits(BigInt(displayPriceWei), currencyDecimals);
+            return formatUnits(BigInt(displayPriceWei), effectiveCurrencyDecimals);
         } catch {
             return '0';
         }
-    }, [displayPriceWei, currencyDecimals]);
+    }, [displayPriceWei, effectiveCurrencyDecimals]);
 
     const formattedTotalPrice = useMemo(() => {
         if (!isErc1155 || !unitPrice) return null;
         if (!price) return null;
 
         try {
-            return formatUnits(BigInt(price), currencyDecimals);
+            return formatUnits(BigInt(price), effectiveCurrencyDecimals);
         } catch {
             return null;
         }
-    }, [isErc1155, unitPrice, price, currencyDecimals]);
+    }, [isErc1155, unitPrice, price, effectiveCurrencyDecimals]);
 
     const currencySymbol = useMemo(() =>
         getCurrencySymbolByAddress(chainId, currency),

@@ -19,18 +19,40 @@ export function useNFTPriceData(priceWei: string | null, currency?: string | nul
         [effectiveChainId, currency]
     );
 
+    const effectiveTokenDecimals = useMemo(() => {
+        if (!priceWei || tokenDecimals >= 18) return tokenDecimals;
+
+        try {
+            const parsedWithTokenDecimals = parseFloat(formatUnits(BigInt(priceWei), tokenDecimals));
+            const parsedWith18Decimals = parseFloat(formatUnits(BigInt(priceWei), 18));
+
+            if (
+                Number.isFinite(parsedWithTokenDecimals)
+                && Number.isFinite(parsedWith18Decimals)
+                && parsedWith18Decimals > 0
+                && parsedWithTokenDecimals / parsedWith18Decimals >= 1_000_000
+            ) {
+                return 18;
+            }
+        } catch {
+            return tokenDecimals;
+        }
+
+        return tokenDecimals;
+    }, [priceWei, tokenDecimals]);
+
     const tokenSymbol = useMemo(
         () => getCurrencySymbolByAddress(effectiveChainId, currency),
         [effectiveChainId, currency]
     );
 
     const tokenPrice = useMemo(() => {
-        return priceWei ? parseFloat(formatUnits(BigInt(priceWei), tokenDecimals)) : 0;
-    }, [priceWei, tokenDecimals]);
+        return priceWei ? parseFloat(formatUnits(BigInt(priceWei), effectiveTokenDecimals)) : 0;
+    }, [priceWei, effectiveTokenDecimals]);
 
     const formattedTokenPrice = useMemo(() => {
-        return formatUnits(BigInt(priceWei || '0'), tokenDecimals);
-    }, [priceWei, tokenDecimals]);
+        return formatUnits(BigInt(priceWei || '0'), effectiveTokenDecimals);
+    }, [priceWei, effectiveTokenDecimals]);
 
     const [convertedPrice, setConvertedPrice] = useState<string>('');
     const [priceLoading, setPriceLoading] = useState<boolean>(false);

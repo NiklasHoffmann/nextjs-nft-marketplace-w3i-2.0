@@ -10,7 +10,7 @@ import { useForm } from '@/hooks';
 import { ExtendedCurrencySelector } from '@/components/marketplace';
 import { ZERO_ADDRESS, getTokenConfig, isNativeETH } from '@/config/tokens';
 import { useListingFlow } from '../../contexts/ListingFlowContext';
-import { devLog } from '@/utils';
+import { convertIpfsToHttp, devLog } from '@/utils';
 
 export type ListingMode = 'sale' | 'trade' | 'hybrid';
 
@@ -39,6 +39,8 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
     const [mode, setMode] = useState<ListingMode>('sale');
     const [selectedTargetNFT, setSelectedTargetNFT] = useState<AggregatedNFT | null>(null);
     const [isSearching, setIsSearching] = useState(false);
+    const [targetSearchError, setTargetSearchError] = useState<string | null>(null);
+    const TRADE_SPECIFIC_ONLY = true;
     const chainId = useChainId();
     const { setProgressStep } = useListingFlow();
     const isErc1155 = selectedNFT?.tokenStandard === 'ERC1155';
@@ -219,13 +221,22 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                 ? Array.from(new Set(rawAddresses.map((address) => getAddress(address))))
                 : [];
 
+            const effectiveTradeType = (mode === 'trade' || mode === 'hybrid')
+                ? (TRADE_SPECIFIC_ONLY ? 'specific' : values.tradeType)
+                : undefined;
+
+            if ((mode === 'trade' || mode === 'hybrid') && effectiveTradeType === 'specific' && !selectedTargetNFT) {
+                alert('Bitte wählen Sie einen gewünschten NFT aus.');
+                return;
+            }
+
             onSubmit({
                 mode,
                 price: submissionPrice,
                 currency: (mode === 'sale' || mode === 'hybrid') ? values.currency : undefined,
                 targetNFT: (mode === 'trade' || mode === 'hybrid') ? selectedTargetNFT || undefined : undefined,
                 targetCollection: values.targetCollection || undefined,
-                tradeType: (mode === 'trade' || mode === 'hybrid') ? values.tradeType : undefined,
+                tradeType: effectiveTradeType,
                 description: values.description,
                 erc1155Quantity: isErc1155 ? values.erc1155Quantity : undefined,
                 partialBuyEnabled: isErc1155 && (mode === 'sale' || mode === 'hybrid') ? values.partialBuyEnabled : false,
@@ -234,6 +245,14 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
             });
         }
     });
+
+    useEffect(() => {
+        if (!TRADE_SPECIFIC_ONLY) return;
+        if (mode !== 'trade' && mode !== 'hybrid') return;
+        if (form.values.tradeType === 'specific') return;
+
+        form.setFieldValue('tradeType', 'specific');
+    }, [mode, form.values.tradeType]);
 
     // Get token config for selected currency
     const selectedTokenConfig = useMemo(() => {
@@ -249,6 +268,12 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
         }
         return null;
     }, [form.values.currency, chainId]);
+
+    const targetPreviewImage = useMemo(() => {
+        const rawImage = selectedTargetNFT?.meta?.image?.trim();
+        if (!rawImage) return '/media/custom-nft-3.jpg';
+        return convertIpfsToHttp(rawImage);
+    }, [selectedTargetNFT?.meta?.image]);
 
     // Generic ERC20 Hook for approval check (works with any token)
     const {
@@ -266,40 +291,83 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
         if (!form.values.targetContractAddress || !form.values.targetTokenId) return;
 
         setIsSearching(true);
+        setTargetSearchError(null);
+
         try {
-            // Mock search - in production würde hier eine API-Anfrage stattfinden
-            const mockResult: AggregatedNFT = {
-                key: `${form.values.targetContractAddress}-${form.values.targetTokenId}`,
-                contractAddress: form.values.targetContractAddress as `0x${string}`,
-                tokenId: form.values.targetTokenId,
-                listed: false,
+            if (!isAddress(form.values.targetContractAddress)) {
+                throw new Error('Ungültige Contract-Adresse.');
+            }
+
+            let normalizedTokenId = '';
+            try {
+                normalizedTokenId = BigInt(form.values.targetTokenId.trim()).toString();
+            } catch {
+                throw new Error('Ungültige Token-ID. Bitte eine ganze Zahl eingeben.');
+            }
+
+            const normalizedContract = getAddress(form.values.targetContractAddress);
+
+            const response = await fetch(
+                `/api/nft/detail?contractAddress=${encodeURIComponent(normalizedContract)}&tokenId=${encodeURIComponent(normalizedTokenId)}`,
+                { cache: 'no-store' }
+            );
+
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error('NFT nicht gefunden. Bitte Contract-Adresse und Token-ID prüfen.');
+                }
+                throw new Error(`Suche fehlgeschlagen (HTTP ${response.status}).`);
+            }
+
+            const result = await response.json();
+            const nftData = result?.success ? result.data : result;
+
+            if (!nftData?.contractAddress || !nftData?.tokenId) {
+                throw new Error('NFT-Daten unvollständig zurückgegeben.');
+            }
+
+            const targetNft: AggregatedNFT = {
+                key: `${nftData.contractAddress}-${nftData.tokenId}`,
+                contractAddress: nftData.contractAddress as `0x${string}`,
+                tokenId: String(nftData.tokenId),
+                listed: !!nftData.marketplace?.isListed,
+                tokenStandard: nftData.marketplace?.tokenStandard === 'ERC1155' ? 'ERC1155' : 'ERC721',
                 core: {
-                    contractAddress: form.values.targetContractAddress as `0x${string}`,
-                    tokenId: form.values.targetTokenId,
-                    tokenURI: null,
-                    name: `Target NFT #${form.values.targetTokenId}`,
-                    owner: '0xOtherUser' as `0x${string}`,
-                    symbol: 'TEST',
-                    contractName: 'Test Collection',
-                    contractSymbol: 'TEST'
+                    contractAddress: nftData.contractAddress as `0x${string}`,
+                    tokenId: String(nftData.tokenId),
+                    tokenURI: nftData.contract?.tokenURI || null,
+                    name: nftData.contract?.name || nftData.metadata?.name || `NFT #${nftData.tokenId}`,
+                    owner: (nftData.blockchain?.owner || null) as `0x${string}` | null,
+                    symbol: nftData.contract?.symbol || null,
+                    contractName: nftData.contract?.name || null,
+                    contractSymbol: nftData.contract?.symbol || null,
+                    totalSupply: nftData.contract?.totalSupply || null
                 },
                 meta: {
-                    name: `Target NFT #${form.values.targetTokenId}`,
-                    description: 'Target NFT for trade',
-                    image: '/media/custom-nft-3.jpg'
+                    name: nftData.metadata?.name || `NFT #${nftData.tokenId}`,
+                    description: nftData.metadata?.description || '',
+                    image: nftData.metadata?.image || '/media/custom-nft-3.jpg',
+                    attributes: nftData.metadata?.attributes || [],
+                    animationUrl: nftData.metadata?.animationUrl || undefined,
+                    externalUrl: nftData.metadata?.externalUrl || undefined
                 },
                 lastUpdated: Date.now(),
                 sources: {
                     blockchain: true,
                     metadata: true,
-                    marketplace: false,
+                    marketplace: !!nftData.marketplace,
                     social: false,
                     insights: false
                 }
             };
 
-            setSelectedTargetNFT(mockResult);
+            setSelectedTargetNFT(targetNft);
+            form.setFieldValue('targetContractAddress', normalizedContract);
+            form.setFieldValue('targetTokenId', normalizedTokenId);
         } catch (error) {
+            const message = error instanceof Error ? error.message : 'Fehler bei der NFT-Suche.';
+            setTargetSearchError(message);
+            setSelectedTargetNFT(null);
             devLog.error('Error searching NFT:', error);
         } finally {
             setIsSearching(false);
@@ -701,9 +769,12 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                                             value="collection"
                                             checked={form.values.tradeType === 'collection'}
                                             onChange={(e) => form.setFieldValue('tradeType', e.target.value as any)}
+                                            disabled={TRADE_SPECIFIC_ONLY}
                                             className="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
                                         />
-                                        <span className="ml-2 text-sm text-gray-700">Beliebiger NFT aus Collection</span>
+                                        <span className={`ml-2 text-sm ${TRADE_SPECIFIC_ONLY ? 'text-gray-400' : 'text-gray-700'}`}>
+                                            Beliebiger NFT aus Collection {TRADE_SPECIFIC_ONLY ? '(vorerst deaktiviert)' : ''}
+                                        </span>
                                     </label>
                                     <label className="flex items-center">
                                         <input
@@ -711,9 +782,12 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                                             value="open"
                                             checked={form.values.tradeType === 'open'}
                                             onChange={(e) => form.setFieldValue('tradeType', e.target.value as any)}
+                                            disabled={TRADE_SPECIFIC_ONLY}
                                             className="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
                                         />
-                                        <span className="ml-2 text-sm text-gray-700">Offen für Angebote</span>
+                                        <span className={`ml-2 text-sm ${TRADE_SPECIFIC_ONLY ? 'text-gray-400' : 'text-gray-700'}`}>
+                                            Offen für Angebote {TRADE_SPECIFIC_ONLY ? '(vorerst deaktiviert)' : ''}
+                                        </span>
                                     </label>
                                 </div>
                             </div>
@@ -752,12 +826,20 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                                         {isSearching ? 'Suche...' : 'NFT suchen'}
                                     </button>
 
+                                    {targetSearchError && (
+                                        <p className="text-sm text-red-600">{targetSearchError}</p>
+                                    )}
+
                                     {selectedTargetNFT && (
                                         <div className="mt-2 p-3 bg-white border border-green-200 rounded-lg">
                                             <div className="flex items-center gap-3">
                                                 <img
-                                                    src={selectedTargetNFT.meta?.image || '/media/custom-nft-3.jpg'}
+                                                    src={targetPreviewImage}
                                                     alt={selectedTargetNFT.meta?.name || 'NFT'}
+                                                    onError={(event) => {
+                                                        event.currentTarget.onerror = null;
+                                                        event.currentTarget.src = '/media/custom-nft-3.jpg';
+                                                    }}
                                                     className="w-12 h-12 rounded-lg object-cover shadow-sm hover:shadow-md transition-shadow duration-300"
                                                 />
                                                 <div className="flex-1 min-w-0">

@@ -43,6 +43,9 @@ export interface WalletNFT extends ExternalNFT {
     remainingQuantity?: string | null;
     unitPrice?: string | null;
     partialBuyEnabled?: boolean;
+    desiredContractAddress?: string;
+    desiredTokenAddress?: string;
+    desiredTokenId?: string;
     // Contract data from blockchain
     totalSupply?: number | null;
     owner?: string | null;
@@ -132,6 +135,9 @@ export class WalletNFTsService {
                         remainingQuantity: nft.remainingQuantity ?? nft.listings?.[0]?.remainingQuantity ?? null,
                         unitPrice: nft.unitPrice ?? nft.listings?.[0]?.unitPrice ?? null,
                         partialBuyEnabled: nft.partialBuyEnabled ?? nft.listings?.[0]?.partialBuyEnabled ?? false,
+                        desiredContractAddress: nft.desiredContractAddress ?? nft.desiredTokenAddress ?? nft.listings?.[0]?.desiredContractAddress ?? nft.listings?.[0]?.desiredTokenAddress,
+                        desiredTokenAddress: nft.desiredTokenAddress ?? nft.desiredContractAddress ?? nft.listings?.[0]?.desiredTokenAddress ?? nft.listings?.[0]?.desiredContractAddress,
+                        desiredTokenId: nft.desiredTokenId ?? nft.listings?.[0]?.desiredTokenId,
                         hasMarketplaceData: !!nft.listings?.length,
                         hasInsightsData: !!nft.insights,
                         insights: nft.insights,

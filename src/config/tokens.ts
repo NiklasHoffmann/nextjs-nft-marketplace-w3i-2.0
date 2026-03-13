@@ -1,4 +1,5 @@
 import { devLog } from '@/utils';
+import { getExtendedTokenByAddress } from './tokens-extended';
 
 /**
  * Token Configuration
@@ -304,6 +305,7 @@ export function getCurrencySymbolByAddress(chainId: number | string, currency?: 
 
     const symbol = getTokenSymbolByAddress(chainId, currency);
     const fallbackSymbol = symbol ? null : findTokenSymbolByAddress(currency);
+    const extendedToken = !symbol && !fallbackSymbol ? getExtendedTokenByAddress(currency) : null;
     
     // DEBUG: Log symbol lookup
     devLog.debug('🔍 [getCurrencySymbolByAddress]', {
@@ -311,10 +313,11 @@ export function getCurrencySymbolByAddress(chainId: number | string, currency?: 
         currency,
         symbol,
         fallbackSymbol,
-        result: symbol || fallbackSymbol || 'WETH'
+        extendedSymbol: extendedToken?.symbol,
+        result: symbol || fallbackSymbol || extendedToken?.symbol || 'WETH'
     });
     
-    return symbol || fallbackSymbol || 'WETH'; // Fallback to WETH for unknown tokens
+    return symbol || fallbackSymbol || extendedToken?.symbol || 'WETH'; // Fallback to WETH for unknown tokens
 }
 
 /**
@@ -342,6 +345,11 @@ export function getTokenDecimalsByAddress(chainId: number | string, currency?: s
                 return token.decimals;
             }
         }
+    }
+
+    const extendedToken = getExtendedTokenByAddress(currency);
+    if (extendedToken) {
+        return extendedToken.decimals;
     }
 
     return 18;

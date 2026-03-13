@@ -2,6 +2,7 @@ import { apiHandler, apiSuccess } from '@/lib/api';
 import { getDatabase } from '@/lib/mongodb';
 import { getNFTSyncService } from '@/services/nft-sync';
 import '@/lib/dev-services-auto-start';
+import { RATE_LIMIT_CONFIG } from '@/lib/middleware/rateLimit';
 
 export const GET = apiHandler(async () => {
   const db = await getDatabase();
@@ -26,4 +27,7 @@ export const GET = apiHandler(async () => {
     },
     syncService: syncStatus,
   });
-}, { admin: true });
+}, { 
+    admin: true,
+    rateLimit: RATE_LIMIT_CONFIG.LENIENT
+});

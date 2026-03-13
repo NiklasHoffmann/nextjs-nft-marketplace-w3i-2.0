@@ -4,7 +4,7 @@
  * Supports mock tokens with simulated exchange rates for testing
  */
 
-import { memo, useMemo, useState, useEffect } from 'react';
+import React, { memo, useMemo, useState, useEffect } from 'react';
 import { useChainId } from 'wagmi';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { formatUnits } from 'viem';
@@ -18,6 +18,7 @@ interface NFTCardPriceProps {
     price: string | null;
     isListed: boolean;
     desiredContractAddress?: string | null; // Deprecated: Use listingType instead
+    desiredTokenId?: string | null;
     currency?: string | null;
     chainId?: number; // Optional: override from props
     listingType?: ListingType | null; // PURE_ETH | SWAP_AND_ETH | PURE_SWAP
@@ -59,6 +60,28 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
         [chainId, currency]
     );
 
+    const effectiveTokenDecimals = useMemo(() => {
+        if (!price || tokenDecimals >= 18) return tokenDecimals;
+
+        try {
+            const parsedWithTokenDecimals = parseFloat(formatUnits(BigInt(price), tokenDecimals));
+            const parsedWith18Decimals = parseFloat(formatUnits(BigInt(price), 18));
+
+            if (
+                Number.isFinite(parsedWithTokenDecimals)
+                && Number.isFinite(parsedWith18Decimals)
+                && parsedWith18Decimals > 0
+                && parsedWithTokenDecimals / parsedWith18Decimals >= 1_000_000
+            ) {
+                return 18;
+            }
+        } catch {
+            return tokenDecimals;
+        }
+
+        return tokenDecimals;
+    }, [price, tokenDecimals]);
+
     // DEBUG: Log incoming props for listed NFTs
     useEffect(() => {
         if (isListed && price) {
@@ -66,14 +89,16 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
                 price,
                 currency,
                 listingType,
-                symbol: currencySymbol
+                symbol: currencySymbol,
+                tokenDecimals,
+                effectiveTokenDecimals
             });
         }
-    }, [isListed, price, currency, listingType, chainId, currencySymbol]);
+    }, [isListed, price, currency, listingType, chainId, currencySymbol, tokenDecimals, effectiveTokenDecimals]);
 
     const tokenAmount = useMemo(() =>
-        price ? formatUnits(BigInt(price), tokenDecimals) : '0',
-        [price, tokenDecimals]
+        price ? formatUnits(BigInt(price), effectiveTokenDecimals) : '0',
+        [price, effectiveTokenDecimals]
     );
 
     const displayAmount = useMemo(() =>
@@ -96,11 +121,6 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
         && Number.isFinite(availableQty)
         && availableQty <= 0;
 
-    const unitAmount = useMemo(() =>
-        unitPrice ? formatUnits(BigInt(unitPrice), tokenDecimals) : null,
-        [unitPrice, tokenDecimals]
-    );
-
     const fallbackUnitRaw = useMemo(() => {
         if (!isERC1155 || !price) return null;
         const qty = listedQty > 0 ? listedQty : availableQty;
@@ -115,8 +135,8 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
     const effectiveUnitRaw = unitPrice || fallbackUnitRaw;
 
     const effectiveUnitAmount = useMemo(() =>
-        effectiveUnitRaw ? formatUnits(BigInt(effectiveUnitRaw), tokenDecimals) : null,
-        [effectiveUnitRaw, tokenDecimals]
+        effectiveUnitRaw ? formatUnits(BigInt(effectiveUnitRaw), effectiveTokenDecimals) : null,
+        [effectiveUnitRaw, effectiveTokenDecimals]
     );
 
     const unitDisplayAmount = useMemo(() =>
@@ -161,7 +181,7 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
 
     if (!isListed || !price) {
         return (
-            <div className="bg-gray-100/95 backdrop-blur-sm p-2 rounded-md shadow-2xl border border-gray-300/60 ring-1 ring-gray-400/20 h-[62px]">
+            <div className="bg-gray-100/95 backdrop-blur-sm p-2 rounded-md shadow-2xl border border-gray-300/60 ring-1 ring-gray-400/20 h-[68px] overflow-hidden">
                 <div className="flex justify-center items-center h-full">
                     <div className="text-gray-500 font-medium text-lg leading-tight">Not Listed</div>
                 </div>
@@ -171,7 +191,7 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
 
     if (isSoldOut) {
         return (
-            <div className="bg-gray-100/95 backdrop-blur-sm p-2 rounded-md shadow-2xl border border-gray-300/60 ring-1 ring-gray-400/20 h-[62px]">
+            <div className="bg-gray-100/95 backdrop-blur-sm p-2 rounded-md shadow-2xl border border-gray-300/60 ring-1 ring-gray-400/20 h-[68px] overflow-hidden">
                 <div className="flex justify-center items-center h-full">
                     <div className="text-gray-500 font-medium text-lg leading-tight">Sold Out</div>
                 </div>
@@ -179,19 +199,29 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
         );
     }
 
-    // Determine if this is a swap listing using listingType (preferred) or fallback to desiredContractAddress check
-    // A swap requires EITHER:
-    // 1. listingType is PURE_SWAP or SWAP_AND_ETH, OR
-    // 2. desiredContractAddress is set AND differs from the NFT's own contract (legacy check)
-    const isSwap = listingType
-        ? isSwapListing({ listingType } as any) // Use helper function from listing-v2.ts
-        : (desiredContractAddress &&
-            desiredContractAddress !== "0x0000000000000000000000000000000000000000" &&
-            desiredContractAddress !== null);
+    const hasDesiredContractAddress = Boolean(
+        desiredContractAddress &&
+        desiredContractAddress !== "0x0000000000000000000000000000000000000000"
+    );
+
+    // Be tolerant to inconsistent listingType payloads from older sync paths.
+    const normalizedListingType = typeof listingType === 'string'
+        ? listingType.toUpperCase()
+        : '';
+
+    const listingTypeSignalsSwap = Boolean(normalizedListingType && normalizedListingType.includes('SWAP'));
+    const strictListingTypeSignalsSwap = listingType
+        ? isSwapListing({ listingType } as any)
+        : false;
+
+    // Determine if this is a swap listing using listingType first, then desired contract fallback.
+    const isSwap = strictListingTypeSignalsSwap || listingTypeSignalsSwap || hasDesiredContractAddress;
+    const indicatorColor = isSwap ? '#c2410c' : '#15803d';
+    const indicatorDotColor = isSwap ? '#f97316' : '#16a34a';
 
     return (
-        <div className="bg-white/95 backdrop-blur-sm p-2 rounded-md shadow-2xl border border-gray-200/60 ring-1 ring-gray-300/20">
-            <div className="relative">
+        <div className="bg-white/95 backdrop-blur-sm p-2 rounded-md shadow-2xl border border-gray-200/60 ring-1 ring-gray-300/20 h-[68px] overflow-hidden">
+            <div className="relative h-full">
                 <div className="text-left min-w-0 pr-24">
                     {isERC1155 && (
                         <div className="text-[10px] text-gray-600 leading-tight mb-0.5 truncate">
@@ -221,18 +251,24 @@ export const NFTCardPrice = memo<NFTCardPriceProps>(({
                     )}
                 </div>
                 {/* Sell/Swap Indicator */}
-                <div className="absolute right-0 bottom-0 flex flex-col items-end gap-1">
-                    <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center">
-                        <div className="flex items-center gap-1.5">
-                            <div className={`w-1.5 h-1.5 rounded-full ${isSwap ? 'bg-orange-500' : 'bg-green-600'}`}></div>
-                            <span className={`text-xs font-semibold leading-none ${isSwap ? 'text-orange-700' : 'text-green-700'}`}>
+                <div className="absolute right-0 bottom-0 flex flex-col items-end gap-0.5 max-w-[88px]">
+                    <div className="bg-white/95 backdrop-blur-sm px-2 py-0.5 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20 h-5 flex items-center max-w-full">
+                        <div className="flex items-center gap-1.5 max-w-full">
+                            <div
+                                className="w-2 h-2 rounded-full"
+                                style={{ backgroundColor: indicatorDotColor }}
+                            ></div>
+                            <span
+                                className="text-xs font-semibold leading-none"
+                                style={{ color: indicatorColor }}
+                            >
                                 {isSwap ? 'Swap' : 'Sell'}
                             </span>
                         </div>
                     </div>
                     {tokenStandard && (
-                        <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20 h-6 flex items-center whitespace-nowrap">
-                            <span className={`text-[11px] font-semibold whitespace-nowrap leading-none ${
+                        <div className="bg-white/95 backdrop-blur-sm px-2 py-0.5 rounded-md shadow-xl border border-gray-200/60 ring-1 ring-gray-300/20 h-5 flex items-center max-w-full">
+                            <span className={`text-[11px] font-semibold leading-none truncate ${
                                 tokenStandard === 'ERC1155' ? 'text-purple-700' : 'text-blue-700'
                             }`}>
                                 {tokenStandard === 'ERC1155' ? 'ERC-1155' : 'ERC-721'}

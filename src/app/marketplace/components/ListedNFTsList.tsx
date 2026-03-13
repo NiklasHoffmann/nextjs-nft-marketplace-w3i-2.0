@@ -55,6 +55,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
     // Get search term from URL
     const searchParams = useSearchParams();
     const urlSearchTerm = searchParams?.get('search') || '';
+    const isFromSuccess = searchParams?.get('from') === 'success';
 
     // Filter and sort state
     const [localFilters, setLocalFilters] = useState<NFTFilters>({
@@ -260,12 +261,26 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
 
     // Listen for new listings and show notification
     useEffect(() => {
+        let delayedRefetchTimeout: ReturnType<typeof setTimeout> | null = null;
+
         const handleDataInvalidation = (event: Event) => {
             const customEvent = event as CustomEvent<{ type: string }>;
             const eventType = customEvent.detail?.type;
 
             if (eventType === 'listing-created') {
                 setShowReloadNotification(true);
+
+                // First pass immediately, second pass after short delay for eventual consistency.
+                refetch();
+
+                if (delayedRefetchTimeout) {
+                    clearTimeout(delayedRefetchTimeout);
+                }
+
+                delayedRefetchTimeout = setTimeout(() => {
+                    refetch();
+                    delayedRefetchTimeout = null;
+                }, 2500);
 
                 // Hide notification after auto-reload completes (3s delay + 2s display)
                 setTimeout(() => {
@@ -279,11 +294,16 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
         }
 
         return () => {
+            if (delayedRefetchTimeout) {
+                clearTimeout(delayedRefetchTimeout);
+                delayedRefetchTimeout = null;
+            }
+
             if (typeof window !== 'undefined') {
                 window.removeEventListener('dataInvalidation', handleDataInvalidation);
             }
         };
-    }, []);
+    }, [refetch]);
 
     // Auto-reload when returning to marketplace page (e.g., from /sell)
     // This ensures new listings are always visible without manual refresh
@@ -315,6 +335,31 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
             }
         };
     }, [refetch]);
+
+    // Success-page transition hard refresh (handles route prefetch + DB sync race)
+    useEffect(() => {
+        if (!isFromSuccess) {
+            return;
+        }
+
+        let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+
+        devLog.info('🔄 [Marketplace] Entered from success page - forcing refetch pass');
+        refetch();
+
+        retryTimeout = setTimeout(() => {
+            devLog.info('🔄 [Marketplace] Deferred refetch after success transition');
+            refetch();
+            retryTimeout = null;
+        }, 2500);
+
+        return () => {
+            if (retryTimeout) {
+                clearTimeout(retryTimeout);
+                retryTimeout = null;
+            }
+        };
+    }, [isFromSuccess, refetch]);
 
     // Infinite Scroll
     useEffect(() => {

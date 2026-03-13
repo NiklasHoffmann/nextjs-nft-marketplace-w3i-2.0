@@ -325,11 +325,11 @@ function NFTDetailPage() {
     }, [metadata?.attributes]);
 
     const swapTargetProps = useMemo(() => ({
-        desiredContractAddress: nftDetails?.desiredContractAddress || "",
+        desiredContractAddress: nftDetails?.desiredContractAddress || nftDetails?.desiredTokenAddress || "",
         desiredTokenId: nftDetails?.desiredTokenId !== undefined && nftDetails?.desiredTokenId !== null
             ? String(nftDetails.desiredTokenId)
             : ""
-    }), [nftDetails?.desiredContractAddress, nftDetails?.desiredTokenId]);
+    }), [nftDetails?.desiredContractAddress, nftDetails?.desiredTokenAddress, nftDetails?.desiredTokenId]);
 
     const collectionItemsProps = useMemo(() => ({
         collection: contractInfo?.name || null,

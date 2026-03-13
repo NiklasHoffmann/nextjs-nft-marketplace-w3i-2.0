@@ -361,7 +361,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
                 listedAt: '$listedAt',
                 listingId: '$listingId',
                 buyer: '$buyer',
-                desiredContractAddress: '$desiredContractAddress',
+                desiredContractAddress: { $ifNull: ['$desiredContractAddress', '$desiredTokenAddress'] },
+                desiredTokenAddress: { $ifNull: ['$desiredTokenAddress', '$desiredContractAddress'] },
                 desiredTokenId: '$desiredTokenId',
                 currency: { $ifNull: ['$currency', '0x0000000000000000000000000000000000000000'] },
 

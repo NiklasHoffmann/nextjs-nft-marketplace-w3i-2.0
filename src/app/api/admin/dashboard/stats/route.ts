@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { apiHandler, apiSuccess } from '@/lib/api';
+import { RATE_LIMIT_CONFIG } from '@/lib/middleware/rateLimit';
 
 /**
  * GET /api/admin/dashboard/stats
@@ -8,6 +9,7 @@ import { apiHandler, apiSuccess } from '@/lib/api';
  */
 async function handler(req: NextRequest) {
     const db = await getDatabase();
+    const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
     const normalizeAddress = (value: unknown): string | null => {
         if (typeof value !== 'string') return null;
@@ -24,7 +26,7 @@ async function handler(req: NextRequest) {
         status: 'LISTED'
     });
 
-    // 3. Listed Volume - Summe aller Preise von gelisteten NFTs
+    // 3. Listed Volume - Legacy mixed-currency sum (kept for backwards compatibility)
     const listedVolumeResult = await db.collection('marketplace_items').aggregate([
         {
             $match: {
@@ -50,7 +52,51 @@ async function handler(req: NextRequest) {
 
     const listedVolume = listedVolumeResult.length > 0 ? (listedVolumeResult[0]?.totalVolume ?? 0) : 0;
 
-    // 4. Sales Volume - Summe aller verkauften NFTs
+    // 3b. Listed Volume by currency (exact raw sums per token)
+    const listedVolumeByCurrencyResult = await db.collection('marketplace_items').aggregate([
+        {
+            $match: {
+                status: 'LISTED'
+            }
+        },
+        {
+            $project: {
+                currencyAddress: {
+                    $toLower: {
+                        $ifNull: ['$currency', ZERO_ADDRESS]
+                    }
+                },
+                rawPrice: {
+                    $convert: {
+                        input: '$price',
+                        to: 'decimal',
+                        onError: 0,
+                        onNull: 0
+                    }
+                }
+            }
+        },
+        {
+            $group: {
+                _id: '$currencyAddress',
+                totalRaw: { $sum: '$rawPrice' },
+                listings: { $sum: 1 }
+            }
+        },
+        {
+            $sort: {
+                listings: -1
+            }
+        }
+    ]).toArray();
+
+    const listedVolumeByCurrency = listedVolumeByCurrencyResult.map((entry: any) => ({
+        currency: (entry?._id || ZERO_ADDRESS).toLowerCase(),
+        totalRaw: String(entry?.totalRaw ?? '0'),
+        listings: Number(entry?.listings ?? 0)
+    }));
+
+    // 4. Sales Volume - Legacy mixed-currency sum (kept for backwards compatibility)
     const salesVolumeResult = await db.collection('marketplace_items').aggregate([
         {
             $match: {
@@ -75,6 +121,50 @@ async function handler(req: NextRequest) {
     ]).toArray();
 
     const salesVolume = salesVolumeResult.length > 0 ? (salesVolumeResult[0]?.totalVolume ?? 0) : 0;
+
+    // 4b. Sales Volume by currency (exact raw sums per token)
+    const salesVolumeByCurrencyResult = await db.collection('marketplace_items').aggregate([
+        {
+            $match: {
+                status: 'SOLD'
+            }
+        },
+        {
+            $project: {
+                currencyAddress: {
+                    $toLower: {
+                        $ifNull: ['$currency', ZERO_ADDRESS]
+                    }
+                },
+                rawPrice: {
+                    $convert: {
+                        input: '$price',
+                        to: 'decimal',
+                        onError: 0,
+                        onNull: 0
+                    }
+                }
+            }
+        },
+        {
+            $group: {
+                _id: '$currencyAddress',
+                totalRaw: { $sum: '$rawPrice' },
+                sales: { $sum: 1 }
+            }
+        },
+        {
+            $sort: {
+                sales: -1
+            }
+        }
+    ]).toArray();
+
+    const salesVolumeByCurrency = salesVolumeByCurrencyResult.map((entry: any) => ({
+        currency: (entry?._id || ZERO_ADDRESS).toLowerCase(),
+        totalRaw: String(entry?.totalRaw ?? '0'),
+        sales: Number(entry?.sales ?? 0)
+    }));
 
     // 4. Total Users - Unique Wallets die interagiert haben
     // Zähle unique addresses aus ALLEN Quellen:
@@ -166,7 +256,9 @@ async function handler(req: NextRequest) {
         totalNFTs,
         activeListings,
         listedVolume,      // Summe der Preise von aktuell gelisteten Items
+        listedVolumeByCurrency,
         salesVolume,       // Summe der Preise von verkauften Items
+        salesVolumeByCurrency,
         totalVolume: salesVolume, // Backwards compatibility
         totalUsers,
         totalSales,
@@ -176,6 +268,7 @@ async function handler(req: NextRequest) {
             nftAddress: sale.nftAddress,
             tokenId: sale.tokenId,
             price: sale.price,
+            currency: sale.currency || ZERO_ADDRESS,
             seller: sale.seller,
             buyer: sale.buyer,
             soldAt: sale.updatedAt
@@ -183,4 +276,7 @@ async function handler(req: NextRequest) {
     });
 }
 
-export const GET = apiHandler(handler, { admin: true });
+export const GET = apiHandler(handler, {
+    admin: true,
+    rateLimit: RATE_LIMIT_CONFIG.LENIENT
+});
