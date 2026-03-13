@@ -14,12 +14,38 @@
  * Database: MongoDB marketplace_items collection with real-time sync
  */
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { ListedNFTsList, CollectionsList } from "./components";
 import { useMarketplaceLayout } from "./context";
 
 export default function MarketplacePage() {
     const { filters, sort, onFiltersChange, onSortChange } = useMarketplaceLayout();
+    const [showCollections, setShowCollections] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const enableCollections = () => {
+            if (!cancelled) {
+                setShowCollections(true);
+            }
+        };
+
+        // Prefer idle time for below-the-fold content; fallback to short delay.
+        if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+            const idleCallbackId = window.requestIdleCallback(enableCollections, { timeout: 1200 });
+            return () => {
+                cancelled = true;
+                window.cancelIdleCallback(idleCallbackId);
+            };
+        }
+
+        const timeoutId = setTimeout(enableCollections, 500);
+        return () => {
+            cancelled = true;
+            clearTimeout(timeoutId);
+        };
+    }, []);
 
     return (
         <>
@@ -35,12 +61,18 @@ export default function MarketplacePage() {
                 <hr className="border-t border-gray-200" />
             </div>
 
-            {/* CollectionsList - MongoDB-powered */}
-            <CollectionsList
-                currentSort={sort}
-                onSortChange={onSortChange}
-                filters={filters}
-            />
+            {/* CollectionsList - deferred to keep first render fast */}
+            {showCollections ? (
+                <CollectionsList
+                    currentSort={sort}
+                    onSortChange={onSortChange}
+                    filters={filters}
+                />
+            ) : (
+                <div className="w-full md:pl-16 pl-10 px-8 py-6 text-sm text-gray-500">
+                    Loading collections...
+                </div>
+            )}
         </>
     );
 }

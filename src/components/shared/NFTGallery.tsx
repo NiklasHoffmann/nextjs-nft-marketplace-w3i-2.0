@@ -6,7 +6,7 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { LazyNFTCard, NFTCard } from '@/components/nft'
+import { LazyNFTCard } from '@/components/nft'
 import { BaseCard } from '@/components/core/Card/BaseCard'
 import { ScrollButtons } from '@/components/ui/ScrollButtons'
 import { EmptyState } from '@/components/core/Empty'
@@ -131,7 +131,7 @@ export function NFTGallery({
     const renderCard = useCallback((item: NFTScrollItem, index: number, cardBody?: React.ReactNode) => {
         const cardProps = buildCardProps(item, priority || index < 4)
         const content = renderCardShell(
-            cardBody || <NFTCard {...cardProps} />,
+            cardBody || <LazyNFTCard {...cardProps} />,
             item
         )
 

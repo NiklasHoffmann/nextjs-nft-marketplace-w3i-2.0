@@ -2,8 +2,6 @@
 
 import React, { type ErrorInfo } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import { ApolloProvider } from "@apollo/client/react";
-import apolloClient from '@/config/apolloClient';
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { NFTStatsProvider } from "@/contexts/nft-stats/NFTStatsContext";
 import { MarketplaceItemsProvider } from "@/contexts/marketplace-items";
@@ -58,6 +56,45 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const isDevelopment = process.env.NODE_ENV === 'development';
+  const pathname = usePathname() || '';
+
+  const needsWalletNFTs =
+    pathname.startsWith('/sell') ||
+    pathname.startsWith('/wallet') ||
+    pathname.startsWith('/nft/');
+
+  const needsCollections =
+    pathname.startsWith('/marketplace') ||
+    pathname.startsWith('/collection/');
+
+  const needsMarketplaceItems =
+    pathname.startsWith('/marketplace') ||
+    pathname.startsWith('/collection/') ||
+    pathname.startsWith('/nft/') ||
+    pathname.startsWith('/sell');
+
+  const content = (
+    <CurrencyProvider>
+      <CartProvider>
+        <AdminGuard>
+          <LayoutContent>{children}</LayoutContent>
+          <NotificationContainer />
+        </AdminGuard>
+      </CartProvider>
+    </CurrencyProvider>
+  );
+
+  const withCollections = needsCollections
+    ? <CollectionsProvider>{content}</CollectionsProvider>
+    : content;
+
+  const withWallet = needsWalletNFTs
+    ? <WalletNFTsProvider>{withCollections}</WalletNFTsProvider>
+    : withCollections;
+
+  const withMarketplaceItems = needsMarketplaceItems
+    ? <MarketplaceItemsProvider>{withWallet}</MarketplaceItemsProvider>
+    : withWallet;
   
   return (
     <ErrorBoundary
@@ -69,30 +106,15 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     >
       <NotificationProvider>
         <Web3Provider>
-          <ApolloProvider client={apolloClient}>
-            <NFTStatsProvider>
-              {/* Real-time WebSocket event listener for marketplace */}
-              <MarketplaceEventsProvider 
-                autoStart={true}
-                debug={isDevelopment}
-              >
-                <MarketplaceItemsProvider>
-                  <WalletNFTsProvider>
-                    <CollectionsProvider>
-                      <CurrencyProvider>
-                        <CartProvider>
-                          <AdminGuard>
-                            <LayoutContent>{children}</LayoutContent>
-                            <NotificationContainer />
-                          </AdminGuard>
-                        </CartProvider>
-                      </CurrencyProvider>
-                    </CollectionsProvider>
-                  </WalletNFTsProvider>
-                </MarketplaceItemsProvider>
-              </MarketplaceEventsProvider>
-            </NFTStatsProvider>
-          </ApolloProvider>
+          <NFTStatsProvider>
+            {/* Real-time WebSocket event listener for marketplace */}
+            <MarketplaceEventsProvider 
+              autoStart={true}
+              debug={isDevelopment}
+            >
+              {withMarketplaceItems}
+            </MarketplaceEventsProvider>
+          </NFTStatsProvider>
         </Web3Provider>
       </NotificationProvider>
     </ErrorBoundary>

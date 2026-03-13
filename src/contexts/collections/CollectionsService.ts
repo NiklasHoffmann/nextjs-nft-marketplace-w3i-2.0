@@ -72,9 +72,7 @@ export class CollectionsService {
 
         try {
             const startTime = Date.now();
-            const response = await fetch(`/api/collections?includeInsights=${includeInsights}`, {
-                cache: 'no-store'
-            });
+            const response = await fetch(`/api/collections?includeInsights=${includeInsights}`);
 
             if (!response.ok) {
                 throw new Error(`API error: ${response.status} ${response.statusText}`);

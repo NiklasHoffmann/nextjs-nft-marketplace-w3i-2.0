@@ -141,7 +141,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
         minWatchlistCount: filters.minWatchlistCount,
         sortBy: sortByMapping[sort.field] || 'price',
         sortOrder: sort.direction,
-        limit: 50, // Increased from 20 to 50 for faster initial load (matches Collections)
+        limit: 24, // Keep first payload smaller for faster first paint/hydration
         autoFetch: true,
         includeFilters: false,
     });
@@ -380,39 +380,6 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
         return () => { if (loadMoreRef.current) observer.unobserve(loadMoreRef.current); };
     }, [loadMore, pagination?.hasMore, loading]);
 
-    // Auto-load all items when total is <= 200 for optimal sorting
-    // Only loads once per filter change when hasMore is true
-    useEffect(() => {
-        const shouldAutoLoad =
-            pagination &&
-            pagination.hasMore &&
-            pagination.total <= 200 &&
-            items.length > 0 &&
-            items.length < pagination.total &&
-            !isLoadingMore.current;
-
-        if (!shouldAutoLoad) return;
-
-        const loadAllFiltered = async () => {
-            isLoadingMore.current = true;
-            try {
-                while (pagination?.hasMore && items.length < pagination.total) {
-                    const prevLength = items.length;
-                    await loadMore();
-
-                    // Break if no new items were loaded (prevent infinite loop)
-                    if (items.length === prevLength) {
-                        break;
-                    }
-                }
-            } finally {
-                isLoadingMore.current = false;
-            }
-        };
-
-        loadAllFiltered();
-    }, [pagination?.total, pagination?.hasMore, items.length, loadMore]);
-
     // Remove isClient check to prevent title flickering - component is client-only already
     // This eliminates the flash of smaller title before hydration
 
@@ -572,8 +539,8 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
                     loading={isInitialLoad}
                     loadingCount={12}
                     enableInsights={true}
-                    showStats={true}
-                    priority={true}
+                    showStats={false}
+                    priority={false}
                     padding="pr-6 pb-4 pt-4"
                     emptyMessage="No active listings found"
                     enableViewAll={true}
