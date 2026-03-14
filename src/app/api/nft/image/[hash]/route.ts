@@ -22,6 +22,7 @@ import { devLog } from '@/utils';
 
 const CACHE_DIR = path.join(process.cwd(), 'public', 'cached-nft-images');
 const METADATA_FILE = path.join(CACHE_DIR, '.cache-metadata.json');
+const IMAGE_CACHE_VERSION = 'v2';
 
 // Cache Configuration
 const MAX_CACHE_SIZE_MB = 500; // 500 MB maximum cache size
@@ -64,6 +65,10 @@ interface CacheMetadata {
 }
 
 type PreferredImageFormat = 'avif' | 'webp';
+
+function buildCacheFileName(safeCacheKey: string, format: PreferredImageFormat): string {
+    return `${safeCacheKey}.${IMAGE_CACHE_VERSION}.${format}`;
+}
 
 function resolvePreferredFormat(request: NextRequest): PreferredImageFormat {
     const accept = request.headers.get('accept') || '';
@@ -240,10 +245,22 @@ async function compressImage(
     }
 
     try {
-        const transformer = sharp(buffer);
-        const compressed = preferredFormat === 'avif'
-            ? await transformer.avif({ quality: 52, effort: 4 }).toBuffer()
-            : await transformer.webp({ quality: 82, effort: 2 }).toBuffer();
+        const image = sharp(buffer, { failOn: 'none' });
+        const metadata = await image.metadata();
+        const width = metadata.width || 0;
+        const height = metadata.height || 0;
+        const pixelCount = width * height;
+        const isLargeHighResImage = pixelCount >= 8_000_000 || originalSize >= 5 * 1024 * 1024;
+
+        // For very large images, prioritize visual quality over max compression.
+        // AVIF can look softer at lower quality settings, so prefer high-quality WebP here.
+        const targetFormat: PreferredImageFormat = isLargeHighResImage && preferredFormat === 'avif'
+            ? 'webp'
+            : preferredFormat;
+
+        const compressed = targetFormat === 'avif'
+            ? await image.avif({ quality: 68, effort: 5, chromaSubsampling: '4:4:4' }).toBuffer()
+            : await image.webp({ quality: isLargeHighResImage ? 90 : 86, effort: 3, smartSubsample: true }).toBuffer();
         
         const compressedSize = compressed.length;
         const ratio = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
@@ -252,8 +269,8 @@ async function compressImage(
         
         return {
             buffer: compressed,
-            format: preferredFormat,
-            contentType: formatToContentType(preferredFormat),
+            format: targetFormat,
+            contentType: formatToContentType(targetFormat),
             originalSize,
             compressedSize
         };
@@ -392,9 +409,9 @@ export async function GET(
     const { hash: ipfsHash } = await params;
     const safeCacheKey = encodeURIComponent(ipfsHash);
     const preferredFormat = resolvePreferredFormat(request);
-    const cacheFileName = `${safeCacheKey}.${preferredFormat}`;
+    const cacheFileName = buildCacheFileName(safeCacheKey, preferredFormat);
     const alternateFormat: PreferredImageFormat = preferredFormat === 'avif' ? 'webp' : 'avif';
-    const alternateCacheFileName = `${safeCacheKey}.${alternateFormat}`;
+    const alternateCacheFileName = buildCacheFileName(safeCacheKey, alternateFormat);
 
     if (!ipfsHash || ipfsHash.length < 10) {
         return NextResponse.json({
@@ -534,6 +551,7 @@ export async function GET(
             'Vercel-CDN-Cache-Control': 'public, max-age=31536000',
             'X-Cache-Status': 'MISS',
             'X-Cache-Format': format,
+            'X-Image-Cache-Version': IMAGE_CACHE_VERSION,
             'X-Compression-Ratio': `${((originalSize - compressedSize) / originalSize * 100).toFixed(1)}%`,
             'X-Original-Size': originalSize.toString(),
             'X-Compressed-Size': compressedSize.toString(),
@@ -618,8 +636,10 @@ export async function DELETE(
         }
 
         // Delete specific image
-        const webpPath = path.join(CACHE_DIR, `${safeCacheKey}.webp`);
-        const avifPath = path.join(CACHE_DIR, `${safeCacheKey}.avif`);
+        const webpPath = path.join(CACHE_DIR, buildCacheFileName(safeCacheKey, 'webp'));
+        const avifPath = path.join(CACHE_DIR, buildCacheFileName(safeCacheKey, 'avif'));
+        const legacyWebpPath = path.join(CACHE_DIR, `${safeCacheKey}.webp`);
+        const legacyAvifPath = path.join(CACHE_DIR, `${safeCacheKey}.avif`);
         const legacyPath = path.join(CACHE_DIR, ipfsHash);
 
         try {
@@ -638,10 +658,24 @@ export async function DELETE(
                     await fs.unlink(webpPath);
                     deletedPath = webpPath;
                 } catch {
-                    const stats = await fs.stat(legacyPath);
-                    size = stats.size;
-                    await fs.unlink(legacyPath);
-                    deletedPath = legacyPath;
+                    try {
+                        const stats = await fs.stat(legacyAvifPath);
+                        size = stats.size;
+                        await fs.unlink(legacyAvifPath);
+                        deletedPath = legacyAvifPath;
+                    } catch {
+                        try {
+                            const stats = await fs.stat(legacyWebpPath);
+                            size = stats.size;
+                            await fs.unlink(legacyWebpPath);
+                            deletedPath = legacyWebpPath;
+                        } catch {
+                            const stats = await fs.stat(legacyPath);
+                            size = stats.size;
+                            await fs.unlink(legacyPath);
+                            deletedPath = legacyPath;
+                        }
+                    }
                 }
             }
             

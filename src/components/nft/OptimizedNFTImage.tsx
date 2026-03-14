@@ -372,11 +372,10 @@ const OptimizedNFTImage = memo(({
         }
     }, [fallbackIndex, imageUrls, currentImageUrl]);
 
-    // Determine object-fit based on aspect ratio - PRIORITIZE FULL IMAGE VISIBILITY
-    const getObjectFit = () => {
-        // Default to object-contain to ensure full image is always visible
-        return 'object-contain';
-    };
+    // Respect explicit object-fit from caller (e.g. NFTCard uses object-cover).
+    // Fallback to object-contain only when no fit class is provided.
+    const hasExplicitObjectFit = /(^|\s)object-(contain|cover|fill|none|scale-down)(\s|$)/.test(className);
+    const objectFitClass = hasExplicitObjectFit ? '' : 'object-contain';
 
     // Generate optimized blur placeholder
     const blurDataURL = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx4f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bz6rasJsTat2yg4dCLwGRupfphjnFBYc8BUx/9k=";
@@ -503,7 +502,7 @@ const OptimizedNFTImage = memo(({
     const imageProps = {
         src: currentImageUrl,
         className: `transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'
-            } ${getObjectFit()} ${className}`,
+            } ${objectFitClass} ${className}`,
         onLoad: handleImageLoad,
         onError: handleImageError,
         placeholder: "blur" as const,
