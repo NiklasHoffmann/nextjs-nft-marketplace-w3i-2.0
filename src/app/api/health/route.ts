@@ -12,14 +12,36 @@ import { getRedisHealthStatus } from '@/lib/redis/client';
 import { getNFTSyncService } from '@/services/nft-sync';
 import { getSSEHealthStatus } from '@/services/sse/broadcast';
 import { devLog } from '@/utils';
+import { initializeBackgroundServices } from '@/lib/init-services';
 
 // Track if services were auto-started
 let autoStarted = false;
+let autoStartPromise: Promise<void> | null = null;
 
 export const GET = apiHandler(async () => {
     try {
+        const quickMode = process.env.HEALTHCHECK_QUICK_MODE === 'true';
         const syncService = getNFTSyncService();
         const status = syncService.getStatus();
+
+        if (quickMode) {
+            return apiSuccess({
+                status: status.isRunning ? 'running' : 'starting',
+                mode: 'quick',
+                services: {
+                    isRunning: status.isRunning,
+                    architecture: status.architecture,
+                },
+                infrastructure: {
+                    process: {
+                        pid: process.pid,
+                        uptimeSec: Math.floor(process.uptime()),
+                    },
+                    timestamp: Date.now(),
+                }
+            });
+        }
+
         const [redis, sse] = await Promise.all([
             getRedisHealthStatus(),
             Promise.resolve(getSSEHealthStatus())
@@ -35,15 +57,24 @@ export const GET = apiHandler(async () => {
             timestamp: Date.now(),
         };
 
-        // Auto-start services if not running (fallback for dev mode)
-        if (!status.isRunning && !autoStarted) {
-            devLog.info('\n🔧 [Health Check] Auto-starting background services...');
-            await syncService.start();
-            autoStarted = true;
+        // Keep health endpoint fast for reverse-proxy checks (Coolify/nginx).
+        // In production, auto-start can be explicitly enabled via env.
+        const allowAutoStart = process.env.NODE_ENV !== 'production'
+            || process.env.HEALTH_AUTO_START_BACKGROUND === 'true';
+
+        if (!status.isRunning && allowAutoStart) {
+            if (!autoStartPromise && !autoStarted) {
+                devLog.info('\n🔧 [Health Check] Triggering background service startup...');
+                autoStartPromise = initializeBackgroundServices({ waitForReady: false })
+                    .finally(() => {
+                        autoStarted = true;
+                        autoStartPromise = null;
+                    });
+            }
 
             return apiSuccess({
-                status: 'started',
-                message: 'Background services auto-started',
+                status: 'starting',
+                message: 'Background services startup triggered',
                 services: syncService.getStatus(),
                 infrastructure
             });

@@ -53,9 +53,9 @@ export async function register() {
         try {
             // Import and initialize background services
             const { initializeBackgroundServices } = await import('./src/lib/init-services');
-            await initializeBackgroundServices();
+            await initializeBackgroundServices({ waitForReady: false });
 
-            console.log('✅ [Instrumentation] Background services started\n');
+            console.log('✅ [Instrumentation] Background services startup triggered\n');
         } catch (error) {
             console.error('❌ [Instrumentation] Failed to start background services:', error);
         }

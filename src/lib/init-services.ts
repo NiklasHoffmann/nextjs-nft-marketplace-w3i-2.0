@@ -10,8 +10,15 @@ import { devLog } from '@/utils';
 
 // Flag to ensure we only initialize once
 let isInitialized = false;
+let startupPromise: Promise<void> | null = null;
 
-export async function initializeBackgroundServices() {
+interface InitializeBackgroundServicesOptions {
+    waitForReady?: boolean;
+}
+
+export async function initializeBackgroundServices(options: InitializeBackgroundServicesOptions = {}) {
+    const { waitForReady = false } = options;
+
     // Only run on server-side
     if (typeof window !== 'undefined') {
         return;
@@ -19,26 +26,29 @@ export async function initializeBackgroundServices() {
 
     // Only initialize once
     if (isInitialized) {
-        devLog.warn('⚠️ Background services already initialized');
+        if (waitForReady && startupPromise) {
+            await startupPromise;
+        }
         return;
     }
 
     devLog.info('🚀 Initializing background services...');
     isInitialized = true;
 
-    try {
-        // Start NFT Sync Service (includes WebSocket Event Listener + GraphQL Fallback)
-        const syncService = getNFTSyncService();
-        await syncService.start();
+    startupPromise = (async () => {
+        try {
+            // Start NFT Sync Service (includes WebSocket Event Listener + GraphQL Fallback)
+            const syncService = getNFTSyncService();
+            await syncService.start();
 
-        devLog.info('✅ Background services initialized successfully');
-    } catch (error) {
-        devLog.error('❌ Failed to initialize background services:', error);
-        // Don't throw - allow app to continue even if background services fail
+            devLog.info('✅ Background services initialized successfully');
+        } catch (error) {
+            devLog.error('❌ Failed to initialize background services:', error);
+            // Don't throw - allow app to continue even if background services fail
+        }
+    })();
+
+    if (waitForReady) {
+        await startupPromise;
     }
-}
-
-// Auto-initialize on module load (server-side only)
-if (typeof window === 'undefined') {
-    initializeBackgroundServices().catch((error) => devLog.error('❌ Background service init failed:', error));
 }
