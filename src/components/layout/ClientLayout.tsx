@@ -20,7 +20,6 @@ import { devLog } from '@/utils';
 import * as Sentry from '@sentry/nextjs';
 
 const DefaultNavbar = dynamic(() => import('./Navbar'));
-const BrowseNavbar = dynamic(() => import('./MarketplaceNavbar'));
 
 // --- Simple global fallback UI for render errors ---
 function GlobalErrorFallback({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {
@@ -45,11 +44,10 @@ function GlobalErrorFallback({ error, resetErrorBoundary }: { error: Error; rese
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAdminRoute = pathname?.startsWith('/admin');
-  const isBrowseRoute = pathname?.startsWith('/marketplace') || pathname?.startsWith('/collection/');
 
   return (
     <div className="min-h-screen flex flex-col">
-      {isAdminRoute ? <AdminNavbar /> : isBrowseRoute ? <BrowseNavbar /> : <DefaultNavbar />}
+      {isAdminRoute ? <AdminNavbar /> : <DefaultNavbar />}
       
       {/* Real-time connection status indicator (bottom-right corner) */}
       {!isAdminRoute && <EventConnectionStatus />}
@@ -62,7 +60,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const isDevelopment = process.env.NODE_ENV === 'development';
   const pathname = usePathname() || '';
-  const isBrowseRoute = pathname.startsWith('/marketplace') || pathname.startsWith('/collection/');
   const isAdminRoute = pathname.startsWith('/admin');
   const needsAdminGuard = APP_LOCK_ENABLED || isAdminRoute;
 
