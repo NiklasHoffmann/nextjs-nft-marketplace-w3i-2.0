@@ -1,29 +1,14 @@
 ﻿// app/layout.tsx
 import type { Metadata } from "next";
 import React from "react";
-import { Poppins, Roboto, Inter } from "next/font/google";
+import { Inter } from "next/font/google";
 import { ClientLayout } from "@/components";
 import "@/app/globals.css";
 import "@/lib/globals";
 
-
-const poppins = Poppins({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "700", "900"],
-  display: "swap",
-  variable: "--font-poppins",
-});
-
-const roboto = Roboto({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "700", "900"],
-  display: "swap",
-  variable: "--font-roboto",
-});
-
 const inter = Inter({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "600"],
   display: "swap",
   variable: "--font-inter",
 });
@@ -39,7 +24,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${poppins.variable} ${roboto.variable} ${inter.variable} bg-primary font-primary`}>
+      <body className={`${inter.variable} bg-primary font-inter`}>
         <ClientLayout>
           {children}
         </ClientLayout>

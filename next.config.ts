@@ -89,41 +89,7 @@ const nextConfig: import('next').NextConfig = {
     if (!dev) {
       config.optimization = {
         ...config.optimization,
-        moduleIds: 'deterministic',
-        splitChunks: {
-          chunks: 'all',
-          cacheGroups: {
-            default: {
-              minChunks: 2,
-              priority: -20,
-              reuseExistingChunk: true,
-            },
-            vendor: {
-              test: /[\\/]node_modules[\\/]/,
-              name: 'vendors',
-              priority: -10,
-              reuseExistingChunk: true,
-            },
-            web3: {
-              test: /[\\/]node_modules[\\/](wagmi|viem|@rainbow-me|@walletconnect)/,
-              name: 'web3',
-              priority: 10,
-              reuseExistingChunk: true,
-            },
-            apollo: {
-              test: /[\\/]node_modules[\\/](@apollo|graphql)/,
-              name: 'apollo',
-              priority: 5,
-              reuseExistingChunk: true,
-            },
-            react: {
-              test: /[\\/]node_modules[\\/](react|react-dom|scheduler)/,
-              name: 'react',
-              priority: 15,
-              reuseExistingChunk: true,
-            },
-          }
-        }
+        moduleIds: 'deterministic'
       };
     }
 
