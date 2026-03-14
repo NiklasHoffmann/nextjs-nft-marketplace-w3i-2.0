@@ -5,13 +5,25 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCart } from '@/contexts';
+import { useAccount, useBalance } from 'wagmi';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 export default function MarketplaceNavbar() {
     const router = useRouter();
     const pathname = usePathname() || '';
     const { itemCount } = useCart();
+    const { address, isConnected } = useAccount();
+    const { data: balance } = useBalance({ address });
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+    const formatAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+    const formatBalance = (value?: string) => {
+        if (!value) return '0.0000';
+        const parsed = Number.parseFloat(value);
+        if (Number.isNaN(parsed)) return '0.0000';
+        return parsed.toFixed(4);
+    };
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -68,6 +80,18 @@ export default function MarketplaceNavbar() {
                 <Link href="/wallet" className="hidden sm:inline text-gray-700 hover:text-blue-600 font-medium transition-colors">
                     Wallet
                 </Link>
+
+                {isConnected && address ? (
+                    <div className="hidden lg:flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg h-10">
+                        <span className="inline-block w-2 h-2 bg-green-500 rounded-full" />
+                        <span className="text-sm font-medium text-gray-700">{formatAddress(address)}</span>
+                        <span className="text-sm text-gray-500 whitespace-nowrap">{formatBalance(balance?.formatted)} ETH</span>
+                    </div>
+                ) : (
+                    <div className="hidden sm:block w-[172px]">
+                        <ConnectButton showBalance={false} chainStatus="icon" accountStatus="address" />
+                    </div>
+                )}
 
                 <Link
                     href="/cart"
