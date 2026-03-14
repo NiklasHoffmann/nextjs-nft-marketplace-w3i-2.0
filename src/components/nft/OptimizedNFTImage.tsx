@@ -252,7 +252,8 @@ const OptimizedNFTImage = memo(({
     const [glitterOpacity, setGlitterOpacity] = useState(0);
     const fadeOutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Combined cache check and preload logic - OPTIMIZED
+    // Cache check without network probing.
+    // Probing via window.Image here caused duplicate first-load requests.
     useEffect(() => {
         if (typeof window === 'undefined' || imageUrls.length === 0) return;
 
@@ -273,30 +274,6 @@ const OptimizedNFTImage = memo(({
             setIsLoading(false);
             return;
         }
-
-        // Not cached - test image loading
-        const testImg = new window.Image();
-        const timeout = setTimeout(() => {
-            testImg.onload = null;
-            testImg.onerror = null;
-        }, 5000); // Increased timeout
-
-        testImg.onload = () => {
-            clearTimeout(timeout);
-            imageLoadCache.set(cacheKey, true);
-            setHasBeenVisible(true);
-            setIsIntersecting(true);
-            setIsLoading(false);
-        };
-
-        testImg.onerror = () => {
-            clearTimeout(timeout);
-            imageLoadCache.set(cacheKey, false);
-            // Don't set hasError immediately - try fallback
-            setIsLoading(false);
-        };
-
-        testImg.src = cacheKey;
     }, [imageUrls, tokenId]);
 
     // Intersection Observer for lazy loading

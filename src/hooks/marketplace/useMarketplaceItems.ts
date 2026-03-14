@@ -307,6 +307,11 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
       // Ignore abort errors (normal flow when filters change)
       if (err instanceof Error && err.name === 'AbortError') {
         devLog.info('⚠️ [useMarketplaceItems] Request aborted (normal)');
+        // If this aborted request is still the active one, ensure UI is not left in loading state.
+        if (abortControllerRef.current === abortController) {
+          setLoading(false);
+          setInitialLoading(false);
+        }
         loadingRef.current = false; // Reset loading ref on abort
         return;
       }

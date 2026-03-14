@@ -39,6 +39,12 @@ const IPFS_GATEWAYS = [
 
 // Gateway Performance Tracking
 const gatewayStats = new Map<string, { hits: number; fails: number; avgTime: number }>();
+const inFlightImageJobs = new Map<string, Promise<{
+    buffer: Buffer;
+    format: string;
+    originalSize: number;
+    compressedSize: number;
+} | null>>();
 
 // Cache Metadata Interface
 interface CacheMetadata {
@@ -184,10 +190,20 @@ async function checkAndCleanup(): Promise<void> {
 async function compressImage(buffer: Buffer): Promise<{ buffer: Buffer; format: string; originalSize: number; compressedSize: number }> {
     const originalSize = buffer.length;
     
+    // Tiny files often get larger when re-encoded. Keep original to reduce CPU and latency.
+    if (originalSize < 48 * 1024) {
+        return {
+            buffer,
+            format: 'original',
+            originalSize,
+            compressedSize: originalSize
+        };
+    }
+
     try {
         // Try WebP compression (best compatibility + good compression)
         const compressed = await sharp(buffer)
-            .webp({ quality: 85, effort: 4 }) // Good balance of quality/speed
+            .webp({ quality: 82, effort: 2 }) // Faster cold-start compression
             .toBuffer();
         
         const compressedSize = compressed.length;
@@ -234,12 +250,12 @@ async function fetchFromIPFS(ipfsHash: string): Promise<Buffer | null> {
         return statsA.avgTime - statsB.avgTime;
     });
 
-    for (const gateway of sortedGateways) {
+    const fetchGateway = async (gateway: string, timeoutMs: number): Promise<Buffer | null> => {
         const startTime = Date.now();
 
         try {
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 8000); // Reduced to 8s for faster fallback
+            const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
             const response = await fetch(`${gateway}${ipfsHash}`, {
                 signal: controller.signal,
@@ -263,11 +279,40 @@ async function fetchFromIPFS(ipfsHash: string): Promise<Buffer | null> {
 
             // Update stats for failed response
             updateGatewayStats(gateway, false, Date.now() - startTime);
+            return null;
 
         } catch (err) {
             // Update stats for error
             updateGatewayStats(gateway, false, Date.now() - startTime);
-            continue;
+            return null;
+        }
+    };
+
+    // Phase 1: Quick single try on best gateway for minimal overhead.
+    const bestGateway = sortedGateways[0];
+    if (bestGateway) {
+        const firstAttempt = await fetchGateway(bestGateway, 3500);
+        if (firstAttempt) {
+            return firstAttempt;
+        }
+    }
+
+    // Phase 2: Parallel race across remaining gateways to avoid long sequential waits.
+    const fallbackGateways = sortedGateways.slice(1);
+    if (fallbackGateways.length > 0) {
+        try {
+            const raced = await Promise.any(
+                fallbackGateways.map(async (gateway) => {
+                    const response = await fetchGateway(gateway, 5000);
+                    if (!response) {
+                        throw new Error(`Gateway failed: ${gateway}`);
+                    }
+                    return response;
+                })
+            );
+            return raced;
+        } catch {
+            // All fallback gateways failed
         }
     }
 
@@ -356,44 +401,63 @@ export async function GET(
         // Not cached, need to download
     }
 
-    // Download from IPFS
-    const imageBuffer = await fetchFromIPFS(ipfsHash);
+    const runImageJob = async () => {
+        // Download from IPFS
+        const imageBuffer = await fetchFromIPFS(ipfsHash);
 
-    if (!imageBuffer) {
+        if (!imageBuffer) {
+            return null;
+        }
+
+        // Compress the image
+        const result = await compressImage(imageBuffer);
+
+        // Check if cleanup is needed before saving
+        await checkAndCleanup();
+
+        // Save compressed version to cache
+        try {
+            await fs.writeFile(cachedPath, new Uint8Array(result.buffer));
+
+            // Update metadata with compression stats
+            const metadata = await loadMetadata();
+            metadata.files[cacheFileName] = {
+                hash: ipfsHash,
+                size: result.compressedSize,
+                originalSize: result.originalSize,
+                compressionRatio: ((result.originalSize - result.compressedSize) / result.originalSize * 100),
+                format: result.format as any,
+                accessCount: 1,
+                lastAccess: Date.now(),
+                created: Date.now()
+            };
+            metadata.totalSize += result.compressedSize;
+            await saveMetadata(metadata);
+        } catch (err) {
+            devLog.warn('⚠️ Failed to cache image:', err);
+        }
+
+        return result;
+    };
+
+    let imageJob = inFlightImageJobs.get(cacheFileName);
+    if (!imageJob) {
+        imageJob = runImageJob().finally(() => {
+            inFlightImageJobs.delete(cacheFileName);
+        });
+        inFlightImageJobs.set(cacheFileName, imageJob);
+    }
+
+    const imageResult = await imageJob;
+
+    if (!imageResult) {
         return NextResponse.json({
             success: false,
             error: 'Failed to download image from IPFS'
         }, { status: 502 });
     }
 
-    // Compress the image
-    const { buffer: compressedBuffer, format, originalSize, compressedSize } = await compressImage(imageBuffer);
-
-    // Check if cleanup is needed before saving
-    await checkAndCleanup();
-
-    // Save compressed version to cache
-    try {
-        await fs.writeFile(cachedPath, new Uint8Array(compressedBuffer));
-        
-        // Update metadata with compression stats
-        const metadata = await loadMetadata();
-        metadata.files[cacheFileName] = {
-            hash: ipfsHash,
-            size: compressedSize,
-            originalSize,
-            compressionRatio: ((originalSize - compressedSize) / originalSize * 100),
-            format: format as any,
-            accessCount: 1,
-            lastAccess: Date.now(),
-            created: Date.now()
-        };
-        metadata.totalSize += compressedSize;
-        await saveMetadata(metadata);
-        
-    } catch (err) {
-        devLog.warn('⚠️ Failed to cache image:', err);
-    }
+    const { buffer: compressedBuffer, format, originalSize, compressedSize } = imageResult;
 
     // Return compressed image
     return new NextResponse(new Uint8Array(compressedBuffer), {

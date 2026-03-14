@@ -244,13 +244,13 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
         return sorted;
     }, [displayItems, sort.field, sort.direction]);
 
-    // Track when first items arrive to hide initial loading state
+    // End initial loading once first request cycle completes,
+    // even if the result set is empty.
     useEffect(() => {
-        // Only set to false when we actually have items loaded successfully
-        if ((items ?? []).length > 0 && !loading) {
+        if (!loading && (pagination !== null || !!error || (items ?? []).length > 0)) {
             setIsInitialLoad(false);
         }
-    }, [items, loading]);
+    }, [items, loading, pagination, error]);
 
     // Update layout context with total/filtered counts
     useEffect(() => {
