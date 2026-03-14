@@ -3,6 +3,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import Link from "next/link";
 import { HOME_CONFIG } from "@/config/app.config";
 import { LoadingState } from '@/components/core/Loading';
 
@@ -71,14 +72,15 @@ export default function Home() {
               Trade, collect, and discover unique digital utilities on our next-generation Web3 marketplace
             </p>
             <div className="flex gap-4 justify-center flex-wrap">
-              <button
+              <Link
+                href="/marketplace"
+                prefetch={true}
                 onMouseEnter={prefetchMarketplace}
                 onFocus={prefetchMarketplace}
-                onClick={() => router.push('/marketplace')}
                 className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-2xl transition-all duration-300 font-semibold text-lg transform hover:scale-105"
               >
                 🏪 Explore Marketplace
-              </button>
+              </Link>
               <button
                 onClick={() => router.push('/wallet')}
                 className="px-8 py-4 bg-white text-gray-900 rounded-xl hover:shadow-2xl transition-all duration-300 font-semibold text-lg border-2 border-gray-200 transform hover:scale-105"
@@ -101,17 +103,18 @@ export default function Home() {
               <p className="text-gray-600 mb-4">
                 Discover unique Utilities collections with detailed insights, rarity scores, and real-time marketplace data.
               </p>
-              <button
+              <Link
+                href="/marketplace"
+                prefetch={true}
                 onMouseEnter={prefetchMarketplace}
                 onFocus={prefetchMarketplace}
-                onClick={() => router.push('/marketplace')}
                 className="text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center gap-2"
               >
                 View Collections
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-              </button>
+              </Link>
             </div>
 
             {/* Feature 2: Trade NFTs */}
@@ -191,17 +194,18 @@ export default function Home() {
               <p className="text-gray-600 mb-4">
                 Get detailed Utilities insights including custom titles, categories, descriptions, and rarity information.
               </p>
-              <button
+              <Link
+                href="/marketplace"
+                prefetch={true}
                 onMouseEnter={prefetchMarketplace}
                 onFocus={prefetchMarketplace}
-                onClick={() => router.push('/marketplace')}
                 className="text-pink-600 font-semibold hover:text-pink-700 transition-colors flex items-center gap-2"
               >
                 Explore Insights
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-              </button>
+              </Link>
             </div>
 
             {/* Feature 6: History Towers Game */}
