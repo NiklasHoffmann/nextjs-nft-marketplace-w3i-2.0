@@ -71,26 +71,67 @@ async function ensureCacheDir() {
     }
 }
 
-/**
- * Load cache metadata
- */
-async function loadMetadata(): Promise<CacheMetadata> {
-    try {
-        const data = await fs.readFile(METADATA_FILE, 'utf-8');
-        return JSON.parse(data);
-    } catch {
-        return {
-            files: {},
-            totalSize: 0,
-            lastCleanup: Date.now()
-        };
+// ---------------------------------------------------------------------------
+// In-memory metadata cache — avoids concurrent disk reads/writes on every HIT
+// Flushed to disk every 30 seconds (debounced). All per-request metadata
+// updates are synchronous in-memory ops with zero I/O latency.
+// ---------------------------------------------------------------------------
+let metadataCache: CacheMetadata | null = null;
+let metadataDirty = false;
+let metadataFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function getMetadata(): Promise<CacheMetadata> {
+    if (!metadataCache) {
+        try {
+            const data = await fs.readFile(METADATA_FILE, 'utf-8');
+            metadataCache = JSON.parse(data);
+        } catch {
+            metadataCache = { files: {}, totalSize: 0, lastCleanup: Date.now() };
+        }
     }
+    return metadataCache!;
 }
 
-/**
- * Save cache metadata
- */
+function scheduleMetadataFlush() {
+    if (metadataFlushTimer) return;
+    metadataFlushTimer = setTimeout(async () => {
+        metadataFlushTimer = null;
+        if (metadataDirty && metadataCache) {
+            metadataDirty = false;
+            try {
+                await fs.writeFile(METADATA_FILE, JSON.stringify(metadataCache, null, 2));
+            } catch (err) {
+                devLog.warn('⚠️ Failed to flush metadata:', err);
+            }
+        }
+    }, 30_000);
+}
+
+// Synchronous in-memory update — no disk I/O in the hot path
+function touchFileAccess(hash: string, size: number, format: string) {
+    if (!metadataCache) return; // cache not loaded yet, skip
+    if (!metadataCache.files[hash]) {
+        metadataCache.files[hash] = {
+            hash, size, format: format as any,
+            accessCount: 0, lastAccess: Date.now(), created: Date.now()
+        };
+        metadataCache.totalSize += size;
+    }
+    const entry = metadataCache.files[hash]!;
+    entry.accessCount++;
+    entry.lastAccess = Date.now();
+    metadataDirty = true;
+    scheduleMetadataFlush();
+}
+
+// For admin stats endpoint — returns current in-memory or loads from disk
+async function loadMetadata(): Promise<CacheMetadata> {
+    return getMetadata();
+}
+
 async function saveMetadata(metadata: CacheMetadata): Promise<void> {
+    metadataCache = metadata;
+    metadataDirty = false;
     try {
         await fs.writeFile(METADATA_FILE, JSON.stringify(metadata, null, 2));
     } catch (err) {
@@ -99,44 +140,14 @@ async function saveMetadata(metadata: CacheMetadata): Promise<void> {
 }
 
 /**
- * Update file access in metadata
- */
-async function updateFileAccess(hash: string, size: number, format: string): Promise<void> {
-    const metadata = await loadMetadata();
-    
-    if (!metadata.files[hash]) {
-        metadata.files[hash] = {
-            hash,
-            size,
-            format: format as any,
-            accessCount: 0,
-            lastAccess: Date.now(),
-            created: Date.now()
-        };
-        metadata.totalSize += size;
-    }
-
-    const entry = metadata.files[hash];
-    if (!entry) {
-        return;
-    }
-
-    entry.accessCount++;
-    entry.lastAccess = Date.now();
-    
-    await saveMetadata(metadata);
-}
-
-/**
- * Check and perform cleanup if needed
+ * Check and perform cleanup if needed (fire-and-forget from the hot path)
  */
 async function checkAndCleanup(): Promise<void> {
-    const metadata = await loadMetadata();
-    const maxSize = MAX_CACHE_SIZE_MB * 1024 * 1024; // Convert to bytes
+    const metadata = await getMetadata();
+    const maxSize = MAX_CACHE_SIZE_MB * 1024 * 1024;
     
-    // Check if cleanup is needed
     if (metadata.totalSize < maxSize * CLEANUP_THRESHOLD) {
-        return; // No cleanup needed
+        return;
     }
     
     devLog.info(`🧹 Cache cleanup triggered: ${(metadata.totalSize / 1024 / 1024).toFixed(2)} MB / ${MAX_CACHE_SIZE_MB} MB`);
@@ -145,9 +156,7 @@ async function checkAndCleanup(): Promise<void> {
     const maxAge = MAX_FILE_AGE_DAYS * 24 * 60 * 60 * 1000;
     const targetSize = maxSize * TARGET_SIZE_AFTER_CLEANUP;
     
-    // Sort files by priority (LRU + age)
     const files = Object.values(metadata.files).sort((a, b) => {
-        // Priority score: lower is worse (delete first)
         const scoreA = a.accessCount * 1000 - (now - a.lastAccess);
         const scoreB = b.accessCount * 1000 - (now - b.lastAccess);
         return scoreA - scoreB;
@@ -157,17 +166,12 @@ async function checkAndCleanup(): Promise<void> {
     let deleted = 0;
     
     for (const file of files) {
-        // Stop if we've reached target size
         if (currentSize <= targetSize) break;
-        
-        // Delete old or low-priority files
         const age = now - file.created;
         const shouldDelete = age > maxAge || currentSize > targetSize;
-        
         if (shouldDelete) {
             try {
-                const filePath = path.join(CACHE_DIR, file.hash);
-                await fs.unlink(filePath);
+                await fs.unlink(path.join(CACHE_DIR, file.hash));
                 delete metadata.files[file.hash];
                 currentSize -= file.size;
                 deleted++;
@@ -179,7 +183,8 @@ async function checkAndCleanup(): Promise<void> {
     
     metadata.totalSize = currentSize;
     metadata.lastCleanup = now;
-    await saveMetadata(metadata);
+    metadataDirty = true;
+    scheduleMetadataFlush();
     
     devLog.info(`✅ Cleanup complete: Deleted ${deleted} files, ${(currentSize / 1024 / 1024).toFixed(2)} MB remaining`);
 }
@@ -376,10 +381,9 @@ export async function GET(
             cachePath = legacyCachedPath;
         }
         
-        // Update access stats
-        const stats = await fs.stat(cachePath);
-        await updateFileAccess(path.basename(cachePath), stats.size, format);
-        
+        // Update access stats in-memory only — no disk I/O on the hot path
+        touchFileAccess(path.basename(cachePath), cached.length, format);
+
         // Determine content type
         const contentType = format === 'webp' ? 'image/webp' : 'image/png';
 
@@ -412,27 +416,28 @@ export async function GET(
         // Compress the image
         const result = await compressImage(imageBuffer);
 
-        // Check if cleanup is needed before saving
-        await checkAndCleanup();
-
-        // Save compressed version to cache
+        // Save compressed version to cache (fire-and-forget metadata updates)
         try {
             await fs.writeFile(cachedPath, new Uint8Array(result.buffer));
 
-            // Update metadata with compression stats
-            const metadata = await loadMetadata();
-            metadata.files[cacheFileName] = {
-                hash: ipfsHash,
-                size: result.compressedSize,
-                originalSize: result.originalSize,
-                compressionRatio: ((result.originalSize - result.compressedSize) / result.originalSize * 100),
-                format: result.format as any,
-                accessCount: 1,
-                lastAccess: Date.now(),
-                created: Date.now()
-            };
-            metadata.totalSize += result.compressedSize;
-            await saveMetadata(metadata);
+            // Update in-memory metadata — no blocking disk write
+            getMetadata().then((metadata) => {
+                metadata.files[cacheFileName] = {
+                    hash: ipfsHash,
+                    size: result.compressedSize,
+                    originalSize: result.originalSize,
+                    compressionRatio: ((result.originalSize - result.compressedSize) / result.originalSize * 100),
+                    format: result.format as any,
+                    accessCount: 1,
+                    lastAccess: Date.now(),
+                    created: Date.now()
+                };
+                metadata.totalSize += result.compressedSize;
+                metadataDirty = true;
+                scheduleMetadataFlush();
+                // Run cleanup check in background — never blocks the response
+                checkAndCleanup().catch(e => devLog.warn('Cleanup error:', e));
+            }).catch(e => devLog.warn('Metadata update error:', e));
         } catch (err) {
             devLog.warn('⚠️ Failed to cache image:', err);
         }
