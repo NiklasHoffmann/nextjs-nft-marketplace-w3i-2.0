@@ -88,45 +88,30 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     ...filters
   } = options;
 
-  const [items, setItems] = useState<EnrichedNFTDocument[]>([]);
-  const [loading, setLoading] = useState(autoFetch); // Start with true if autoFetch is enabled
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(initialPage);
-  const [pagination, setPagination] = useState<UseMarketplaceItemsReturn['pagination']>(null);
-  const [availableFilters, setAvailableFilters] = useState<UseMarketplaceItemsReturn['filters']>(null);
-
   // Get cache context
   const cacheContext = useMarketplaceItemsContext();
 
-  // Prevent concurrent loadMore calls
-  const loadingRef = useRef(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  // Create cache key from filters
-  const createFilterKey = useCallback(() => {
-    return JSON.stringify({
-      cacheVersion: CACHE_VERSION,
-      refreshSeed: cacheContext.refreshTrigger,
-      search: filters.search || '',
-      contractAddress: filters.contractAddress || '',
-      minPrice: filters.minPrice || '',
-      maxPrice: filters.maxPrice || '',
-      seller: filters.seller || '',
-      isListed: filters.isListed ?? true,
-      category: filters.category || '',
-      tokenStandard: filters.tokenStandard || '',
-      rarity: filters.rarity || '',
-      tags: filters.tags?.join(',') || '',
-      minRating: filters.minRating || 0,
-      minViews: filters.minViews || 0,
-      minLikes: filters.minLikes || 0,
-      minWatchlistCount: filters.minWatchlistCount || 0,
-      sortBy: filters.sortBy || 'price',
-      sortOrder: filters.sortOrder || 'desc',
-      includeFilters,
-    });
-  }, [
+  const filterKey = useMemo(() => JSON.stringify({
+    cacheVersion: CACHE_VERSION,
+    refreshSeed: cacheContext.refreshTrigger,
+    search: filters.search || '',
+    contractAddress: filters.contractAddress || '',
+    minPrice: filters.minPrice || '',
+    maxPrice: filters.maxPrice || '',
+    seller: filters.seller || '',
+    isListed: filters.isListed ?? true,
+    category: filters.category || '',
+    tokenStandard: filters.tokenStandard || '',
+    rarity: filters.rarity || '',
+    tags: filters.tags?.join(',') || '',
+    minRating: filters.minRating || 0,
+    minViews: filters.minViews || 0,
+    minLikes: filters.minLikes || 0,
+    minWatchlistCount: filters.minWatchlistCount || 0,
+    sortBy: filters.sortBy || 'price',
+    sortOrder: filters.sortOrder || 'desc',
+    includeFilters,
+  }), [
     cacheContext.refreshTrigger,
     includeFilters,
     filters.search,
@@ -147,6 +132,20 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     filters.sortOrder,
   ]);
 
+  const initialCachedEntry = useMemo(() => cacheContext.getCached(filterKey), [cacheContext, filterKey]);
+
+  const [items, setItems] = useState<EnrichedNFTDocument[]>(() => initialCachedEntry?.data.items ?? []);
+  const [loading, setLoading] = useState(() => autoFetch && !initialCachedEntry);
+  const [initialLoading, setInitialLoading] = useState(() => autoFetch && !initialCachedEntry);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(initialPage);
+  const [pagination, setPagination] = useState<UseMarketplaceItemsReturn['pagination']>(() => initialCachedEntry?.data.pagination ?? null);
+  const [availableFilters, setAvailableFilters] = useState<UseMarketplaceItemsReturn['filters']>(() => initialCachedEntry?.data.filters || null);
+
+  // Prevent concurrent loadMore calls
+  const loadingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   /**
    * Fetch items from API (with cache support)
    */
@@ -166,7 +165,6 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
 
     // Check cache first (only for page 1, not for pagination)
     // IMPORTANT: Check cache BEFORE clearing items to avoid flicker
-    const filterKey = createFilterKey();
     devLog.info('🔍 [useMarketplaceItems] Checking cache for key:', filterKey);
 
     let hasFreshCacheHit = false;
@@ -283,7 +281,6 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
 
           // Cache the result (only for page 1)
           if (pageNum === 1 && data.data && Array.isArray(data.data.items)) {
-            const filterKey = createFilterKey();
             cacheContext.setCache(filterKey, data.data);
           }
         }
@@ -347,7 +344,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     filters.sortBy,
     filters.sortOrder,
     cacheContext,
-    createFilterKey,
+    filterKey,
   ]);
 
   /**
@@ -384,8 +381,17 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
 
     devLog.info('[useMarketplaceItems] useEffect triggered - fetching with stale-while-revalidate...');
 
-    // Keep current items visible until fresh payload arrives
-    setLoading(true);
+    const cached = cacheContext.getCached(filterKey);
+
+    // Keep current items visible until fresh payload arrives.
+    // If we already have cache for this filter key, do not re-enter the initial loading state.
+    setLoading(!cached);
+    if (cached) {
+      setInitialLoading(false);
+      setItems(cached.data.items);
+      setPagination(cached.data.pagination);
+      setAvailableFilters(cached.data.filters || null);
+    }
 
     // Abort any pending request
     if (abortControllerRef.current) {
@@ -426,6 +432,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     filters.minWatchlistCount,
     filters.sortBy,
     filters.sortOrder,
+    filterKey,
   ]);
 
   return {

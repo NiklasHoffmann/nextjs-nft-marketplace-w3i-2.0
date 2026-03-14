@@ -544,7 +544,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
                             loadingLabel="Refreshing..."
                         />
                     }
-                    loading={isInitialLoad}
+                    loading={isInitialLoad && sortedDisplayItems.length === 0}
                     loadingCount={12}
                     enableInsights={true}
                     showStats={false}

@@ -72,11 +72,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     pathname.startsWith('/marketplace') ||
     pathname.startsWith('/collection/');
 
-  const needsMarketplaceItems =
-    pathname.startsWith('/marketplace') ||
-    pathname.startsWith('/collection/') ||
-    pathname.startsWith('/nft/') ||
-    pathname.startsWith('/sell');
+  const needsMarketplaceItems = !isAdminRoute;
 
   const innerContent = (
     <CurrencyProvider>

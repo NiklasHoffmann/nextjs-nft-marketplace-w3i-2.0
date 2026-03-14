@@ -371,8 +371,8 @@ const OptimizedNFTImage = memo(({
     const hasExplicitObjectFit = /(^|\s)object-(contain|cover|fill|none|scale-down)(\s|$)/.test(className);
     const objectFitClass = hasExplicitObjectFit ? '' : 'object-contain';
 
-    // Generate optimized blur placeholder
-    const blurDataURL = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx4f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bz6rasJsTat2yg4dCLwGRupfphjnFBYc8BUx/9k=";
+    // Use a neutral light placeholder to avoid dark flashes before image decode.
+    const blurDataURL = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%23f3f4f6'/%3E%3Cstop offset='1' stop-color='%23e5e7eb'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='16' height='16' fill='url(%23g)'/%3E%3C/svg%3E";
 
     // Check if this is a sharp image (not background) and should have glitter effect
     // CRITICAL: Convert tokenId to string (may be Number from marketplace_items)
@@ -525,7 +525,7 @@ const OptimizedNFTImage = memo(({
     return (
         <div
             ref={imgRef}
-            className={`relative overflow-hidden ${fill ? 'w-full h-full' : ''} ${aspectRatio && Math.abs(aspectRatio - 1) < 0.1 ? 'bg-transparent' : ''} ${className}`}
+            className={`relative overflow-hidden bg-gray-100 ${fill ? 'w-full h-full' : ''} ${className}`}
         >
             <Image key={currentImageUrl} alt={alt || `NFT ${tokenId}`} {...imageProps} />
 
