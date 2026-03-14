@@ -496,6 +496,7 @@ const OptimizedNFTImage = memo(({
         unoptimized:
             currentImageUrl.startsWith('data:') ||
             currentImageUrl.startsWith('blob:') ||
+            currentImageUrl.startsWith('/api/nft/image/') ||
             currentImageUrl.startsWith('http://') ||
             currentImageUrl.startsWith('https://'),
         // Optimized sizes for NFT cards - use consistent sizes for better cache hits
