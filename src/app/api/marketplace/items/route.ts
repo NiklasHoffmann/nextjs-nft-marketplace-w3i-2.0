@@ -38,6 +38,9 @@ const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$
 const FILTER_OPTIONS_TTL_MS = 30_000;
 const FILTER_OPTIONS_TTL_SECONDS = Math.ceil(FILTER_OPTIONS_TTL_MS / 1000);
 const FILTER_OPTIONS_CACHE_KEY = 'marketplace:items:filter-options:v1';
+const MARKETPLACE_DEFAULT_RESPONSE_TTL_MS = 15_000;
+const MARKETPLACE_DEFAULT_RESPONSE_TTL_SECONDS = Math.ceil(MARKETPLACE_DEFAULT_RESPONSE_TTL_MS / 1000);
+const MARKETPLACE_DEFAULT_RESPONSE_CACHE_KEY = 'marketplace:items:default-response:v2';
 
 interface FilterOptionsCacheEntry {
     categories: string[];
@@ -137,6 +140,42 @@ export const GET = apiHandler(async (request: NextRequest) => {
     // Parse sorting
     const sortBy = searchParams.get('sortBy') || 'price';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
+
+    // Fast-path cache for initial marketplace load (home -> marketplace)
+    const isDefaultBrowseQuery =
+        page === 1 &&
+        limit === 20 &&
+        !search &&
+        !contractAddress &&
+        !minPrice &&
+        !maxPrice &&
+        !seller &&
+        (isListed === null || isListed === 'true') &&
+        (!category || category.length === 0) &&
+        (!tokenStandard || tokenStandard.length === 0) &&
+        (!rarity || rarity.length === 0) &&
+        (!tags || tags.length === 0) &&
+        !minRating &&
+        !minViews &&
+        !minLikes &&
+        !minWatchlistCount &&
+        sortBy === 'price' &&
+        sortOrder === 'desc' &&
+        includeFilters;
+
+    if (isDefaultBrowseQuery) {
+        const cachedResponse = await getSharedCacheValue<MarketplaceItemsResponse['data']>(MARKETPLACE_DEFAULT_RESPONSE_CACHE_KEY);
+        if (cachedResponse) {
+            const cachedApiResponse = apiSuccess({
+                ...cachedResponse,
+                cached: true,
+                timestamp: Date.now(),
+            });
+            cachedApiResponse.headers.set('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30');
+            cachedApiResponse.headers.set('X-API-Cache', 'HIT');
+            return cachedApiResponse;
+        }
+    }
 
     // Build MongoDB query
     const query: any = {};
@@ -720,10 +759,19 @@ export const GET = apiHandler(async (request: NextRequest) => {
         cached: false
     };
 
+    if (isDefaultBrowseQuery) {
+        await setSharedCacheValue(
+            MARKETPLACE_DEFAULT_RESPONSE_CACHE_KEY,
+            response,
+            MARKETPLACE_DEFAULT_RESPONSE_TTL_SECONDS
+        );
+    }
+
     const duration = Date.now() - startTime;
     devLog.info(`✅ Marketplace query completed in ${duration}ms (${total} total, ${items.length} returned)`);
 
     const apiResponse = apiSuccess(response);
     apiResponse.headers.set('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30');
+    apiResponse.headers.set('X-API-Cache', 'MISS');
     return apiResponse;
 });

@@ -9,11 +9,38 @@ import { LoadingState } from '@/components/core/Loading';
 export default function Home() {
   const router = useRouter();
 
+  const prefetchMarketplace = () => {
+    router.prefetch('/marketplace');
+    if (typeof window !== 'undefined') {
+      // Warm API + DB/cache path so first click in incognito feels faster.
+      fetch('/api/marketplace/items?page=1&limit=20&sortBy=price&sortOrder=desc&includeFilters=true', {
+        method: 'GET',
+        cache: 'no-store',
+        keepalive: true,
+      }).catch(() => {
+        // Non-critical warmup.
+      });
+    }
+  };
+
   // Redirect if enabled
   useEffect(() => {
     if (HOME_CONFIG.ENABLE_REDIRECT) {
       router.replace(HOME_CONFIG.REDIRECT_TARGET);
     }
+  }, [router]);
+
+  useEffect(() => {
+    if (HOME_CONFIG.ENABLE_REDIRECT) return;
+
+    // Start warming marketplace route/data shortly after home renders.
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(prefetchMarketplace, { timeout: 1200 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timer = setTimeout(prefetchMarketplace, 400);
+    return () => clearTimeout(timer);
   }, [router]);
 
   // Show redirect loading state if enabled
@@ -45,6 +72,8 @@ export default function Home() {
             </p>
             <div className="flex gap-4 justify-center flex-wrap">
               <button
+                onMouseEnter={prefetchMarketplace}
+                onFocus={prefetchMarketplace}
                 onClick={() => router.push('/marketplace')}
                 className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-2xl transition-all duration-300 font-semibold text-lg transform hover:scale-105"
               >
@@ -73,6 +102,8 @@ export default function Home() {
                 Discover unique Utilities collections with detailed insights, rarity scores, and real-time marketplace data.
               </p>
               <button
+                onMouseEnter={prefetchMarketplace}
+                onFocus={prefetchMarketplace}
                 onClick={() => router.push('/marketplace')}
                 className="text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center gap-2"
               >
@@ -161,6 +192,8 @@ export default function Home() {
                 Get detailed Utilities insights including custom titles, categories, descriptions, and rarity information.
               </p>
               <button
+                onMouseEnter={prefetchMarketplace}
+                onFocus={prefetchMarketplace}
                 onClick={() => router.push('/marketplace')}
                 className="text-pink-600 font-semibold hover:text-pink-700 transition-colors flex items-center gap-2"
               >
