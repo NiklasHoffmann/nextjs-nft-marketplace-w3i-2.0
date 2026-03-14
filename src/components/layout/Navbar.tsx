@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAccount, useBalance } from 'wagmi';
 import { Web3ConnectButton } from './Web3ConnectButton';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
@@ -24,19 +24,20 @@ export default function Navbar() {
 
     const router = useRouter();
     const pathname = usePathname();
-    const searchParams = useSearchParams();
 
     // Wait for hydration before using wagmi hooks
     useEffect(() => {
         setMounted(true);
     }, []);
 
-    // Sync search term with URL
+    // Sync search term with URL (read from window.location to avoid useSearchParams SSR requirement)
     useEffect(() => {
-        const search = searchParams?.get('search') || '';
+        if (!mounted) return;
+        const params = new URLSearchParams(window.location.search);
+        const search = params.get('search') || '';
         setSearchTerm(search);
         setDebouncedSearchTerm(search);
-    }, [searchParams]);
+    }, [mounted, pathname]);
 
     // Debounce search term (500ms delay)
     useEffect(() => {
@@ -50,7 +51,7 @@ export default function Navbar() {
     // Apply search when debounced term changes
     useEffect(() => {
         // Don't navigate if debounced term matches URL (prevents loop)
-        const currentUrlSearch = searchParams?.get('search') || '';
+        const currentUrlSearch = new URLSearchParams(window.location.search).get('search') || '';
         if (debouncedSearchTerm === currentUrlSearch) return;
 
         // Navigate to marketplace with search parameter
@@ -66,7 +67,7 @@ export default function Navbar() {
             // Update URL without navigation if already on marketplace
             router.replace(`/marketplace?${params.toString()}`, { scroll: false });
         }
-    }, [debouncedSearchTerm, pathname, router, searchParams]);
+    }, [debouncedSearchTerm, pathname, router]);
 
     const clearSearch = () => {
         setSearchTerm('');

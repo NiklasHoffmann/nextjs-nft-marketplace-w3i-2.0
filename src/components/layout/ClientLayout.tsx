@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { type ErrorInfo, Suspense } from "react";
+import React, { type ErrorInfo } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { NFTStatsProvider } from "@/contexts/nft-stats/NFTStatsContext";
@@ -44,7 +44,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {isAdminRoute ? <AdminNavbar /> : <Suspense fallback={null}><Navbar /></Suspense>}
+      {isAdminRoute ? <AdminNavbar /> : <Navbar />}
       
       {/* Real-time connection status indicator (bottom-right corner) */}
       {!isAdminRoute && <EventConnectionStatus />}
