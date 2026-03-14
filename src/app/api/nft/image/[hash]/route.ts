@@ -42,6 +42,7 @@ const gatewayStats = new Map<string, { hits: number; fails: number; avgTime: num
 const inFlightImageJobs = new Map<string, Promise<{
     buffer: Buffer;
     format: string;
+    contentType: string;
     originalSize: number;
     compressedSize: number;
 } | null>>();
@@ -60,6 +61,34 @@ interface CacheMetadata {
     }>;
     totalSize: number;
     lastCleanup: number;
+}
+
+type PreferredImageFormat = 'avif' | 'webp';
+
+function resolvePreferredFormat(request: NextRequest): PreferredImageFormat {
+    const accept = request.headers.get('accept') || '';
+    return accept.includes('image/avif') ? 'avif' : 'webp';
+}
+
+function formatToContentType(format: string, fallback: string = 'image/jpeg'): string {
+    if (format === 'avif') return 'image/avif';
+    if (format === 'webp') return 'image/webp';
+    if (format === 'png') return 'image/png';
+    if (format === 'jpeg' || format === 'jpg') return 'image/jpeg';
+    if (format === 'gif') return 'image/gif';
+    if (format === 'svg') return 'image/svg+xml';
+    return fallback;
+}
+
+function inferContentTypeFromHash(hash: string): string {
+    const lowered = hash.toLowerCase();
+    if (lowered.endsWith('.avif')) return 'image/avif';
+    if (lowered.endsWith('.webp')) return 'image/webp';
+    if (lowered.endsWith('.png')) return 'image/png';
+    if (lowered.endsWith('.gif')) return 'image/gif';
+    if (lowered.endsWith('.svg')) return 'image/svg+xml';
+    if (lowered.endsWith('.jpg') || lowered.endsWith('.jpeg')) return 'image/jpeg';
+    return 'image/jpeg';
 }
 
 // Ensure cache directory exists
@@ -192,7 +221,11 @@ async function checkAndCleanup(): Promise<void> {
 /**
  * Compress image using Sharp (WebP with fallback to AVIF)
  */
-async function compressImage(buffer: Buffer): Promise<{ buffer: Buffer; format: string; originalSize: number; compressedSize: number }> {
+async function compressImage(
+    buffer: Buffer,
+    preferredFormat: PreferredImageFormat,
+    sourceContentType: string
+): Promise<{ buffer: Buffer; format: string; contentType: string; originalSize: number; compressedSize: number }> {
     const originalSize = buffer.length;
     
     // Tiny files often get larger when re-encoded. Keep original to reduce CPU and latency.
@@ -200,16 +233,17 @@ async function compressImage(buffer: Buffer): Promise<{ buffer: Buffer; format: 
         return {
             buffer,
             format: 'original',
+            contentType: sourceContentType,
             originalSize,
             compressedSize: originalSize
         };
     }
 
     try {
-        // Try WebP compression (best compatibility + good compression)
-        const compressed = await sharp(buffer)
-            .webp({ quality: 82, effort: 2 }) // Faster cold-start compression
-            .toBuffer();
+        const transformer = sharp(buffer);
+        const compressed = preferredFormat === 'avif'
+            ? await transformer.avif({ quality: 52, effort: 4 }).toBuffer()
+            : await transformer.webp({ quality: 82, effort: 2 }).toBuffer();
         
         const compressedSize = compressed.length;
         const ratio = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
@@ -218,7 +252,8 @@ async function compressImage(buffer: Buffer): Promise<{ buffer: Buffer; format: 
         
         return {
             buffer: compressed,
-            format: 'webp',
+            format: preferredFormat,
+            contentType: formatToContentType(preferredFormat),
             originalSize,
             compressedSize
         };
@@ -227,6 +262,7 @@ async function compressImage(buffer: Buffer): Promise<{ buffer: Buffer; format: 
         return {
             buffer,
             format: 'original',
+            contentType: sourceContentType,
             originalSize,
             compressedSize: originalSize
         };
@@ -238,7 +274,7 @@ async function compressImage(buffer: Buffer): Promise<{ buffer: Buffer; format: 
  * Try multiple IPFS gateways until one works
  * Optimized with performance tracking and adaptive ordering
  */
-async function fetchFromIPFS(ipfsHash: string): Promise<Buffer | null> {
+async function fetchFromIPFS(ipfsHash: string): Promise<{ buffer: Buffer; contentType: string } | null> {
     // Sort gateways by performance (best first)
     const sortedGateways = [...IPFS_GATEWAYS].sort((a, b) => {
         const statsA = gatewayStats.get(a);
@@ -255,7 +291,7 @@ async function fetchFromIPFS(ipfsHash: string): Promise<Buffer | null> {
         return statsA.avgTime - statsB.avgTime;
     });
 
-    const fetchGateway = async (gateway: string, timeoutMs: number): Promise<Buffer | null> => {
+    const fetchGateway = async (gateway: string, timeoutMs: number): Promise<{ buffer: Buffer; contentType: string } | null> => {
         const startTime = Date.now();
 
         try {
@@ -266,7 +302,7 @@ async function fetchFromIPFS(ipfsHash: string): Promise<Buffer | null> {
                 signal: controller.signal,
                 headers: {
                     'User-Agent': 'W3I-NFT-Marketplace/1.0',
-                    'Accept': 'image/webp,image/png,image/jpeg,image/*;q=0.8' // Prefer WebP
+                    'Accept': 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8'
                 }
             });
 
@@ -279,7 +315,11 @@ async function fetchFromIPFS(ipfsHash: string): Promise<Buffer | null> {
                 // Update gateway stats
                 updateGatewayStats(gateway, true, fetchTime);
 
-                return Buffer.from(arrayBuffer);
+                const contentType = response.headers.get('content-type') || inferContentTypeFromHash(ipfsHash);
+                return {
+                    buffer: Buffer.from(arrayBuffer),
+                    contentType,
+                };
             }
 
             // Update stats for failed response
@@ -351,7 +391,10 @@ export async function GET(
 ) {
     const { hash: ipfsHash } = await params;
     const safeCacheKey = encodeURIComponent(ipfsHash);
-    const cacheFileName = `${safeCacheKey}.webp`;
+    const preferredFormat = resolvePreferredFormat(request);
+    const cacheFileName = `${safeCacheKey}.${preferredFormat}`;
+    const alternateFormat: PreferredImageFormat = preferredFormat === 'avif' ? 'webp' : 'avif';
+    const alternateCacheFileName = `${safeCacheKey}.${alternateFormat}`;
 
     if (!ipfsHash || ipfsHash.length < 10) {
         return NextResponse.json({
@@ -362,30 +405,40 @@ export async function GET(
 
     await ensureCacheDir();
 
-    // Check if already cached (with .webp extension for compressed files)
+    // Check if already cached (format-specific files)
     const cachedPath = path.join(CACHE_DIR, cacheFileName);
+    const alternateCachedPath = path.join(CACHE_DIR, alternateCacheFileName);
     const legacyCachedPath = path.join(CACHE_DIR, ipfsHash); // Old format without extension
 
     try {
         // Try new compressed format first
         let cached: Buffer;
-        let format = 'webp';
+        let format: string = preferredFormat;
         let cachePath = cachedPath;
         
         try {
             cached = await fs.readFile(cachedPath);
         } catch {
-            // Fallback to legacy format
-            cached = await fs.readFile(legacyCachedPath);
-            format = 'legacy';
-            cachePath = legacyCachedPath;
+            try {
+                // Fallback to alternate modern format
+                cached = await fs.readFile(alternateCachedPath);
+                format = alternateFormat;
+                cachePath = alternateCachedPath;
+            } catch {
+                // Fallback to legacy format
+                cached = await fs.readFile(legacyCachedPath);
+                format = 'legacy';
+                cachePath = legacyCachedPath;
+            }
         }
         
         // Update access stats in-memory only — no disk I/O on the hot path
         touchFileAccess(path.basename(cachePath), cached.length, format);
 
         // Determine content type
-        const contentType = format === 'webp' ? 'image/webp' : 'image/png';
+        const contentType = format === 'legacy'
+            ? inferContentTypeFromHash(ipfsHash)
+            : formatToContentType(format);
 
         return new NextResponse(new Uint8Array(cached), {
             headers: {
@@ -407,14 +460,14 @@ export async function GET(
 
     const runImageJob = async () => {
         // Download from IPFS
-        const imageBuffer = await fetchFromIPFS(ipfsHash);
+        const sourceImage = await fetchFromIPFS(ipfsHash);
 
-        if (!imageBuffer) {
+        if (!sourceImage) {
             return null;
         }
 
         // Compress the image
-        const result = await compressImage(imageBuffer);
+        const result = await compressImage(sourceImage.buffer, preferredFormat, sourceImage.contentType);
 
         // Save compressed version to cache (fire-and-forget metadata updates)
         try {
@@ -427,7 +480,15 @@ export async function GET(
                     size: result.compressedSize,
                     originalSize: result.originalSize,
                     compressionRatio: ((result.originalSize - result.compressedSize) / result.originalSize * 100),
-                    format: result.format as any,
+                    format: result.format === 'original'
+                        ? (sourceImage.contentType.includes('png')
+                            ? 'png'
+                            : sourceImage.contentType.includes('gif')
+                                ? 'gif'
+                                : sourceImage.contentType.includes('svg')
+                                    ? 'svg'
+                                    : 'jpeg')
+                        : result.format as any,
                     accessCount: 1,
                     lastAccess: Date.now(),
                     created: Date.now()
@@ -462,16 +523,17 @@ export async function GET(
         }, { status: 502 });
     }
 
-    const { buffer: compressedBuffer, format, originalSize, compressedSize } = imageResult;
+    const { buffer: compressedBuffer, format, contentType, originalSize, compressedSize } = imageResult;
 
     // Return compressed image
     return new NextResponse(new Uint8Array(compressedBuffer), {
         headers: {
-            'Content-Type': format === 'webp' ? 'image/webp' : 'image/png',
+            'Content-Type': contentType,
             'Cache-Control': 'public, max-age=31536000, immutable',
             'CDN-Cache-Control': 'public, max-age=31536000',
             'Vercel-CDN-Cache-Control': 'public, max-age=31536000',
             'X-Cache-Status': 'MISS',
+            'X-Cache-Format': format,
             'X-Compression-Ratio': `${((originalSize - compressedSize) / originalSize * 100).toFixed(1)}%`,
             'X-Original-Size': originalSize.toString(),
             'X-Compressed-Size': compressedSize.toString(),
@@ -557,6 +619,7 @@ export async function DELETE(
 
         // Delete specific image
         const webpPath = path.join(CACHE_DIR, `${safeCacheKey}.webp`);
+        const avifPath = path.join(CACHE_DIR, `${safeCacheKey}.avif`);
         const legacyPath = path.join(CACHE_DIR, ipfsHash);
 
         try {
@@ -564,15 +627,22 @@ export async function DELETE(
             let size = 0;
             
             try {
-                const stats = await fs.stat(webpPath);
+                const stats = await fs.stat(avifPath);
                 size = stats.size;
-                await fs.unlink(webpPath);
-                deletedPath = webpPath;
+                await fs.unlink(avifPath);
+                deletedPath = avifPath;
             } catch {
-                const stats = await fs.stat(legacyPath);
-                size = stats.size;
-                await fs.unlink(legacyPath);
-                deletedPath = legacyPath;
+                try {
+                    const stats = await fs.stat(webpPath);
+                    size = stats.size;
+                    await fs.unlink(webpPath);
+                    deletedPath = webpPath;
+                } catch {
+                    const stats = await fs.stat(legacyPath);
+                    size = stats.size;
+                    await fs.unlink(legacyPath);
+                    deletedPath = legacyPath;
+                }
             }
             
             // Update metadata
