@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { useChainId } from 'wagmi';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { formatCardCurrencyAmount } from '@/utils';
+
+const DEFAULT_CHAIN_ID = Number.parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || '11155111', 10);
 
 const getEffectiveDecimals = (rawValue: number, tokenDecimals: number): number => {
     if (!Number.isFinite(rawValue) || rawValue <= 0 || tokenDecimals >= 18) {
@@ -54,13 +55,12 @@ export const CollectionPriceDisplay = React.memo(({
     hasERC721 = false,
     hasERC1155 = false,
 }: CollectionPriceDisplayProps) => {
-    const chainId = useChainId();
     const { convertTokenToUSD, convertFromUSD, convertUSDToETH, formatPrice } = useCurrency();
     const [convertedHeadline, setConvertedHeadline] = useState<string>('');
     const [secondaryValueLabel, setSecondaryValueLabel] = useState<string>('');
     const [loading, setLoading] = useState(false);
 
-    const effectiveChainId = chainId || 11155111;
+    const effectiveChainId = Number.isFinite(DEFAULT_CHAIN_ID) ? DEFAULT_CHAIN_ID : 11155111;
     const valueCurrency = totalValueCurrency || '0x0000000000000000000000000000000000000000';
     const floorCurrency = floorPriceCurrency || valueCurrency;
 
