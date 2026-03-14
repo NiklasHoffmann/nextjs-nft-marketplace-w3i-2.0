@@ -27,34 +27,27 @@ export function AdminGuard({
     const router = useRouter();
     const { signMessageAsync } = useSignMessage();
 
-    const [isChecking, setIsChecking] = useState(true);
-    const [isAuthorized, setIsAuthorized] = useState(false);
+    // If no admin check is required (APP_LOCK_ENABLED=false and requireAdmin=false),
+    // skip the check entirely — no spinner, immediate render.
+    const needsAdmin = APP_LOCK_ENABLED || requireAdmin;
+    const [isChecking, setIsChecking] = useState(needsAdmin);
+    const [isAuthorized, setIsAuthorized] = useState(!needsAdmin);
     const [isSigning, setIsSigning] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Prüfe Session beim Mount und bei Adress-Änderung
     useEffect(() => {
-        checkSession();
+        if (needsAdmin) checkSession();
     }, [address, isConnected]);
 
     /**
      * Prüft ob eine gültige Admin-Session existiert
      */
     const checkSession = async () => {
-        setIsChecking(true);
         setError(null);
+        setIsChecking(true);
 
         try {
-            // Wenn App-Sperre aktiv ODER spezifisch Admin erforderlich
-            const needsAdmin = APP_LOCK_ENABLED || requireAdmin;
-
-            if (!needsAdmin) {
-                // Kein Admin erforderlich
-                setIsAuthorized(true);
-                setIsChecking(false);
-                return;
-            }
-
             // Wallet muss verbunden sein
             if (!isConnected || !address) {
                 setIsAuthorized(false);

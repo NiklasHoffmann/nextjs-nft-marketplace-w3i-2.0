@@ -8,11 +8,8 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { ReactNode, useState, useEffect } from 'react'
 import { ApolloProvider } from '@apollo/client'
 import apolloClient from '@/config/apolloClient'
-import { LoadingState } from '@/components/core/Loading';
 
 export default function Web3Provider({ children }: { children: ReactNode }) {
-    const [mounted, setMounted] = useState(false)
-
     // React Query: optimized for Web3 operations
     const [queryClient] = useState(
         () =>
@@ -33,20 +30,6 @@ export default function Web3Provider({ children }: { children: ReactNode }) {
             })
     );
 
-    // Prevent hydration errors
-    useEffect(() => {
-        setMounted(true)
-    }, [])
-
-    // Zeige einen Loader während der Hydration
-    if (!mounted) {
-        return (
-            <div className="min-h-screen bg-white">
-                <LoadingState size="xl" variant="centered" className="h-screen" />
-            </div>
-        )
-    }
-
     return (
         <WagmiProvider config={wagmiConfig}>
             <QueryClientProvider client={queryClient}>
@@ -62,7 +45,11 @@ export default function Web3Provider({ children }: { children: ReactNode }) {
 
 function WalletAwareRainbowKit({ children }: { children: ReactNode }) {
     const { isConnected } = useAccount();
-    const initialChain = isConnected ? undefined : wagmiConfig.chains[0];
+    // mounted guards initialChain to avoid SSR/hydration mismatch on the prop only
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
+
+    const initialChain = mounted && isConnected ? undefined : wagmiConfig.chains[0];
 
     return (
         <RainbowKitProvider
