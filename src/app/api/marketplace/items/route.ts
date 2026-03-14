@@ -108,6 +108,13 @@ import '@/lib/dev-services-auto-start';
 
 export const GET = apiHandler(async (request: NextRequest) => {
     const startTime = Date.now();
+    const timings: Record<string, number> = {
+        cacheLookupMs: 0,
+        dbConnectMs: 0,
+        itemsAggregationMs: 0,
+        totalCountMs: 0,
+        filterOptionsMs: 0,
+    };
     const { searchParams } = new URL(request.url);
 
     // Parse pagination
@@ -164,15 +171,25 @@ export const GET = apiHandler(async (request: NextRequest) => {
         includeFilters;
 
     if (isDefaultBrowseQuery) {
+        const cacheLookupStart = Date.now();
         const cachedResponse = await getSharedCacheValue<MarketplaceItemsResponse['data']>(MARKETPLACE_DEFAULT_RESPONSE_CACHE_KEY);
+        timings.cacheLookupMs = Date.now() - cacheLookupStart;
         if (cachedResponse) {
             const cachedApiResponse = apiSuccess({
                 ...cachedResponse,
                 cached: true,
                 timestamp: Date.now(),
             });
+            const totalDuration = Date.now() - startTime;
+            const timingHeader = [
+                `total=${totalDuration}`,
+                `cacheLookup=${timings.cacheLookupMs}`,
+            ].join(',');
+
+            devLog.info(`⚡ Marketplace cache HIT in ${totalDuration}ms (lookup ${timings.cacheLookupMs}ms)`);
             cachedApiResponse.headers.set('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30');
             cachedApiResponse.headers.set('X-API-Cache', 'HIT');
+            cachedApiResponse.headers.set('X-API-Timing', timingHeader);
             return cachedApiResponse;
         }
     }
@@ -207,9 +224,10 @@ export const GET = apiHandler(async (request: NextRequest) => {
     // because price is stored as string but needs numeric comparison
 
     // Get database and collections
+    const dbConnectStart = Date.now();
     const db = await getDatabase();
+    timings.dbConnectMs = Date.now() - dbConnectStart;
     const collection = db.collection('marketplace_items');
-    const metadataCollection = db.collection('nft_metadata');
 
     // Build aggregation pipeline
     const pipeline: any[] = [
@@ -658,8 +676,15 @@ export const GET = apiHandler(async (request: NextRequest) => {
         }
     });
 
-    const items = await collection.aggregate(pipeline).toArray();
-    const total = await collection.countDocuments(query);
+    const itemsAggregationStart = Date.now();
+    const itemsPromise = collection.aggregate(pipeline).toArray();
+
+    const totalCountStart = Date.now();
+    const totalPromise = collection.countDocuments(query);
+
+    const [items, total] = await Promise.all([itemsPromise, totalPromise]);
+    timings.itemsAggregationMs = Date.now() - itemsAggregationStart;
+    timings.totalCountMs = Date.now() - totalCountStart;
 
     // Debug: Count items with/without insights
     const withInsights = items.filter((item: any) => item.insights).length;
@@ -711,7 +736,9 @@ export const GET = apiHandler(async (request: NextRequest) => {
     let priceMax = '0';
 
     if (includeFilters) {
+        const filterOptionsStart = Date.now();
         const filterOptions = await getMarketplaceFilterOptionsCached(db);
+        timings.filterOptionsMs = Date.now() - filterOptionsStart;
         categories = filterOptions.categories;
         rarities = filterOptions.rarities;
         priceMin = filterOptions.priceMin;
@@ -768,10 +795,23 @@ export const GET = apiHandler(async (request: NextRequest) => {
     }
 
     const duration = Date.now() - startTime;
-    devLog.info(`✅ Marketplace query completed in ${duration}ms (${total} total, ${items.length} returned)`);
+    devLog.info(
+        `✅ Marketplace query completed in ${duration}ms (${total} total, ${items.length} returned) ` +
+        `[db:${timings.dbConnectMs}ms agg:${timings.itemsAggregationMs}ms count:${timings.totalCountMs}ms filters:${timings.filterOptionsMs}ms cacheLookup:${timings.cacheLookupMs}ms]`
+    );
+
+    const timingHeader = [
+        `total=${duration}`,
+        `dbConnect=${timings.dbConnectMs}`,
+        `aggregation=${timings.itemsAggregationMs}`,
+        `count=${timings.totalCountMs}`,
+        `filterOptions=${timings.filterOptionsMs}`,
+        `cacheLookup=${timings.cacheLookupMs}`,
+    ].join(',');
 
     const apiResponse = apiSuccess(response);
     apiResponse.headers.set('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30');
     apiResponse.headers.set('X-API-Cache', 'MISS');
+    apiResponse.headers.set('X-API-Timing', timingHeader);
     return apiResponse;
 });
