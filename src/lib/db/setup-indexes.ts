@@ -83,6 +83,33 @@ export async function setupMongoDBIndexes() {
         );
         devLog.info('  ✅ marketplace_items: chain_id index');
 
+        // Hot-path index for default marketplace query (isListed + listingId existence)
+        await marketplaceItems.createIndex(
+            { isListed: 1, listingId: 1, createdAt: -1 },
+            { name: 'listed_hotpath', background: true }
+        );
+        devLog.info('  ✅ marketplace_items: listed_hotpath index');
+
+        // Optional filter acceleration for common seller/token standard use-cases
+        await marketplaceItems.createIndex(
+            { isListed: 1, seller: 1, tokenStandard: 1 },
+            { name: 'listed_seller_standard', background: true }
+        );
+        devLog.info('  ✅ marketplace_items: listed_seller_standard index');
+
+        // Contract filter fallback fields used in OR queries
+        await marketplaceItems.createIndex(
+            { nftAddress: 1 },
+            { name: 'nft_address_lookup', background: true }
+        );
+        devLog.info('  ✅ marketplace_items: nft_address_lookup index');
+
+        await marketplaceItems.createIndex(
+            { tokenAddress: 1 },
+            { name: 'token_address_lookup', background: true }
+        );
+        devLog.info('  ✅ marketplace_items: token_address_lookup index');
+
         // ============================================
         // nft_stats collection
         // ============================================

@@ -19,6 +19,28 @@ interface InitializeBackgroundServicesOptions {
 }
 
 /**
+ * Prewarm marketplace API response cache so first user navigation to /marketplace
+ * doesn't pay the full cold aggregation cost.
+ */
+async function prewarmMarketplaceApi(): Promise<void> {
+    try {
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+            || `http://localhost:${process.env.PORT || 3000}`;
+
+        const warmupUrl = `${baseUrl}/api/marketplace/items?page=1&limit=20&sortBy=price&sortOrder=desc&includeFilters=true`;
+        const response = await fetch(warmupUrl, { cache: 'no-store' });
+
+        if (response.ok) {
+            devLog.info('🏪 [MarketplacePrewarm] API cache primed successfully');
+        } else {
+            devLog.warn(`🏪 [MarketplacePrewarm] Warmup returned ${response.status}`);
+        }
+    } catch (error) {
+        devLog.warn('🏪 [MarketplacePrewarm] Failed (non-fatal):', error);
+    }
+}
+
+/**
  * Prewarm image cache: download and compress all marketplace NFT images from IPFS
  * so the first user to view each image gets a fast response from disk instead of
  * waiting 3-8 seconds for an IPFS fetch.
@@ -132,6 +154,21 @@ export async function initializeBackgroundServices(options: InitializeBackground
             await syncService.start();
 
             devLog.info('✅ Background services initialized successfully');
+
+            // Ensure performance-critical MongoDB indexes exist (non-blocking)
+            setTimeout(async () => {
+                try {
+                    const { setupMongoDBIndexes } = await import('@/lib/db/setup-indexes');
+                    await setupMongoDBIndexes();
+                } catch (e) {
+                    devLog.warn('⚠️ [MongoDB] Background index setup failed (non-fatal):', e);
+                }
+            }, 2_000);
+
+            // Prewarm marketplace API cache in background.
+            setTimeout(() => {
+                prewarmMarketplaceApi().catch(e => devLog.warn('MarketplacePrewarm error:', e));
+            }, 6_000);
 
             // After sync service is up, prewarm image cache in background (fire-and-forget)
             // Delay by 10s to avoid competing with the initial sync for network bandwidth
