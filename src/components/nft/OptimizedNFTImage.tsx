@@ -167,27 +167,21 @@ const extractIPFSInfo = (url: string): { hash: string; path: string } | null => 
     return null;
 };
 
-// Convert IPFS URLs to use our server-side cache first, then fallback to gateways
+// Convert IPFS URLs to use our server-side proxy/cache only.
+// Public gateway fallbacks in the browser caused inconsistent quality/latency.
 const optimizeImageUrl = (url: string): string[] => {
     if (!url) return [];
 
     // Extract IPFS hash and path
     const ipfsInfo = extractIPFSInfo(url);
 
-    // If it's an IPFS URL, use our server cache first!
+    // If it's an IPFS URL, always use our server cache route.
     if (ipfsInfo) {
         const { hash, path: ipfsPath } = ipfsInfo;
         const fullHash = ipfsPath ? `${hash}/${ipfsPath}` : hash;
 
-        // Priority order:
-        // 1. Our server-side cache (shared between all users!)
-        // 2. Cloudflare IPFS (fastest public gateway)
-        // 3. Other gateways as fallback
         return [
-            `/api/nft/image/${encodeURIComponent(fullHash)}`, // Server cache - shared!
-            `https://cloudflare-ipfs.com/ipfs/${fullHash}`,   // Fast CDN fallback
-            `https://gateway.pinata.cloud/ipfs/${fullHash}`,  // Reliable fallback
-            `https://dweb.link/ipfs/${fullHash}`              // Last resort
+            `/api/nft/image/${encodeURIComponent(fullHash)}` // Server cache + server-side gateway fallback
         ];
     }
 

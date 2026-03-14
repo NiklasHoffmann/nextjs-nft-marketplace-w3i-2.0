@@ -22,7 +22,7 @@ import { devLog } from '@/utils';
 
 const CACHE_DIR = path.join(process.cwd(), 'public', 'cached-nft-images');
 const METADATA_FILE = path.join(CACHE_DIR, '.cache-metadata.json');
-const IMAGE_CACHE_VERSION = 'v2';
+const IMAGE_CACHE_VERSION = 'v3';
 
 // Cache Configuration
 const MAX_CACHE_SIZE_MB = 500; // 500 MB maximum cache size
@@ -232,6 +232,19 @@ async function compressImage(
     sourceContentType: string
 ): Promise<{ buffer: Buffer; format: string; contentType: string; originalSize: number; compressedSize: number }> {
     const originalSize = buffer.length;
+    const normalizedSourceType = sourceContentType.toLowerCase();
+
+    // Never re-encode vector/animated formats in this path.
+    // Re-encoding GIF/SVG can degrade rendering or break animation behavior.
+    if (normalizedSourceType.includes('image/gif') || normalizedSourceType.includes('image/svg+xml')) {
+        return {
+            buffer,
+            format: 'original',
+            contentType: sourceContentType,
+            originalSize,
+            compressedSize: originalSize
+        };
+    }
     
     // Tiny files often get larger when re-encoded. Keep original to reduce CPU and latency.
     if (originalSize < 48 * 1024) {
@@ -249,6 +262,7 @@ async function compressImage(
         const metadata = await image.metadata();
         const width = metadata.width || 0;
         const height = metadata.height || 0;
+        const hasAlpha = Boolean(metadata.hasAlpha);
         const pixelCount = width * height;
         const isLargeHighResImage = pixelCount >= 8_000_000 || originalSize >= 5 * 1024 * 1024;
 
@@ -260,7 +274,11 @@ async function compressImage(
 
         const compressed = targetFormat === 'avif'
             ? await image.avif({ quality: 68, effort: 5, chromaSubsampling: '4:4:4' }).toBuffer()
-            : await image.webp({ quality: isLargeHighResImage ? 90 : 86, effort: 3, smartSubsample: true }).toBuffer();
+            : await image.webp(
+                hasAlpha
+                    ? { lossless: true, effort: 4 }
+                    : { quality: isLargeHighResImage ? 90 : 86, effort: 3, smartSubsample: true }
+            ).toBuffer();
         
         const compressedSize = compressed.length;
         const ratio = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
