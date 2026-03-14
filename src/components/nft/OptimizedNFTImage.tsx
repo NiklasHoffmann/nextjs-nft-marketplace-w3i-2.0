@@ -131,6 +131,9 @@ class ImageCache {
 
 const imageLoadCache = new ImageCache();
 
+// Matches bare IPFS CIDs: CIDv0 (Qm..., 46 chars) and CIDv1 (bafy..., bafk..., etc.)
+const BARE_CID_REGEX = /^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{58,})(\/.*)?$/;
+
 // Extract IPFS hash from various URL formats (including path after hash)
 const extractIPFSInfo = (url: string): { hash: string; path: string } | null => {
     if (!url) return null;
@@ -151,6 +154,14 @@ const extractIPFSInfo = (url: string): { hash: string; path: string } | null => 
         const hash = parts[0];
         const path = parts.slice(1).join('/');
         return hash ? { hash, path } : null;
+    }
+
+    // Bare CID (no protocol prefix) — e.g. "QmTKHm7x..." or "bafybei..."
+    const bareMatch = BARE_CID_REGEX.exec(url);
+    if (bareMatch) {
+        const hash = bareMatch[1]!;
+        const path = bareMatch[2] ? bareMatch[2].slice(1) : ''; // strip leading /
+        return { hash, path };
     }
 
     return null;
@@ -185,8 +196,9 @@ const optimizeImageUrl = (url: string): string[] => {
         return [url];
     }
 
-    // Fallback to original URL
-    return [url];
+    // Relative path or unknown format — not a valid standalone URL, return empty
+    // (avoids browser treating bare filenames like "Image4.jpg" as hostnames)
+    return [];
 };
 
 const selectInitialImageIndex = (urls: string[]): number => {
@@ -239,8 +251,8 @@ const OptimizedNFTImage = memo(({
     const initialFallbackIndex = useMemo(() => selectInitialImageIndex(imageUrls), [imageUrls]);
 
     const [isLoading, setIsLoading] = useState(!isCachedInitially); // Start as loaded if cached!
-    const [hasError, setHasError] = useState(false);
-    const [currentImageUrl, setCurrentImageUrl] = useState(() => imageUrls[initialFallbackIndex] || normalizedImageUrl);
+    const [hasError, setHasError] = useState(imageUrls.length === 0); // Immediately error if no valid URL
+    const [currentImageUrl, setCurrentImageUrl] = useState(() => imageUrls[initialFallbackIndex] || '');
     const [fallbackIndex, setFallbackIndex] = useState(initialFallbackIndex);
     const [aspectRatio, setAspectRatio] = useState<number | null>(null);
     const [isIntersecting, setIsIntersecting] = useState(priority || isCachedInitially);
@@ -302,6 +314,14 @@ const OptimizedNFTImage = memo(({
     // Update current image URL when imageUrl prop changes - OPTIMIZED FOR CACHE
     useEffect(() => {
         const newUrls = optimizeImageUrl(normalizedImageUrl);
+
+        if (newUrls.length === 0) {
+            setCurrentImageUrl('');
+            setHasError(true);
+            setIsLoading(false);
+            return;
+        }
+
         const nextIndex = selectInitialImageIndex(newUrls);
         const selectedUrl = newUrls[nextIndex];
         const isCached = selectedUrl && imageLoadCache.get(selectedUrl) === true;
