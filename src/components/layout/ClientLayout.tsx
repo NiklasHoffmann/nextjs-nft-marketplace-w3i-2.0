@@ -11,6 +11,7 @@ import { CollectionsProvider } from "@/contexts/collections";
 import { CartProvider } from "@/contexts/CartContext";
 import { NotificationProvider, NotificationContainer } from "@/contexts/notifications";
 import { AdminGuard } from "@/components/auth";
+import { APP_LOCK_ENABLED } from '@/config/admin';
 import { MarketplaceEventsProvider, EventConnectionStatus } from "@/providers/MarketplaceEventsProvider";
 import AdminNavbar from '@/app/admin/components/AdminNavbar';
 import Web3Provider from './Web3Provider';
@@ -62,6 +63,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const isDevelopment = process.env.NODE_ENV === 'development';
   const pathname = usePathname() || '';
   const isBrowseRoute = pathname.startsWith('/marketplace') || pathname.startsWith('/collection/');
+  const isAdminRoute = pathname.startsWith('/admin');
+  const needsAdminGuard = APP_LOCK_ENABLED || isAdminRoute;
 
   const needsWalletNFTs =
     pathname.startsWith('/sell') ||
@@ -78,16 +81,18 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     pathname.startsWith('/nft/') ||
     pathname.startsWith('/sell');
 
-  const content = (
+  const innerContent = (
     <CurrencyProvider>
       <CartProvider>
-        <AdminGuard>
-          <LayoutContent>{children}</LayoutContent>
-          <NotificationContainer />
-        </AdminGuard>
+        <LayoutContent>{children}</LayoutContent>
+        <NotificationContainer />
       </CartProvider>
     </CurrencyProvider>
   );
+
+  const content = needsAdminGuard
+    ? <AdminGuard>{innerContent}</AdminGuard>
+    : innerContent;
 
   const withCollections = needsCollections
     ? <CollectionsProvider>{content}</CollectionsProvider>

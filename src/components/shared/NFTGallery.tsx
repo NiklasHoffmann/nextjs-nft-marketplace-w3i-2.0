@@ -6,8 +6,7 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { LazyNFTCard } from '@/components/nft'
-import { BaseCard } from '@/components/core/Card/BaseCard'
+import { LazyNFTCard, NFTCardSkeleton } from '@/components/nft'
 import { ScrollButtons } from '@/components/ui/ScrollButtons'
 import { EmptyState } from '@/components/core/Empty'
 import type { NFTScrollItem, NFTScrollListProps } from '@/types/marketplace'
@@ -190,33 +189,7 @@ export function NFTGallery({
                 <div className={`flex ${gap} ${padding} pl-8 overflow-hidden`}>
                     {Array.from({ length: loadingCount }).map((_, i) => (
                         <div key={i} className={`flex-shrink-0 ${cardWidth}`}>
-                            {/* Match NFTCard's exact structure - h-72, border, rounded-lg outer container */}
-                            <div className="w-full h-72 rounded-lg shadow-xl border border-black bg-gray-200 relative">
-                                {/* Inner content container with inset-2 (matches NFTCard structure) */}
-                                <div className="absolute inset-2 shadow-lg rounded-md overflow-hidden bg-white">
-                                    <div className="w-full h-full p-1 flex flex-col gap-1 animate-pulse">
-                                        {/* Header placeholder */}
-                                        <div className="flex-shrink-0 h-8">
-                                            <div className="h-3 bg-gray-200 rounded w-2/3 mb-1" />
-                                            <div className="h-2 bg-gray-200 rounded w-1/2" />
-                                        </div>
-
-                                        {/* Image/Description area */}
-                                        <div className="flex-1 min-h-0 bg-gray-200 rounded-md" />
-
-                                        {/* Footer placeholder */}
-                                        <div className="flex-shrink-0 h-6 flex gap-1">
-                                            <div className="h-5 bg-gray-200 rounded w-16" />
-                                            <div className="h-5 bg-gray-200 rounded w-12" />
-                                        </div>
-
-                                        {/* Price placeholder */}
-                                        <div className="flex-shrink-0 h-8">
-                                            <div className="h-6 bg-gray-200 rounded w-24" />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <NFTCardSkeleton />
                         </div>
                     ))}
                 </div>

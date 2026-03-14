@@ -25,7 +25,6 @@ import { useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
 import { devLog } from '@/utils';
 import type { AggregatedNFT } from '@/types/core/core-nft-modern';
 import OptimizedNFTImage from './OptimizedNFTImage';
-import { BaseCard } from '@/components/core/Card/BaseCard';
 import { useCardTilt } from '@/hooks';
 import { NFTCardHeader } from './NFTCard/NFTCardHeader';
 import { NFTCardImage } from './NFTCard/NFTCardImage';
@@ -179,6 +178,56 @@ function buildLegacyAggregatedNFT(props: LegacyNFTCardProps): AggregatedNFT {
     lastUpdated: Date.now()
   };
 }
+
+// ===== SKELETON =====
+
+export const NFTCardSkeleton = memo(({ className = '' }: { className?: string }) => (
+    <div className={`group cursor-pointer transform-gpu ${className}`}>
+        <div className="rounded-lg shadow-xl flex flex-col gap-2 w-full h-72 relative border border-black overflow-hidden">
+            <div className="absolute inset-2 shadow-lg rounded-md overflow-hidden flex flex-col h-[calc(100%-16px)] bg-gray-100">
+                <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 animate-pulse" />
+                <div className="relative z-10 flex flex-col h-full p-1 gap-1">
+                    {/* Header: symbol + name + rating badge */}
+                    <div className="flex-shrink-0 bg-white/95 rounded-md p-2 border border-gray-200/60 shadow-xl ring-1 ring-gray-300/20">
+                        <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                                <div className="h-3 bg-gray-200 rounded w-2/3 mb-1" />
+                                <div className="h-2.5 bg-gray-200 rounded w-1/2" />
+                            </div>
+                            <div className="ml-2 h-6 w-10 bg-gray-200 rounded-md flex-shrink-0" />
+                        </div>
+                    </div>
+                    {/* Image area */}
+                    <div className="flex-1 min-h-0 grid grid-cols-2 gap-1">
+                        <div className="bg-white/85 rounded-md border border-gray-200/70 animate-pulse" />
+                        <div className="bg-white/85 rounded-md border border-gray-200/70 animate-pulse" />
+                    </div>
+                    {/* Footer: category badge left + heart badge right */}
+                    <div className="flex-shrink-0 flex items-center gap-1">
+                        <div className="h-6 bg-white/95 rounded-md border border-gray-200/60 ring-1 ring-gray-300/20 px-2 flex items-center w-16">
+                            <div className="h-2.5 bg-gray-300 rounded w-full" />
+                        </div>
+                        <div className="flex-1" />
+                        <div className="h-6 bg-white/95 rounded-md border border-gray-200/60 ring-1 ring-gray-300/20 px-2 flex items-center gap-1">
+                            <div className="h-3 w-3 rounded-full bg-red-200 flex-shrink-0" />
+                            <div className="h-2.5 bg-gray-300 rounded w-4" />
+                        </div>
+                    </div>
+                    {/* Price area with listing/standard badges */}
+                    <div className="flex-shrink-0 flex flex-col gap-1">
+                      <div className="flex items-center gap-1">
+                        <div className="h-5 bg-white/95 rounded-md border border-gray-200/60 ring-1 ring-gray-300/20 px-2 w-14" />
+                        <div className="h-5 bg-white/95 rounded-md border border-gray-200/60 ring-1 ring-gray-300/20 px-2 w-16" />
+                        <div className="h-5 bg-white/95 rounded-md border border-gray-200/60 ring-1 ring-gray-300/20 px-2 w-12 ml-auto" />
+                      </div>
+                      <div className="h-7 bg-gray-200 rounded w-28" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+));
+NFTCardSkeleton.displayName = 'NFTCardSkeleton';
 
 // ===== HELPER FUNCTIONS =====
 
@@ -349,9 +398,7 @@ export function NFTCard(props: NFTCardAllProps) {
 
   // ===== LOADING STATE =====
 
-  if (statsLoading && !stats) {
-    return <BaseCard loading={true} size="md" className={className} />;
-  }
+  // Stats are secondary — render the card immediately and let stats fill in when ready.
 
   // ===== RENDER =====
 
@@ -365,7 +412,7 @@ export function NFTCard(props: NFTCardAllProps) {
     >
       <div className={`hover:shadow-[0_15px_30px_-8px_rgba(0,0,0,0.4)] hover:scale-[1.02] transition-all duration-300 ease-out rounded-lg shadow-xl flex flex-col flex-end gap-2 w-full h-72 relative will-change-transform origin-center border border-black ${rarityBg}`}>
         {/* Content container */}
-        <div className={`absolute inset-2 shadow-lg rounded-md overflow-hidden flex flex-col h-[calc(100%-16px)] ${imageUrl ? 'bg-secondary' : 'bg-gray-100'}`}>
+        <div className="absolute inset-2 shadow-lg rounded-md overflow-hidden flex flex-col h-[calc(100%-16px)] bg-gray-100">
 
           {/* Blurred Background Image */}
           {imageUrl && (

@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { lazy, Suspense, memo } from 'react';
-import { BaseCard } from '@/components/core/Card/BaseCard';
+import { NFTCardSkeleton } from './NFTCard';
 
 // Lazy load NFTCard component for better code splitting
 const NFTCard = lazy(() => import('./NFTCard'));
@@ -71,7 +71,7 @@ interface LazyNFTCardProps {
  */
 const LazyNFTCard = memo((props: LazyNFTCardProps) => {
   return (
-    <Suspense fallback={<BaseCard loading={true} size="md" className={props.className} />}>
+    <Suspense fallback={<NFTCardSkeleton className={props.className} />}>
       <NFTCard {...props} />
     </Suspense>
   );

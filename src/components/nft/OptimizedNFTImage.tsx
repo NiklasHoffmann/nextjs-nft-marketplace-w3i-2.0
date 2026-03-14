@@ -561,7 +561,18 @@ const OptimizedNFTImage = memo(({
                 <div
                     className={`absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 animate-pulse`}
                     style={fill ? {} : { width, height }}
-                />
+                >
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="rounded-md bg-white/75 px-2 py-1 shadow-sm backdrop-blur-sm flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-gray-400 animate-pulse" />
+                            <span className="h-2 w-2 rounded-full bg-gray-400 animate-pulse [animation-delay:120ms]" />
+                            <span className="h-2 w-2 rounded-full bg-gray-400 animate-pulse [animation-delay:240ms]" />
+                        </div>
+                    </div>
+                    <div className="absolute bottom-0 left-0 h-0.5 w-full bg-gray-200/80 overflow-hidden">
+                        <div className="h-full w-1/3 bg-gray-400/80 animate-[shimmer_1.6s_infinite]" />
+                    </div>
+                </div>
             )}
             {/* Debug info for development */}
             {process.env.NODE_ENV === 'development' && fallbackIndex > 0 && (

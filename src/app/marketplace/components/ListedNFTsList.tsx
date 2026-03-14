@@ -507,6 +507,14 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
                                 )}
                             </div>
                         )}
+
+                    {/* Inline loading status for filter/sort refresh cycles */}
+                    {loading && !isInitialLoad && (
+                        <div className="mt-3 inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm text-blue-700">
+                            <SpinnerIcon className="h-4 w-4 animate-spin" />
+                            <span className="font-medium">Updating listings...</span>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -545,6 +553,16 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
                     emptyMessage="No active listings found"
                     enableViewAll={true}
                 />
+
+                {/* Infinite-scroll/load-more feedback */}
+                {loading && !isInitialLoad && sortedDisplayItems.length > 0 && (
+                    <div className="px-8 pb-4">
+                        <div className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 shadow-sm">
+                            <SpinnerIcon className="h-4 w-4 animate-spin" />
+                            <span>Loading more utilities...</span>
+                        </div>
+                    </div>
+                )}
 
             </div>
 
