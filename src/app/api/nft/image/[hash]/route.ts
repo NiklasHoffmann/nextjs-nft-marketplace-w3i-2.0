@@ -484,8 +484,9 @@ export async function GET(
                 'Vercel-CDN-Cache-Control': 'public, max-age=31536000',
                 'X-Cache-Status': 'HIT',
                 'X-Cache-Format': format,
+                'X-Image-Cache-Version': IMAGE_CACHE_VERSION,
                 'Vary': 'Accept',
-                'ETag': `"${ipfsHash}"`,
+                'ETag': `"${ipfsHash}.${IMAGE_CACHE_VERSION}.${format}"`,
                 'Access-Control-Allow-Origin': '*',
                 'Cross-Origin-Resource-Policy': 'cross-origin'
             }
@@ -584,7 +585,7 @@ export async function GET(
             'X-Original-Size': originalSize.toString(),
             'X-Compressed-Size': compressedSize.toString(),
             'Vary': 'Accept',
-            'ETag': `"${ipfsHash}"`,
+            'ETag': `"${ipfsHash}.${IMAGE_CACHE_VERSION}.${format}"`,
             'Access-Control-Allow-Origin': '*',
             'Cross-Origin-Resource-Policy': 'cross-origin'
         }

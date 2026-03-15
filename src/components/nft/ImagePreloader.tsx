@@ -34,6 +34,8 @@ const extractIPFSInfo = (url: string): { hash: string; path: string } | null => 
 };
 
 // Convert to our server-side cache URL
+const IMAGE_CACHE_BUST_VERSION = 'v5';
+
 const optimizeUrl = (url: string): string => {
     if (!url) return url;
 
@@ -42,7 +44,7 @@ const optimizeUrl = (url: string): string => {
         const { hash, path } = ipfsInfo;
         const fullHash = path ? `${hash}/${path}` : hash;
         // Use our server-side cache!
-        return `/api/nft/image/${encodeURIComponent(fullHash)}`;
+        return `/api/nft/image/${encodeURIComponent(fullHash)}?v=${IMAGE_CACHE_BUST_VERSION}`;
     }
 
     return url;
