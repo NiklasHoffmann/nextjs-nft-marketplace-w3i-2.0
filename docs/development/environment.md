@@ -116,6 +116,11 @@ When deploying to production (Vercel, Railway, etc.):
 
 ## Runtime Role Split (Web + Worker)
 
+If Coolify's Nixpacks integration fails while parsing the generated plan,
+switch the service to Dockerfile-based deployment and use the repository's
+root Dockerfile instead. The Docker image honors `APP_RUNTIME_ROLE` and can
+run as either `web` or `worker`.
+
 To keep full functionality on weaker servers without overloading the web process,
 run the app in split mode:
 

@@ -34,5 +34,13 @@ yarn-error.log*
 .git
 .gitignore
 
+# Editor / reports
+playwright-report
+test-results
+
+# Large archives not needed in runtime image
+docs/archive
+scripts/archive
+
 # Cache
 .cache
