@@ -22,7 +22,6 @@ import { devLog } from '@/utils';
 
 const CACHE_DIR = path.join(process.cwd(), 'public', 'cached-nft-images');
 const METADATA_FILE = path.join(CACHE_DIR, '.cache-metadata.json');
-const IMAGE_CACHE_VERSION = 'v5'; // v5: fix format-mismatch bug (avif filename with webp content)
 
 // Cache Configuration
 const MAX_CACHE_SIZE_MB = 500; // 500 MB maximum cache size
@@ -67,7 +66,7 @@ interface CacheMetadata {
 type PreferredImageFormat = 'avif' | 'webp';
 
 function buildCacheFileName(safeCacheKey: string, format: PreferredImageFormat): string {
-    return `${safeCacheKey}.${IMAGE_CACHE_VERSION}.${format}`;
+    return `${safeCacheKey}.${format}`;
 }
 
 function resolvePreferredFormat(request: NextRequest): PreferredImageFormat {
@@ -448,7 +447,7 @@ export async function GET(
 
     try {
         // Try new compressed format first
-        let cached: Buffer;
+        let cached: Buffer | null = null;
         let format: string = preferredFormat;
         let cachePath = cachedPath;
         
@@ -467,6 +466,10 @@ export async function GET(
                 cachePath = legacyCachedPath;
             }
         }
+
+        if (!cached) {
+            throw new Error('Cached image not found');
+        }
         
         // Update access stats in-memory only — no disk I/O on the hot path
         touchFileAccess(path.basename(cachePath), cached.length, format);
@@ -484,9 +487,8 @@ export async function GET(
                 'Vercel-CDN-Cache-Control': 'public, max-age=31536000',
                 'X-Cache-Status': 'HIT',
                 'X-Cache-Format': format,
-                'X-Image-Cache-Version': IMAGE_CACHE_VERSION,
                 'Vary': 'Accept',
-                'ETag': `"${ipfsHash}.${IMAGE_CACHE_VERSION}.${format}"`,
+                'ETag': `"${ipfsHash}.${format}"`,
                 'Access-Control-Allow-Origin': '*',
                 'Cross-Origin-Resource-Policy': 'cross-origin'
             }
@@ -580,12 +582,11 @@ export async function GET(
             'Vercel-CDN-Cache-Control': 'public, max-age=31536000',
             'X-Cache-Status': 'MISS',
             'X-Cache-Format': format,
-            'X-Image-Cache-Version': IMAGE_CACHE_VERSION,
             'X-Compression-Ratio': `${((originalSize - compressedSize) / originalSize * 100).toFixed(1)}%`,
             'X-Original-Size': originalSize.toString(),
             'X-Compressed-Size': compressedSize.toString(),
             'Vary': 'Accept',
-            'ETag': `"${ipfsHash}.${IMAGE_CACHE_VERSION}.${format}"`,
+            'ETag': `"${ipfsHash}.${format}"`,
             'Access-Control-Allow-Origin': '*',
             'Cross-Origin-Resource-Policy': 'cross-origin'
         }

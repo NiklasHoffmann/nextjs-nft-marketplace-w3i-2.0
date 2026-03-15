@@ -169,8 +169,6 @@ const extractIPFSInfo = (url: string): { hash: string; path: string } | null => 
 
 // Convert IPFS URLs to use our server-side proxy/cache only.
 // Public gateway fallbacks in the browser caused inconsistent quality/latency.
-const IMAGE_CACHE_BUST_VERSION = 'v5';
-
 const optimizeImageUrl = (url: string): string[] => {
     if (!url) return [];
 
@@ -183,7 +181,7 @@ const optimizeImageUrl = (url: string): string[] => {
         const fullHash = ipfsPath ? `${hash}/${ipfsPath}` : hash;
 
         return [
-            `/api/nft/image/${encodeURIComponent(fullHash)}?v=${IMAGE_CACHE_BUST_VERSION}` // Server cache + server-side gateway fallback
+            `/api/nft/image/${encodeURIComponent(fullHash)}` // Server cache + server-side gateway fallback
         ];
     }
 
