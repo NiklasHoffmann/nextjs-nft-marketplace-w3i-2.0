@@ -18,13 +18,20 @@ async function handler(req: NextRequest) {
         return trimmed.toLowerCase();
     };
 
-    // 1. Total NFTs - alle jemals bezogenen NFTs aus nft_metadata
-    const totalNFTs = await db.collection('nft_metadata').countDocuments();
-
-    // 2. Active Listings - gelistete NFTs aus marketplace_items
-    const activeListings = await db.collection('marketplace_items').countDocuments({
-        status: 'LISTED'
-    });
+    // 1+2+6. Parallelize independent counters to avoid serial DB round-trips.
+    const [
+        totalNFTs,
+        activeListings,
+        pendingListings,
+        cancelledListings,
+        totalSales,
+    ] = await Promise.all([
+        db.collection('nft_metadata').countDocuments(),
+        db.collection('marketplace_items').countDocuments({ status: 'LISTED' }),
+        db.collection('marketplace_items').countDocuments({ status: 'PENDING' }),
+        db.collection('marketplace_items').countDocuments({ status: 'CANCELLED' }),
+        db.collection('marketplace_items').countDocuments({ status: 'SOLD' }),
+    ]);
 
     // 3. Listed Volume - Legacy mixed-currency sum (kept for backwards compatibility)
     const listedVolumeResult = await db.collection('marketplace_items').aggregate([
@@ -231,19 +238,6 @@ async function handler(req: NextRequest) {
     });
 
     const totalUsers = allUserAddresses.size;
-
-    // 6. Additional Stats
-    const pendingListings = await db.collection('marketplace_items').countDocuments({
-        status: 'PENDING'
-    });
-
-    const cancelledListings = await db.collection('marketplace_items').countDocuments({
-        status: 'CANCELLED'
-    });
-
-    const totalSales = await db.collection('marketplace_items').countDocuments({
-        status: 'SOLD'
-    });
 
     // 7. Recent Sales (last 5)
     const recentSales = await db.collection('marketplace_items')

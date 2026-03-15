@@ -531,7 +531,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
             count: transformedCollections.length,
             timestamp: new Date().toISOString()
         });
-        response.headers.set('Cache-Control', 'no-store, max-age=0');
+        response.headers.set('Cache-Control', 'public, s-maxage=15, stale-while-revalidate=45');
         return response;
     } catch (error: any) {
         devLog.error('❌ [Collections API] Error:', error);
