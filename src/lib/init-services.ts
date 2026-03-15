@@ -14,9 +14,30 @@ import path from 'path';
 let isInitialized = false;
 let startupPromise: Promise<void> | null = null;
 
+export type BackgroundRuntimeRole = 'all' | 'web' | 'worker';
+
 interface InitializeBackgroundServicesOptions {
     waitForReady?: boolean;
+    runtimeRole?: BackgroundRuntimeRole;
+    enableIndexSetup?: boolean;
+    enableMarketplacePrewarm?: boolean;
+    enableImagePrewarm?: boolean;
 }
+
+const isEnabled = (value: string | undefined, defaultValue: boolean): boolean => {
+    if (value === undefined) return defaultValue;
+    const normalized = value.trim().toLowerCase();
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+    if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+    return defaultValue;
+};
+
+const resolveRuntimeRole = (explicitRole?: BackgroundRuntimeRole): BackgroundRuntimeRole => {
+    if (explicitRole) return explicitRole;
+    const value = (process.env.APP_RUNTIME_ROLE || 'all').trim().toLowerCase();
+    if (value === 'web' || value === 'worker' || value === 'all') return value;
+    return 'all';
+};
 
 /**
  * Prewarm marketplace API response cache so first user navigation to /marketplace
@@ -129,10 +150,23 @@ async function prewarmImageCache(): Promise<void> {
 }
 
 export async function initializeBackgroundServices(options: InitializeBackgroundServicesOptions = {}) {
-    const { waitForReady = false } = options;
+    const {
+        waitForReady = false,
+        runtimeRole,
+        enableIndexSetup,
+        enableMarketplacePrewarm,
+        enableImagePrewarm,
+    } = options;
+    const role = resolveRuntimeRole(runtimeRole);
+    const shouldRunInThisProcess = role !== 'web';
 
     // Only run on server-side
     if (typeof window !== 'undefined') {
+        return;
+    }
+
+    if (!shouldRunInThisProcess) {
+        devLog.info('⏭️ Skipping background services in web-only runtime (APP_RUNTIME_ROLE=web)');
         return;
     }
 
@@ -149,6 +183,10 @@ export async function initializeBackgroundServices(options: InitializeBackground
 
     startupPromise = (async () => {
         try {
+            const runIndexSetup = enableIndexSetup ?? isEnabled(process.env.BACKGROUND_ENABLE_INDEX_SETUP, true);
+            const runMarketplacePrewarm = enableMarketplacePrewarm ?? isEnabled(process.env.BACKGROUND_ENABLE_MARKETPLACE_PREWARM, true);
+            const runImagePrewarm = enableImagePrewarm ?? isEnabled(process.env.BACKGROUND_ENABLE_IMAGE_PREWARM, true);
+
             // Start NFT Sync Service (includes WebSocket Event Listener + GraphQL Fallback)
             const syncService = getNFTSyncService();
             await syncService.start();
@@ -156,25 +194,31 @@ export async function initializeBackgroundServices(options: InitializeBackground
             devLog.info('✅ Background services initialized successfully');
 
             // Ensure performance-critical MongoDB indexes exist (non-blocking)
-            setTimeout(async () => {
-                try {
-                    const { setupMongoDBIndexes } = await import('@/lib/db/setup-indexes');
-                    await setupMongoDBIndexes();
-                } catch (e) {
-                    devLog.warn('⚠️ [MongoDB] Background index setup failed (non-fatal):', e);
-                }
-            }, 2_000);
+            if (runIndexSetup) {
+                setTimeout(async () => {
+                    try {
+                        const { setupMongoDBIndexes } = await import('@/lib/db/setup-indexes');
+                        await setupMongoDBIndexes();
+                    } catch (e) {
+                        devLog.warn('⚠️ [MongoDB] Background index setup failed (non-fatal):', e);
+                    }
+                }, 2_000);
+            }
 
             // Prewarm marketplace API cache in background.
-            setTimeout(() => {
-                prewarmMarketplaceApi().catch(e => devLog.warn('MarketplacePrewarm error:', e));
-            }, 6_000);
+            if (runMarketplacePrewarm) {
+                setTimeout(() => {
+                    prewarmMarketplaceApi().catch(e => devLog.warn('MarketplacePrewarm error:', e));
+                }, 6_000);
+            }
 
             // After sync service is up, prewarm image cache in background (fire-and-forget)
             // Delay by 10s to avoid competing with the initial sync for network bandwidth
-            setTimeout(() => {
-                prewarmImageCache().catch(e => devLog.warn('ImagePrewarm error:', e));
-            }, 10_000);
+            if (runImagePrewarm) {
+                setTimeout(() => {
+                    prewarmImageCache().catch(e => devLog.warn('ImagePrewarm error:', e));
+                }, 10_000);
+            }
         } catch (error) {
             devLog.error('❌ Failed to initialize background services:', error);
             // Don't throw - allow app to continue even if background services fail

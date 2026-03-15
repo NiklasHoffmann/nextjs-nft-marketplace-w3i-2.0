@@ -113,3 +113,62 @@ When deploying to production (Vercel, Railway, etc.):
 - MongoDB URI, JWT Secret, Google API Key
 - Never add `NEXT_PUBLIC_` prefix to these
 - Only accessible in API routes and server components
+
+## Runtime Role Split (Web + Worker)
+
+To keep full functionality on weaker servers without overloading the web process,
+run the app in split mode:
+
+### 1) Web process (serves HTTP only)
+
+Set:
+
+```env
+APP_RUNTIME_ROLE=web
+```
+
+Run:
+
+```bash
+npm run start:web
+```
+
+### 2) Worker process (background services)
+
+Set:
+
+```env
+APP_RUNTIME_ROLE=worker
+```
+
+Run:
+
+```bash
+npm run worker:start
+```
+
+This keeps all sync functionality (WebSocket listener, Graph fallback, stats sync,
+insights sync, cache prewarm), but moves heavy work off the web instance.
+
+## Background Service Tuning (Optional)
+
+Use these env vars to tune load for smaller servers:
+
+```env
+# Disable optional startup jobs (worker-safe toggles)
+BACKGROUND_ENABLE_INDEX_SETUP=true
+BACKGROUND_ENABLE_MARKETPLACE_PREWARM=true
+BACKGROUND_ENABLE_IMAGE_PREWARM=true
+
+# Graph fallback polling window (ms)
+GRAPH_SYNC_MIN_INTERVAL_MS=300000
+GRAPH_SYNC_MAX_INTERVAL_MS=900000
+
+# Stats sync cadence and throughput
+STATS_SYNC_INTERVAL_MS=300000
+STATS_SYNC_BATCH_SIZE=50
+
+# Insights sync cadence and throughput
+INSIGHTS_SYNC_INTERVAL_MS=1800000
+INSIGHTS_SYNC_BATCH_SIZE=100
+```

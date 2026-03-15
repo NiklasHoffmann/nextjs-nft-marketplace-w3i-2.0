@@ -22,7 +22,7 @@ import { devLog } from '@/utils';
 
 const CACHE_DIR = path.join(process.cwd(), 'public', 'cached-nft-images');
 const METADATA_FILE = path.join(CACHE_DIR, '.cache-metadata.json');
-const IMAGE_CACHE_VERSION = 'v3';
+const IMAGE_CACHE_VERSION = 'v4';
 
 // Cache Configuration
 const MAX_CACHE_SIZE_MB = 500; // 500 MB maximum cache size
@@ -246,8 +246,9 @@ async function compressImage(
         };
     }
     
-    // Tiny files often get larger when re-encoded. Keep original to reduce CPU and latency.
-    if (originalSize < 48 * 1024) {
+    // Small files often lose perceptual quality when re-encoded.
+    // Keep originals here to preserve detail and reduce CPU/latency.
+    if (originalSize < 160 * 1024) {
         return {
             buffer,
             format: 'original',
@@ -273,11 +274,11 @@ async function compressImage(
             : preferredFormat;
 
         const compressed = targetFormat === 'avif'
-            ? await image.avif({ quality: 68, effort: 5, chromaSubsampling: '4:4:4' }).toBuffer()
+            ? await image.avif({ quality: 80, effort: 4, chromaSubsampling: '4:4:4' }).toBuffer()
             : await image.webp(
                 hasAlpha
                     ? { lossless: true, effort: 4 }
-                    : { quality: isLargeHighResImage ? 90 : 86, effort: 3, smartSubsample: true }
+                    : { quality: isLargeHighResImage ? 94 : 92, effort: 4, smartSubsample: true }
             ).toBuffer();
         
         const compressedSize = compressed.length;

@@ -12,6 +12,8 @@
     "build": "next build",
     "build:analyze": "ANALYZE=true next build",
     "start": "next start",
+    "start:web": "next start",
+    "worker:start": "tsx scripts/production/background-worker.ts",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest",

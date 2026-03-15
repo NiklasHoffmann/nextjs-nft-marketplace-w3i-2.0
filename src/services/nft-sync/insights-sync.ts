@@ -7,6 +7,12 @@
 import { getEnrichedNFTsCollection } from '@/lib/mongodb';
 import { devLog } from '@/utils';
 
+const parsePositiveInt = (value: string | undefined, fallback: number): number => {
+    if (!value) return fallback;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
 export class InsightsSync {
     private intervalId: NodeJS.Timeout | null = null;
     private isRunning: boolean = false;
@@ -15,11 +21,11 @@ export class InsightsSync {
     private errorCount: number = 0;
     private lastErrorAt: Date | null = null;
 
-    // Run every 30 minutes (insights change less frequently)
-    private readonly INTERVAL_MS = 30 * 60 * 1000;
+    // Run every 30 minutes by default (configurable)
+    private readonly INTERVAL_MS = parsePositiveInt(process.env.INSIGHTS_SYNC_INTERVAL_MS, 30 * 60 * 1000);
 
-    // Process max 100 items per run
-    private readonly BATCH_SIZE = 100;
+    // Process max 100 items per run by default (configurable)
+    private readonly BATCH_SIZE = parsePositiveInt(process.env.INSIGHTS_SYNC_BATCH_SIZE, 100);
 
     /**
      * Start periodic insights sync

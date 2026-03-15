@@ -21,6 +21,8 @@ let autoStartPromise: Promise<void> | null = null;
 export const GET = apiHandler(async () => {
     try {
         const quickMode = process.env.HEALTHCHECK_QUICK_MODE === 'true';
+        const runtimeRole = (process.env.APP_RUNTIME_ROLE || 'all').trim().toLowerCase();
+        const canRunBackgroundInThisProcess = runtimeRole !== 'web';
         const syncService = getNFTSyncService();
         const status = syncService.getStatus();
 
@@ -37,6 +39,7 @@ export const GET = apiHandler(async () => {
                         pid: process.pid,
                         uptimeSec: Math.floor(process.uptime()),
                     },
+                    runtimeRole,
                     timestamp: Date.now(),
                 }
             });
@@ -54,13 +57,16 @@ export const GET = apiHandler(async () => {
                 pid: process.pid,
                 uptimeSec: Math.floor(process.uptime()),
             },
+            runtimeRole,
             timestamp: Date.now(),
         };
 
         // Keep health endpoint fast for reverse-proxy checks (Coolify/nginx).
         // In production, auto-start can be explicitly enabled via env.
-        const allowAutoStart = process.env.NODE_ENV !== 'production'
-            || process.env.HEALTH_AUTO_START_BACKGROUND === 'true';
+        const allowAutoStart = canRunBackgroundInThisProcess && (
+            process.env.NODE_ENV !== 'production'
+            || process.env.HEALTH_AUTO_START_BACKGROUND === 'true'
+        );
 
         if (!status.isRunning && allowAutoStart) {
             if (!autoStartPromise && !autoStarted) {

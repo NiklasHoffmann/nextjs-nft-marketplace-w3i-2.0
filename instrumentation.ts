@@ -9,6 +9,8 @@ export async function register() {
     const { default: Sentry } = await import('@sentry/nextjs');
     const isNodeRuntime = process.env.NEXT_RUNTIME === 'nodejs';
     const isDev = process.env.NODE_ENV === 'development';
+    const runtimeRole = (process.env.APP_RUNTIME_ROLE || 'all').trim().toLowerCase();
+    const shouldStartBackgroundServices = runtimeRole !== 'web';
 
     Sentry.init({
         dsn: process.env.SENTRY_DSN,
@@ -48,16 +50,20 @@ export async function register() {
             }
         }
 
-        console.log('\n🔧 [Instrumentation] Starting background services...');
+        if (shouldStartBackgroundServices) {
+            console.log(`\n🔧 [Instrumentation] Starting background services (role=${runtimeRole})...`);
 
-        try {
-            // Import and initialize background services
-            const { initializeBackgroundServices } = await import('./src/lib/init-services');
-            await initializeBackgroundServices({ waitForReady: false });
+            try {
+                // Import and initialize background services
+                const { initializeBackgroundServices } = await import('./src/lib/init-services');
+                await initializeBackgroundServices({ waitForReady: false });
 
-            console.log('✅ [Instrumentation] Background services startup triggered\n');
-        } catch (error) {
-            console.error('❌ [Instrumentation] Failed to start background services:', error);
+                console.log('✅ [Instrumentation] Background services startup triggered\n');
+            } catch (error) {
+                console.error('❌ [Instrumentation] Failed to start background services:', error);
+            }
+        } else {
+            console.log('\n🔧 [Instrumentation] APP_RUNTIME_ROLE=web -> background services disabled in this process\n');
         }
     }
 }

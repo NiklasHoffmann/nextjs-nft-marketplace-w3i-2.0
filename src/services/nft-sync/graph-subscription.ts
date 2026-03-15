@@ -16,6 +16,12 @@ import { IPFSMetadataLazySync } from './ipfs-metadata-lazy-sync';
 import { getCurrencyFixSync } from './currency-fix-sync';
 import { devLog } from '@/utils';
 
+const parsePositiveInt = (value: string | undefined, fallback: number): number => {
+    if (!value) return fallback;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
 export class GraphQLSync {
     private client: ApolloClient<any> | null = null;
     private isActive: boolean = false;
@@ -23,9 +29,9 @@ export class GraphQLSync {
     private itemsProcessed: number = 0;
     private lastUpdate: Date | null = null;
     private consecutiveErrors: number = 0;
-    private currentInterval: number = 300000; // Start with 300 seconds (5 minutes)
-    private readonly MIN_INTERVAL = 300000; // 5 minutes minimum (WebSocket is primary)
-    private readonly MAX_INTERVAL = 900000; // 15 minutes maximum
+    private readonly MIN_INTERVAL = parsePositiveInt(process.env.GRAPH_SYNC_MIN_INTERVAL_MS, 300000); // default 5 minutes
+    private readonly MAX_INTERVAL = parsePositiveInt(process.env.GRAPH_SYNC_MAX_INTERVAL_MS, 900000); // default 15 minutes
+    private currentInterval: number = this.MIN_INTERVAL;
 
     private isTransientNetworkError(error: any): boolean {
         const message = String(error?.message || '').toLowerCase();
