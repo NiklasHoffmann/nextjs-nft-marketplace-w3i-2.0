@@ -39,14 +39,19 @@ const resolveRuntimeRole = (explicitRole?: BackgroundRuntimeRole): BackgroundRun
     return 'all';
 };
 
+const resolveInternalApiBaseUrl = (): string => {
+    return process.env.INTERNAL_API_BASE_URL
+        || process.env.NEXT_PUBLIC_BASE_URL
+        || `http://localhost:${process.env.PORT || 3000}`;
+};
+
 /**
  * Prewarm marketplace API response cache so first user navigation to /marketplace
  * doesn't pay the full cold aggregation cost.
  */
 async function prewarmMarketplaceApi(): Promise<void> {
     try {
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
-            || `http://localhost:${process.env.PORT || 3000}`;
+        const baseUrl = resolveInternalApiBaseUrl();
 
         const warmupUrl = `${baseUrl}/api/marketplace/items?page=1&limit=20&sortBy=price&sortOrder=desc&includeFilters=true`;
         const response = await fetch(warmupUrl, { cache: 'no-store' });
@@ -124,8 +129,7 @@ async function prewarmImageCache(): Promise<void> {
         devLog.info(`🌄 [ImagePrewarm] Prewarming ${uncached.length} uncached images...`);
 
         // Trigger caching via internal HTTP — reuses the route's dedup + compress logic
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
-            || `http://localhost:${process.env.PORT || 3000}`;
+        const baseUrl = resolveInternalApiBaseUrl();
 
         let cached = 0;
         for (let i = 0; i < uncached.length; i += CONCURRENT) {

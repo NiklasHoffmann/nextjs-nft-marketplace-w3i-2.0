@@ -13,6 +13,12 @@ const parsePositiveInt = (value: string | undefined, fallback: number): number =
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
+const resolveInternalApiBaseUrl = (): string => {
+    return process.env.INTERNAL_API_BASE_URL
+        || process.env.NEXT_PUBLIC_BASE_URL
+        || `http://localhost:${process.env.PORT || 3000}`;
+};
+
 export class InsightsSync {
     private intervalId: NodeJS.Timeout | null = null;
     private isRunning: boolean = false;
@@ -66,7 +72,8 @@ export class InsightsSync {
     private async runSync() {
         try {
             // Get all insights from API
-            const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/nft/insights`);
+            const baseUrl = resolveInternalApiBaseUrl();
+            const response = await fetch(`${baseUrl}/api/nft/insights`);
 
             if (!response.ok) {
                 throw new Error(`Insights API error: ${response.status}`);
@@ -138,7 +145,8 @@ export class InsightsSync {
      */
     async syncNFT(contractAddress: string, tokenId: string) {
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/nft/insights?contractAddress=${contractAddress}&tokenId=${tokenId}`);
+            const baseUrl = resolveInternalApiBaseUrl();
+            const response = await fetch(`${baseUrl}/api/nft/insights?contractAddress=${contractAddress}&tokenId=${tokenId}`);
 
             if (!response.ok) {
                 throw new Error(`Insights API error: ${response.status}`);

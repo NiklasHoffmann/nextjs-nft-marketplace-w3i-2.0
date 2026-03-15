@@ -8,6 +8,7 @@ COPY package.json package-lock.json ./
 RUN npm install --include=dev
 
 FROM deps AS builder
+ENV NODE_ENV=production
 COPY . .
 RUN npm run build
 

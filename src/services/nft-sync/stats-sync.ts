@@ -13,6 +13,12 @@ const parsePositiveInt = (value: string | undefined, fallback: number): number =
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
+const resolveInternalApiBaseUrl = (): string => {
+    return process.env.INTERNAL_API_BASE_URL
+        || process.env.NEXT_PUBLIC_BASE_URL
+        || `http://localhost:${process.env.PORT || 3000}`;
+};
+
 export class StatsSync {
     private intervalId: NodeJS.Timeout | null = null;
     private isRunning: boolean = false;
@@ -110,7 +116,8 @@ export class StatsSync {
     private async syncStatsForNFT(contractAddress: string, tokenId: string) {
         try {
             // Call existing stats API
-            const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/nft/stats/${contractAddress}/${tokenId}`);
+            const baseUrl = resolveInternalApiBaseUrl();
+            const response = await fetch(`${baseUrl}/api/nft/stats/${contractAddress}/${tokenId}`);
 
             if (!response.ok) {
                 // Stats API might return 404 if no stats exist yet - this is OK
