@@ -22,7 +22,7 @@ import { devLog } from '@/utils';
 
 const CACHE_DIR = path.join(process.cwd(), 'public', 'cached-nft-images');
 const METADATA_FILE = path.join(CACHE_DIR, '.cache-metadata.json');
-const IMAGE_CACHE_VERSION = 'v4';
+const IMAGE_CACHE_VERSION = 'v5'; // v5: fix format-mismatch bug (avif filename with webp content)
 
 // Cache Configuration
 const MAX_CACHE_SIZE_MB = 500; // 500 MB maximum cache size
@@ -505,13 +505,22 @@ export async function GET(
         // Compress the image
         const result = await compressImage(sourceImage.buffer, preferredFormat, sourceImage.contentType);
 
+        // Use the ACTUAL format returned by compression for the cache filename.
+        // compressImage may silently downgrade avif → webp for large images; storing
+        // with the wrong extension causes Content-Type mismatches and pixelated output.
+        const actualCacheFormat = (result.format === 'avif' || result.format === 'webp')
+            ? result.format as PreferredImageFormat
+            : preferredFormat; // 'original' → keep preferred extension (passthrough)
+        const actualCacheFileName = buildCacheFileName(safeCacheKey, actualCacheFormat);
+        const actualCachedPath = path.join(CACHE_DIR, actualCacheFileName);
+
         // Save compressed version to cache (fire-and-forget metadata updates)
         try {
-            await fs.writeFile(cachedPath, new Uint8Array(result.buffer));
+            await fs.writeFile(actualCachedPath, new Uint8Array(result.buffer));
 
             // Update in-memory metadata — no blocking disk write
             getMetadata().then((metadata) => {
-                metadata.files[cacheFileName] = {
+                metadata.files[actualCacheFileName] = {
                     hash: ipfsHash,
                     size: result.compressedSize,
                     originalSize: result.originalSize,
