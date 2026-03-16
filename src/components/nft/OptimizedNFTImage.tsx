@@ -41,11 +41,13 @@ interface CacheEntry {
 
 // Storage key for localStorage persistence
 const STORAGE_KEY = 'nft-image-cache-v1';
+const SUCCESS_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
+const FAILURE_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 class ImageCache {
     private cache = new Map<string, CacheEntry>();
     private maxSize = 500; // Increased from 100 to 500 for better caching
-    private failureRetryTime = 5 * 60 * 1000; // 5 minutes for failed images
+    private failureRetryTime = FAILURE_CACHE_TTL;
     private saveDebounceTimer: NodeJS.Timeout | null = null;
 
     constructor() {
@@ -55,12 +57,11 @@ class ImageCache {
                 const stored = localStorage.getItem(STORAGE_KEY);
                 if (stored) {
                     const parsed = JSON.parse(stored) as [string, CacheEntry][];
-                    // Load successful entries (<24h) and recent failed entries (<failureRetryTime)
+                    // Load successful entries and recent failed entries.
                     const now = Date.now();
-                    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
                     parsed.forEach(([key, entry]) => {
                         const age = now - entry.timestamp;
-                        if ((entry.success && age < maxAge) || (!entry.success && age < this.failureRetryTime)) {
+                        if ((entry.success && age < SUCCESS_CACHE_TTL) || (!entry.success && age < this.failureRetryTime)) {
                             this.cache.set(key, entry);
                         }
                     });
@@ -83,11 +84,10 @@ class ImageCache {
             try {
                 // Save successful entries and recent failed entries
                 const now = Date.now();
-                const maxAge = 24 * 60 * 60 * 1000; // 24 hours
                 const entries = Array.from(this.cache.entries())
                     .filter(([_, entry]) => {
                         const age = now - entry.timestamp;
-                        return (entry.success && age < maxAge) || (!entry.success && age < this.failureRetryTime);
+                        return (entry.success && age < SUCCESS_CACHE_TTL) || (!entry.success && age < this.failureRetryTime);
                     })
                     .slice(-this.maxSize); // Keep latest entries
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
@@ -217,6 +217,11 @@ const selectInitialImageIndex = (urls: string[]): number => {
     return 0;
 };
 
+const hasLoadableImageUrl = (urls: string[]): boolean => {
+    if (urls.length === 0) return false;
+    return urls.some((url) => imageLoadCache.get(url) !== false);
+};
+
 const OptimizedNFTImage = memo(({
     imageUrl,
     tokenId,
@@ -242,11 +247,16 @@ const OptimizedNFTImage = memo(({
         return imageLoadCache.get(cacheKey) === true;
     }, [imageUrls]);
 
+    const hasAnyLoadableUrl = useMemo(() => hasLoadableImageUrl(imageUrls), [imageUrls]);
+
     const initialFallbackIndex = useMemo(() => selectInitialImageIndex(imageUrls), [imageUrls]);
 
     const [isLoading, setIsLoading] = useState(!isCachedInitially); // Start as loaded if cached!
-    const [hasError, setHasError] = useState(imageUrls.length === 0); // Immediately error if no valid URL
-    const [currentImageUrl, setCurrentImageUrl] = useState(() => imageUrls[initialFallbackIndex] || '');
+    const [hasError, setHasError] = useState(imageUrls.length === 0 || !hasAnyLoadableUrl);
+    const [currentImageUrl, setCurrentImageUrl] = useState(() => {
+        if (!hasAnyLoadableUrl) return '';
+        return imageUrls[initialFallbackIndex] || '';
+    });
     const [fallbackIndex, setFallbackIndex] = useState(initialFallbackIndex);
     const [aspectRatio, setAspectRatio] = useState<number | null>(null);
     const [isIntersecting, setIsIntersecting] = useState(priority || isCachedInitially);
@@ -277,6 +287,8 @@ const OptimizedNFTImage = memo(({
         }
 
         if (cachedResult === false) {
+            setHasError(true);
+            setCurrentImageUrl('');
             setIsLoading(false);
             return;
         }
@@ -316,6 +328,13 @@ const OptimizedNFTImage = memo(({
             return;
         }
 
+        if (!hasLoadableImageUrl(newUrls)) {
+            setCurrentImageUrl('');
+            setHasError(true);
+            setIsLoading(false);
+            return;
+        }
+
         const nextIndex = selectInitialImageIndex(newUrls);
         const selectedUrl = newUrls[nextIndex];
         const isCached = selectedUrl && imageLoadCache.get(selectedUrl) === true;
@@ -342,28 +361,23 @@ const OptimizedNFTImage = memo(({
     const handleImageError = useCallback(() => {
         imageLoadCache.set(currentImageUrl, false);
 
-        // Try next fallback URL if available
-        if (fallbackIndex < imageUrls.length - 1) {
-            const nextIndex = fallbackIndex + 1;
+        // Try next fallback URL if available and not already known as failed.
+        for (let nextIndex = fallbackIndex + 1; nextIndex < imageUrls.length; nextIndex++) {
             const nextUrl = imageUrls[nextIndex];
-            if (nextUrl) {
-                // Small delay before retry to avoid flooding
-                setTimeout(() => {
-                    setFallbackIndex(nextIndex);
-                    setCurrentImageUrl(nextUrl);
-                    setIsLoading(true);
-                }, 100);
-            } else {
-                // URL is undefined
-                setHasError(true);
-                setIsLoading(false);
-            }
-        } else {
-            // All fallbacks failed - cache as failed
-            imageLoadCache.set(imageUrls[0] || currentImageUrl, false);
-            setHasError(true);
-            setIsLoading(false);
+            if (!nextUrl) continue;
+            if (imageLoadCache.get(nextUrl) === false) continue;
+
+            setFallbackIndex(nextIndex);
+            setCurrentImageUrl(nextUrl);
+            setIsLoading(true);
+            return;
         }
+
+        // All fallbacks failed - cache primary as failed and stop retries.
+        imageLoadCache.set(imageUrls[0] || currentImageUrl, false);
+        setCurrentImageUrl('');
+        setHasError(true);
+        setIsLoading(false);
     }, [fallbackIndex, imageUrls, currentImageUrl]);
 
     // Respect explicit object-fit from caller (e.g. NFTCard uses object-cover).
@@ -509,7 +523,6 @@ const OptimizedNFTImage = memo(({
         unoptimized:
             currentImageUrl.startsWith('data:') ||
             currentImageUrl.startsWith('blob:') ||
-            currentImageUrl.startsWith('/api/nft/image/') ||
             currentImageUrl.startsWith('http://') ||
             currentImageUrl.startsWith('https://'),
         // Optimized sizes for NFT cards - use consistent sizes for better cache hits
@@ -518,7 +531,7 @@ const OptimizedNFTImage = memo(({
                 ? "(max-width: 640px) 45vw, (max-width: 1024px) 24vw, 256px"
                 : "(max-width: 640px) 45vw, (max-width: 1024px) 24vw, 256px") :
             `${width}px`),
-        quality: normalizedTokenId.includes('-bg') ? 35 : 72, // Lower quality for background images
+        quality: normalizedTokenId.includes('-bg') ? 45 : 86,
         ...(fill ? { fill: true } : { width, height }),
     };
 

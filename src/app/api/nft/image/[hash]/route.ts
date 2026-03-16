@@ -39,6 +39,7 @@ const IPFS_GATEWAYS = [
 
 // Gateway Performance Tracking
 const gatewayStats = new Map<string, { hits: number; fails: number; avgTime: number }>();
+const failedHashCache = new Map<string, { retryAfter: number; reason: string }>();
 const inFlightImageJobs = new Map<string, Promise<{
     buffer: Buffer;
     format: string;
@@ -46,6 +47,7 @@ const inFlightImageJobs = new Map<string, Promise<{
     originalSize: number;
     compressedSize: number;
 } | null>>();
+const FAILED_HASH_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
 
 // Cache Metadata Interface
 interface CacheMetadata {
@@ -497,6 +499,27 @@ export async function GET(
         // Not cached, need to download
     }
 
+    const failedEntry = failedHashCache.get(ipfsHash);
+    if (failedEntry) {
+        if (Date.now() < failedEntry.retryAfter) {
+            return NextResponse.json({
+                success: false,
+                error: 'Image temporarily unavailable',
+                retryAfterMs: failedEntry.retryAfter - Date.now(),
+                reason: failedEntry.reason
+            }, {
+                status: 404,
+                headers: {
+                    'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
+                    'X-Cache-Status': 'NEGATIVE-HIT',
+                    'Access-Control-Allow-Origin': '*',
+                }
+            });
+        }
+
+        failedHashCache.delete(ipfsHash);
+    }
+
     const runImageJob = async () => {
         // Download from IPFS
         const sourceImage = await fetchFromIPFS(ipfsHash);
@@ -565,11 +588,25 @@ export async function GET(
     const imageResult = await imageJob;
 
     if (!imageResult) {
+        failedHashCache.set(ipfsHash, {
+            retryAfter: Date.now() + FAILED_HASH_COOLDOWN_MS,
+            reason: 'all-gateways-failed'
+        });
+
         return NextResponse.json({
             success: false,
             error: 'Failed to download image from IPFS'
-        }, { status: 502 });
+        }, {
+            status: 502,
+            headers: {
+                'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
+                'X-Cache-Status': 'NEGATIVE-MISS',
+                'Access-Control-Allow-Origin': '*',
+            }
+        });
     }
+
+    failedHashCache.delete(ipfsHash);
 
     const { buffer: compressedBuffer, format, contentType, originalSize, compressedSize } = imageResult;
 
@@ -630,6 +667,7 @@ export async function DELETE(
                 totalSize: 0,
                 lastCleanup: Date.now()
             });
+            failedHashCache.clear();
 
             return apiSuccess({
                 deleted,
@@ -718,6 +756,7 @@ export async function DELETE(
                 delete metadata.files[fileName];
                 await saveMetadata(metadata);
             }
+            failedHashCache.delete(ipfsHash);
             
             return apiSuccess({
                 message: 'Cached image deleted',
