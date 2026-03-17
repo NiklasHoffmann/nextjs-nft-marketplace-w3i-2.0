@@ -7,12 +7,14 @@ ENV NODE_ENV=development
 COPY package.json package-lock.json ./
 RUN npm install --include=dev
 
-FROM deps AS builder
-ENV NODE_ENV=production
+FROM deps AS source
 COPY . .
+
+FROM source AS builder
+ENV NODE_ENV=production
 RUN npm run build
 
-FROM base AS runner
+FROM base AS web-runner
 ENV NODE_ENV=production
 ENV PORT=3000
 COPY --from=deps /app/node_modules ./node_modules
@@ -32,4 +34,23 @@ COPY --from=builder /app/postcss.config.mjs ./postcss.config.mjs
 COPY --from=builder /app/tailwind.config.js ./tailwind.config.js
 COPY --from=builder /app/next-env.d.ts ./next-env.d.ts
 EXPOSE 3000
-CMD ["sh", "-lc", "if [ \"${APP_RUNTIME_ROLE:-web}\" = \"worker\" ]; then npm run worker:start; else npm run start:web; fi"]
+CMD ["npm", "run", "start:web"]
+
+FROM base AS worker-runner
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=source /app/package.json ./package.json
+COPY --from=source /app/package-lock.json ./package-lock.json
+COPY --from=source /app/tsconfig.json ./tsconfig.json
+COPY --from=source /app/src ./src
+COPY --from=source /app/scripts ./scripts
+COPY --from=source /app/public ./public
+COPY --from=source /app/instrumentation.ts ./instrumentation.ts
+COPY --from=source /app/next.config.ts ./next.config.ts
+COPY --from=source /app/next-env.d.ts ./next-env.d.ts
+COPY --from=source /app/sentry.client.config.ts ./sentry.client.config.ts
+COPY --from=source /app/sentry.edge.config.ts ./sentry.edge.config.ts
+COPY --from=source /app/sentry.server.config.ts ./sentry.server.config.ts
+CMD ["npm", "run", "worker:start"]
+
+FROM web-runner AS runner
