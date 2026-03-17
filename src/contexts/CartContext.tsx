@@ -88,6 +88,21 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 const CART_STORAGE_KEY = 'nft-marketplace-cart';
 
+function mergeCartItems(baseItems: CartItem[], preferredItems: CartItem[]): CartItem[] {
+    const merged = new Map<string, CartItem>();
+
+    baseItems.forEach((item) => {
+        merged.set(item.listingId, item);
+    });
+
+    // Keep optimistic/local items when duplicates exist.
+    preferredItems.forEach((item) => {
+        merged.set(item.listingId, item);
+    });
+
+    return Array.from(merged.values());
+}
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
     const { address, isConnected } = useAccount();
     const chainId = useChainId();
@@ -149,10 +164,41 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
     }, [remoteSyncEnabled]);
 
+    const getLocalStorageItems = useCallback((): CartItem[] => {
+        try {
+            const savedCart = localStorage.getItem(CART_STORAGE_KEY);
+            if (!savedCart) return [];
+
+            const parsedCart = JSON.parse(savedCart);
+            if (!Array.isArray(parsedCart)) return [];
+
+            return parsedCart as CartItem[];
+        } catch (error) {
+            devLog.error('cart', '❌ Failed to read localStorage cart:', error);
+            return [];
+        }
+    }, []);
+
+    // Helper: Load from localStorage
+    const loadFromLocalStorage = useCallback(() => {
+        const localItems = getLocalStorageItems();
+        if (localItems.length > 0) {
+            devLog.info('cart', '💾 Loaded from localStorage:', localItems.length, 'items');
+        }
+        setItems(localItems);
+    }, [getLocalStorageItems]);
+
     // Load cart on mount or when wallet connects
     useEffect(() => {
         const loadCart = async () => {
             if (isConnected && address) {
+                // Prime from local cache first to avoid empty-cart flashes/resets during route remounts.
+                const localItems = getLocalStorageItems();
+                if (localItems.length > 0) {
+                    devLog.info('cart', '💾 Priming cart from localStorage before DB load:', localItems.length, 'items');
+                    setItems(localItems);
+                }
+
                 // Load from MongoDB
                 try {
                     devLog.info('cart', '📡 Loading cart from MongoDB for:', address);
@@ -173,11 +219,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                     const data = await response.json();
 
                     if (data.success && data.data.items) {
-                        devLog.info('cart', '✅ Loaded from DB:', data.data.items.length, 'items');
-                        setItems(data.data.items);
+                        const dbItems = data.data.items as CartItem[];
+                        devLog.info('cart', '✅ Loaded from DB:', dbItems.length, 'items');
 
-                        // Also update localStorage as cache
-                        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(data.data.items));
+                        setItems((prevItems) => {
+                            const shouldMergeOptimistic = !isLoaded && prevItems.length > 0;
+                            const nextItems = shouldMergeOptimistic
+                                ? mergeCartItems(dbItems, prevItems)
+                                : dbItems;
+
+                            if (shouldMergeOptimistic) {
+                                devLog.warn('cart', '⚠️ Preserving optimistic cart items during initial DB hydration');
+                            }
+
+                            // Keep local cache aligned with the final resolved cart.
+                            localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(nextItems));
+                            return nextItems;
+                        });
                     }
                 } catch (error) {
                     devLog.error('cart', '❌ Failed to load from DB, using localStorage:', error);
@@ -193,25 +251,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         };
 
         loadCart();
-    }, [address, isConnected]);
-
-    // Helper: Load from localStorage
-    const loadFromLocalStorage = () => {
-        try {
-            const savedCart = localStorage.getItem(CART_STORAGE_KEY);
-            if (savedCart) {
-                const parsedCart = JSON.parse(savedCart);
-                devLog.info('cart', '💾 Loaded from localStorage:', parsedCart.length, 'items');
-                setItems(parsedCart);
-            }
-        } catch (error) {
-            devLog.error('cart', '❌ Failed to load from localStorage:', error);
-        }
-    };
+    }, [address, isConnected, getLocalStorageItems, loadFromLocalStorage]);
 
     // Sync cart to storage (localStorage + MongoDB if connected)
     const syncCart = useCallback((updatedItems: CartItem[]) => {
-        if (!isLoaded) return;
+        // Do not wipe persisted cart during initial hydration.
+        if (!isLoaded && updatedItems.length === 0) {
+            return;
+        }
 
         // Always save to localStorage (instant cache)
         try {
@@ -222,7 +269,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Queue DB sync (if connected) - with retry mechanism
-        if (isConnected && address) {
+        if (isConnected && address && isLoaded) {
             if (!remoteSyncEnabled) {
                 return;
             }
