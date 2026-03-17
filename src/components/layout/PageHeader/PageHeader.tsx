@@ -288,7 +288,7 @@ export function PageHeader({
     const isScrolled = useScrollPosition(80);
 
     return (
-        <div className={`fixed top-[66px] left-0 right-0 ${hasSidebar ? 'md:left-16' : ''} z-10 bg-white border-b border-gray-200 transition-all duration-300 ${isScrolled ? 'shadow-sm' : ''
+        <div className={`fixed top-[66px] left-0 right-0 ${hasSidebar ? 'md:left-16' : ''} z-50 bg-white border-b border-gray-200 transition-all duration-300 ${isScrolled ? 'shadow-sm' : ''
             } ${className}`}>
             <div className={`px-4 sm:px-6 md:px-8 transition-all duration-300 ${isScrolled ? 'py-1.5 md:py-1.5' : 'py-3 md:py-2.5'
                 }`}>

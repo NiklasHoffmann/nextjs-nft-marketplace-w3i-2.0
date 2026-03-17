@@ -394,7 +394,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
             )}
 
             {/* Header with Categories and Active Filters */}
-            <div className="sticky top-[66px] z-10 bg-white border-b border-gray-200 mb-8 md:pl-16 pl-10">
+            <div className="sticky top-[66px] z-40 bg-white border-b border-gray-200 mb-8 md:pl-16 pl-10">
                 <div className="px-8 py-3">
                     {/* Category Selection */}
                     <div className="mb-3">
