@@ -478,6 +478,7 @@ const OptimizedNFTImage = memo(({
                 onLoad={handleImageLoad}
                 onError={handleImageError}
                 loading={priority || isIntersecting ? 'eager' : 'lazy'}
+                fetchPriority={priority ? 'high' : 'auto'}
                 decoding="auto"
                 draggable={false}
                 data-variant={resolvedVariant}

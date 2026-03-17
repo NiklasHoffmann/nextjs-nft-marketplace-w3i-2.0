@@ -198,6 +198,24 @@ const nextConfig: import('next').NextConfig = {
         ],
       },
       {
+        // Long-term browser cache for pre-generated NFT image variants in public/
+        source: '/cached-nft-images/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+          {
+            key: 'Cross-Origin-Resource-Policy',
+            value: 'cross-origin',
+          },
+        ],
+      },
+      {
         // Cache Next.js optimized images for 30 days
         source: '/_next/image(.*)',
         headers: [

@@ -113,10 +113,13 @@ function inferContentTypeFromHash(hash: string): string {
     return 'image/jpeg';
 }
 
-// Ensure cache directory exists
+// Ensure cache directory exists (with module-level flag to skip on every subsequent request)
+let cacheDirEnsured = false;
 async function ensureCacheDir() {
+    if (cacheDirEnsured) return;
     try {
         await fs.mkdir(CACHE_DIR, { recursive: true });
+        cacheDirEnsured = true;
     } catch (err) {
         devLog.warn('⚠️ Failed to create cache directory:', err);
     }
@@ -131,6 +134,25 @@ let metadataCache: CacheMetadata | null = null;
 let metadataDirty = false;
 let metadataFlushTimer: ReturnType<typeof setTimeout> | null = null;
 
+// ---------------------------------------------------------------------------
+// Format index — maps safeCacheKey → cached format so we can jump directly
+// to the right file without probing all format candidates sequentially.
+// Built once from the metadata file and updated on every cache write.
+// ---------------------------------------------------------------------------
+const safeKeyToFormatIndex = new Map<string, CachedImageFormat>();
+
+function rebuildFormatIndex(metadata: CacheMetadata): void {
+    safeKeyToFormatIndex.clear();
+    const suffix = `.${CACHE_SCHEMA_VERSION}.`;
+    for (const filename of Object.keys(metadata.files)) {
+        const entry = metadata.files[filename];
+        if (!entry) continue;
+        const idx = filename.lastIndexOf(suffix);
+        if (idx === -1) continue;
+        safeKeyToFormatIndex.set(filename.slice(0, idx), entry.format);
+    }
+}
+
 async function getMetadata(): Promise<CacheMetadata> {
     if (!metadataCache) {
         try {
@@ -139,6 +161,7 @@ async function getMetadata(): Promise<CacheMetadata> {
         } catch {
             metadataCache = { files: {}, totalSize: 0, lastCleanup: Date.now() };
         }
+        rebuildFormatIndex(metadataCache!);
     }
     return metadataCache!;
 }
@@ -159,20 +182,27 @@ function scheduleMetadataFlush() {
 }
 
 // Synchronous in-memory update — no disk I/O in the hot path
-function touchFileAccess(hash: string, size: number, format: string) {
+function touchFileAccess(fileName: string, size: number, format: string) {
     if (!metadataCache) return; // cache not loaded yet, skip
-    if (!metadataCache.files[hash]) {
-        metadataCache.files[hash] = {
-            hash, size, format: format as any,
+    if (!metadataCache.files[fileName]) {
+        metadataCache.files[fileName] = {
+            hash: fileName, size, format: format as any,
             accessCount: 0, lastAccess: Date.now(), created: Date.now()
         };
         metadataCache.totalSize += size;
     }
-    const entry = metadataCache.files[hash]!;
+    const entry = metadataCache.files[fileName]!;
     entry.accessCount++;
     entry.lastAccess = Date.now();
     metadataDirty = true;
     scheduleMetadataFlush();
+
+    // Keep format index up-to-date
+    const suffix = `.${CACHE_SCHEMA_VERSION}.`;
+    const idx = fileName.lastIndexOf(suffix);
+    if (idx !== -1) {
+        safeKeyToFormatIndex.set(fileName.slice(0, idx), format as CachedImageFormat);
+    }
 }
 
 // For admin stats endpoint — returns current in-memory or loads from disk
@@ -467,30 +497,46 @@ export async function GET(
     }));
 
     try {
-        // Try new compressed format first
+        // Eagerly load metadata to populate the format index (fast in-memory op on warm start)
+        await getMetadata();
+
+        // Fast path: format index tells us exactly which file to read — zero wasted disk reads
         let cached: Buffer | null = null;
         let format: CachedImageFormat = preferredFormat;
-        let cachePath = cachedPath;
-        
-        try {
-            cached = await fs.readFile(cachedPath);
-        } catch {
+        let foundCachePath = cachedPath;
+
+        const indexedFormat = safeKeyToFormatIndex.get(safeCacheKey);
+        if (indexedFormat) {
+            const directPath = path.join(CACHE_DIR, buildCacheFileName(safeCacheKey, indexedFormat));
             try {
-                // Fallback to alternate modern format
-                cached = await fs.readFile(alternateCachedPath);
-                format = alternateFormat;
-                cachePath = alternateCachedPath;
+                cached = await fs.readFile(directPath);
+                format = indexedFormat;
+                foundCachePath = directPath;
             } catch {
-                for (const passthroughPath of passthroughPaths) {
-                    try {
-                        cached = await fs.readFile(passthroughPath.fullPath);
-                        format = passthroughPath.format;
-                        cachePath = passthroughPath.fullPath;
-                        break;
-                    } catch {
-                        // Try next format candidate
-                    }
-                }
+                // Index entry is stale (file was deleted) — fall through to parallel probe
+                safeKeyToFormatIndex.delete(safeCacheKey);
+            }
+        }
+
+        // Parallel probe: start all format candidates simultaneously and take the first hit
+        if (!cached) {
+            const allCandidates: Array<{ fmt: CachedImageFormat; filePath: string }> = [
+                { fmt: preferredFormat, filePath: cachedPath },
+                { fmt: alternateFormat, filePath: alternateCachedPath },
+                ...passthroughPaths.map(p => ({ fmt: p.format, filePath: p.fullPath })),
+            ];
+            try {
+                const result = await Promise.any(
+                    allCandidates.map(async (c) => {
+                        const buf = await fs.readFile(c.filePath);
+                        return { buf, fmt: c.fmt, filePath: c.filePath };
+                    })
+                );
+                cached = result.buf;
+                format = result.fmt;
+                foundCachePath = result.filePath;
+            } catch {
+                // AggregateError: no format found on disk → fall through to IPFS fetch
             }
         }
 
@@ -498,8 +544,9 @@ export async function GET(
             throw new Error('Cached image not found');
         }
         
-        // Update access stats in-memory only — no disk I/O on the hot path
-        touchFileAccess(path.basename(cachePath), cached.length, format);
+        // Update access stats and format index (synchronous in-memory, zero disk I/O)
+        const cacheFileName = path.basename(foundCachePath);
+        touchFileAccess(cacheFileName, cached.length, format);
 
         // Determine content type
         const contentType = formatToContentType(format);
