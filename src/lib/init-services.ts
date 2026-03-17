@@ -220,18 +220,21 @@ export async function initializeBackgroundServices(options: InitializeBackground
                 }, 6_000);
             }
 
-            // After sync service is up, prewarm image cache in background (fire-and-forget)
-            // Delay by 10s to avoid competing with the initial sync for network bandwidth
-            if (runImagePrewarm) {
+            // Image prewarm is intentionally skipped when ImageEnrichmentSync is enabled.
+            // The enrichment worker already warms disk variants after each metadata pass,
+            // so running both simultaneously only doubles CPU/RAM pressure on the VPS.
+            if (runImagePrewarm && !runImageEnrichment) {
                 setTimeout(() => {
                     prewarmImageCache().catch(e => devLog.warn('ImagePrewarm error:', e));
-                }, 10_000);
+                }, 15_000);
             }
 
+            // Start image enrichment with a generous delay so the NFT sync service
+            // can finish its initial TheGraph fetch before sharp starts competing for I/O.
             if (runImageEnrichment) {
                 setTimeout(() => {
                     imageEnrichmentSync.start();
-                }, 12_000);
+                }, 30_000);
             }
         } catch (error) {
             devLog.error('❌ Failed to initialize background services:', error);

@@ -6,11 +6,19 @@ import { extractIpfsInfoFromUrl } from '@/utils/nft/image-url';
 import { promises as fs } from 'fs';
 import path from 'path';
 
+// Limit sharp to 1 libuv thread so it never saturates the thread pool.
+// Without this, 3 concurrent sharp ops block ALL Node.js I/O and the web
+// server becomes unresponsive on low-memory VPS instances.
+sharp.concurrency(1);
+
+// Conservative defaults — designed for small VPS (1-2 vCPU, <=2 GB RAM).
+// Override via env vars when running on beefier hardware.
 const DEFAULT_INTERVAL_MS = 15 * 60 * 1000;
-const DEFAULT_BATCH_SIZE = 25;
-const DEFAULT_CONCURRENCY = 3;
-const DEFAULT_MAX_BATCHES_PER_RUN = 20;
-const DEFAULT_FAST_FOLLOWUP_MS = 5000;
+const DEFAULT_BATCH_SIZE = 5;          // was 25 — keeps per-run RAM spikes small
+const DEFAULT_CONCURRENCY = 1;         // was 3  — one IPFS+sharp op at a time
+const DEFAULT_MAX_BATCHES_PER_RUN = 3; // was 20 — caps a single run at 15 NFTs
+const DEFAULT_FAST_FOLLOWUP_MS = 60_000; // was 5 000 — 60 s breathing room
+const DEFAULT_INTER_CHUNK_DELAY_MS = 300; // yield to event loop between chunks
 const CACHE_DIR = path.join(process.cwd(), 'public', 'cached-nft-images');
 const CACHE_SCHEMA_VERSION = 'v6';
 const CACHE_FORMATS = ['webp', 'avif', 'png', 'jpeg', 'gif', 'svg'] as const;
@@ -353,8 +361,16 @@ export class NFTImageEnrichmentSync {
 
                 devLog.info(`🖼️ [ImageEnrichment] Processing batch ${batchIndex + 1}/${maxBatchesPerRun} (${candidates.length} docs)...`);
 
+                const interChunkDelayMs = Math.max(0, Number(process.env.IMAGE_ENRICH_INTER_CHUNK_DELAY_MS || DEFAULT_INTER_CHUNK_DELAY_MS));
+
                 for (let i = 0; i < candidates.length; i += concurrency) {
                     const chunk = candidates.slice(i, i + concurrency);
+
+                    // Yield to event loop before each chunk so web request handling
+                    // is never starved during a long enrichment run.
+                    if (i > 0 && interChunkDelayMs > 0) {
+                        await new Promise(r => setTimeout(r, interChunkDelayMs));
+                    }
 
                     await Promise.allSettled(
                         chunk.map(async (doc: any) => {
@@ -445,7 +461,12 @@ export class NFTImageEnrichmentSync {
 
             this.stats.remainingCandidatesEstimate = await collection.countDocuments(buildMissingImageEnrichmentQuery());
 
-            const diskWarmup = await this.runDiskVariantWarmup(batchSize, concurrency);
+            // Only run disk warmup when there's nothing left to metadata-enrich —
+            // running it on every cycle doubles I/O pressure for no gain.
+            let diskWarmup = { warmed: 0, remaining: 0 };
+            if (this.stats.remainingCandidatesEstimate === 0) {
+                diskWarmup = await this.runDiskVariantWarmup(batchSize, concurrency);
+            }
             this.stats.lastRunDiskWarmed = diskWarmup.warmed;
             this.stats.remainingCandidatesEstimate = Math.max(this.stats.remainingCandidatesEstimate, diskWarmup.remaining);
 
