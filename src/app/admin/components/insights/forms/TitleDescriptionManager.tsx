@@ -79,14 +79,15 @@ export default function TitleDescriptionManager({
 
     const removeTitleDescriptionPair = useCallback((pairId: string) => {
         const currentPairs = safeDescriptions?.titleDescriptionPairs || [];
-        if (currentPairs.length > 1) {
+        const canRemovePair = hideTitle || currentPairs.length > 1;
+        if (canRemovePair) {
             const updated: DescriptionStructure = {
                 ...safeDescriptions,
                 titleDescriptionPairs: currentPairs.filter(pair => pair.id !== pairId)
             };
             onChange(updated);
         }
-    }, [safeDescriptions, onChange]);
+    }, [safeDescriptions, onChange, hideTitle]);
 
     const updatePairTitle = useCallback((pairId: string, title: string) => {
         const updated: DescriptionStructure = {
@@ -201,7 +202,7 @@ export default function TitleDescriptionManager({
                                         </h4>
                                     )}
                                 </div>
-                                {titleDescriptionPairs.length > 1 && (
+                                {(hideTitle || titleDescriptionPairs.length > 1) && (
                                     <button
                                         type="button"
                                         onClick={() => removeTitleDescriptionPair(pair.id)}

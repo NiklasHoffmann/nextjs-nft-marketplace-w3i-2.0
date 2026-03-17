@@ -82,6 +82,14 @@ function normalizeDescriptions(
   };
 }
 
+const sanitizeCardDescriptions = (value?: string[]): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((desc) => (typeof desc === 'string' ? desc.trim() : ''))
+    .filter((desc) => desc.length > 0)
+    .slice(0, 2);
+};
+
 // ===== VALIDATION SCHEMAS =====
 
 const titleDescriptionPairSchema = z.object({
@@ -167,7 +175,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
     projectDescriptions,
     functionalitiesDescriptions,
     specificDescriptions,
-    cardDescriptions: data.cardDescriptions || [],
+    cardDescriptions: sanitizeCardDescriptions(data.cardDescriptions),
     category: data.category,
     tags: data.tags || [],
     rarity: data.rarity,
@@ -264,6 +272,10 @@ export const PUT = apiHandler(async (req: NextRequest) => {
 
   if (update.descriptions && update.descriptions.length > 0 && !update.description) {
     update.description = update.descriptions[0];
+  }
+
+  if (Array.isArray(update.cardDescriptions)) {
+    update.cardDescriptions = sanitizeCardDescriptions(update.cardDescriptions);
   }
 
   // Lowercase contract address if present

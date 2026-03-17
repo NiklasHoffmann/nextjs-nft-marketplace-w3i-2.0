@@ -306,6 +306,8 @@ export function NFTCard(props: NFTCardAllProps) {
   const descriptions = useMemo(() => {
     return Array.isArray(nft.insight?.cardDescription)
       ? nft.insight.cardDescription
+          .map((desc) => (typeof desc === 'string' ? desc.trim() : ''))
+          .filter((desc) => desc.length > 0)
       : [];
   }, [nft.insight?.cardDescription]);
 
@@ -396,7 +398,7 @@ export function NFTCard(props: NFTCardAllProps) {
 
   return (
     <div
-      className="group cursor-pointer"
+      className="group cursor-pointer relative z-0 isolate"
       onClick={handleClick}
     >
       <div className={`hover:shadow-[0_15px_30px_-8px_rgba(0,0,0,0.4)] transition-all duration-300 ease-out rounded-lg shadow-xl flex flex-col flex-end gap-2 w-full h-72 relative origin-center border border-black ${rarityBg}`}>
@@ -406,7 +408,7 @@ export function NFTCard(props: NFTCardAllProps) {
           {/* Background layer intentionally disabled to keep foreground NFT image fully crisp */}
 
           {/* Content overlay with fixed layout */}
-          <div className="relative z-10 flex flex-col h-full p-1 gap-1">
+          <div className="relative z-0 flex flex-col h-full p-1 gap-1">
 
             {/* Header */}
             <div className="flex-shrink-0">

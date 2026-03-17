@@ -222,7 +222,11 @@ export default function InsightsManager() {
                         || '',
                     projectDescriptions,
                     functionalitiesDescriptions,
-                    cardDescriptions: (insightsToUse as any).cardDescriptions || [], // Load card descriptions (only for NFT-specific)
+                    cardDescriptions: Array.isArray((insightsToUse as any).cardDescriptions)
+                        ? (insightsToUse as any).cardDescriptions
+                            .map((desc: string) => (typeof desc === 'string' ? desc.trim() : ''))
+                            .filter((desc: string) => desc.length > 0)
+                        : [],
                     category: insightsToUse.category || '',
                     tags: insightsToUse.tags || [],
                     rarity: insightsToUse.rarity || 'common',
@@ -309,6 +313,11 @@ export default function InsightsManager() {
                 finalCardDescriptions.push(currentCardInput.trim());
             }
 
+            finalCardDescriptions = finalCardDescriptions
+                .map((desc: string) => (typeof desc === 'string' ? desc.trim() : ''))
+                .filter((desc: string) => desc.length > 0)
+                .slice(0, 2);
+
             requestData.cardDescriptions = finalCardDescriptions;
 
             let result;
@@ -331,7 +340,7 @@ export default function InsightsManager() {
         } finally {
             setLoading(false);
         }
-    }, [formData, create, update, isEditMode, existingInsights, adminAddress]);
+    }, [formData, create, update, isEditMode, existingInsights, adminAddress, currentCardInput]);
 
     const updateFormData = useCallback((updates: Partial<NFTInsightFormData>) => {
 

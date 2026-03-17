@@ -22,7 +22,9 @@ const convertCardDescriptionsToTitlePairs = (descriptions: string[]): TitleDescr
     }));
 };// Helper function to convert TitleDescriptionPair[] back to string[] for card descriptions
 const convertTitlePairsToCardDescriptions = (pairs: TitleDescriptionPair[]): string[] => {
-    return pairs.map(pair => pair.descriptions[0] || '');
+    return pairs
+        .map(pair => (pair.descriptions[0] || '').trim())
+        .filter(desc => desc.length > 0);
 };
 
 interface NFTSpecificDescriptionsManagerProps {
