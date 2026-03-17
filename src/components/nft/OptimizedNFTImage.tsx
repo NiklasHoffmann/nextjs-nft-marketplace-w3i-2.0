@@ -143,6 +143,10 @@ class ImageCache {
         return entry.success;
     }
 
+    delete(key: string) {
+        this.cache.delete(key);
+    }
+
     // Check if we have many cached images (for preloading decision)
     get size(): number {
         return this.cache.size;
@@ -226,6 +230,7 @@ const OptimizedNFTImage = memo(({
     const [aspectRatio, setAspectRatio] = useState<number | null>(null);
     const [isIntersecting, setIsIntersecting] = useState(priority || isCachedInitially);
     const [hasBeenVisible, setHasBeenVisible] = useState(isCachedInitially);
+    const [retryAttempt, setRetryAttempt] = useState(0);
     const imgRef = useRef<HTMLDivElement>(null);
 
     // New state for smooth glitter fade-out
@@ -312,6 +317,14 @@ const OptimizedNFTImage = memo(({
     }, [currentImageUrl]);
 
     const handleImageError = useCallback(() => {
+        // Browsers can abort/deprioritize image requests while the tab is hidden.
+        // Do not persist these as hard failures.
+        if (typeof document !== 'undefined' && document.hidden) {
+            setIsLoading(true);
+            setHasError(false);
+            return;
+        }
+
         imageLoadCache.set(currentImageUrl, false);
 
         // Try next fallback URL if available and not already known as failed.
@@ -332,6 +345,37 @@ const OptimizedNFTImage = memo(({
         setHasError(true);
         setIsLoading(false);
     }, [fallbackIndex, imageUrls, currentImageUrl]);
+
+    // Recover images after returning to a previously hidden tab.
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+
+        const handleVisibilityChange = () => {
+            if (document.hidden) return;
+            if (!hasError && !isLoading) return;
+            if (imageUrls.length === 0) return;
+
+            // Clear short-lived failure marks so the first candidate can be retried now.
+            imageUrls.forEach((url) => {
+                if (url) imageLoadCache.delete(url);
+            });
+
+            const nextIndex = selectInitialImageIndex(imageUrls);
+            const nextUrl = imageUrls[nextIndex] || '';
+            if (!nextUrl) return;
+
+            setFallbackIndex(nextIndex);
+            setCurrentImageUrl(nextUrl);
+            setHasError(false);
+            setIsLoading(true);
+            setHasBeenVisible(true);
+            setIsIntersecting(true);
+            setRetryAttempt((prev) => prev + 1);
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [hasError, isLoading, imageUrls]);
 
     // Respect explicit object-fit from caller (e.g. NFTCard uses object-cover).
     // Fallback to object-contain only when no fit class is provided.
@@ -471,7 +515,7 @@ const OptimizedNFTImage = memo(({
             className={`relative overflow-hidden bg-gray-100 ${fill ? 'w-full h-full' : ''} ${className}`}
         >
             <img
-                key={currentImageUrl}
+                key={`${currentImageUrl}::${retryAttempt}`}
                 src={currentImageUrl}
                 alt={alt || `NFT ${tokenId}`}
                 className={imageClassName}
