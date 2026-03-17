@@ -20,7 +20,7 @@ export default function AdminNotFound() {
                         Admin Page Not Found
                     </h1>
                     <p className="text-xl text-gray-600">
-                        The admin page you're looking for doesn't exist.
+                        The admin page you&apos;re looking for doesn&apos;t exist.
                     </p>
                 </div>
 

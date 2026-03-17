@@ -2,7 +2,7 @@
 'use client';
 
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import Link from "next/link";
 import { HOME_CONFIG } from "@/config/app.config";
 import { LoadingState } from '@/components/core/Loading';
@@ -10,7 +10,7 @@ import { LoadingState } from '@/components/core/Loading';
 export default function Home() {
   const router = useRouter();
 
-  const prefetchMarketplace = () => {
+  const prefetchMarketplace = useCallback(() => {
     router.prefetch('/marketplace');
     if (typeof window !== 'undefined') {
       // Warm API + DB/cache path so first click in incognito feels faster.
@@ -22,7 +22,7 @@ export default function Home() {
         // Non-critical warmup.
       });
     }
-  };
+  }, [router]);
 
   // Redirect if enabled
   useEffect(() => {
@@ -42,7 +42,7 @@ export default function Home() {
 
     const timer = setTimeout(prefetchMarketplace, 400);
     return () => clearTimeout(timer);
-  }, [router]);
+  }, [prefetchMarketplace]);
 
   // Show redirect loading state if enabled
   if (HOME_CONFIG.ENABLE_REDIRECT) {

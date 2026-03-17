@@ -11,7 +11,7 @@
  * - 📋 Live preview and organization
  */
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import type {
     TitleDescriptionPair,
 } from "@/types";
@@ -56,9 +56,11 @@ export default function TitleDescriptionManager({
 
     // Ensure descriptions has a proper structure
     // For hideTitle mode, allow empty titleDescriptionPairs for button-first pattern
-    const safeDescriptions: DescriptionStructure = descriptions || {
-        titleDescriptionPairs: hideTitle ? [] : [createEmptyPair()]
-    };
+    const safeDescriptions: DescriptionStructure = useMemo(() => {
+        return descriptions || {
+            titleDescriptionPairs: hideTitle ? [] : [createEmptyPair()]
+        };
+    }, [descriptions, hideTitle]);
 
     // Debug logging
 
@@ -341,7 +343,7 @@ export default function TitleDescriptionManager({
                     <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
                         {titleDescriptionPairs
                             .filter((pair: TitleDescriptionPair) => pair.title.trim().length > 0 || pair.descriptions.some((desc: string) => desc.trim().length > 0))
-                            .map((pair: TitleDescriptionPair, index: number) => (
+                            .map((pair: TitleDescriptionPair) => (
                                 <div key={pair.id} className="border-l-4 border-blue-500 pl-3">
                                     {pair.title.trim().length > 0 && (
                                         <h5 className="font-medium text-gray-900 text-sm mb-1">

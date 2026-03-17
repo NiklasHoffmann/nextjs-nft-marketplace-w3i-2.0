@@ -24,10 +24,10 @@ export default function NotFound() {
                         Page Not Found
                     </h1>
                     <p className="text-xl text-gray-300">
-                        Oops! The page you're looking for doesn't exist.
+                        Oops! The page you&apos;re looking for doesn&apos;t exist.
                     </p>
                     <p className="text-gray-400">
-                        The NFT you're searching for might have been sold, or the URL might be incorrect.
+                        The NFT you&apos;re searching for might have been sold, or the URL might be incorrect.
                     </p>
                 </div>
 

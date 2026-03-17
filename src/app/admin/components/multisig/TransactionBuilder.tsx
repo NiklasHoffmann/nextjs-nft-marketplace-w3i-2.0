@@ -502,7 +502,7 @@ export function TransactionBuilder({ diamondAddress, onSuccess }: TransactionBui
                     <li>You will submit this transaction proposal</li>
                     <li>2 of 3 owners must confirm the transaction</li>
                     <li>Transaction executes automatically on the last confirmation</li>
-                    <li>You'll pay gas fees for submission</li>
+                    <li>You&apos;ll pay gas fees for submission</li>
                 </ul>
             </div>
 

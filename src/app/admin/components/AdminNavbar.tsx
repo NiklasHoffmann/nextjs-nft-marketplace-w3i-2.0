@@ -6,7 +6,6 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useAccount, useBalance } from 'wagmi';
 import { Web3ConnectButton } from '@/components/layout/Web3ConnectButton';
-import { hasAdminAccess } from '@/utils';
 
 export default function AdminNavbar() {
     const [mounted, setMounted] = useState(false);
@@ -53,8 +52,6 @@ export default function AdminNavbar() {
         document.addEventListener('keydown', handleEscapeKey);
         return () => document.removeEventListener('keydown', handleEscapeKey);
     }, []);
-
-    const isAdmin = mounted ? hasAdminAccess(address) : false;
 
     const formatAddress = (addr: string) => {
         return `${addr.slice(0, 6)}...${addr.slice(-4)}`;

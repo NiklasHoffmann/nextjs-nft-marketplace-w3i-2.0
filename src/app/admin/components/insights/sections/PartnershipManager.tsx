@@ -12,7 +12,6 @@ interface PartnershipManagerProps {
 }
 
 const PartnershipManager: React.FC<PartnershipManagerProps> = ({
-    partnerships,
     partnershipDetails,
     onChange
 }) => {

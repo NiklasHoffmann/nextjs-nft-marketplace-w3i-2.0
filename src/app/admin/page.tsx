@@ -1,6 +1,5 @@
 ﻿import React, { Suspense } from 'react';
 import Link from 'next/link';
-import { hasAdminAccess } from '@/utils';
 import { AdminPageShell } from '@/app/admin/components/shared/AdminPageShell';
 
 // Separate component to handle URL parameters (requires Suspense in Next.js 15)

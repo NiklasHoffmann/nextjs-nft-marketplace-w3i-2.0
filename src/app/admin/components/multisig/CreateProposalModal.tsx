@@ -258,7 +258,7 @@ export function CreateProposalModal({ isOpen, onClose, onSubmit, marketplaceAddr
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
                     />
                     <p className="mt-1 text-xs text-gray-500">
-                        Enter arguments as needed. Use JSON array format for multiple args: ["0x...", 123]
+                        Enter arguments as needed. Use JSON array format for multiple args: [&quot;0x...&quot;, 123]
                     </p>
                 </div>
 

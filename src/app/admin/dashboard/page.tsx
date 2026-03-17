@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { devLog } from '@/utils';
 import Link from 'next/link';
 import { useAccount, useChainId } from 'wagmi';
-import { formatEther } from 'viem';
 import { AdminPageShell } from '@/app/admin/components/shared/AdminPageShell';
 import { AddressWithEns } from '@/app/admin/components/shared/AddressWithEns';
 import { formatUnits } from 'viem';
@@ -193,11 +192,6 @@ export default function AdminDashboard() {
         if (!mounted) return;
         fetchMetrics();
     }, [mounted, fetchMetrics]);
-
-    const formatVolume = (volumeWei: number | string) => {
-        const formatted = formatEther(BigInt(volumeWei));
-        return parseFloat(formatted).toFixed(4);
-    };
 
     const formatTokenAmount = useCallback((rawValue: string | number, currencyAddress?: string | null) => {
         try {

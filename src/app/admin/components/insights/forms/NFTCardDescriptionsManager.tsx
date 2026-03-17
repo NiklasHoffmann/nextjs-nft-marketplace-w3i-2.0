@@ -21,7 +21,7 @@ const NFTCardDescriptionsManager: React.FC<NFTCardDescriptionsManagerProps> = ({
     maxDescriptions = 2,
     maxCharactersPerDescription = 80,
     currentInput = '',
-    onCurrentInputChange
+    onCurrentInputChange: _onCurrentInputChange
 }) => {
     // Add empty description directly like other managers do
     const handleAddDescription = useCallback(() => {
@@ -138,7 +138,7 @@ const NFTCardDescriptionsManager: React.FC<NFTCardDescriptionsManagerProps> = ({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <div className="text-sm text-blue-800">
-                            <strong>Aktuelle Eingabe:</strong> "{currentInput.trim()}" wird beim Submit mit allen anderen Daten gespeichert
+                            <strong>Aktuelle Eingabe:</strong> &quot;{currentInput.trim()}&quot; wird beim Submit mit allen anderen Daten gespeichert
                         </div>
                     </div>
                 </div>

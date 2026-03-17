@@ -32,8 +32,6 @@ interface CollectionStatsProps {
 
 function CollectionStats({
     totalListings,
-    totalVolume,
-    avgPrice,
     floorPrice,
     floorPriceCurrency,
     totalSupplyItems,

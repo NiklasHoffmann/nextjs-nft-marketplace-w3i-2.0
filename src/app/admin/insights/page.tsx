@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
-import InsightsManager from "../components/insights/InsightsManager";
+import InsightsManager from '@/app/admin/components/insights/InsightsManager';
 import { LoadingState } from '@/components/core/Loading';
 import { AdminPageShell } from '@/app/admin/components/shared/AdminPageShell';
 

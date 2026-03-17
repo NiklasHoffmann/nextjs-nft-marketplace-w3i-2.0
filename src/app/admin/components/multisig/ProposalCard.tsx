@@ -159,7 +159,7 @@ export function ProposalCard({
             <div className="mb-4 p-3 bg-gray-50 rounded border border-gray-100">
                 <div className="text-xs text-gray-500 mb-1">Function Call:</div>
                 <div className="font-mono text-sm text-gray-900 break-all">
-                    {proposal.functionName}({proposal.functionArgs.map((arg, i) =>
+                    {proposal.functionName}({proposal.functionArgs.map((arg) =>
                         typeof arg === 'string' ? `"${arg}"` : String(arg)
                     ).join(', ')})
                 </div>

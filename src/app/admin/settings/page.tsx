@@ -21,7 +21,6 @@ interface AdminSessionItem {
 export default function AdminSettings() {
     const router = useRouter();
     const { address: connectedAddress } = useAccount();
-    const [mounted, setMounted] = useState(false);
     const [sessions, setSessions] = useState<AdminSessionItem[]>([]);
     const [sessionsLoading, setSessionsLoading] = useState(false);
     const [sessionActionLoading, setSessionActionLoading] = useState(false);
@@ -69,10 +68,6 @@ export default function AdminSettings() {
         Array.isArray(owners) &&
         owners.some((owner) => String(owner).toLowerCase() === connectedAddress.toLowerCase())
     );
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
 
     const loadSessions = async () => {
         try {

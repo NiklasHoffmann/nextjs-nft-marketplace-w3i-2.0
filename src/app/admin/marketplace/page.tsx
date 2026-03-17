@@ -10,7 +10,6 @@ import { isAddress } from 'viem';
 import { hasAdminAccess } from '@/utils';
 import Link from 'next/link';
 import { AdminModeIndicator } from '@/app/admin/components/shared/AdminModeIndicator';
-import { MigrationBanner } from '@/app/admin/components/shared/MigrationBanner';
 import { AdminPageShell } from '@/app/admin/components/shared/AdminPageShell';
 import { devLog } from '@/utils';
 import { AddressWithEns } from '@/app/admin/components/shared/AddressWithEns';

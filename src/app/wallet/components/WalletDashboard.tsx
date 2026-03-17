@@ -4,7 +4,7 @@ import React from 'react';
 import { useAccount } from 'wagmi';
 import Link from 'next/link';
 import { WalletNFTsList } from './WalletNFTsList';
-import { useWalletLayout } from '../context';
+import { useWalletLayout } from '@/app/wallet/context';
 import { useWalletNFTsV2 } from '@/hooks/wallet/useWalletNFTsV2';
 import { LoadingState } from '@/components/core/Loading';
 

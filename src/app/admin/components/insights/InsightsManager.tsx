@@ -171,9 +171,6 @@ export default function InsightsManager() {
         // Priority: 1. NFT-specific (with tokenId), 2. Collection-wide (tokenId="")
         const insightsToUse = existingInsights || collectionInsights;
         const isCollectionFallback = !existingInsights && !!collectionInsights;
-        const fallbackSource = !existingInsights
-            ? 'Collection-wide Insights (tokenId="")'
-            : 'NFT-specific Insights';
 
         if (insightsToUse) {
             // Only set edit mode if we have NFT-specific insights

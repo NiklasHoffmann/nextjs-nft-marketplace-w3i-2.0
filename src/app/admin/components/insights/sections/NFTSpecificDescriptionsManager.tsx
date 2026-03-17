@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import React from 'react';
-import { TitleDescriptionManager } from '../forms';
+import { TitleDescriptionManager } from '@/app/admin/components/insights/forms';
 
 import type { NFTProjectDescriptions, NFTFunctionalitiesDescriptions, TitleDescriptionPair } from "@/types/features/nft-insights";
 

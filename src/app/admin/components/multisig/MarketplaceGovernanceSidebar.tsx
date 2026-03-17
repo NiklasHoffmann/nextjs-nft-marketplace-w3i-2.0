@@ -75,7 +75,10 @@ export function MarketplaceGovernanceSidebar({ diamondAddress }: MarketplaceGove
     const currentFeePercent = useMemo(() => formatFeePercent(currentFee as bigint | undefined), [currentFee]);
 
     const whitelistedList = Array.isArray(whitelistedCollections) ? whitelistedCollections : [];
-    const currencyList = Array.isArray(allowedCurrencies) ? allowedCurrencies : [];
+    const currencyList = useMemo(
+        () => (Array.isArray(allowedCurrencies) ? allowedCurrencies : []),
+        [allowedCurrencies]
+    );
 
     const availableTokens = useMemo(() => {
         if (!chainId) return [];

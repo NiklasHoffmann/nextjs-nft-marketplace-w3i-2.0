@@ -114,7 +114,7 @@ export default function AdminLoginPage() {
             devLog.error('Session check error:', error);
             setIsChecking(false);
         }
-    }, [address, clearSession, isConnected, redirectTo, router]);
+    }, [address, clearSession, isConnected, notifications, redirectTo, router]);
 
     const handleSwitchWallet = async () => {
         setIsSwitchingWallet(true);

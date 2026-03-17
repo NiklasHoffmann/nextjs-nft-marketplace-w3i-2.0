@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import React from "react";
 import { Inter, Poppins, Roboto } from "next/font/google";
 import { ClientLayout } from "@/components";
-import "@/app/globals.css";
+import "./globals.css";
 import "@/lib/globals";
 
 const poppins = Poppins({
