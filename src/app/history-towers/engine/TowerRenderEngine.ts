@@ -10,7 +10,7 @@
  * Extrahiert aus HistoryJumperV2.tsx für bessere Wartbarkeit
  */
 
-import type { Platform, TowerGameState, RenderContext } from '../types/historyTower.types'
+import type { Platform } from '@/app/history-towers/types/historyTower.types'
 import {
     CANVAS_WIDTH,
     CANVAS_HEIGHT,
@@ -23,10 +23,9 @@ import {
     WINDOW_SPACING,
     CHARACTER_SIZE_IN_WINDOW,
     COLORS,
-    PLATFORM_HEIGHT,
     PLATFORMS_PER_LEVEL,
     BACKGROUND_LAYER_UPDATE_THRESHOLD,
-} from '../config/gameConstants'
+} from '@/app/history-towers/config/gameConstants'
 
 export class TowerRenderEngine {
     private ctx: CanvasRenderingContext2D

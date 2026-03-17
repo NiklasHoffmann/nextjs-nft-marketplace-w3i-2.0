@@ -18,13 +18,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAccount } from 'wagmi';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
-import { useListingFlow } from '../contexts/ListingFlowContext';
+import { useListingFlow } from '@/app/sell/contexts/ListingFlowContext';
 import { useMarketplaceContracts, useMarketplaceData } from '@/hooks/marketplace';
 import { useNFTApproval } from '@/hooks/nfts';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
 import { FEATURES } from '@/config';
-import { walletNFTToAggregatedNFT, sortNFTs, filterNFTs } from '../utils';
-import type { StepStatus, ListingType, NFTFilterOptions } from '../types';
+import { walletNFTToAggregatedNFT, sortNFTs, filterNFTs } from '@/app/sell/utils';
+import type { StepStatus, ListingType, NFTFilterOptions } from '@/app/sell/types';
 import { devLog } from '@/utils';
 
 // UI Components
@@ -43,7 +43,7 @@ export function SellPage() {
     const { isConnected, address } = useAccount();
     const searchParams = useSearchParams();
     const router = useRouter();
-    const { setFormData, setProgressStep, setWhitelistStatus: setWhitelistStatusContext, setApprovalStatus: setApprovalStatusContext } = useListingFlow();
+    const { setFormData, setWhitelistStatus: setWhitelistStatusContext, setApprovalStatus: setApprovalStatusContext } = useListingFlow();
     const { marketplaceAddress } = useMarketplaceContracts();
     const { useCollectionWhitelist } = useMarketplaceData(marketplaceAddress || '0x0000000000000000000000000000000000000000');
 

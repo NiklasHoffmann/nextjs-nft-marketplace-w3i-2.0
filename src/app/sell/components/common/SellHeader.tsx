@@ -39,12 +39,12 @@ interface SellHeaderProps {
 
 export function SellHeader({
     listingType,
-    setListingType,
-    showToggle = false,
-    nftCount = 0,
-    filteredCount,
-    showProgress = true,
-    stepStates = {},
+    setListingType: _setListingType,
+    showToggle: _showToggle = false,
+    nftCount: _nftCount = 0,
+    filteredCount: _filteredCount,
+    showProgress: _showProgress = true,
+    stepStates: _stepStates = {},
     title,
     subtitle,
     icon = 'sell',

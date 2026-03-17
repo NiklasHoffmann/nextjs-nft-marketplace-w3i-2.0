@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { devLog } from '@/utils';
-import type { GameScore, TopScoresResponse } from '@/types';
+import type { GameScore } from '@/types';
 
 interface HighscoreTableProps {
     walletAddress?: string;
@@ -73,10 +73,10 @@ export default function HighscoreTable({ walletAddress, refreshTrigger }: Highsc
     // Wenn die Wallet-Adresse sich ändert und wir auf "My Scores" sind,
     // automatisch zurück zu "All Time" wechseln
     useEffect(() => {
-        if (filter === 'my-scores' && !walletAddress) {
+        if (filter === 'my-scores' && !walletAddress) { 
             setFilter('all-time');
         }
-    }, [walletAddress]);
+    }, [walletAddress, filter]);
 
     const formatDate = (date: Date | string) => {
         const d = new Date(date);

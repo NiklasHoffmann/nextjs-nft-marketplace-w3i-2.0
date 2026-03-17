@@ -26,8 +26,8 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { AVAILABLE_CHARACTERS } from '../config/gameConstants'
-import type { LoadedCharacters } from '../types/historyTower.types'
+import { AVAILABLE_CHARACTERS } from '@/app/history-towers/config/gameConstants'
+import type { LoadedCharacters } from '@/app/history-towers/types/historyTower.types'
 import { devLog } from '@/utils'
 
 /**

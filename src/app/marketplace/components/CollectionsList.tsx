@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMarketplaceCollections } from '@/hooks';
-import { useAdminStatus, useHorizontalScroll } from '@/hooks';
-import { ScrollButtons, RefreshButton, AdminDebugPanel } from '@/components/ui';
+import { useHorizontalScroll } from '@/hooks';
+import { ScrollButtons, RefreshButton } from '@/components/ui';
 import { LoadingState } from '@/components/core/Loading';
 import { CollectionCard } from './CollectionCard';
 import type { NFTSortOptions, NFTFilters } from '@/types/marketplace';
@@ -60,9 +60,8 @@ interface CollectionsListProps {
  * - useAdminStatus for admin checks
  * - Shared UI components (RefreshButton, AdminDebugPanel)
  */
-export function CollectionsList({ currentSort, onSortChange, filters }: CollectionsListProps) {
+export function CollectionsList({ currentSort, onSortChange: _onSortChange, filters }: CollectionsListProps) {
     const router = useRouter();
-    const { isAdmin } = useAdminStatus();
 
     // Horizontal scroll functionality
     const {

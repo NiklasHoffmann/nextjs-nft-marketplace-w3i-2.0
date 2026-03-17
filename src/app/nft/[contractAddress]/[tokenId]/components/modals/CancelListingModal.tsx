@@ -6,12 +6,10 @@
  */
 'use client'
 import { memo, useState, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { BaseModal } from '@/components/core/Modal';
 import { useTransactionService } from '@/services/blockchain';
 import { useMarketplaceItems } from '@/contexts/marketplace-items';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
-import { useAccount } from 'wagmi';
 import { devLog } from '@/utils';
 
 interface CancelListingModalProps {
@@ -36,8 +34,6 @@ function CancelListingModal({
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     // Hooks
-    const router = useRouter();
-    const { address } = useAccount();
     const txService = useTransactionService();
     const { removeNFT } = useMarketplaceItems();
     const { refresh: refreshWallet } = useWalletNFTs();

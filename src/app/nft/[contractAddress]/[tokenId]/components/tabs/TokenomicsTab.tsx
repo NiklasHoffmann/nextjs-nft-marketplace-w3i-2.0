@@ -13,7 +13,7 @@ export default function TokenomicsTab({
     royaltyInfo,
     tokenStandard,
     blockchain,
-    currentOwner
+    currentOwner: _currentOwner
 }: TokenomicsTabProps) {
     const chainId = useChainId();
     const tokenDecimals = getTokenDecimalsByAddress(chainId, currency);

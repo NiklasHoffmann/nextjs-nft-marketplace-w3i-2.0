@@ -3,8 +3,7 @@ import { getCurrencySymbolByAddress } from '@/config/tokens';
 import { NFTAttribute } from '@/types/features/nft-detail';
 import { NFTInsights } from '@/types';
 import { PublicNFTInsights } from '@/types';
-import { InvalidListingWarning } from '../InvalidListingWarning';
-import { useChainId } from 'wagmi';
+import { InvalidListingWarning } from '@/app/nft/[contractAddress]/[tokenId]/components/InvalidListingWarning';
 import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
 
 interface OverviewTabProps {
@@ -40,24 +39,23 @@ export default function OverviewTab({ contractAddress,
     collection,
     contractSymbol,
     description,
-    price,
+    price: _price,
     isListed,
     currentOwner,
     creator,
     seller,
     attributes,
     insights,
-    rarityRank,
-    rarityScore,
-    totalSupply,
-    blockchain,
+    rarityRank: _rarityRank,
+    rarityScore: _rarityScore,
+    totalSupply: _totalSupply,
+    blockchain: _blockchain,
     tokenStandard,
     isValid,
     invalidReasons,
     invalidatedAt,
     nftDetails
 }: OverviewTabProps) {
-    const chainId = useChainId();
     const { marketplaceAddress } = useMarketplaceContracts();
     const { innovationFeePercentage, royaltyFeePercentage } = useMarketplaceFees({
         marketplaceAddress,

@@ -10,8 +10,8 @@ interface MarketInsightsTabProps {
 }
 
 export default function MarketInsightsTab({
-    contractAddress,
-    tokenId,
+    contractAddress: _contractAddress,
+    tokenId: _tokenId,
     publicInsights,
     loading
 }: MarketInsightsTabProps) {

@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { TowerPhysicsEngine } from '../engine/TowerPhysicsEngine'
 import type { Platform } from '../types/historyTower.types'

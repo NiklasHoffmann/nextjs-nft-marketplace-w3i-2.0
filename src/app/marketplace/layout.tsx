@@ -21,7 +21,7 @@ export default function MarketplaceLayout({ children }: { children: ReactNode })
         direction: 'desc'
     });
     const [filteredCount, setFilteredCount] = useState(0);
-    const [totalItems, setTotalItems] = useState(0);
+    const [totalItems] = useState(0);
 
     // Sync URL search param with filters
     useEffect(() => {

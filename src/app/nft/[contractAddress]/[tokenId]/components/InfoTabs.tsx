@@ -76,10 +76,10 @@ function NewNFTInfoTabs({
     onToggleFavorite,
     onToggleWatchlist,
     onSetRating,
-    stats,
-    userRating,
-    isWatchlisted,
-    isFavorited,
+    stats: _stats,
+    userRating: _userRating,
+    isWatchlisted: _isWatchlisted,
+    isFavorited: _isFavorited,
     adminInsights,
     collectionInsights,
     adminInsightsLoading,
@@ -265,10 +265,6 @@ function NewNFTInfoTabs({
         onToggleFavorite,
         onToggleWatchlist,
         onSetRating,
-        stats,
-        userRating,
-        isWatchlisted,
-        isFavorited,
         adminInsights,
         collectionInsights,
         adminInsightsLoading,
@@ -277,6 +273,7 @@ function NewNFTInfoTabs({
         invalidatedAt,
         ownerBalance,
         approved,
+        isApprovedForAll,
         tokenURI
     ]);
 

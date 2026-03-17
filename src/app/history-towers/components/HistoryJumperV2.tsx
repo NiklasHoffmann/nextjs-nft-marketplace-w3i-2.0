@@ -1,29 +1,14 @@
 ﻿'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useCallback } from 'react'
 import { devLog } from '@/utils'
 import { useAccount } from 'wagmi'
 import HighscoreDialog from './HighscoreDialog'
 import type { ScoreSubmitResponse } from '@/types'
-import type { Platform } from '../types/historyTower.types'
+import type { Platform } from '@/app/history-towers/types/historyTower.types'
 import {
     CANVAS_WIDTH,
     CANVAS_HEIGHT,
-    GRAVITY,
-    JUMP_VELOCITY,
-    MOVE_SPEED_BASE,
-    MAX_FALL_SPEED,
-    AVAILABLE_CHARACTERS,
-    BRICK_WIDTH,
-    BRICK_HEIGHT,
-    BACKGROUND_SCROLL_SPEED,
-    WINDOW_WIDTH,
-    WINDOW_HEIGHT,
-    WINDOW_ARCH_HEIGHT,
-    WINDOW_SPACING,
-    CHARACTER_SIZE_IN_WINDOW,
-    COLORS,
-    PLATFORMS_PER_LEVEL,
     PLAYER_WIDTH,
     PLAYER_HEIGHT,
     MAX_VISIBLE_PLATFORMS,
@@ -33,12 +18,11 @@ import {
     PLATFORM_CLEANUP_OFFSET,
     SPAWN_THRESHOLD_Y,
     MAX_FRAME_TIME,
-    MOBILE_BREAKPOINT,
     DISTANCE_THRESHOLD_GAME_OVER,
-} from '../config/gameConstants'
-import { TowerRenderEngine } from '../engine/TowerRenderEngine'
-import { TowerPhysicsEngine } from '../engine/TowerPhysicsEngine'
-import { useTowerCharacters, useGameInput, useGameState } from '../hooks'
+} from '@/app/history-towers/config/gameConstants'
+import { TowerRenderEngine } from '@/app/history-towers/engine/TowerRenderEngine'
+import { TowerPhysicsEngine } from '@/app/history-towers/engine/TowerPhysicsEngine'
+import { useTowerCharacters, useGameInput, useGameState } from '@/app/history-towers/hooks'
 
 interface HistoryJumperV2Props {
     onGameStateChange?: (isActive: boolean) => void;
@@ -53,8 +37,6 @@ export default function HistoryJumperV2({ onGameStateChange, onLeaderboardRefres
     const {
         playerImageRef,
         windowCharactersRef,
-        playerPathRef,
-        loading: charactersLoading
     } = useTowerCharacters()
     // ===================================
 
@@ -64,7 +46,6 @@ export default function HistoryJumperV2({ onGameStateChange, onLeaderboardRefres
         motionControl,
         setTouchInput,
         toggleMotionControl,
-        resetInput
     } = useGameInput()
     // ====================================
 
@@ -140,7 +121,7 @@ export default function HistoryJumperV2({ onGameStateChange, onLeaderboardRefres
 
     const rand = (min: number, max: number) => Math.random() * (max - min) + min
 
-    function resetGame() {
+    const resetGame = useCallback(() => {
         const s = stateRef.current
         const physics = physicsEngineRef.current
 
@@ -180,7 +161,7 @@ export default function HistoryJumperV2({ onGameStateChange, onLeaderboardRefres
         s.jumpPressed = false
         resetGameState()
         updateScore(0)
-    }
+    }, [resetGameState, updateScore, HEIGHT, WIDTH])
 
     function spawnPlatformsIfNeeded() {
         const s = stateRef.current
@@ -188,11 +169,9 @@ export default function HistoryJumperV2({ onGameStateChange, onLeaderboardRefres
         if (!physics) return
 
         let minY = Infinity
-        let topPlatform: typeof s.platforms[0] | undefined
         s.platforms.forEach(p => {
             if (p.y < minY) {
                 minY = p.y
-                topPlatform = p
             }
         })
 
@@ -229,7 +208,7 @@ export default function HistoryJumperV2({ onGameStateChange, onLeaderboardRefres
         // Keine extra Level-Linien mehr - die goldenen Safe-Plattformen sind die Level-Markierungen!
 
         // ===== Layer-based Rendering: Background Layer (optimized) =====
-        const backgroundUpdated = renderEngineRef.current?.updateBackgroundLayer(s.backgroundScroll)
+        renderEngineRef.current?.updateBackgroundLayer(s.backgroundScroll)
         renderEngineRef.current?.drawBackgroundLayer()
         // ================================================================
 
@@ -431,7 +410,7 @@ export default function HistoryJumperV2({ onGameStateChange, onLeaderboardRefres
 
     useEffect(() => {
         resetGame()
-    }, [])
+    }, [resetGame])
 
     useEffect(() => {
         const canvas = canvasRef.current
@@ -441,7 +420,6 @@ export default function HistoryJumperV2({ onGameStateChange, onLeaderboardRefres
             const container = canvas.parentElement
             if (!container) return
 
-            const isMobile = window.innerWidth < MOBILE_BREAKPOINT
             const containerWidth = container.clientWidth
             const containerHeight = container.clientHeight
 
@@ -533,7 +511,7 @@ export default function HistoryJumperV2({ onGameStateChange, onLeaderboardRefres
         return () => {
             window.removeEventListener('keydown', handleKeyDown)
         }
-    }, [running, startGameState])
+    }, [running, startGameState, resetGame])
 
     const handleTouchButton = (action: 'left' | 'right' | 'jump', pressed: boolean) => {
         setTouchInput(action, pressed)

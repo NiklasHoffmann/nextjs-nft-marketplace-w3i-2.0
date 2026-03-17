@@ -53,14 +53,8 @@ export default function NFTInsightsPanel({ contractAddress, tokenId }: NFTInsigh
         };
     }, [contractAddress, tokenId]);
 
-    const [expandedSection, setExpandedSection] = useState<string | null>(null);
-
     // Check access permissions
     const canEdit = canPerformAdminActions(address);
-
-    const toggleSection = (section: string) => {
-        setExpandedSection(expandedSection === section ? null : section);
-    };
 
     // Show compact version if no insights or not connected
     if (!isConnected) {

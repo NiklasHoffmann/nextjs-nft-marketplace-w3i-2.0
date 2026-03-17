@@ -41,7 +41,7 @@ interface ListedNFTsListPropsExtended extends ListedNFTsListProps {
     onFiltersChange?: (filters: NFTFilters) => void;
 }
 
-export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, onFiltersChange }: ListedNFTsListPropsExtended = {}) {
+export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _onStatsUpdate, onFiltersChange }: ListedNFTsListPropsExtended = {}) {
     const loadMoreRef = useRef<HTMLDivElement>(null);
     const isLoadingMore = useRef(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -376,8 +376,12 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate, o
             { rootMargin: '200px', threshold: 0.1 }
         );
 
-        observer.observe(loadMoreRef.current);
-        return () => { if (loadMoreRef.current) observer.unobserve(loadMoreRef.current); };
+        const loadMoreNode = loadMoreRef.current;
+        observer.observe(loadMoreNode);
+
+        return () => {
+            observer.unobserve(loadMoreNode);
+        };
     }, [loadMore, pagination?.hasMore, loading]);
 
     // Remove isClient check to prevent title flickering - component is client-only already

@@ -9,8 +9,8 @@
 'use client';
 
 import React from 'react';
-import { useListingFlow } from '../../contexts/ListingFlowContext';
-import type { ListingStep, StepStatus, ListingType } from '../../types';
+import { useListingFlow } from '@/app/sell/contexts/ListingFlowContext';
+import type { StepStatus, ListingType } from '@/app/sell/types';
 
 interface FlowSidebarProps {
     className?: string;
@@ -21,20 +21,6 @@ interface FlowSidebarProps {
     filteredCount?: number;
     listingType?: ListingType;
 }
-
-const statusLabel: Record<StepStatus, string> = {
-    'not-started': 'Ausstehend',
-    checking: 'In Prüfung',
-    done: 'Erledigt',
-    failed: 'Aktion nötig'
-};
-
-const statusStyle: Record<StepStatus, string> = {
-    'not-started': 'border-gray-200 bg-gray-50 text-gray-500',
-    checking: 'border-blue-200 bg-blue-50 text-blue-700',
-    done: 'border-green-200 bg-green-50 text-green-700',
-    failed: 'border-red-200 bg-red-50 text-red-700'
-};
 
 interface FlowStepItem {
     id: string;
@@ -90,8 +76,8 @@ export function FlowSidebar({
     whitelistStatus = 'not-started',
     approvalStatus = 'not-started',
     selectedCount = 0,
-    totalNFTs = 0,
-    filteredCount,
+    totalNFTs: _totalNFTs = 0,
+    filteredCount: _filteredCount,
     listingType = 'single'
 }: FlowSidebarProps) {
     const { progressData } = useListingFlow();
@@ -197,8 +183,6 @@ export function FlowSidebar({
         if (step.id === activeStep.id) return 'checking';
         return 'not-started';
     };
-
-    const selectedLabel = listingType === 'batch' ? 'NFTs ausgewählt' : 'NFT ausgewählt';
 
     return (
         <aside className={`space-y-3 ${className}`}>

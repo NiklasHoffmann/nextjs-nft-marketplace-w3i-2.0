@@ -4,7 +4,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 import { useForm } from '@/hooks';
-import { useMarketplaceData } from '@/hooks/marketplace';
 import { devLog } from '@/utils';
 
 interface BatchListingFormProps {
@@ -368,8 +367,6 @@ export function BatchListingForm({
                             const collection = nfts[0];
                             if (!collection) return null;
                             const allSelected = nfts.every(nft => selectedNFTs.has(nft.key));
-                            const someSelected = nfts.some(nft => selectedNFTs.has(nft.key));
-
                             return (
                                 <div key={contractAddress} className="border border-gray-200 rounded-xl p-3 bg-gray-50">
                                     {/* Collection Header */}

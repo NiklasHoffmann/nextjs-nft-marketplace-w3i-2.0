@@ -3,15 +3,15 @@
 import React, { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useChainId } from 'wagmi';
-import { useListingFlow } from '../contexts/ListingFlowContext';
+import { useListingFlow } from '@/app/sell/contexts/ListingFlowContext';
 import NFTCard from '@/components/nft/NFTCard';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
 import { FEATURES } from '@/config';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
 import { parseUnits } from 'viem';
-import { BatchTransactionPreview } from '../components/preview';
-import { formatTokenDisplay } from '../utils';
+import { BatchTransactionPreview } from '@/app/sell/components/preview';
+import { formatTokenDisplay } from '@/app/sell/utils';
 import { resolveNftImageUrl } from '@/utils';
 
 export default function CheckListingPage() {
@@ -33,6 +33,20 @@ export default function CheckListingPage() {
 
     const isBatch = !!formData.selectedNFTs?.length && !formData.selectedNFT;
     const isBatchListingEnabled = FEATURES.SELL_BATCH_LISTING;
+
+    const targetNFTPreviewImage = useMemo(() => {
+        const rawImage =
+            formData.targetNFT?.meta?.image
+            || (formData.targetNFT as any)?.metadata?.image
+            || (formData.targetNFT as any)?.image
+            || '';
+
+        if (!rawImage) {
+            return '/media/custom-nft-3.jpg';
+        }
+
+        return resolveNftImageUrl(rawImage, '/media/custom-nft-3.jpg');
+    }, [formData.targetNFT]);
 
     // Guard: Redirect if no NFT selected
     useEffect(() => {
@@ -141,20 +155,6 @@ export default function CheckListingPage() {
             desiredTokenId: formData.targetNFT?.tokenId || null
         }
     };
-
-    const targetNFTPreviewImage = useMemo(() => {
-        const rawImage =
-            formData.targetNFT?.meta?.image
-            || (formData.targetNFT as any)?.metadata?.image
-            || (formData.targetNFT as any)?.image
-            || '';
-
-        if (!rawImage) {
-            return '/media/custom-nft-3.jpg';
-        }
-
-        return resolveNftImageUrl(rawImage, '/media/custom-nft-3.jpg');
-    }, [formData.targetNFT]);
 
     return (
         <section className="space-y-6 bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">

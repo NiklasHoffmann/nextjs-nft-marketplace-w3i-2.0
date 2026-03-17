@@ -2,7 +2,7 @@
  * NFT Search and Filter Controls
  */
 
-import type { NFTFilterOptions } from '../../types';
+import type { NFTFilterOptions } from '@/app/sell/types';
 
 interface NFTSearchFilterProps {
     filterOptions: NFTFilterOptions;
@@ -10,7 +10,7 @@ interface NFTSearchFilterProps {
     unlistedCount: number;
 }
 
-export function NFTSearchFilter({ filterOptions, onFilterChange, unlistedCount }: NFTSearchFilterProps) {
+export function NFTSearchFilter({ filterOptions, onFilterChange, unlistedCount: _unlistedCount }: NFTSearchFilterProps) {
     return (
         <div className="space-y-3">
             {/* Search Bar and Sort Controls */}

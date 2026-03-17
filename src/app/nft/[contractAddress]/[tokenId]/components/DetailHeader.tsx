@@ -19,10 +19,10 @@ export default function NFTDetailHeader({
     collection,
     contractSymbol,
     contractAddress,
-    imageUrl,
+    imageUrl: _imageUrl,
     // Keep these for backward compatibility (will be overridden by context)
     isFavorited: legacyIsFavorited,
-    onToggleFavorite: legacyOnToggleFavorite,
+    onToggleFavorite: _legacyOnToggleFavorite,
     onShare
 }: ExtendedNFTDetailHeaderProps) {
     // Get wallet connection state

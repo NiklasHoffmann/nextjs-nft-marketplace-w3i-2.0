@@ -25,7 +25,7 @@ export default function PersonalTab({
     // Legacy props - context will override these
     userInteractions: legacyUserInteractions,
     userWalletAddress: legacyUserWalletAddress,
-    loading: legacyLoading,
+    loading: _legacyLoading,
     onUpdateInteraction,
     onToggleFavorite: legacyOnToggleFavorite,
     onToggleWatchlist: legacyOnToggleWatchlist,
@@ -36,9 +36,7 @@ export default function PersonalTab({
 
     // Use the new unified stats context - this ensures real-time sync with header
     const {
-        stats,
         userInteractions,
-        loading: statsLoading,
         toggleFavorite,
         toggleWatchlist,
         setRating
@@ -46,8 +44,6 @@ export default function PersonalTab({
 
     // Use context data with fallbacks to legacy props
     const effectiveUserAddress = userAddress || legacyUserWalletAddress;
-    const effectiveUserInteractions = userInteractions || legacyUserInteractions;
-
     const [localRating, setLocalRating] = useState(() => {
         // Context userInteractions uses 'userRating', legacy uses 'rating'
         if (userInteractions) return userInteractions.userRating || 0;
@@ -81,7 +77,7 @@ export default function PersonalTab({
         setLocalRating(rating);
         setPersonalNotes(notes);
         setLastSavedNotes(notes);
-    }, [userInteractions?.userRating, legacyUserInteractions?.personalNotes]);
+    }, [userInteractions, legacyUserInteractions]);
 
     // Create effective values that handle both context and legacy data
     const effectiveIsFavorited = userInteractions?.isFavorited ?? (legacyUserInteractions as any)?.isFavorite ?? false;

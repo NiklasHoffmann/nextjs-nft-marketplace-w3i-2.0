@@ -10,7 +10,7 @@ import { useForm } from '@/hooks';
 import { ExtendedCurrencySelector } from '@/components/marketplace';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 import { ZERO_ADDRESS, getTokenConfig, isNativeETH } from '@/config/tokens';
-import { useListingFlow } from '../../contexts/ListingFlowContext';
+import { useListingFlow } from '@/app/sell/contexts/ListingFlowContext';
 import { resolveNftImageUrl, devLog } from '@/utils';
 
 export type ListingMode = 'sale' | 'trade' | 'hybrid';
@@ -36,7 +36,7 @@ interface UnifiedListingFormProps {
     }) => void;
 }
 
-export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhitelisted = true, whitelistStatus = 'not-started', approvalStatus = 'not-started', onSubmit }: UnifiedListingFormProps) {
+export function UnifiedListingForm({ selectedNFT, whitelistStatus = 'not-started', approvalStatus = 'not-started', onSubmit }: UnifiedListingFormProps) {
     const [mode, setMode] = useState<ListingMode>('sale');
     const [selectedTargetNFT, setSelectedTargetNFT] = useState<AggregatedNFT | null>(null);
     const [isSearching, setIsSearching] = useState(false);
@@ -223,7 +223,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                 : [];
 
             const effectiveTradeType = (mode === 'trade' || mode === 'hybrid')
-                ? (TRADE_SPECIFIC_ONLY ? 'specific' : values.tradeType)
+                ? 'specific'
                 : undefined;
 
             if ((mode === 'trade' || mode === 'hybrid') && effectiveTradeType === 'specific' && !selectedTargetNFT) {
@@ -246,14 +246,6 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
             });
         }
     });
-
-    useEffect(() => {
-        if (!TRADE_SPECIFIC_ONLY) return;
-        if (mode !== 'trade' && mode !== 'hybrid') return;
-        if (form.values.tradeType === 'specific') return;
-
-        form.setFieldValue('tradeType', 'specific');
-    }, [mode, form.values.tradeType]);
 
     // Get token config for selected currency
     const selectedTokenConfig = useMemo(() => {
@@ -280,8 +272,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
     const {
         hasEnoughAllowance,
         approve,
-        balance: tokenBalance,
-        isApproving
+        balance: tokenBalance
     } = useERC20({
         tokenAddress: selectedTokenConfig?.address as `0x${string}` | undefined,
         spenderAddress: marketplaceAddress,

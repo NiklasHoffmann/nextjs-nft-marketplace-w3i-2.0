@@ -11,7 +11,7 @@
 
 import React from 'react';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
-import type { ListingMode, TradeType, Currency } from '../../types';
+import type { ListingMode, TradeType, Currency } from '@/app/sell/types';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 
 interface ListingDetailsViewProps {

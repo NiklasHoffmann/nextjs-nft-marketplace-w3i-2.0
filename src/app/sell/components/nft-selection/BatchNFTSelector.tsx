@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 

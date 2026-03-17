@@ -74,7 +74,7 @@ function NFTMediaSection({
                 </div>
             </div>
         );
-    }, [mediaConfig]);
+    }, [mediaConfig, tokenId]);
 
     return (
         <div className="space-y-6">

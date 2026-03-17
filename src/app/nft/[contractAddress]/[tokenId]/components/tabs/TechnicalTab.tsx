@@ -1,7 +1,7 @@
 import { truncateAddress } from '@/utils';
 import { NFTAttribute } from '@/types/features/nft-detail';
 import { RoyaltyInfo } from '@/types';
-import { ContractInfoSection } from '../ContractInfoSection';
+import { ContractInfoSection } from '@/app/nft/[contractAddress]/[tokenId]/components/ContractInfoSection';
 
 interface TechnicalTabProps {
     contractAddress: string;

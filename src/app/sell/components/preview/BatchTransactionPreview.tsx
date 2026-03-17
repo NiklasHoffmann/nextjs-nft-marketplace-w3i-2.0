@@ -6,7 +6,7 @@ import { useMarketplaceFees, useMarketplaceContracts } from '@/hooks/marketplace
 import { ButtonSpinner } from '@/components/core/Loading';
 import { useChainId } from 'wagmi';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
-import { formatTokenDisplay } from '../../utils';
+import { formatTokenDisplay } from '@/app/sell/utils';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 
 interface BatchTransactionData {

@@ -1,4 +1,4 @@
-import { expect, afterEach, vi } from 'vitest'
+import { afterEach, vi } from 'vitest'
 import { TextDecoder, TextEncoder } from 'util'
 import { cleanup } from '@testing-library/react'
 

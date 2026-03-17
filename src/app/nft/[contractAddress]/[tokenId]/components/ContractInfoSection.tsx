@@ -28,11 +28,6 @@ interface ContractInfoSectionProps {
     isApprovedForAll?: boolean; // Operator-level approval (separate prop!)
 }
 
-function shortenAddress(address: string | null): string {
-    if (!address) return 'N/A';
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
-
 function InfoRow({ label, value, subtitle }: { label: string; value: React.ReactNode; subtitle?: string }) {
     return (
         <div className="py-3 border-b border-gray-200 last:border-0">

@@ -4,7 +4,6 @@ import { AdminNFTInsight, AdminCollectionInsight } from '@/types';
 import { TitleDescriptionPair } from '@/types/features/nft-insights';
 import { EmptyState } from '@/components/core/Empty';
 import React from 'react';
-import Link from 'next/link';
 
 interface ProjektTabProps {
   adminInsights?: AdminNFTInsight;

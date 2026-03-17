@@ -10,7 +10,7 @@
  * Extrahiert aus HistoryJumperV2.tsx für bessere Wartbarkeit
  */
 
-import type { Platform, Difficulty, TowerGameState } from '../types/historyTower.types'
+import type { Platform, Difficulty } from '@/app/history-towers/types/historyTower.types'
 import {
     CANVAS_WIDTH,
     CANVAS_HEIGHT,
@@ -18,8 +18,6 @@ import {
     JUMP_VELOCITY,
     MOVE_SPEED_BASE,
     MAX_FALL_SPEED,
-    PLAYER_WIDTH,
-    PLAYER_HEIGHT,
     PLATFORMS_PER_LEVEL,
     PLAYER_SPEED_INCREASE_PER_LEVEL,
     SPACING_DECREASE_PER_LEVEL,
@@ -37,7 +35,7 @@ import {
     HORIZONTAL_SPEED_BASE,
     HORIZONTAL_SPEED_INCREASE,
     COLLISION_CHECK_DISTANCE,
-} from '../config/gameConstants'
+} from '@/app/history-towers/config/gameConstants'
 
 export class TowerPhysicsEngine {
     private width: number

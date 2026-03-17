@@ -826,7 +826,7 @@ function BuyNowModal({
                                             This NFT requires {calculations.price.toFixed(4)} WETH. You have {wethBalance || '0'} WETH but {ethBalance || '0'} ETH.
                                         </p>
                                         <p className="text-xs text-purple-600 mt-2">
-                                            Click "Wrap ETH" to convert {calculations.price.toFixed(4)} ETH → WETH, then approve and purchase.
+                                            Click &quot;Wrap ETH&quot; to convert {calculations.price.toFixed(4)} ETH → WETH, then approve and purchase.
                                         </p>
                                     </div>
                                 </div>
@@ -1164,7 +1164,7 @@ function BuyNowModal({
                                     <div className="text-left">
                                         <p className="text-sm font-medium text-blue-900">Check your wallet</p>
                                         <p className="text-sm text-blue-700 mt-1">
-                                            A MetaMask popup should appear. If you don't see it, click the MetaMask extension icon.
+                                            A MetaMask popup should appear. If you don&apos;t see it, click the MetaMask extension icon.
                                         </p>
                                     </div>
                                 </div>
@@ -1210,7 +1210,7 @@ function BuyNowModal({
                                 <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-left">
                                     <p className="text-sm font-medium text-red-900 mb-2">💸 Insufficient Funds</p>
                                     <p className="text-sm text-red-700">
-                                        Your wallet doesn't have enough funds to complete this purchase.
+                                        Your wallet doesn&apos;t have enough funds to complete this purchase.
                                         You need at least <span className="font-semibold">{calculations.total.toFixed(4)} {currencySymbol}</span> (plus gas fees in ETH).
                                     </p>
                                     <p className="text-sm text-red-600 mt-2">

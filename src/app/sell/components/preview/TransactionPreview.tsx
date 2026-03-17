@@ -2,12 +2,12 @@
 
 import React, { useMemo } from 'react';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
-import type { ListingMode } from '../../types';
+import type { ListingMode } from '@/app/sell/types';
 import { useMarketplaceFees, useMarketplaceContracts } from '@/hooks/marketplace';
 import { ButtonSpinner } from '@/components/core/Loading';
 import { useChainId } from 'wagmi';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
-import { formatTokenDisplay } from '../../utils';
+import { formatTokenDisplay } from '@/app/sell/utils';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 
 interface TransactionData {
@@ -42,10 +42,6 @@ export function TransactionPreview({ data, onConfirm, onCancel, isLoading }: Tra
         tokenId: selectedNFT?.tokenId
     });
 
-    if (!selectedNFT) {
-        return null;
-    }
-
     const currencySymbol = useMemo(
         () => getCurrencySymbolByAddress(chainId, data.currency || ZERO_ADDRESS),
         [chainId, data.currency]
@@ -55,6 +51,10 @@ export function TransactionPreview({ data, onConfirm, onCancel, isLoading }: Tra
         () => getTokenDecimalsByAddress(chainId, data.currency || ZERO_ADDRESS),
         [chainId, data.currency]
     );
+
+    if (!selectedNFT) {
+        return null;
+    }
 
     const renderNFTCard = (nft: AggregatedNFT, title: string) => (
         <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-5 border border-gray-200 shadow-sm">

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useChainId } from 'wagmi';
 import { useForm } from '@/hooks';
-import { useListingFlow } from '../../contexts/ListingFlowContext';
+import { useListingFlow } from '@/app/sell/contexts/ListingFlowContext';
 import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
 import { useERC20 } from '@/hooks/tokens';
 import { ExtendedCurrencySelector } from '@/components/marketplace';
@@ -206,8 +206,7 @@ export function BatchPricingForm({ selectedCount, hasErc1155Selected = false, wh
     const {
         hasEnoughAllowance,
         approve,
-        balance: tokenBalance,
-        isApproving
+        balance: tokenBalance
     } = useERC20({
         tokenAddress: selectedTokenConfig?.address as `0x${string}` | undefined,
         spenderAddress: marketplaceAddress,

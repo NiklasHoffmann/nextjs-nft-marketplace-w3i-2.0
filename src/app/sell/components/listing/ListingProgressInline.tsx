@@ -5,7 +5,7 @@ import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import { useChainId } from 'wagmi';
 import { NFTCard } from '@/components/nft/NFTCard';
 import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
-import { CheckCircleIcon, SpinnerIcon } from '@/components/icons';
+import { CheckCircleIcon } from '@/components/icons';
 import { getCurrencySymbolByAddress, ZERO_ADDRESS } from '@/config/tokens';
 
 interface ListingProgressInlineProps {

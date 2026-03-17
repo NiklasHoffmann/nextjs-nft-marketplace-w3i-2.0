@@ -33,6 +33,11 @@ export function ListingProgressOverlay({
 }: ListingProgressOverlayProps) {
     const chainId = useChainId();
 
+    const currencySymbol = useMemo(
+        () => getCurrencySymbolByAddress(chainId, currency || ZERO_ADDRESS),
+        [chainId, currency]
+    );
+
     if (!isVisible) return null;
 
     const steps = [
@@ -117,10 +122,6 @@ export function ListingProgressOverlay({
     };
 
     const classes = getModeClasses();
-    const currencySymbol = useMemo(
-        () => getCurrencySymbolByAddress(chainId, currency || ZERO_ADDRESS),
-        [chainId, currency]
-    );
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">

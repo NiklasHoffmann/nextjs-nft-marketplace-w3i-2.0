@@ -23,7 +23,7 @@
  */
 
 import { useReducer, useCallback } from 'react'
-import type { GameUIState } from '../types/historyTower.types'
+import type { GameUIState } from '@/app/history-towers/types/historyTower.types'
 
 // Action Types
 type GameStateAction =

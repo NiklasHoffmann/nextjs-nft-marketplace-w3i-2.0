@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { useNFTPriceData, useMarketplaceItemDetail } from '@/hooks';
 import { useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
-import { isValidContractAddress, isValidNFTTokenId, createShareableNFTUrl, resolveNFTImageByVariant } from '@/utils';
+import { isValidContractAddress, isValidNFTTokenId, resolveNFTImageByVariant } from '@/utils';
 import { TabType } from '@/types';
 import { devLog } from '@/utils';
 import {
@@ -62,7 +62,6 @@ function NFTDetailPage() {
 
     // All stats and user interactions from NFTStatsContext
     const {
-        stats: statsData,
         userInteractions: statsUserInteractions,
         toggleFavorite: statsToggleFavorite,
         toggleWatchlist: statsToggleWatchlist,
@@ -79,20 +78,6 @@ function NFTDetailPage() {
         router.back();
     }, [router]);
 
-    const handleShare = useCallback(() => {
-        if (!contractAddress || !tokenId) return;
-        const shareUrl = createShareableNFTUrl(contractAddress, tokenId);
-        if (navigator.share) {
-            navigator.share({
-                title: `NFT ${tokenId}`,
-                text: `Check out this NFT on Ideationmarket from collection ${contractAddress}`,
-                url: shareUrl,
-            });
-        } else {
-            navigator.clipboard.writeText(shareUrl);
-        }
-    }, [contractAddress, tokenId]);
-
     const handleTabChange = useCallback((tab: TabType) => {
         setActiveTab(tab);
     }, []);
@@ -106,11 +91,11 @@ function NFTDetailPage() {
         'detail',
         nftData?.metadata?.images,
     );
-    const contractInfo = {
+    const contractInfo = useMemo(() => ({
         name: nftData?.contract?.name,
         symbol: nftData?.contract?.symbol,
         totalSupply: nftData?.contract?.totalSupply
-    };
+    }), [nftData?.contract?.name, nftData?.contract?.symbol, nftData?.contract?.totalSupply]);
     const publicInsights = nftData?.insights;
 
     const nftDetails = useMemo(() => {
@@ -264,7 +249,7 @@ function NFTDetailPage() {
         nftDetails?.desiredErc1155Quantity, nftDetails?.erc1155QuantityListed, nftDetails?.remainingQuantity,
         nftDetails?.unitPrice, nftDetails?.partialBuyEnabled,
         priceData.convertedPrice, priceData.priceLoading, priceData.selectedCurrencySymbol,
-        contractAddress, tokenId, nftData?.contract?.owner, userAddress, finalName, finalImageUrl
+        contractAddress, tokenId, nftData?.contract?.owner, nftData?.blockchain?.owner, userAddress, finalName, finalImageUrl
     ]);
 
     const infoTabsProps = useMemo(() => {
@@ -323,10 +308,6 @@ function NFTDetailPage() {
         statsUserInteractions, publicInsights, isLoading, statsToggleFavorite, statsToggleWatchlist, statsSetRating,
         isWalletConnected, nftData
     ]);
-
-    const hasProperties = useMemo(() => {
-        return metadata?.attributes && metadata.attributes.length > 0;
-    }, [metadata?.attributes]);
 
     const swapTargetProps = useMemo(() => ({
         desiredContractAddress: nftDetails?.desiredContractAddress || nftDetails?.desiredTokenAddress || "",

@@ -38,7 +38,7 @@ export default function CollectionItemsList({
     contractAddress,
     tokenId,
     name,
-    price
+    price: _price
 }: CollectionItemsListProps) {
     const router = useRouter();
     const chainId = useChainId();

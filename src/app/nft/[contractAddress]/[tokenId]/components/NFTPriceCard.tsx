@@ -3,7 +3,7 @@ import { formatUnits } from 'viem';
 import { NFTPriceCardProps } from '@/types';
 import { AddToCartButton } from '@/components/ui';
 import type { ActiveItem } from '@/types';
-import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
+import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
 import { useChainId } from 'wagmi';
 import {
     BuyNowModal,
@@ -16,7 +16,7 @@ function NFTPriceCard({
     isListed,
     convertedPrice,
     priceLoading,
-    selectedCurrencySymbol,
+    selectedCurrencySymbol: _selectedCurrencySymbol,
     contractAddress,
     tokenId,
     seller,

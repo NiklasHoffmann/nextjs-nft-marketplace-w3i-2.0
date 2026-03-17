@@ -173,7 +173,7 @@ function UpdateListingModal({
         } finally {
             setIsSubmitting(false);
         }
-    }, [listingId, contractAddress, tokenId, listingType, form, txService, refreshMarketplace]);
+    }, [listingId, contractAddress, tokenId, listingType, form, txService, refreshMarketplace, currentCurrency]);
 
     const handleClose = useCallback(() => {
         if (!isSubmitting && updateStep !== 'processing') {
