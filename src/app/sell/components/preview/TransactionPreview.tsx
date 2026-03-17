@@ -8,6 +8,7 @@ import { ButtonSpinner } from '@/components/core/Loading';
 import { useChainId } from 'wagmi';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
 import { formatTokenDisplay } from '../../utils';
+import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 
 interface TransactionData {
     mode: ListingMode;
@@ -59,11 +60,19 @@ export function TransactionPreview({ data, onConfirm, onCancel, isLoading }: Tra
         <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-5 border border-gray-200 shadow-sm">
             <h3 className="text-lg font-medium text-gray-900 mb-3">{title}</h3>
             <div className="flex gap-4">
-                <img
-                    src={nft.meta?.image || '/media/custom-nft.jpg'}
-                    alt={nft.core.name || nft.meta?.name || `NFT #${nft.tokenId}`}
-                    className="w-24 h-24 rounded-xl object-cover shadow-md hover:shadow-lg transition-shadow duration-300"
-                />
+                <div className="w-24 h-24 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 relative">
+                    <OptimizedNFTImage
+                        imageUrl={nft.meta?.image || '/media/custom-nft.jpg'}
+                        tokenId={String(nft.tokenId)}
+                        alt={nft.core.name || nft.meta?.name || `NFT #${nft.tokenId}`}
+                        imageVariants={nft.meta?.images}
+                        blurDataURL={nft.meta?.blurDataURL}
+                        variant="card"
+                        disableVisualEffects={true}
+                        className="object-cover"
+                        fill={true}
+                    />
+                </div>
                 <div>
                     <h4 className="font-medium text-gray-900">
                         {nft.core.name || nft.meta?.name || `NFT #${nft.tokenId}`}
@@ -140,11 +149,19 @@ export function TransactionPreview({ data, onConfirm, onCancel, isLoading }: Tra
                     <div className="bg-white rounded-xl p-4 border border-green-200 shadow-sm">
                         <p className="text-xs text-gray-600 mb-2">Gewünschter NFT:</p>
                         <div className="flex gap-3">
-                            <img
-                                src={data.targetNFT.meta?.image || '/media/custom-nft-3.jpg'}
-                                alt={data.targetNFT.core.name || data.targetNFT.meta?.name || `NFT #${data.targetNFT.tokenId}`}
-                                className="w-20 h-20 rounded-lg object-cover shadow-md hover:shadow-lg transition-shadow duration-300"
-                            />
+                            <div className="w-20 h-20 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 relative">
+                                <OptimizedNFTImage
+                                    imageUrl={data.targetNFT.meta?.image || '/media/custom-nft-3.jpg'}
+                                    tokenId={String(data.targetNFT.tokenId)}
+                                    alt={data.targetNFT.core.name || data.targetNFT.meta?.name || `NFT #${data.targetNFT.tokenId}`}
+                                    imageVariants={data.targetNFT.meta?.images}
+                                    blurDataURL={data.targetNFT.meta?.blurDataURL}
+                                    variant="card"
+                                    disableVisualEffects={true}
+                                    className="object-cover"
+                                    fill={true}
+                                />
+                            </div>
                             <div>
                                 <h4 className="font-medium text-gray-900 text-sm">
                                     {data.targetNFT.core.name || data.targetNFT.meta?.name || `NFT #${data.targetNFT.tokenId}`}

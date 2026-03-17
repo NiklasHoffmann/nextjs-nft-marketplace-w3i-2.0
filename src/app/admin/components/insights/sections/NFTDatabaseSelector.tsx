@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
+import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 import { devLog } from '@/utils';
 import { AddressWithEns } from '@/app/admin/components/shared/AddressWithEns';
 
@@ -123,11 +124,15 @@ export default function NFTDatabaseSelector({
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             {selectedNFT.image && (
-                                <img
-                                    src={selectedNFT.image}
-                                    alt={selectedNFT.name || 'NFT'}
-                                    className="w-12 h-12 rounded object-cover"
-                                />
+                                <div className="w-12 h-12 rounded overflow-hidden relative">
+                                    <OptimizedNFTImage
+                                        imageUrl={selectedNFT.image}
+                                        tokenId={selectedNFT.tokenId}
+                                        alt={selectedNFT.name || 'NFT'}
+                                        className="object-cover"
+                                        fill={true}
+                                    />
+                                </div>
                             )}
                             <div>
                                 <p className="font-medium text-gray-900">
@@ -175,11 +180,15 @@ export default function NFTDatabaseSelector({
                                 className="w-full px-4 py-3 hover:bg-gray-50 flex items-center gap-3 text-left border-b border-gray-100 last:border-b-0"
                             >
                                 {nft.image && (
-                                    <img
-                                        src={nft.image}
-                                        alt={nft.name || 'NFT'}
-                                        className="w-10 h-10 rounded object-cover flex-shrink-0"
-                                    />
+                                    <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0 relative">
+                                        <OptimizedNFTImage
+                                            imageUrl={nft.image}
+                                            tokenId={nft.tokenId}
+                                            alt={nft.name || 'NFT'}
+                                            className="object-cover"
+                                            fill={true}
+                                        />
+                                    </div>
                                 )}
                                 <div className="flex-1 min-w-0">
                                     <p className="font-medium text-gray-900 truncate">

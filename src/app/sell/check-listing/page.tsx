@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useChainId } from 'wagmi';
 import { useListingFlow } from '../contexts/ListingFlowContext';
 import NFTCard from '@/components/nft/NFTCard';
+import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
 import { FEATURES } from '@/config';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
 import { parseUnits } from 'viem';
 import { BatchTransactionPreview } from '../components/preview';
 import { formatTokenDisplay } from '../utils';
-import { convertIpfsToHttp } from '@/utils';
+import { resolveNftImageUrl } from '@/utils';
 
 export default function CheckListingPage() {
     const router = useRouter();
@@ -152,7 +153,7 @@ export default function CheckListingPage() {
             return '/media/custom-nft-3.jpg';
         }
 
-        return convertIpfsToHttp(rawImage);
+        return resolveNftImageUrl(rawImage, '/media/custom-nft-3.jpg');
     }, [formData.targetNFT]);
 
     return (
@@ -299,15 +300,15 @@ export default function CheckListingPage() {
                                     <div className="bg-white rounded-lg border border-green-200 p-4">
                                         <p className="text-xs text-gray-600 mb-2">Gewünschter NFT:</p>
                                         <div className="flex gap-3">
-                                            <img
-                                                src={targetNFTPreviewImage}
-                                                alt={formData.targetNFT.core.name || `NFT #${formData.targetNFT.tokenId}`}
-                                                onError={(event) => {
-                                                    event.currentTarget.onerror = null;
-                                                    event.currentTarget.src = '/media/custom-nft-3.jpg';
-                                                }}
-                                                className="w-16 h-16 rounded-lg object-cover"
-                                            />
+                                            <div className="w-16 h-16 rounded-lg overflow-hidden relative">
+                                                <OptimizedNFTImage
+                                                    imageUrl={targetNFTPreviewImage}
+                                                    tokenId={String(formData.targetNFT.tokenId)}
+                                                    alt={formData.targetNFT.core.name || `NFT #${formData.targetNFT.tokenId}`}
+                                                    className="object-cover"
+                                                    fill={true}
+                                                />
+                                            </div>
                                             <div>
                                                 <h4 className="font-medium text-gray-900 text-sm">
                                                     {formData.targetNFT.core.name || `NFT #${formData.targetNFT.tokenId}`}

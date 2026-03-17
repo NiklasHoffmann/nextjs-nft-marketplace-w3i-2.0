@@ -7,6 +7,7 @@
 
 import { getNFTSyncService } from '@/services/nft-sync';
 import { devLog } from '@/utils';
+import { initializeBackgroundServices } from '@/lib/init-services';
 
 let devServicesStarted = false;
 
@@ -19,15 +20,15 @@ export async function startDevServices() {
     devLog.info('\n🚀 [Dev Mode] Auto-starting background services...');
 
     try {
+        // Use the shared initializer so dev/prod start behavior stays consistent.
+        // This includes NFT sync, image enrichment and optional prewarm jobs.
+        await initializeBackgroundServices({ waitForReady: false });
         const syncService = getNFTSyncService();
-        const status = syncService.getStatus();
+        const syncStatus = syncService.getStatus();
 
-        if (!status.isRunning) {
-            await syncService.start();
-            devLog.info('✅ [Dev Mode] NFT Sync Service started\n');
-        } else {
-            devLog.warn('⚠️ [Dev Mode] NFT Sync Service already running\n');
-        }
+        devLog.info(
+            `✅ [Dev Mode] Background services startup triggered (sync running=${Boolean(syncStatus?.isRunning)})\n`
+        );
     } catch (error) {
         devLog.error('❌ [Dev Mode] Failed to start background services:', error);
     }

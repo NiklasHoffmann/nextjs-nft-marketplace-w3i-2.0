@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { useNFTPriceData, useMarketplaceItemDetail } from '@/hooks';
 import { useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
-import { isValidContractAddress, isValidNFTTokenId, createShareableNFTUrl } from '@/utils';
+import { isValidContractAddress, isValidNFTTokenId, createShareableNFTUrl, resolveNFTImageByVariant } from '@/utils';
 import { TabType } from '@/types';
 import { devLog } from '@/utils';
 import {
@@ -101,7 +101,11 @@ function NFTDetailPage() {
 
     // Extract data from MongoDB response
     const metadata = nftData?.metadata;
-    const imageUrl = nftData?.metadata?.image;
+    const imageUrl = resolveNFTImageByVariant(
+        nftData?.metadata?.imageOriginal || nftData?.metadata?.image || '',
+        'detail',
+        nftData?.metadata?.images,
+    );
     const contractInfo = {
         name: nftData?.contract?.name,
         symbol: nftData?.contract?.symbol,

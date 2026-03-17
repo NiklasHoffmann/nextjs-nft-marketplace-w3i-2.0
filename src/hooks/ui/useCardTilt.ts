@@ -71,7 +71,7 @@ export function useCardTilt(options: UseCardTiltOptions = {}): UseCardTiltReturn
     // State
     const [currentRotation, setCurrentRotation] = useState({ rotateX: 0, rotateY: 0 });
     const [tiltStyle, setTiltStyle] = useState<TiltStyle>({
-        transform: `perspective(${perspective}px) rotateX(0deg) rotateY(0deg)`,
+        transform: 'none',
         transformOrigin: 'center center',
         transition: 'none',
     });
@@ -143,7 +143,7 @@ export function useCardTilt(options: UseCardTiltOptions = {}): UseCardTiltReturn
 
         setCurrentRotation({ rotateX: 0, rotateY: 0 });
         setTiltStyle({
-            transform: `perspective(${perspective}px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`,
+            transform: 'none',
             transformOrigin: 'center center',
             transition: 'transform 0.3s ease-out',
         });

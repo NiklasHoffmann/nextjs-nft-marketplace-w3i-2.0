@@ -1018,6 +1018,7 @@ export function CartPage() {
                                                             imageUrl={item.imageUrl}
                                                             tokenId={item.tokenId}
                                                             alt={item.name || `NFT #${item.tokenId}`}
+                                                            variant="small"
                                                             className="object-cover rounded-lg"
                                                             width={80}
                                                             height={80}

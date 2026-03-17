@@ -6,7 +6,9 @@
  */
 
 import { getNFTSyncService } from '@/services/nft-sync';
+import { imageEnrichmentSync } from '@/services/nft-sync/image-enrichment-sync';
 import { devLog } from '@/utils';
+import { extractIpfsInfoFromUrl } from '@/utils/nft/image-url';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -22,6 +24,7 @@ interface InitializeBackgroundServicesOptions {
     enableIndexSetup?: boolean;
     enableMarketplacePrewarm?: boolean;
     enableImagePrewarm?: boolean;
+    enableImageEnrichment?: boolean;
 }
 
 const isEnabled = (value: string | undefined, defaultValue: boolean): boolean => {
@@ -77,6 +80,7 @@ async function prewarmImageCache(): Promise<void> {
     const CACHE_DIR = path.join(process.cwd(), 'public', 'cached-nft-images');
     const IMAGE_API_BASE = '/api/nft/image/';
     const CONCURRENT = 3; // max parallel IPFS downloads
+    const CACHE_SCHEMA_VERSION = 'v6';
 
     try {
         // Dynamically import heavy modules — only available on server
@@ -98,12 +102,10 @@ async function prewarmImageCache(): Promise<void> {
             const url: string | undefined = nft.metadata?.image;
             if (!url) continue;
 
-            let hash: string | null = null;
-            if (url.startsWith('ipfs://')) {
-                hash = url.replace('ipfs://', '');
-            } else if (url.includes('/ipfs/')) {
-                hash = url.split('/ipfs/')[1] || null;
-            }
+            const ipfsInfo = extractIpfsInfoFromUrl(url);
+            const hash = ipfsInfo
+                ? (ipfsInfo.path ? `${ipfsInfo.hash}/${ipfsInfo.path}` : ipfsInfo.hash)
+                : null;
             if (hash) hashes.push(hash);
         }
 
@@ -112,12 +114,12 @@ async function prewarmImageCache(): Promise<void> {
 
         // Filter to only uncached hashes (fast fs.access check)
         await fs.mkdir(CACHE_DIR, { recursive: true });
+        const cachedFiles = await fs.readdir(CACHE_DIR);
         const uncached: string[] = [];
         for (const hash of hashes) {
-            const safeName = `${encodeURIComponent(hash)}.webp`;
-            try {
-                await fs.access(path.join(CACHE_DIR, safeName));
-            } catch {
+            const safeBase = `${encodeURIComponent(hash)}.${CACHE_SCHEMA_VERSION}`;
+            const hasVersionedVariant = cachedFiles.some((file) => file.startsWith(`${safeBase}.`));
+            if (!hasVersionedVariant) {
                 uncached.push(hash);
             }
         }
@@ -160,6 +162,7 @@ export async function initializeBackgroundServices(options: InitializeBackground
         enableIndexSetup,
         enableMarketplacePrewarm,
         enableImagePrewarm,
+        enableImageEnrichment,
     } = options;
     const role = resolveRuntimeRole(runtimeRole);
     const shouldRunInThisProcess = role !== 'web';
@@ -190,6 +193,7 @@ export async function initializeBackgroundServices(options: InitializeBackground
             const runIndexSetup = enableIndexSetup ?? isEnabled(process.env.BACKGROUND_ENABLE_INDEX_SETUP, true);
             const runMarketplacePrewarm = enableMarketplacePrewarm ?? isEnabled(process.env.BACKGROUND_ENABLE_MARKETPLACE_PREWARM, true);
             const runImagePrewarm = enableImagePrewarm ?? isEnabled(process.env.BACKGROUND_ENABLE_IMAGE_PREWARM, true);
+            const runImageEnrichment = enableImageEnrichment ?? isEnabled(process.env.BACKGROUND_ENABLE_IMAGE_ENRICHMENT, true);
 
             // Start NFT Sync Service (includes WebSocket Event Listener + GraphQL Fallback)
             const syncService = getNFTSyncService();
@@ -222,6 +226,12 @@ export async function initializeBackgroundServices(options: InitializeBackground
                 setTimeout(() => {
                     prewarmImageCache().catch(e => devLog.warn('ImagePrewarm error:', e));
                 }, 10_000);
+            }
+
+            if (runImageEnrichment) {
+                setTimeout(() => {
+                    imageEnrichmentSync.start();
+                }, 12_000);
             }
         } catch (error) {
             devLog.error('❌ Failed to initialize background services:', error);

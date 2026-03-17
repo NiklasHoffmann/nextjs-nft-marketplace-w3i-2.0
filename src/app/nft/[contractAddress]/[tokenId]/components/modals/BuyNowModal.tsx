@@ -707,6 +707,7 @@ function BuyNowModal({
                                         imageUrl={nftImage || '/media/custom-nft.jpg'}
                                         tokenId={tokenId}
                                         alt={nftName || `NFT #${tokenId}`}
+                                        variant="small"
                                         fill
                                         className="object-cover"
                                     />

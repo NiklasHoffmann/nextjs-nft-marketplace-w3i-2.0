@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react';
-import Image from 'next/image';
+import { OptimizedNFTImage } from '@/components/nft';
 import { NFTMediaSectionProps } from '@/types';
-import { formatNFTDisplayName, convertIpfsToHttp } from '@/utils';
+import { formatNFTDisplayName, convertIpfsToHttp, resolveNftImageUrl } from '@/utils';
 
 function NFTMediaSection({
     imageUrl,
@@ -23,8 +23,8 @@ function NFTMediaSection({
             hasImage,
             displayName,
             videoSrc: convertIpfsToHttp(animationUrl || videoUrl || ''),
-            poster: imageUrl ? convertIpfsToHttp(imageUrl) : undefined,
-            imageSrc: imageUrl ? convertIpfsToHttp(imageUrl) : '',
+            poster: imageUrl ? resolveNftImageUrl(imageUrl, convertIpfsToHttp(imageUrl)) : undefined,
+            imageSrc: imageUrl ? resolveNftImageUrl(imageUrl, imageUrl) : '',
             audioSrc: audioUrl ? convertIpfsToHttp(audioUrl) : ''
         };
     }, [animationUrl, videoUrl, audioUrl, imageUrl, name, tokenId]);
@@ -49,17 +49,16 @@ function NFTMediaSection({
         if (mediaConfig.hasImage) {
             return (
                 <div className="bg-gray-100 rounded-2xl shadow-lg overflow-hidden w-full">
-                    <Image
-                        src={mediaConfig.imageSrc}
+                    <OptimizedNFTImage
+                        imageUrl={mediaConfig.imageSrc}
+                        tokenId={String(tokenId)}
                         alt={mediaConfig.displayName}
+                        variant="detail"
+                        className="w-full h-auto object-contain"
                         width={800}
                         height={800}
-                        className="w-full h-auto object-contain"
                         sizes="(max-width: 768px) 100vw, (max-width: 1280px) 78vw, 960px"
                         priority={true}
-                        quality={90}
-                        placeholder="blur"
-                        blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx4f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bz6rasJsTat2yg4dCLwGRupfphjnFBYc8BUx/9k="
                     />
                 </div>
             );

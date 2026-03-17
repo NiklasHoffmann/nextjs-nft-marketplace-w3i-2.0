@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useListingFlow } from '../contexts/ListingFlowContext';
 import NFTCard from '@/components/nft/NFTCard';
+import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 import Link from 'next/link';
 import { useMarketplaceItems } from '@/contexts/marketplace-items';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
@@ -12,7 +13,7 @@ import type { AggregatedNFT } from '@/types/core/core-nft-modern';
 import { invalidateAfterListing } from '@/services/validation';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
 import { useChainId } from 'wagmi';
-import { devLog } from '@/utils';
+import { devLog, resolveNftImageUrl } from '@/utils';
 
 export default function SuccessPage() {
     const router = useRouter();
@@ -350,11 +351,13 @@ export default function SuccessPage() {
                             <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
                                 {selectedNFTs.map((nft, idx) => (
                                     <div key={nft.key} className="relative">
-                                        <div className="aspect-square rounded-lg overflow-hidden border border-gray-200">
-                                            <img
-                                                src={nft.meta?.image || '/media/custom-nft.jpg'}
+                                        <div className="aspect-square rounded-lg overflow-hidden border border-gray-200 relative">
+                                            <OptimizedNFTImage
+                                                imageUrl={nft.meta?.image || '/media/custom-nft.jpg'}
+                                                tokenId={String(nft.tokenId)}
                                                 alt={nft.meta?.name || `NFT #${nft.tokenId}`}
-                                                className="w-full h-full object-cover"
+                                                className="object-cover"
+                                                fill={true}
                                             />
                                         </div>
                                         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">

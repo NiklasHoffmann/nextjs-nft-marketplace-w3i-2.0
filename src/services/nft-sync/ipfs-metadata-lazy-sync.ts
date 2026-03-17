@@ -11,15 +11,70 @@
 
 import { getCollection } from '@/lib/mongodb';
 import { devLog } from '@/utils';
+import { buildNFTImageVariants } from '@/utils/nft/image-variants';
 
 export interface IPFSMetadata {
     name?: string;
     description?: string;
     image?: string;
+    imageOriginal?: string;
+    images?: {
+        thumb?: string | null;
+        small?: string | null;
+        card?: string | null;
+        detail?: string | null;
+        original?: string | null;
+    };
+    imageMeta?: {
+        width?: number | null;
+        height?: number | null;
+        mimeType?: string | null;
+    };
+    blurDataURL?: string | null;
     attributes?: Array<{ trait_type: string; value: string | number }>;
     external_url?: string;
     animation_url?: string;
     background_color?: string;
+}
+
+function buildBlurDataPlaceholder(contractAddress: string, tokenId: string): string {
+    const seed = `${contractAddress.toLowerCase()}-${tokenId}`;
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+        hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+        hash |= 0;
+    }
+
+    const hue = Math.abs(hash) % 360;
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop stop-color='hsl(${hue} 60% 72%)'/><stop offset='1' stop-color='hsl(${(hue + 26) % 360} 58% 58%)'/></linearGradient></defs><rect width='16' height='16' fill='url(#g)'/></svg>`;
+
+    return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+}
+
+function enrichMetadataWithImageSet(
+    metadata: IPFSMetadata,
+    contractAddress: string,
+    tokenId: string,
+): IPFSMetadata {
+    const sourceImage = metadata.imageOriginal || metadata.image || null;
+    if (!sourceImage) return metadata;
+
+    const variants = metadata.images && Object.keys(metadata.images).length > 0
+        ? metadata.images
+        : buildNFTImageVariants(sourceImage);
+
+    return {
+        ...metadata,
+        imageOriginal: metadata.imageOriginal || sourceImage,
+        image: metadata.image || variants.card || variants.detail || variants.original || sourceImage,
+        images: variants,
+        imageMeta: metadata.imageMeta || {
+            width: null,
+            height: null,
+            mimeType: null,
+        },
+        blurDataURL: metadata.blurDataURL || buildBlurDataPlaceholder(contractAddress, tokenId),
+    };
 }
 
 function normalizeErc1155TokenUri(tokenUri: string, tokenId: bigint): string {
@@ -43,6 +98,27 @@ export class IPFSMetadataLazySync {
             });
 
             if (existing?.metadata) {
+                const needsImageBackfill = !existing.metadata?.images || !existing.metadata?.imageOriginal;
+                if (needsImageBackfill) {
+                    const enrichedExistingMetadata = enrichMetadataWithImageSet(
+                        existing.metadata as IPFSMetadata,
+                        contractAddress,
+                        tokenId,
+                    );
+
+                    await nftMetadata.updateOne(
+                        { contractAddress, tokenId },
+                        {
+                            $set: {
+                                metadata: enrichedExistingMetadata,
+                                updatedAt: new Date(),
+                            },
+                        },
+                    );
+
+                    return enrichedExistingMetadata;
+                }
+
                 devLog.info(`  ✅ Metadata already cached for ${contractAddress}/${tokenId}`);
                 return existing.metadata as IPFSMetadata;
             }
@@ -66,6 +142,8 @@ export class IPFSMetadataLazySync {
                 return null;
             }
 
+            const enrichedMetadata = enrichMetadataWithImageSet(metadata, contractAddress, tokenId);
+
             // Store in nft_metadata (infinite cache - IPFS is immutable)
             await nftMetadata.updateOne(
                 { contractAddress, tokenId },
@@ -74,7 +152,7 @@ export class IPFSMetadataLazySync {
                         // CRITICAL: Set contractAddress and tokenId explicitly for upsert
                         contractAddress,
                         tokenId,
-                        metadata,
+                        metadata: enrichedMetadata,
                         metadataFetchedAt: new Date(),
                         'contract.tokenURI': tokenURI,
                         'contract.contractType': tokenUriResult?.tokenStandard || null,
@@ -87,9 +165,9 @@ export class IPFSMetadataLazySync {
                 { upsert: true }
             );
 
-            devLog.info(`  ✅ Metadata stored: ${metadata.name || 'Unnamed NFT'}`);
+            devLog.info(`  ✅ Metadata stored: ${enrichedMetadata.name || 'Unnamed NFT'}`);
 
-            return metadata;
+            return enrichedMetadata;
 
         } catch (error) {
             devLog.error(`❌ Error fetching metadata for ${contractAddress}/${tokenId}:`, error);
@@ -234,6 +312,10 @@ export class IPFSMetadataLazySync {
             // Process image URL
             if (metadata.image && metadata.image.startsWith('ipfs://')) {
                 metadata.image = metadata.image.replace('ipfs://', 'https://ipfs.io/ipfs/');
+            }
+
+            if (metadata.image) {
+                metadata.imageOriginal = metadata.image;
             }
 
             return metadata;

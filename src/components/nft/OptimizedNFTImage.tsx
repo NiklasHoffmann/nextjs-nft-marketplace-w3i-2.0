@@ -1,7 +1,13 @@
 ﻿"use client";
 
-import Image from "next/image";
 import { useState, memo, useCallback, useRef, useEffect, useMemo } from "react";
+import {
+    getNFTVariantWidth,
+    type NFTImageVariant,
+    type NFTImageVariants,
+    resolveNFTImageByVariant,
+    resolveNftImageCandidates,
+} from "@/utils";
 
 // Simple loading skeleton component
 const ImageSkeleton = memo(({ className, width, height, fill }: {
@@ -21,6 +27,7 @@ ImageSkeleton.displayName = 'ImageSkeleton';
 
 interface OptimizedNFTImageProps {
     imageUrl: string;
+    imageVariants?: NFTImageVariants | null;
     tokenId: string;
     alt?: string;
     className?: string;
@@ -29,9 +36,22 @@ interface OptimizedNFTImageProps {
     height?: number;
     sizes?: string;
     priority?: boolean;
+    variant?: NFTImageVariant;
+    blurDataURL?: string | null;
+    disableVisualEffects?: boolean;
     // New prop for glitter effect synchronization
     tiltRotation?: { rotateX: number; rotateY: number };
 }
+
+const inferVariantFromSize = (width: number, height: number): NFTImageVariant => {
+    const maxSize = Math.max(width || 0, height || 0);
+
+    if (maxSize <= 160) return 'thumb';
+    if (maxSize <= 260) return 'small';
+    if (maxSize <= 760) return 'card';
+
+    return 'detail';
+};
 
 // Cache with timestamp for expired retry logic
 interface CacheEntry {
@@ -42,7 +62,7 @@ interface CacheEntry {
 // Storage key for localStorage persistence
 const STORAGE_KEY = 'nft-image-cache-v1';
 const SUCCESS_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
-const FAILURE_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const FAILURE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 class ImageCache {
     private cache = new Map<string, CacheEntry>();
@@ -57,11 +77,11 @@ class ImageCache {
                 const stored = localStorage.getItem(STORAGE_KEY);
                 if (stored) {
                     const parsed = JSON.parse(stored) as [string, CacheEntry][];
-                    // Load successful entries and recent failed entries.
+                    // Persist only successful entries to avoid long-lived false negatives.
                     const now = Date.now();
                     parsed.forEach(([key, entry]) => {
                         const age = now - entry.timestamp;
-                        if ((entry.success && age < SUCCESS_CACHE_TTL) || (!entry.success && age < this.failureRetryTime)) {
+                        if (entry.success && age < SUCCESS_CACHE_TTL) {
                             this.cache.set(key, entry);
                         }
                     });
@@ -82,12 +102,12 @@ class ImageCache {
 
         this.saveDebounceTimer = setTimeout(() => {
             try {
-                // Save successful entries and recent failed entries
+                // Save only successful entries. Failed attempts stay in-memory for short-term backoff.
                 const now = Date.now();
                 const entries = Array.from(this.cache.entries())
                     .filter(([_, entry]) => {
                         const age = now - entry.timestamp;
-                        return (entry.success && age < SUCCESS_CACHE_TTL) || (!entry.success && age < this.failureRetryTime);
+                        return entry.success && age < SUCCESS_CACHE_TTL;
                     })
                     .slice(-this.maxSize); // Keep latest entries
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
@@ -131,70 +151,6 @@ class ImageCache {
 
 const imageLoadCache = new ImageCache();
 
-// Matches bare IPFS CIDs: CIDv0 (Qm..., 46 chars) and CIDv1 (bafy..., bafk..., etc.)
-const BARE_CID_REGEX = /^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{58,})(\/.*)?$/;
-
-// Extract IPFS hash from various URL formats (including path after hash)
-const extractIPFSInfo = (url: string): { hash: string; path: string } | null => {
-    if (!url) return null;
-
-    // ipfs:// protocol
-    if (url.startsWith('ipfs://')) {
-        const parts = url.replace('ipfs://', '').split('/');
-        const hash = parts[0];
-        const path = parts.slice(1).join('/');
-        return hash ? { hash, path } : null;
-    }
-
-    // HTTP IPFS gateway URLs
-    if (url.includes('/ipfs/')) {
-        const afterIpfs = url.split('/ipfs/')[1];
-        if (!afterIpfs) return null;
-        const parts = afterIpfs.split('/');
-        const hash = parts[0];
-        const path = parts.slice(1).join('/');
-        return hash ? { hash, path } : null;
-    }
-
-    // Bare CID (no protocol prefix) — e.g. "QmTKHm7x..." or "bafybei..."
-    const bareMatch = BARE_CID_REGEX.exec(url);
-    if (bareMatch) {
-        const hash = bareMatch[1]!;
-        const path = bareMatch[2] ? bareMatch[2].slice(1) : ''; // strip leading /
-        return { hash, path };
-    }
-
-    return null;
-};
-
-// Convert IPFS URLs to use our server-side proxy/cache only.
-// Public gateway fallbacks in the browser caused inconsistent quality/latency.
-const optimizeImageUrl = (url: string): string[] => {
-    if (!url) return [];
-
-    // Extract IPFS hash and path
-    const ipfsInfo = extractIPFSInfo(url);
-
-    // If it's an IPFS URL, always use our server cache route.
-    if (ipfsInfo) {
-        const { hash, path: ipfsPath } = ipfsInfo;
-        const fullHash = ipfsPath ? `${hash}/${ipfsPath}` : hash;
-
-        return [
-            `/api/nft/image/${encodeURIComponent(fullHash)}` // Server cache + server-side gateway fallback
-        ];
-    }
-
-    // If it's already a non-IPFS HTTP URL, use it directly
-    if (url.startsWith('http')) {
-        return [url];
-    }
-
-    // Relative path or unknown format — not a valid standalone URL, return empty
-    // (avoids browser treating bare filenames like "Image4.jpg" as hostnames)
-    return [];
-};
-
 const selectInitialImageIndex = (urls: string[]): number => {
     if (urls.length === 0) return 0;
 
@@ -217,13 +173,9 @@ const selectInitialImageIndex = (urls: string[]): number => {
     return 0;
 };
 
-const hasLoadableImageUrl = (urls: string[]): boolean => {
-    if (urls.length === 0) return false;
-    return urls.some((url) => imageLoadCache.get(url) !== false);
-};
-
 const OptimizedNFTImage = memo(({
     imageUrl,
+    imageVariants,
     tokenId,
     alt,
     className = "",
@@ -232,12 +184,30 @@ const OptimizedNFTImage = memo(({
     height = 256,
     sizes,
     priority = false,
+    variant,
+    blurDataURL,
+    disableVisualEffects = false,
     tiltRotation = { rotateX: 0, rotateY: 0 },
 }: OptimizedNFTImageProps) => {
     const normalizedImageUrl = imageUrl?.trim() || '';
+    // `fill` images often receive default width/height props (256x256),
+    // which can under-select a too-small variant and look pixelated after lazy load.
+    const resolvedVariant = variant || (fill ? 'card' : inferVariantFromSize(width, height));
+    const selectedVariantSource = useMemo(
+        () => resolveNFTImageByVariant(normalizedImageUrl, resolvedVariant, imageVariants),
+        [normalizedImageUrl, resolvedVariant, imageVariants],
+    );
+    const variantWidth = getNFTVariantWidth(resolvedVariant);
 
     // Get all possible URLs for this image (memoized to keep effect dependencies stable)
-    const imageUrls = useMemo(() => optimizeImageUrl(normalizedImageUrl), [normalizedImageUrl]);
+    const imageUrls = useMemo(() => {
+        const urls = resolveNftImageCandidates(selectedVariantSource, { width: variantWidth });
+        if (urls.length > 0) {
+            return urls;
+        }
+
+        return resolveNftImageCandidates(normalizedImageUrl, { width: variantWidth });
+    }, [selectedVariantSource, normalizedImageUrl, variantWidth]);
 
     // Check if image is likely cached BEFORE setting initial loading state ⚡
     const isCachedInitially = useMemo(() => {
@@ -247,16 +217,11 @@ const OptimizedNFTImage = memo(({
         return imageLoadCache.get(cacheKey) === true;
     }, [imageUrls]);
 
-    const hasAnyLoadableUrl = useMemo(() => hasLoadableImageUrl(imageUrls), [imageUrls]);
-
     const initialFallbackIndex = useMemo(() => selectInitialImageIndex(imageUrls), [imageUrls]);
 
     const [isLoading, setIsLoading] = useState(!isCachedInitially); // Start as loaded if cached!
-    const [hasError, setHasError] = useState(imageUrls.length === 0 || !hasAnyLoadableUrl);
-    const [currentImageUrl, setCurrentImageUrl] = useState(() => {
-        if (!hasAnyLoadableUrl) return '';
-        return imageUrls[initialFallbackIndex] || '';
-    });
+    const [hasError, setHasError] = useState(imageUrls.length === 0);
+    const [currentImageUrl, setCurrentImageUrl] = useState(() => imageUrls[initialFallbackIndex] || '');
     const [fallbackIndex, setFallbackIndex] = useState(initialFallbackIndex);
     const [aspectRatio, setAspectRatio] = useState<number | null>(null);
     const [isIntersecting, setIsIntersecting] = useState(priority || isCachedInitially);
@@ -287,8 +252,6 @@ const OptimizedNFTImage = memo(({
         }
 
         if (cachedResult === false) {
-            setHasError(true);
-            setCurrentImageUrl('');
             setIsLoading(false);
             return;
         }
@@ -319,16 +282,9 @@ const OptimizedNFTImage = memo(({
 
     // Update current image URL when imageUrl prop changes - OPTIMIZED FOR CACHE
     useEffect(() => {
-        const newUrls = optimizeImageUrl(normalizedImageUrl);
+        const newUrls = resolveNftImageCandidates(selectedVariantSource, { width: variantWidth });
 
         if (newUrls.length === 0) {
-            setCurrentImageUrl('');
-            setHasError(true);
-            setIsLoading(false);
-            return;
-        }
-
-        if (!hasLoadableImageUrl(newUrls)) {
             setCurrentImageUrl('');
             setHasError(true);
             setIsLoading(false);
@@ -340,15 +296,12 @@ const OptimizedNFTImage = memo(({
         const isCached = selectedUrl && imageLoadCache.get(selectedUrl) === true;
 
         // Use the optimized URL (e.g., /api/nft/image/{hash}) instead of raw IPFS URL
-        setCurrentImageUrl(selectedUrl || normalizedImageUrl);
+        setCurrentImageUrl(selectedUrl || selectedVariantSource || normalizedImageUrl);
         setFallbackIndex(nextIndex);
         setHasError(false);
-
-        // Don't set loading state if image is already cached!
-        if (!isCached) {
-            setIsLoading(true);
-        }
-    }, [normalizedImageUrl]);
+        // Keep loading state in sync with the selected URL to avoid stale overlays.
+        setIsLoading(!isCached);
+    }, [selectedVariantSource, normalizedImageUrl, variantWidth]);
 
     const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
         const img = e.currentTarget;
@@ -384,14 +337,13 @@ const OptimizedNFTImage = memo(({
     // Fallback to object-contain only when no fit class is provided.
     const hasExplicitObjectFit = /(^|\s)object-(contain|cover|fill|none|scale-down)(\s|$)/.test(className);
     const objectFitClass = hasExplicitObjectFit ? '' : 'object-contain';
-
-    // Use a neutral light placeholder to avoid dark flashes before image decode.
-    const blurDataURL = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%23f3f4f6'/%3E%3Cstop offset='1' stop-color='%23e5e7eb'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='16' height='16' fill='url(%23g)'/%3E%3C/svg%3E";
+    const hasAutoHeight = /(^|\s)h-auto(\s|$)/.test(className);
+    const hasAutoWidth = /(^|\s)w-auto(\s|$)/.test(className);
 
     // Check if this is a sharp image (not background) and should have glitter effect
     // CRITICAL: Convert tokenId to string (may be Number from marketplace_items)
     const normalizedTokenId = String(tokenId);
-    const isSharpImage = !normalizedTokenId.includes('-bg');
+    const isSharpImage = !disableVisualEffects && !normalizedTokenId.includes('-bg');
 
     // Simplified glitter effect calculation for better performance
     const glitterIntensity = useMemo(() => {
@@ -476,9 +428,13 @@ const OptimizedNFTImage = memo(({
         return (
             <div
                 ref={imgRef}
-                className={`bg-gradient-to-br from-gray-100 to-gray-200 animate-pulse ${className}`}
+                className={`relative bg-gradient-to-br from-gray-100 to-gray-200 ${className}`}
                 style={fill ? {} : { width, height }}
-            />
+            >
+                <div className="absolute bottom-0 left-0 h-0.5 w-full bg-gray-300/80 overflow-hidden">
+                    <div className="h-full w-1/3 bg-gray-500/90 animate-[shimmer_1.2s_infinite]" />
+                </div>
+            </div>
         );
     }
 
@@ -507,40 +463,38 @@ const OptimizedNFTImage = memo(({
         );
     }
 
-    const imageProps = {
-        src: currentImageUrl,
-        className: `transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'
-            } ${objectFitClass} ${className}`,
-        onLoad: handleImageLoad,
-        onError: handleImageError,
-        placeholder: "blur" as const,
-        blurDataURL,
-        priority,
-        // Use Next.js image optimization for caching (30 day TTL in next.config.ts)
-        // Only use optimizer for local/proxied images.
-        // External IPFS gateway fallbacks can return 400 in /_next/image (invalid upstream image response),
-        // so load them directly.
-        unoptimized:
-            currentImageUrl.startsWith('data:') ||
-            currentImageUrl.startsWith('blob:') ||
-            currentImageUrl.startsWith('http://') ||
-            currentImageUrl.startsWith('https://'),
-        // Optimized sizes for NFT cards - use consistent sizes for better cache hits
-        sizes: sizes ?? (fill ?
-            (normalizedTokenId.includes('-bg')
-                ? "(max-width: 640px) 45vw, (max-width: 1024px) 24vw, 256px"
-                : "(max-width: 640px) 45vw, (max-width: 1024px) 24vw, 256px") :
-            `${width}px`),
-        quality: normalizedTokenId.includes('-bg') ? 45 : 86,
-        ...(fill ? { fill: true } : { width, height }),
-    };
+    const imageClassName = `${objectFitClass} ${className}`;
 
     return (
         <div
             ref={imgRef}
             className={`relative overflow-hidden bg-gray-100 ${fill ? 'w-full h-full' : ''} ${className}`}
         >
-            <Image key={currentImageUrl} alt={alt || `NFT ${tokenId}`} {...imageProps} />
+            <img
+                key={currentImageUrl}
+                src={currentImageUrl}
+                alt={alt || `NFT ${tokenId}`}
+                className={imageClassName}
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+                loading={priority || isIntersecting ? 'eager' : 'lazy'}
+                decoding="auto"
+                draggable={false}
+                data-variant={resolvedVariant}
+                style={fill ? {
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    imageRendering: 'auto',
+                } : {
+                    width: hasAutoWidth ? 'auto' : width,
+                    height: hasAutoHeight ? 'auto' : height,
+                    imageRendering: 'auto',
+                }}
+            />
+
+            {/* Blur placeholder overlay disabled to avoid soft/pixelated look while scrolling */}
 
             {/* Optimized single-layer glitter effect for sharp images */}
             {isSharpImage && displayGlitter && (
@@ -571,20 +525,8 @@ const OptimizedNFTImage = memo(({
 
             {/* Loading skeleton */}
             {isLoading && (
-                <div
-                    className={`absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 animate-pulse`}
-                    style={fill ? {} : { width, height }}
-                >
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="rounded-md bg-white/75 px-2 py-1 shadow-sm backdrop-blur-sm flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-full bg-gray-400 animate-pulse" />
-                            <span className="h-2 w-2 rounded-full bg-gray-400 animate-pulse [animation-delay:120ms]" />
-                            <span className="h-2 w-2 rounded-full bg-gray-400 animate-pulse [animation-delay:240ms]" />
-                        </div>
-                    </div>
-                    <div className="absolute bottom-0 left-0 h-0.5 w-full bg-gray-200/80 overflow-hidden">
-                        <div className="h-full w-1/3 bg-gray-400/80 animate-[shimmer_1.6s_infinite]" />
-                    </div>
+                <div className="absolute bottom-0 left-0 h-0.5 w-full bg-gray-300/80 overflow-hidden">
+                    <div className="h-full w-1/3 bg-gray-500/90 animate-[shimmer_1.2s_infinite]" />
                 </div>
             )}
             {/* Debug info for development */}

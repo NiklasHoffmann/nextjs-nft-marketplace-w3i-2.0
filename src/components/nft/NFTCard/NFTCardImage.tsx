@@ -4,7 +4,7 @@
  */
 
 import { memo } from 'react';
-import OptimizedNFTImage from '../OptimizedNFTImage';
+import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 
 interface NFTCardImageProps {
     imageUrl: string | null;
@@ -25,13 +25,14 @@ export const NFTCardImage = memo<NFTCardImageProps>(({
     if (hasImage && !hasDescription) {
         return (
             <div className="h-full w-full min-w-0">
-                <div className="rounded-md border-2 border-white/50 backdrop-blur-sm overflow-hidden relative h-full w-full">
+                <div className="rounded-md border-2 border-white/50 overflow-hidden relative h-full w-full">
                     <OptimizedNFTImage
                         imageUrl={imageUrl ?? ''}
                         tokenId={tokenId}
+                        variant="card"
                         className="object-cover h-full w-full"
                         fill={true}
-                        sizes="(max-width: 640px) 86vw, (max-width: 1024px) 36vw, 220px"
+                        sizes="(max-width: 640px) 86vw, (max-width: 1024px) 36vw, 560px"
                         priority={priority}
                     />
                     <div className="absolute inset-0 rounded-md ring-1 ring-white/20 pointer-events-none"></div>
@@ -60,13 +61,14 @@ export const NFTCardImage = memo<NFTCardImageProps>(({
     return (
         <div className="grid grid-cols-2 gap-1 h-full min-w-0">
             <div className="h-full overflow-hidden">
-                <div className="rounded-md border-2 border-white/50 backdrop-blur-sm overflow-hidden relative h-full w-full">
+                <div className="rounded-md border-2 border-white/50 overflow-hidden relative h-full w-full">
                     <OptimizedNFTImage
                         imageUrl={imageUrl ?? ''}
                         tokenId={tokenId}
+                        variant="small"
                         className="object-cover h-full w-full"
                         fill={true}
-                        sizes="(max-width: 640px) 44vw, (max-width: 1024px) 18vw, 140px"
+                        sizes="220px"
                         priority={priority}
                     />
                     <div className="absolute inset-0 rounded-md ring-1 ring-white/20 pointer-events-none"></div>

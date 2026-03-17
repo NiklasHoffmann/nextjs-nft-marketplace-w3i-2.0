@@ -1,52 +1,13 @@
 ﻿"use client";
 
 import { useEffect, memo, useRef } from 'react';
+import { resolveNftImageCandidates } from '@/utils';
 
 interface ImagePreloaderProps {
     imageUrls: string[];
     priority?: boolean;
     maxPreload?: number; // Maximum number of images to preload
 }
-
-// Extract IPFS hash and path from URL
-const extractIPFSInfo = (url: string): { hash: string; path: string } | null => {
-    if (!url) return null;
-
-    // ipfs:// protocol
-    if (url.startsWith('ipfs://')) {
-        const parts = url.replace('ipfs://', '').split('/');
-        const hash = parts[0];
-        const path = parts.slice(1).join('/');
-        return hash ? { hash, path } : null;
-    }
-
-    // HTTP IPFS gateway URLs
-    if (url.includes('/ipfs/')) {
-        const afterIpfs = url.split('/ipfs/')[1];
-        if (!afterIpfs) return null;
-        const parts = afterIpfs.split('/');
-        const hash = parts[0];
-        const path = parts.slice(1).join('/');
-        return hash ? { hash, path } : null;
-    }
-
-    return null;
-};
-
-// Convert to our server-side cache URL
-const optimizeUrl = (url: string): string => {
-    if (!url) return url;
-
-    const ipfsInfo = extractIPFSInfo(url);
-    if (ipfsInfo) {
-        const { hash, path } = ipfsInfo;
-        const fullHash = path ? `${hash}/${path}` : hash;
-        // Use our server-side cache!
-        return `/api/nft/image/${encodeURIComponent(fullHash)}`;
-    }
-
-    return url;
-};
 
 // Component to preload critical images
 const ImagePreloader = memo(({ imageUrls, priority = false, maxPreload = 8 }: ImagePreloaderProps) => {
@@ -59,7 +20,7 @@ const ImagePreloader = memo(({ imageUrls, priority = false, maxPreload = 8 }: Im
             // Get unique URLs we haven't preloaded yet
             const urlsToPreload = imageUrls
                 .slice(0, maxPreload)
-                .map(optimizeUrl)
+                .map((url) => resolveNftImageCandidates(url)[0] || '')
                 .filter(url => url && !preloadedRef.current.has(url));
 
             urlsToPreload.forEach((url) => {

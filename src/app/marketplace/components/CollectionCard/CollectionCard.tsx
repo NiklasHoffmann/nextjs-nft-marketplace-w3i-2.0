@@ -3,7 +3,6 @@
 import React from 'react';
 import { BaseCard } from '@/components/core/Card/BaseCard';
 import { OptimizedNFTImage } from '@/components/nft';
-import { useCardTilt } from '@/hooks';
 import { CollectionCardHeader } from './CollectionCardHeader';
 import { CollectionCardPreview } from './CollectionCardPreview';
 import { CollectionCardStats } from './CollectionCardStats';
@@ -53,11 +52,6 @@ export const CollectionCard = React.memo(({
     onClick,
 }: CollectionCardProps) => {
     const firstPreviewImage = collection.previewImages?.[0] || '';
-    const { cardRef, tiltStyle, handlers } = useCardTilt({
-        maxTilt: 15,
-        scale: 1.02,
-        perspective: 1000
-    });
 
     const handleClick = () => {
         if (onClick && collection.contractAddress) {
@@ -66,12 +60,7 @@ export const CollectionCard = React.memo(({
     };
 
     return (
-        <div
-            ref={cardRef}
-            className="transform-gpu"
-            {...handlers}
-            style={tiltStyle}
-        >
+        <div>
             <BaseCard
                 size="md"
                 hoverable
@@ -88,10 +77,11 @@ export const CollectionCard = React.memo(({
                                     tokenId={`${collection.contractAddress}-card-bg`}
                                     alt={`${collection.contractName || 'Collection'} background`}
                                     className="w-full h-full object-cover"
+                                    variant="card"
                                     fill
                                     sizes="(max-width: 640px) 94vw, (max-width: 1024px) 44vw, 360px"
                                 />
-                                <div className="absolute inset-0 backdrop-blur-sm bg-white/35" />
+                                <div className="absolute inset-0 bg-white/30" />
                             </div>
                         ) : (
                             <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200" />

@@ -8,10 +8,11 @@ import { useTransactionService } from '@/services/blockchain';
 import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace';
 import { FEATURES } from '@/config';
 import NFTCard from '@/components/nft/NFTCard';
+import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 import Link from 'next/link';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
 import { formatTokenDisplay } from '../utils';
-import { devLog } from '@/utils';
+import { devLog, resolveNftImageUrl } from '@/utils';
 
 export default function ListingPage() {
     const router = useRouter();
@@ -540,11 +541,15 @@ export default function ListingPage() {
                                     <div className="bg-white rounded-lg border border-green-200 p-4">
                                         <p className="text-xs text-gray-600 mb-2">Gewünschter NFT:</p>
                                         <div className="flex gap-3">
-                                            <img
-                                                src={formData.targetNFT.meta?.image || '/media/custom-nft-3.jpg'}
-                                                alt={formData.targetNFT.core.name || `NFT #${formData.targetNFT.tokenId}`}
-                                                className="w-16 h-16 rounded-lg object-cover"
-                                            />
+                                            <div className="w-16 h-16 rounded-lg overflow-hidden relative">
+                                                <OptimizedNFTImage
+                                                    imageUrl={formData.targetNFT.meta?.image || '/media/custom-nft-3.jpg'}
+                                                    tokenId={String(formData.targetNFT.tokenId)}
+                                                    alt={formData.targetNFT.core.name || `NFT #${formData.targetNFT.tokenId}`}
+                                                    className="object-cover"
+                                                    fill={true}
+                                                />
+                                            </div>
                                             <div>
                                                 <h4 className="font-medium text-gray-900 text-sm">
                                                     {formData.targetNFT.core.name || `NFT #${formData.targetNFT.tokenId}`}

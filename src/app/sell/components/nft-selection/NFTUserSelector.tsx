@@ -62,6 +62,10 @@ export function NFTUserSelector({ userNFTs, selectedNFT, onSelect, isLoading }: 
                                 imageUrl={nft.meta?.image || ''}
                                 tokenId={nft.tokenId}
                                 alt={nft.core.name || nft.meta?.name || `NFT #${nft.tokenId}`}
+                                imageVariants={nft.meta?.images}
+                                blurDataURL={nft.meta?.blurDataURL}
+                                variant="card"
+                                disableVisualEffects={true}
                                 className="w-20 h-20 rounded-lg object-cover"
                                 width={80}
                                 height={80}

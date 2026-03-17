@@ -17,6 +17,20 @@ export interface ExternalNFT {
     name?: string;
     description?: string;
     image?: string;
+    imageOriginal?: string;
+    images?: {
+        thumb?: string | null;
+        small?: string | null;
+        card?: string | null;
+        detail?: string | null;
+        original?: string | null;
+    };
+    imageMeta?: {
+        width?: number | null;
+        height?: number | null;
+        mimeType?: string | null;
+    };
+    blurDataURL?: string | null;
     animationUrl?: string;
     attributes?: Array<{
         trait_type: string;
@@ -112,6 +126,10 @@ export class WalletNFTsService {
                         name: nft.metadata?.name,
                         description: nft.metadata?.description,
                         image: nft.metadata?.image,
+                        imageOriginal: nft.metadata?.imageOriginal,
+                        images: nft.metadata?.images,
+                        imageMeta: nft.metadata?.imageMeta,
+                        blurDataURL: nft.metadata?.blurDataURL,
                         animationUrl: nft.metadata?.animationUrl,
                         attributes: nft.metadata?.attributes,
                         contractName: nft.contract?.name,

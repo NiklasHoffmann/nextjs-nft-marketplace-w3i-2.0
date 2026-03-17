@@ -17,6 +17,14 @@ interface CollectionNFT {
     metadata?: {
         name?: string;
         image?: string;
+        images?: {
+            thumb?: string | null;
+            small?: string | null;
+            card?: string | null;
+            detail?: string | null;
+            original?: string | null;
+        };
+        blurDataURL?: string | null;
     };
     marketplace?: {
         price?: string;
@@ -129,8 +137,11 @@ export default function CollectionItemsList({
                             {item.metadata?.image ? (
                                 <OptimizedNFTImage
                                     imageUrl={item.metadata.image}
+                                    imageVariants={item.metadata.images}
+                                    blurDataURL={item.metadata.blurDataURL}
                                     tokenId={item.tokenId}
                                     alt={item.metadata?.name || `#${item.tokenId}`}
+                                    variant="card"
                                     className="w-full h-full object-cover"
                                     fill={false}
                                     width={300}

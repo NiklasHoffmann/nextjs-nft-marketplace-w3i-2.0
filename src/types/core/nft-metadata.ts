@@ -17,6 +17,20 @@ export interface NFTMetadata {
         name: string | null;
         description: string | null;
         image: string | null;
+        imageOriginal?: string | null;
+        images?: {
+            thumb?: string | null;
+            small?: string | null;
+            card?: string | null;
+            detail?: string | null;
+            original?: string | null;
+        };
+        imageMeta?: {
+            width?: number | null;
+            height?: number | null;
+            mimeType?: string | null;
+        };
+        blurDataURL?: string | null;
         animationUrl?: string | null;
         externalUrl?: string | null;
         attributes?: Array<{

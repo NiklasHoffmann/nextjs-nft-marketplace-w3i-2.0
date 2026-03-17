@@ -21,6 +21,7 @@ import { getCollection } from '@/lib/mongodb';
 import { blockchainStateSync } from '@/services/nft-sync/blockchain-state-sync';
 import { ipfsMetadataLazySync } from '@/services/nft-sync/ipfs-metadata-lazy-sync';
 import { devLog } from '@/utils';
+import { buildNFTImageVariants } from '@/utils/nft/image-variants';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -122,17 +123,39 @@ export const GET = apiHandler(async (request: NextRequest) => {
     });
 
     // Prepare response
+    const metadataImageSource = nft?.metadata?.imageOriginal || nft?.metadata?.image || '';
+    const computedVariants = metadataImageSource ? buildNFTImageVariants(metadataImageSource) : {};
+    const resolvedMetadata = nft?.metadata ? {
+        ...nft.metadata,
+        imageOriginal: nft.metadata.imageOriginal || metadataImageSource || null,
+        images: nft.metadata.images || computedVariants,
+        imageMeta: nft.metadata.imageMeta || {
+            width: null,
+            height: null,
+            mimeType: null,
+        },
+        blurDataURL: nft.metadata.blurDataURL || null,
+    } : {
+        name: `NFT #${tokenId}`,
+        description: '',
+        image: '',
+        imageOriginal: null,
+        images: {},
+        imageMeta: {
+            width: null,
+            height: null,
+            mimeType: null,
+        },
+        blurDataURL: null,
+        attributes: []
+    };
+
     const response = {
         contractAddress: normalizedAddress,
         tokenId,
 
         // IPFS metadata (cached forever)
-        metadata: nft?.metadata || {
-            name: `NFT #${tokenId}`,
-            description: '',
-            image: '',
-            attributes: []
-        },
+        metadata: resolvedMetadata,
 
         // Contract info
         contract: nft?.contract || {

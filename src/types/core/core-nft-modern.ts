@@ -39,6 +39,20 @@ export type NftMeta = {
     name?: string
     description?: string
     image?: string // ipfs://� oder https://�
+    imageOriginal?: string
+    images?: {
+        thumb?: string | null
+        small?: string | null
+        card?: string | null
+        detail?: string | null
+        original?: string | null
+    }
+    imageMeta?: {
+        width?: number | null
+        height?: number | null
+        mimeType?: string | null
+    }
+    blurDataURL?: string | null
     attributes?: Array<{ trait_type?: string; value?: any }>
     animationUrl?: string
     externalUrl?: string

@@ -202,7 +202,7 @@ export const BaseCard = memo<BaseCardProps>(({
     // Build dynamic classes
     const cardClasses = cn(
         // Base layout
-        'flex-shrink-0 overflow-hidden transform-gpu',
+        'flex-shrink-0 overflow-hidden',
         config.width,
 
         // Background & Border

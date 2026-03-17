@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 import { NFTCard } from '@/components/nft/NFTCard';
+import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 import { useChainId } from 'wagmi';
 import { getCurrencySymbolByAddress, ZERO_ADDRESS } from '@/config/tokens';
 
@@ -141,11 +142,15 @@ export function ListingProgressOverlay({
                         <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-5 border border-gray-200 mb-6">
                             <div className="flex gap-4">
                                 <div className="relative">
-                                    <img
-                                        src={nft.meta?.image || '/media/custom-nft.jpg'}
-                                        alt={nft.core.name || nft.meta?.name || `NFT #${nft.tokenId}`}
-                                        className="w-24 h-24 rounded-xl object-cover shadow-lg"
-                                    />
+                                    <div className="w-24 h-24 rounded-xl overflow-hidden shadow-lg relative">
+                                        <OptimizedNFTImage
+                                            imageUrl={nft.meta?.image || '/media/custom-nft.jpg'}
+                                            tokenId={String(nft.tokenId)}
+                                            alt={nft.core.name || nft.meta?.name || `NFT #${nft.tokenId}`}
+                                            className="object-cover"
+                                            fill={true}
+                                        />
+                                    </div>
                                     <div className={`absolute inset-0 rounded-xl border-2 animate-pulse ${classes.pulseBorder}`}></div>
                                 </div>
                                 <div className="flex-1">

@@ -10,6 +10,7 @@
 'use client';
 
 import React from 'react';
+import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 import type { ListingMode, TradeType, Currency } from '../../types';
 import { AggregatedNFT } from '@/types/core/core-nft-modern';
 
@@ -144,11 +145,15 @@ export function ListingDetailsView({
                             <p className="text-sm text-gray-600 mb-2">Gewünschtes NFT:</p>
                             <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-3">
                                 {(targetNFT as any).imageUrl && (
-                                    <img
-                                        src={(targetNFT as any).imageUrl}
-                                        alt={(targetNFT as any).displayName || 'Target NFT'}
-                                        className="w-12 h-12 rounded-lg object-cover"
-                                    />
+                                    <div className="w-12 h-12 rounded-lg overflow-hidden relative">
+                                        <OptimizedNFTImage
+                                            imageUrl={(targetNFT as any).imageUrl || '/media/custom-nft-3.jpg'}
+                                            tokenId={String(targetNFT.core?.tokenId || '0')}
+                                            alt={(targetNFT as any).displayName || 'Target NFT'}
+                                            className="object-cover"
+                                            fill={true}
+                                        />
+                                    </div>
                                 )}
                                 <div>
                                     <p className="font-medium text-gray-900">{(targetNFT as any).displayName || 'Unnamed'}</p>

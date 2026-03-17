@@ -7,6 +7,7 @@ import { ButtonSpinner } from '@/components/core/Loading';
 import { useChainId } from 'wagmi';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress, ZERO_ADDRESS } from '@/config/tokens';
 import { formatTokenDisplay } from '../../utils';
+import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 
 interface BatchTransactionData {
     selectedNFTs: AggregatedNFT[];
@@ -196,11 +197,13 @@ export function BatchTransactionPreview({ data, onConfirm, onCancel, isLoading }
                     <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 max-h-60 overflow-y-auto">
                         {data.selectedNFTs.map((nft, index) => (
                             <div key={nft.key} className="relative group">
-                                <div className="aspect-square rounded-lg overflow-hidden border border-gray-300 shadow-sm hover:shadow-md transition-shadow">
-                                    <img
-                                        src={nft.meta?.image || '/media/custom-nft.jpg'}
+                                <div className="aspect-square rounded-lg overflow-hidden border border-gray-300 shadow-sm hover:shadow-md transition-shadow relative">
+                                    <OptimizedNFTImage
+                                        imageUrl={nft.meta?.image || '/media/custom-nft.jpg'}
+                                        tokenId={String(nft.tokenId)}
                                         alt={`#${nft.tokenId}`}
-                                        className="w-full h-full object-cover"
+                                        className="object-cover"
+                                        fill={true}
                                     />
                                 </div>
                                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-1 rounded-b-lg">

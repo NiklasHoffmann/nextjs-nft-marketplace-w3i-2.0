@@ -8,9 +8,10 @@ import { useMarketplaceContracts, useMarketplaceFees } from '@/hooks/marketplace
 import { useERC20 } from '@/hooks/tokens';
 import { useForm } from '@/hooks';
 import { ExtendedCurrencySelector } from '@/components/marketplace';
+import OptimizedNFTImage from '@/components/nft/OptimizedNFTImage';
 import { ZERO_ADDRESS, getTokenConfig, isNativeETH } from '@/config/tokens';
 import { useListingFlow } from '../../contexts/ListingFlowContext';
-import { convertIpfsToHttp, devLog } from '@/utils';
+import { resolveNftImageUrl, devLog } from '@/utils';
 
 export type ListingMode = 'sale' | 'trade' | 'hybrid';
 
@@ -272,7 +273,7 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
     const targetPreviewImage = useMemo(() => {
         const rawImage = selectedTargetNFT?.meta?.image?.trim();
         if (!rawImage) return '/media/custom-nft-3.jpg';
-        return convertIpfsToHttp(rawImage);
+        return resolveNftImageUrl(rawImage, '/media/custom-nft-3.jpg');
     }, [selectedTargetNFT?.meta?.image]);
 
     // Generic ERC20 Hook for approval check (works with any token)
@@ -833,15 +834,15 @@ export function UnifiedListingForm({ selectedNFT, isFullyApproved = false, isWhi
                                     {selectedTargetNFT && (
                                         <div className="mt-2 p-3 bg-white border border-green-200 rounded-lg">
                                             <div className="flex items-center gap-3">
-                                                <img
-                                                    src={targetPreviewImage}
-                                                    alt={selectedTargetNFT.meta?.name || 'NFT'}
-                                                    onError={(event) => {
-                                                        event.currentTarget.onerror = null;
-                                                        event.currentTarget.src = '/media/custom-nft-3.jpg';
-                                                    }}
-                                                    className="w-12 h-12 rounded-lg object-cover shadow-sm hover:shadow-md transition-shadow duration-300"
-                                                />
+                                                <div className="w-12 h-12 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 relative">
+                                                    <OptimizedNFTImage
+                                                        imageUrl={targetPreviewImage}
+                                                        tokenId={String(selectedTargetNFT.tokenId)}
+                                                        alt={selectedTargetNFT.meta?.name || 'NFT'}
+                                                        className="object-cover"
+                                                        fill={true}
+                                                    />
+                                                </div>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-medium text-gray-900 truncate">
                                                         {selectedTargetNFT.meta?.name || `NFT #${selectedTargetNFT.tokenId}`}

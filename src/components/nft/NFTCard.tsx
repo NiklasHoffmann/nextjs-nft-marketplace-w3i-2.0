@@ -25,7 +25,6 @@ import { useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
 import { devLog } from '@/utils';
 import type { AggregatedNFT } from '@/types/core/core-nft-modern';
 import OptimizedNFTImage from './OptimizedNFTImage';
-import { useCardTilt } from '@/hooks';
 import { NFTCardHeader } from './NFTCard/NFTCardHeader';
 import { NFTCardImage } from './NFTCard/NFTCardImage';
 import { NFTCardFooter } from './NFTCard/NFTCardFooter';
@@ -286,13 +285,6 @@ export function NFTCard(props: NFTCardAllProps) {
   // Get stats (likes, watchlist, etc.)
   const { stats, loading: statsLoading } = useNFTUserStats(contractAddress, tokenId);
 
-  // 3D Tilt effect
-  const { cardRef, tiltStyle, handlers } = useCardTilt({
-    maxTilt: 15,
-    scale: 1.02,
-    perspective: 1000
-  });
-
   // ===== COMPUTED VALUES =====
 
   // Extract display data
@@ -404,32 +396,14 @@ export function NFTCard(props: NFTCardAllProps) {
 
   return (
     <div
-      ref={cardRef}
-      className="group cursor-pointer transform-gpu"
+      className="group cursor-pointer"
       onClick={handleClick}
-      {...handlers}
-      style={tiltStyle}
     >
-      <div className={`hover:shadow-[0_15px_30px_-8px_rgba(0,0,0,0.4)] hover:scale-[1.02] transition-all duration-300 ease-out rounded-lg shadow-xl flex flex-col flex-end gap-2 w-full h-72 relative will-change-transform origin-center border border-black ${rarityBg}`}>
+      <div className={`hover:shadow-[0_15px_30px_-8px_rgba(0,0,0,0.4)] transition-all duration-300 ease-out rounded-lg shadow-xl flex flex-col flex-end gap-2 w-full h-72 relative origin-center border border-black ${rarityBg}`}>
         {/* Content container */}
         <div className="absolute inset-2 shadow-lg rounded-md overflow-hidden flex flex-col h-[calc(100%-16px)] bg-gray-100">
 
-          {/* Blurred Background Image */}
-          {imageUrl && (
-            <div className="absolute inset-0 overflow-hidden rounded-md">
-              <OptimizedNFTImage
-                imageUrl={imageUrl}
-                tokenId={`${tokenId}-bg`}
-                className="object-cover will-change-transform rounded-md"
-                fill={true}
-                sizes="(max-width: 640px) 92vw, (max-width: 1024px) 42vw, 320px"
-                priority={priority}
-                width={200}
-                height={200}
-              />
-              <div className="absolute inset-0 backdrop-blur-sm bg-white/30 rounded-md"></div>
-            </div>
-          )}
+          {/* Background layer intentionally disabled to keep foreground NFT image fully crisp */}
 
           {/* Content overlay with fixed layout */}
           <div className="relative z-10 flex flex-col h-full p-1 gap-1">

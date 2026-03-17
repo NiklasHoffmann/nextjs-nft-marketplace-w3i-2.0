@@ -57,6 +57,50 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   );
 }
 
+const CHUNK_RELOAD_GUARD_KEY = 'chunk-reload-guard-v1';
+
+const isChunkLoadRelatedError = (input: unknown): boolean => {
+  const message = input instanceof Error
+    ? input.message
+    : typeof input === 'string'
+      ? input
+      : JSON.stringify(input || '');
+
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('loading chunk') ||
+    normalized.includes('chunkloaderror') ||
+    normalized.includes('failed to fetch dynamically imported module')
+  );
+};
+
+const shouldReloadForChunkError = (pathname: string): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    const raw = window.sessionStorage.getItem(CHUNK_RELOAD_GUARD_KEY);
+    const now = Date.now();
+
+    if (!raw) {
+      window.sessionStorage.setItem(CHUNK_RELOAD_GUARD_KEY, JSON.stringify({ pathname, ts: now }));
+      return true;
+    }
+
+    const parsed = JSON.parse(raw) as { pathname?: string; ts?: number };
+    const samePath = parsed?.pathname === pathname;
+    const isRecent = typeof parsed?.ts === 'number' && (now - parsed.ts) < 30_000;
+
+    if (samePath && isRecent) {
+      return false;
+    }
+
+    window.sessionStorage.setItem(CHUNK_RELOAD_GUARD_KEY, JSON.stringify({ pathname, ts: now }));
+    return true;
+  } catch {
+    return true;
+  }
+};
+
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const isDevelopment = process.env.NODE_ENV === 'development';
   const pathname = usePathname() || '';
@@ -98,6 +142,33 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const withMarketplaceItems = needsMarketplaceItems
     ? <MarketplaceItemsProvider>{withWallet}</MarketplaceItemsProvider>
     : withWallet;
+
+  React.useEffect(() => {
+    const onWindowError = (event: ErrorEvent) => {
+      const candidate = event.error || event.message;
+      if (!isChunkLoadRelatedError(candidate)) return;
+
+      if (shouldReloadForChunkError(pathname)) {
+        window.location.reload();
+      }
+    };
+
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (!isChunkLoadRelatedError(event.reason)) return;
+
+      if (shouldReloadForChunkError(pathname)) {
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener('error', onWindowError);
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', onWindowError);
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+    };
+  }, [pathname]);
   
   return (
     <ErrorBoundary

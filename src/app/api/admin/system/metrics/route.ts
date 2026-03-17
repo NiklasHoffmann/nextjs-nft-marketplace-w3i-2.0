@@ -1,6 +1,7 @@
 import { apiHandler, apiSuccess } from '@/lib/api';
 import { getDatabase } from '@/lib/mongodb';
 import { getNFTSyncService } from '@/services/nft-sync';
+import { imageEnrichmentSync } from '@/services/nft-sync/image-enrichment-sync';
 import '@/lib/dev-services-auto-start';
 import { RATE_LIMIT_CONFIG } from '@/lib/middleware/rateLimit';
 
@@ -8,6 +9,7 @@ export const GET = apiHandler(async () => {
   const db = await getDatabase();
   const syncService = getNFTSyncService();
   const syncStatus = syncService.getStatus();
+  const imageEnrichmentStatus = imageEnrichmentSync.getStatus();
 
   const [marketplaceCount, metadataCount, statsCount] = await Promise.all([
     db.collection('marketplace_items').countDocuments({}),
@@ -26,6 +28,7 @@ export const GET = apiHandler(async () => {
       nftStats: statsCount,
     },
     syncService: syncStatus,
+    imageEnrichment: imageEnrichmentStatus,
   });
 }, { 
     admin: true,

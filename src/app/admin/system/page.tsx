@@ -29,6 +29,40 @@ interface SystemHealth {
         cancelled: number;
         stale: number;
     };
+    images?: {
+        totalNftMetadataDocs: number;
+        docsWithImageSource: number;
+        enrichedDocs: number;
+        missingImageFieldsCount: number;
+        enrichmentCoverage: number;
+        blurPlaceholderCount: number;
+        status: 'healthy' | 'backfill-needed';
+        variantCoverage?: {
+            docsWithAllVariants: number;
+            docsWithAllCorrectVariantWidths: number;
+            variants: {
+                thumb: { expectedWidth: number; presentCount: number; correctWidthCount: number };
+                small: { expectedWidth: number; presentCount: number; correctWidthCount: number };
+                card: { expectedWidth: number; presentCount: number; correctWidthCount: number };
+                detail: { expectedWidth: number; presentCount: number; correctWidthCount: number };
+            };
+        };
+        diskCacheCoverage?: {
+            cacheDirectory: string;
+            totalCachedFiles: number;
+            expectedVariantFilesTotal: number;
+            presentVariantFilesTotal: number;
+            coverage: number;
+            status: 'warm' | 'partial';
+            note?: string;
+            variants: {
+                thumb: { expectedWidth: number; expectedCount: number; presentOnDiskCount: number; missingOnDiskCount: number; coverage: number };
+                small: { expectedWidth: number; expectedCount: number; presentOnDiskCount: number; missingOnDiskCount: number; coverage: number };
+                card: { expectedWidth: number; expectedCount: number; presentOnDiskCount: number; missingOnDiskCount: number; coverage: number };
+                detail: { expectedWidth: number; expectedCount: number; presentOnDiskCount: number; missingOnDiskCount: number; coverage: number };
+            };
+        };
+    };
 }
 
 interface SystemMetrics {
@@ -81,6 +115,36 @@ interface SystemMetrics {
             batchSize?: number;
             errorCount?: number;
             lastErrorAt?: string | number | Date | null;
+        };
+    };
+    imageEnrichment?: {
+        isEnabled: boolean;
+        isRunning: boolean;
+        intervalMs: number;
+        nextRunAt: string | number | Date | null;
+        runsTotal: number;
+        runsWithWork: number;
+        totalProcessed: number;
+        totalUpdated: number;
+        totalFailed: number;
+        lastRunStartedAt: string | number | Date | null;
+        lastRunCompletedAt: string | number | Date | null;
+        lastRunDurationMs: number | null;
+        lastRunCandidates: number;
+        lastRunProcessed: number;
+        lastRunUpdated: number;
+        lastRunFailed: number;
+        lastRunBatches: number;
+        remainingCandidatesEstimate: number;
+        lastRunDiskWarmed: number;
+        lastErrorAt: string | number | Date | null;
+        lastErrorMessage: string | null;
+        progress: {
+            currentBatchTotal: number;
+            currentBatchProcessed: number;
+            currentBatchUpdated: number;
+            currentBatchFailed: number;
+            percentage: number;
         };
     };
 }
@@ -187,6 +251,11 @@ export default function AdminSystemDiagnostics() {
         }
     };
 
+    const getImageStatusBadgeClass = (status?: 'healthy' | 'backfill-needed') => {
+        if (status === 'healthy') return 'bg-emerald-100 text-emerald-700';
+        return 'bg-amber-100 text-amber-700';
+    };
+
     const getAgeMs = (value?: string | number | Date | null) => {
         if (!value) return null;
         const date = value instanceof Date ? value : new Date(value);
@@ -246,6 +315,17 @@ export default function AdminSystemDiagnostics() {
             } else if (ageMs === null) {
                 items.push({ level: 'warning', message: 'Insights sync has not reported a last run yet.' });
             }
+        }
+
+        const imageEnrichment = metrics?.imageEnrichment;
+        if (imageEnrichment?.isEnabled && !imageEnrichment.isRunning) {
+            const ageMs = getAgeMs(imageEnrichment.lastRunCompletedAt);
+            if (ageMs !== null && imageEnrichment.intervalMs > 0 && ageMs > imageEnrichment.intervalMs * 2) {
+                items.push({ level: 'warning', message: 'Image enrichment has not run recently.' });
+            }
+        }
+        if ((imageEnrichment?.lastRunFailed ?? 0) > 0) {
+            items.push({ level: 'warning', message: `Image enrichment failures in last run: ${imageEnrichment?.lastRunFailed}.` });
         }
 
         return items;
@@ -387,6 +467,132 @@ export default function AdminSystemDiagnostics() {
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                    <h2 className="text-lg font-semibold text-gray-900">Image Enrichment Health</h2>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getImageStatusBadgeClass(health?.images?.status)}`}>
+                        {health?.images?.status || 'unknown'}
+                    </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                    <div className="rounded-md border border-gray-100 bg-gray-50 p-3">
+                        <div className="text-xs text-gray-500">Coverage</div>
+                        <div className="text-base font-semibold text-gray-900">
+                            {health?.images ? `${health.images.enrichmentCoverage}%` : '—'}
+                        </div>
+                    </div>
+                    <div className="rounded-md border border-gray-100 bg-gray-50 p-3">
+                        <div className="text-xs text-gray-500">Missing Fields</div>
+                        <div className="text-base font-semibold text-gray-900">
+                            {health?.images ? health.images.missingImageFieldsCount.toLocaleString() : '—'}
+                        </div>
+                    </div>
+                    <div className="rounded-md border border-gray-100 bg-gray-50 p-3">
+                        <div className="text-xs text-gray-500">All Variants Present</div>
+                        <div className="text-base font-semibold text-gray-900">
+                            {health?.images?.variantCoverage?.docsWithAllVariants?.toLocaleString() || '—'}
+                        </div>
+                    </div>
+                    <div className="rounded-md border border-gray-100 bg-gray-50 p-3">
+                        <div className="text-xs text-gray-500">All Variant Widths Correct</div>
+                        <div className="text-base font-semibold text-gray-900">
+                            {health?.images?.variantCoverage?.docsWithAllCorrectVariantWidths?.toLocaleString() || '—'}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="text-left text-gray-500 border-b border-gray-100">
+                                <th className="py-2 pr-3 font-medium">Variant</th>
+                                <th className="py-2 pr-3 font-medium">Expected Width</th>
+                                <th className="py-2 pr-3 font-medium">Present</th>
+                                <th className="py-2 font-medium">Correct Width</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-gray-800">
+                            {(['thumb', 'small', 'card', 'detail'] as const).map((variant) => {
+                                const row = health?.images?.variantCoverage?.variants?.[variant];
+                                return (
+                                    <tr key={variant} className="border-b border-gray-50 last:border-b-0">
+                                        <td className="py-2 pr-3 font-medium">{variant}</td>
+                                        <td className="py-2 pr-3">{row ? `${row.expectedWidth}px` : '—'}</td>
+                                        <td className="py-2 pr-3">{row ? row.presentCount.toLocaleString() : '—'}</td>
+                                        <td className="py-2">{row ? row.correctWidthCount.toLocaleString() : '—'}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="mt-5 pt-4 border-t border-gray-100">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <h3 className="text-sm font-semibold text-gray-900">Physical Disk Cache</h3>
+                        <span className="text-xs text-gray-500">
+                            {health?.images?.diskCacheCoverage
+                                ? `${health.images.diskCacheCoverage.coverage}% warm`
+                                : '—'}
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                        <div className="rounded-md border border-gray-100 bg-gray-50 p-3">
+                            <div className="text-xs text-gray-500">Expected Files</div>
+                            <div className="text-base font-semibold text-gray-900">
+                                {health?.images?.diskCacheCoverage?.expectedVariantFilesTotal?.toLocaleString() || '—'}
+                            </div>
+                        </div>
+                        <div className="rounded-md border border-gray-100 bg-gray-50 p-3">
+                            <div className="text-xs text-gray-500">Present on Disk</div>
+                            <div className="text-base font-semibold text-gray-900">
+                                {health?.images?.diskCacheCoverage?.presentVariantFilesTotal?.toLocaleString() || '—'}
+                            </div>
+                        </div>
+                        <div className="rounded-md border border-gray-100 bg-gray-50 p-3">
+                            <div className="text-xs text-gray-500">Unique Cached Keys</div>
+                            <div className="text-base font-semibold text-gray-900">
+                                {health?.images?.diskCacheCoverage?.totalCachedFiles?.toLocaleString() || '—'}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="text-left text-gray-500 border-b border-gray-100">
+                                    <th className="py-2 pr-3 font-medium">Variant</th>
+                                    <th className="py-2 pr-3 font-medium">Expected</th>
+                                    <th className="py-2 pr-3 font-medium">On Disk</th>
+                                    <th className="py-2 pr-3 font-medium">Missing</th>
+                                    <th className="py-2 font-medium">Coverage</th>
+                                </tr>
+                            </thead>
+                            <tbody className="text-gray-800">
+                                {(['thumb', 'small', 'card', 'detail'] as const).map((variant) => {
+                                    const row = health?.images?.diskCacheCoverage?.variants?.[variant];
+                                    return (
+                                        <tr key={`disk-${variant}`} className="border-b border-gray-50 last:border-b-0">
+                                            <td className="py-2 pr-3 font-medium">{variant}</td>
+                                            <td className="py-2 pr-3">{row ? row.expectedCount.toLocaleString() : '—'}</td>
+                                            <td className="py-2 pr-3">{row ? row.presentOnDiskCount.toLocaleString() : '—'}</td>
+                                            <td className="py-2 pr-3">{row ? row.missingOnDiskCount.toLocaleString() : '—'}</td>
+                                            <td className="py-2">{row ? `${row.coverage}%` : '—'}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p className="mt-3 text-xs text-gray-500">
+                        {health?.images?.diskCacheCoverage?.note || 'Disk cache metrics unavailable.'}
+                    </p>
+                </div>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Service Alerts</h2>
                 {alerts.length === 0 ? (
                     <p className="text-sm text-gray-500">Keine Alerts. Alle Services sehen stabil aus.</p>
@@ -484,6 +690,53 @@ export default function AdminSystemDiagnostics() {
                             <div className="flex items-center justify-between text-xs text-gray-500">
                                 <span>Last Error</span>
                                 <span>{formatDateTime(metrics?.syncService?.insightsSync?.lastErrorAt)}</span>
+                            </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-gray-100 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-gray-600">Image Enrichment</span>
+                                <span className="font-medium text-gray-900">
+                                    {metrics?.imageEnrichment?.isEnabled
+                                        ? (metrics?.imageEnrichment?.isRunning ? 'running' : 'idle')
+                                        : 'disabled'}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                                <span>Progress (current batch)</span>
+                                <span>
+                                    {metrics?.imageEnrichment
+                                        ? `${metrics.imageEnrichment.progress.currentBatchProcessed}/${metrics.imageEnrichment.progress.currentBatchTotal} (${metrics.imageEnrichment.progress.percentage}%)`
+                                        : '—'}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                                <span>Last Run</span>
+                                <span>{formatDateTime(metrics?.imageEnrichment?.lastRunCompletedAt)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                                <span>Next Run</span>
+                                <span>{formatDateTime(metrics?.imageEnrichment?.nextRunAt)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                                <span>Last Batch Updated</span>
+                                <span>{metrics?.imageEnrichment?.lastRunUpdated?.toLocaleString() || '—'}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                                <span>Last Run Batches</span>
+                                <span>{metrics?.imageEnrichment?.lastRunBatches?.toLocaleString() || '—'}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                                <span>Remaining (Estimate)</span>
+                                <span>{metrics?.imageEnrichment?.remainingCandidatesEstimate?.toLocaleString() || '—'}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                                <span>Disk Warmed (Last Run)</span>
+                                <span>{metrics?.imageEnrichment?.lastRunDiskWarmed?.toLocaleString() || '—'}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                                <span>Total Updated</span>
+                                <span>{metrics?.imageEnrichment?.totalUpdated?.toLocaleString() || '—'}</span>
                             </div>
                         </div>
                     </div>

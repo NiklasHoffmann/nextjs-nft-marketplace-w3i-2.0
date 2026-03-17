@@ -18,6 +18,7 @@ import { useContextDevtools } from '@/hooks/useContextDevtools';
 import type { ActiveItem } from '@/types';
 import { getCurrencySymbolByAddress, getTokenDecimalsByAddress } from '@/config/tokens';
 import { formatUnits } from 'viem';
+import { resolveNFTImageByVariant } from '@/utils';
 
 interface CartItem {
     listingId: string;
@@ -284,7 +285,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 feeRate: data.marketplace?.feeRate ?? null,
                 royaltyFeePercentage: null,
                 name: data.metadata?.name || data.name || undefined,
-                imageUrl: data.metadata?.image || data.image || undefined
+                imageUrl: resolveNFTImageByVariant(
+                    data.metadata?.imageOriginal || data.metadata?.image || data.image || '',
+                    'thumb',
+                    data.metadata?.images,
+                ) || undefined
             };
 
             devLog.info('cart', 'Added to cart with metadata:', cartItem.name, cartItem.imageUrl);
