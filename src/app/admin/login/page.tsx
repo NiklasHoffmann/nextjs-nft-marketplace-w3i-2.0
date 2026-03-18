@@ -1,6 +1,6 @@
 "use client";
 
-import { useAccount, useSignMessage, useConnectorClient, useDisconnect } from 'wagmi';
+import { useAccount, useSignMessage, useDisconnect } from 'wagmi';
 import { useEffect, useState, useCallback } from 'react';
 import { devLog } from '@/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -11,7 +11,6 @@ import { useNotifications } from '@/contexts/notifications';
 
 export default function AdminLoginPage() {
     const { address, isConnected, connector } = useAccount();
-    const { data: connectorClient } = useConnectorClient();
     const { disconnect } = useDisconnect();
     const notifications = useNotifications();
     const router = useRouter();
@@ -157,10 +156,6 @@ export default function AdminLoginPage() {
 
             if (!connector) {
                 throw new Error('Wallet-Connector nicht verfügbar. Bitte Wallet neu verbinden.');
-            }
-
-            if (!connectorClient) {
-                throw new Error('Wallet-Client nicht bereit. Bitte warten oder Seite neu laden.');
             }
 
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -330,13 +325,12 @@ export default function AdminLoginPage() {
                                 <div className="mb-6">
                                     <label className="block text-sm font-medium text-gray-700 mb-3">2. Signatur zur Authentifizierung</label>
 
-                                    {!signMessageAsync || !connector || !connectorClient ? (
+                                    {!signMessageAsync || !connector ? (
                                         <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                                             <p className="text-sm text-yellow-800 font-medium mb-2">⚠️ Wallet noch nicht vollständig bereit</p>
                                             <p className="text-xs text-yellow-700">
                                                 {!signMessageAsync && 'Signatur-Hook nicht verfügbar. '}
                                                 {!connector && 'Connector nicht verbunden. '}
-                                                {!connectorClient && 'Client wird geladen... '}
                                             </p>
                                             <button
                                                 onClick={() => window.location.reload()}

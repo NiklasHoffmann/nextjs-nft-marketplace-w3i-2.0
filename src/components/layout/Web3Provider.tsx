@@ -1,11 +1,11 @@
 ﻿'use client'
 import '@rainbow-me/rainbowkit/styles.css'
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
-import { WagmiProvider, useAccount } from 'wagmi'
+import { WagmiProvider } from 'wagmi'
 import { wagmiConfig } from '@/config/wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import { ReactNode, useState, useEffect } from 'react'
+import { ReactNode, useState } from 'react'
 import { ApolloProvider } from '@apollo/client'
 import apolloClient from '@/config/apolloClient'
 
@@ -34,31 +34,18 @@ export default function Web3Provider({ children }: { children: ReactNode }) {
         <WagmiProvider config={wagmiConfig}>
             <QueryClientProvider client={queryClient}>
                 <ApolloProvider client={apolloClient}>
-                    <WalletAwareRainbowKit>{children}</WalletAwareRainbowKit>
+                    <RainbowKitProvider
+                        theme={darkTheme()}
+                        modalSize="compact"
+                        showRecentTransactions={true}
+                        initialChain={wagmiConfig.chains[0]}
+                    >
+                        {children}
+                    </RainbowKitProvider>
                 </ApolloProvider>
                 {/* React Query Devtools only in development */}
                 {process.env.NODE_ENV !== "production" && <ReactQueryDevtools initialIsOpen={false} />}
             </QueryClientProvider>
         </WagmiProvider>
     )
-}
-
-function WalletAwareRainbowKit({ children }: { children: ReactNode }) {
-    const { isConnected } = useAccount();
-    // mounted guards initialChain to avoid SSR/hydration mismatch on the prop only
-    const [mounted, setMounted] = useState(false);
-    useEffect(() => setMounted(true), []);
-
-    const initialChain = mounted && isConnected ? undefined : wagmiConfig.chains[0];
-
-    return (
-        <RainbowKitProvider
-            theme={darkTheme()}
-            modalSize="compact"
-            showRecentTransactions={true}
-            initialChain={initialChain}
-        >
-            {children}
-        </RainbowKitProvider>
-    );
 }
