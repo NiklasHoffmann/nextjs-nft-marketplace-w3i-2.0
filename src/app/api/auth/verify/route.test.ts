@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 const cookiesSetMock = vi.fn();
 const cookiesMock = vi.fn();
 const verifyMessageMock = vi.fn();
-const isAdminAddressMock = vi.fn();
+const hasAdminAccessMock = vi.fn();
 
 vi.mock('next/headers', () => ({
   cookies: cookiesMock,
@@ -14,13 +14,17 @@ vi.mock('viem', () => ({
   verifyMessage: verifyMessageMock,
 }));
 
-vi.mock('@/config/admin', () => ({
-  isAdminAddress: isAdminAddressMock,
+vi.mock('@/lib/auth/admin-access', () => ({
+  hasAdminAccess: hasAdminAccessMock,
 }));
+
+const createChallengeMessage = (nonce: string, timestamp: number) =>
+  `Sign this message to authenticate as admin.\n\nNonce: ${nonce}\nTimestamp: ${timestamp}`;
 
 const createRequest = (body: Record<string, unknown>): NextRequest => {
   return {
     method: 'POST',
+    headers: new Headers(),
     nextUrl: new URL('http://localhost/api/auth/verify'),
     json: vi.fn().mockResolvedValue(body),
   } as unknown as NextRequest;
@@ -32,7 +36,8 @@ const loadRoute = async () => {
   cookiesSetMock.mockReset();
   cookiesMock.mockReset();
   verifyMessageMock.mockReset();
-  isAdminAddressMock.mockReset();
+  hasAdminAccessMock.mockReset();
+  hasAdminAccessMock.mockResolvedValue(true);
   cookiesMock.mockResolvedValue({ set: cookiesSetMock });
 
   return await import('./route');
@@ -57,12 +62,12 @@ describe('POST /api/auth/verify', () => {
 
   it('rejects expired challenges', async () => {
     const { POST } = await loadRoute();
-    const nonce = 'nonce';
+    const nonce = 'a'.repeat(32);
     const timestamp = Date.now() - 10 * 60 * 1000;
     const req = createRequest({
       address: '0x1111111111111111111111111111111111111111',
       signature: '0xabc',
-      message: `Sign this message to authenticate as admin.\n\nNonce: ${nonce}\nTimestamp: ${timestamp}`,
+      message: createChallengeMessage(nonce, timestamp),
       nonce,
       timestamp,
     });
@@ -78,13 +83,13 @@ describe('POST /api/auth/verify', () => {
   it('rejects invalid signatures', async () => {
     const { POST } = await loadRoute();
     verifyMessageMock.mockResolvedValue(false);
-    isAdminAddressMock.mockReturnValue(true);
-    const nonce = 'nonce';
+    hasAdminAccessMock.mockResolvedValue(true);
+    const nonce = 'b'.repeat(32);
     const timestamp = Date.now();
     const req = createRequest({
       address: '0x1111111111111111111111111111111111111111',
       signature: '0xabc',
-      message: `Sign this message to authenticate as admin.\n\nNonce: ${nonce}\nTimestamp: ${timestamp}`,
+      message: createChallengeMessage(nonce, timestamp),
       nonce,
       timestamp,
     });
@@ -100,13 +105,13 @@ describe('POST /api/auth/verify', () => {
   it('rejects non-admin addresses', async () => {
     const { POST } = await loadRoute();
     verifyMessageMock.mockResolvedValue(true);
-    isAdminAddressMock.mockReturnValue(false);
-    const nonce = 'nonce';
+    hasAdminAccessMock.mockResolvedValue(false);
+    const nonce = 'c'.repeat(32);
     const timestamp = Date.now();
     const req = createRequest({
       address: '0x2222222222222222222222222222222222222222',
       signature: '0xabc',
-      message: `Sign this message to authenticate as admin.\n\nNonce: ${nonce}\nTimestamp: ${timestamp}`,
+      message: createChallengeMessage(nonce, timestamp),
       nonce,
       timestamp,
     });
@@ -122,13 +127,13 @@ describe('POST /api/auth/verify', () => {
   it('creates session cookie for valid admin signature', async () => {
     const { POST } = await loadRoute();
     verifyMessageMock.mockResolvedValue(true);
-    isAdminAddressMock.mockReturnValue(true);
-    const nonce = 'nonce';
+    hasAdminAccessMock.mockResolvedValue(true);
+    const nonce = 'd'.repeat(32);
     const timestamp = Date.now();
     const req = createRequest({
       address: '0x1111111111111111111111111111111111111111',
       signature: '0xabc',
-      message: `Sign this message to authenticate as admin.\n\nNonce: ${nonce}\nTimestamp: ${timestamp}`,
+      message: createChallengeMessage(nonce, timestamp),
       nonce,
       timestamp,
     });

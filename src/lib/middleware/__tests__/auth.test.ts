@@ -1,7 +1,17 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
 import { createHmac } from 'crypto';
-import { ForbiddenError, UnauthorizedError } from '../../api/errors';
+
+const hasAdminAccessMock = vi.fn();
+const isAdminSessionRevokedMock = vi.fn();
+
+vi.mock('@/lib/auth/admin-access', () => ({
+  hasAdminAccess: hasAdminAccessMock,
+}));
+
+vi.mock('@/lib/auth/admin-session-registry', () => ({
+  isAdminSessionRevoked: isAdminSessionRevokedMock,
+}));
 
 const ADMIN_ADDRESS = '0x1111111111111111111111111111111111111111';
 const USER_ADDRESS = '0x2222222222222222222222222222222222222222';
@@ -22,6 +32,10 @@ const createRequest = (options?: {
 
 const loadAuthModule = async () => {
   vi.resetModules();
+  hasAdminAccessMock.mockReset();
+  isAdminSessionRevokedMock.mockReset();
+  hasAdminAccessMock.mockResolvedValue(true);
+  isAdminSessionRevokedMock.mockResolvedValue(false);
   process.env.NEXT_PUBLIC_INSIGHTS_ADMIN_ADDRESSES = ADMIN_ADDRESS;
   process.env.JWT_SECRET = JWT_SECRET;
   return await import('../auth');
@@ -65,6 +79,7 @@ describe('auth middleware', () => {
   it('withAdmin rejects non-admin session token', async () => {
     const { withAdmin } = await loadAuthModule();
     const token = createSignedToken({
+      jti: 'non-admin-jti',
       address: USER_ADDRESS,
       isAdmin: false,
       exp: Date.now() + 60_000,
@@ -113,6 +128,7 @@ describe('auth middleware', () => {
   it('withAdmin authorizes admin with valid signed session cookie', async () => {
     const { withAdmin } = await loadAuthModule();
     const token = createSignedToken({
+      jti: 'valid-admin-jti',
       address: ADMIN_ADDRESS,
       isAdmin: true,
       exp: Date.now() + 60_000,
@@ -132,6 +148,7 @@ describe('auth middleware', () => {
   it('withAdmin rejects expired signed session cookie', async () => {
     const { withAdmin } = await loadAuthModule();
     const token = createSignedToken({
+      jti: 'expired-admin-jti',
       address: ADMIN_ADDRESS,
       isAdmin: true,
       exp: Date.now() - 1_000,
@@ -151,6 +168,7 @@ describe('auth middleware', () => {
   it('withAdmin rejects invalid signed session cookie', async () => {
     const { withAdmin } = await loadAuthModule();
     const token = createSignedToken({
+      jti: 'tampered-admin-jti',
       address: ADMIN_ADDRESS,
       isAdmin: true,
       exp: Date.now() + 60_000,
