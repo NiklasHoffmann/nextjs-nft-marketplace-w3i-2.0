@@ -72,5 +72,6 @@ export const wagmiConfig = createConfig({
         [polygon.id]: http(process.env.NEXT_PUBLIC_RPC_POLYGON || 'https://polygon.llamarpc.com'),
         [base.id]: http(process.env.NEXT_PUBLIC_RPC_BASE || 'https://base.llamarpc.com'),
     },
-    ssr: true,
+    // Client-only wallet UX (RainbowKit modals, QR pairing) is more reliable here without SSR hydration.
+    ssr: false,
 })

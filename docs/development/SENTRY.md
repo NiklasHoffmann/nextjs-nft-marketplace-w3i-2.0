@@ -16,9 +16,10 @@ Optional build-time values for source map upload:
 
 ## Configuration Files
 
-- `sentry.client.config.ts`
+- `instrumentation-client.ts`
 - `sentry.server.config.ts`
 - `sentry.edge.config.ts`
+- `instrumentation.ts` (contains `onRequestError` hook)
 
 ## Notes
 

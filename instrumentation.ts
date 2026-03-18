@@ -5,8 +5,12 @@
  * https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
  */
 
+import * as Sentry from '@sentry/nextjs';
+
+// Required by recent Sentry/Next.js versions to capture nested RSC request errors.
+export const onRequestError = Sentry.captureRequestError;
+
 export async function register() {
-    const { default: Sentry } = await import('@sentry/nextjs');
     const isNodeRuntime = process.env.NEXT_RUNTIME === 'nodejs';
     const isDev = process.env.NODE_ENV === 'development';
     const runtimeRole = (process.env.APP_RUNTIME_ROLE || 'all').trim().toLowerCase();

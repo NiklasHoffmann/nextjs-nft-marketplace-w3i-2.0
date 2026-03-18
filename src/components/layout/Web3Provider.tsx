@@ -1,13 +1,62 @@
 ﻿'use client'
 import '@rainbow-me/rainbowkit/styles.css'
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
-import { WagmiProvider } from 'wagmi'
+import { WagmiProvider, useAccount, useReconnect } from 'wagmi'
 import { wagmiConfig } from '@/config/wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import { ReactNode, useState } from 'react'
+import { ReactNode, useEffect, useRef, useState } from 'react'
 import { ApolloProvider } from '@apollo/client'
 import apolloClient from '@/config/apolloClient'
+
+function WalletConnectionSync() {
+    const { isConnected, isConnecting } = useAccount();
+    const { reconnect } = useReconnect();
+    const isReconnectingRef = useRef(false);
+
+    useEffect(() => {
+        if (isConnected) return;
+
+        const safeReconnect = async () => {
+            if (isConnected || isConnecting || isReconnectingRef.current) return;
+            isReconnectingRef.current = true;
+            try {
+                await reconnect();
+            } catch {
+                // no-op: best-effort sync for WalletConnect mobile QR flows
+            } finally {
+                isReconnectingRef.current = false;
+            }
+        };
+
+        const onFocus = () => {
+            void safeReconnect();
+        };
+
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                void safeReconnect();
+            }
+        };
+
+        const intervalId = window.setInterval(() => {
+            void safeReconnect();
+        }, 2500);
+
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVisibility);
+
+        void safeReconnect();
+
+        return () => {
+            window.clearInterval(intervalId);
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVisibility);
+        };
+    }, [isConnected, isConnecting, reconnect]);
+
+    return null;
+}
 
 export default function Web3Provider({ children }: { children: ReactNode }) {
     // React Query: optimized for Web3 operations
@@ -34,6 +83,7 @@ export default function Web3Provider({ children }: { children: ReactNode }) {
         <WagmiProvider config={wagmiConfig}>
             <QueryClientProvider client={queryClient}>
                 <ApolloProvider client={apolloClient}>
+                    <WalletConnectionSync />
                     <RainbowKitProvider
                         theme={darkTheme()}
                         modalSize="compact"

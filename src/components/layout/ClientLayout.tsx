@@ -105,7 +105,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const isDevelopment = process.env.NODE_ENV === 'development';
   const pathname = usePathname() || '';
   const isAdminRoute = pathname.startsWith('/admin');
-  const needsAdminGuard = APP_LOCK_ENABLED || isAdminRoute;
+  // Admin routes are protected by middleware + app/admin/layout.tsx (AdminAuthGuard).
+  // Keep the global AdminGuard only for full app-lock mode on non-admin pages.
+  const needsAdminGuard = APP_LOCK_ENABLED && !isAdminRoute;
 
   const needsWalletNFTs =
     pathname.startsWith('/sell') ||
