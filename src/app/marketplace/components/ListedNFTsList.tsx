@@ -12,7 +12,7 @@
  * Performance: ~65ms vs V1's 3-5s load time
  */
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMarketplaceItems } from '@/hooks';
 import { useMarketplaceLayout } from '@/app/marketplace/context';
@@ -45,6 +45,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _
     const loadMoreRef = useRef<HTMLDivElement>(null);
     const isLoadingMore = useRef(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
+    const [loadingMode, setLoadingMode] = useState<'refresh' | 'load-more' | null>(null);
     const [showReloadNotification, setShowReloadNotification] = useState(false);
     const [cachedItems, setCachedItems] = useState<NFTScrollItem[]>([]);
     const lastVisibleTimestamp = useRef<number>(Date.now());
@@ -146,6 +147,16 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _
         includeFilters: false,
     });
 
+    const runRefresh = useCallback(async () => {
+        setLoadingMode('refresh');
+        await refetch();
+    }, [refetch]);
+
+    const runLoadMore = useCallback(async () => {
+        setLoadingMode('load-more');
+        await loadMore();
+    }, [loadMore]);
+
     // Events are handled by MarketplaceItemsContext automatically
 
     // Convert MongoDB items to NFTScrollItem format
@@ -244,6 +255,20 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _
         return sorted;
     }, [displayItems, sort.field, sort.direction]);
 
+    // Keep exactly one visible loading indicator for list refreshes.
+    const showListLoadingIndicator = loading && !isInitialLoad && sortedDisplayItems.length > 0;
+    const listLoadingMessage = loadingMode === 'load-more'
+        ? 'Loading more utilities...'
+        : loadingMode === 'refresh'
+            ? 'Refreshing listings...'
+            : 'Updating listings...';
+
+    useEffect(() => {
+        if (!loading) {
+            setLoadingMode(null);
+        }
+    }, [loading]);
+
     // End initial loading once first request cycle completes,
     // even if the result set is empty.
     useEffect(() => {
@@ -271,14 +296,14 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _
                 setShowReloadNotification(true);
 
                 // First pass immediately, second pass after short delay for eventual consistency.
-                refetch();
+                void runRefresh();
 
                 if (delayedRefetchTimeout) {
                     clearTimeout(delayedRefetchTimeout);
                 }
 
                 delayedRefetchTimeout = setTimeout(() => {
-                    refetch();
+                    void runRefresh();
                     delayedRefetchTimeout = null;
                 }, 2500);
 
@@ -303,7 +328,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _
                 window.removeEventListener('dataInvalidation', handleDataInvalidation);
             }
         };
-    }, [refetch]);
+    }, [runRefresh]);
 
     // Auto-reload when returning to marketplace page (e.g., from /sell)
     // This ensures new listings are always visible without manual refresh
@@ -317,7 +342,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _
                 // (Likely user went to /sell, listed NFT, came back)
                 if (timeHidden > 5000) {
                     devLog.info(`🔄 [Marketplace] Page visible again after ${Math.round(timeHidden / 1000)}s - auto-reloading...`);
-                    refetch();
+                    void runRefresh();
                 }
             } else {
                 // Track when page became hidden
@@ -334,7 +359,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _
                 document.removeEventListener('visibilitychange', handleVisibilityChange);
             }
         };
-    }, [refetch]);
+    }, [runRefresh]);
 
     // Success-page transition hard refresh (handles route prefetch + DB sync race)
     useEffect(() => {
@@ -345,11 +370,11 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _
         let retryTimeout: ReturnType<typeof setTimeout> | null = null;
 
         devLog.info('🔄 [Marketplace] Entered from success page - forcing refetch pass');
-        refetch();
+        void runRefresh();
 
         retryTimeout = setTimeout(() => {
             devLog.info('🔄 [Marketplace] Deferred refetch after success transition');
-            refetch();
+            void runRefresh();
             retryTimeout = null;
         }, 2500);
 
@@ -359,7 +384,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _
                 retryTimeout = null;
             }
         };
-    }, [isFromSuccess, refetch]);
+    }, [isFromSuccess, runRefresh]);
 
     // Infinite Scroll
     useEffect(() => {
@@ -370,7 +395,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _
                 const entry = entries[0];
                 if (entry?.isIntersecting && pagination.hasMore && !loading && !isLoadingMore.current) {
                     isLoadingMore.current = true;
-                    loadMore().finally(() => { isLoadingMore.current = false; });
+                    runLoadMore().finally(() => { isLoadingMore.current = false; });
                 }
             },
             { rootMargin: '200px', threshold: 0.1 }
@@ -382,7 +407,7 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _
         return () => {
             observer.unobserve(loadMoreNode);
         };
-    }, [loadMore, pagination?.hasMore, loading]);
+    }, [runLoadMore, pagination?.hasMore, loading]);
 
     // Remove isClient check to prevent title flickering - component is client-only already
     // This eliminates the flash of smaller title before hydration
@@ -512,13 +537,6 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _
                             </div>
                         )}
 
-                    {/* Inline loading status for filter/sort refresh cycles */}
-                    {loading && !isInitialLoad && (
-                        <div className="mt-3 inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm text-blue-700">
-                            <SpinnerIcon className="h-4 w-4 animate-spin" />
-                            <span className="font-medium">Updating listings...</span>
-                        </div>
-                    )}
                 </div>
             </div>
 
@@ -542,8 +560,8 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _
                     }
                     actions={
                         <RefreshButton
-                            onClick={refetch}
-                            loading={loading}
+                            onClick={runRefresh}
+                            loading={false}
                             label="Refresh"
                             loadingLabel="Refreshing..."
                         />
@@ -558,12 +576,12 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _
                     enableViewAll={true}
                 />
 
-                {/* Infinite-scroll/load-more feedback */}
-                {loading && !isInitialLoad && sortedDisplayItems.length > 0 && (
+                {/* Single list-loading indicator for refetch/load-more */}
+                {showListLoadingIndicator && (
                     <div className="px-8 pb-4">
                         <div className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 shadow-sm">
                             <SpinnerIcon className="h-4 w-4 animate-spin" />
-                            <span>Loading more utilities...</span>
+                            <span>{listLoadingMessage}</span>
                         </div>
                     </div>
                 )}

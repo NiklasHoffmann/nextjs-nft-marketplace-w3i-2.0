@@ -141,10 +141,15 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
   const [page, setPage] = useState(initialPage);
   const [pagination, setPagination] = useState<UseMarketplaceItemsReturn['pagination']>(() => initialCachedEntry?.data.pagination ?? null);
   const [availableFilters, setAvailableFilters] = useState<UseMarketplaceItemsReturn['filters']>(() => initialCachedEntry?.data.filters || null);
+  const itemsRef = useRef<EnrichedNFTDocument[]>(initialCachedEntry?.data.items ?? []);
 
   // Prevent concurrent loadMore calls
   const loadingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   /**
    * Fetch items from API (with cache support)
@@ -208,9 +213,13 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
 
     try {
       // Build query string
+      const effectiveLimit = (!append && pageNum === 1 && hasFreshCacheHit)
+        ? Math.max(limit, itemsRef.current.length)
+        : limit;
+
       const params = new URLSearchParams({
         page: pageNum.toString(),
-        limit: limit.toString(),
+        limit: effectiveLimit.toString(),
         sortBy: filters.sortBy || 'price',
         sortOrder: filters.sortOrder || 'desc',
         ...(filters.search && { search: filters.search }),
@@ -266,18 +275,29 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
       if (!abortController.signal.aborted) {
         // Update state
         if (append) {
-          setItems(prev => {
-            // Deduplication: Filter out items that already exist (by listingId)
-            const existingIds = new Set(prev.map(item => item.listingId).filter(Boolean));
-            const newItems = itemsFromApi.filter((item: EnrichedNFTDocument) => {
-              if (!item.listingId) return true; // Keep items without listingId
-              return !existingIds.has(item.listingId); // Skip duplicates
-            });
+          const previousItems = itemsRef.current;
 
-            return [...prev, ...newItems];
+          // Deduplication: Filter out items that already exist (by listingId)
+          const existingIds = new Set(previousItems.map(item => item.listingId).filter(Boolean));
+          const newItems = itemsFromApi.filter((item: EnrichedNFTDocument) => {
+            if (!item.listingId) return true; // Keep items without listingId
+            return !existingIds.has(item.listingId); // Skip duplicates
           });
+
+          const mergedItems = [...previousItems, ...newItems];
+          setItems(mergedItems);
+          itemsRef.current = mergedItems;
+
+          // Persist appended pages in cache so back-navigation restores all loaded items.
+          if (data.data) {
+            cacheContext.setCache(filterKey, {
+              ...data.data,
+              items: mergedItems,
+            });
+          }
         } else {
           setItems(itemsFromApi);
+          itemsRef.current = itemsFromApi;
 
           // Cache the result (only for page 1)
           if (pageNum === 1 && data.data && Array.isArray(data.data.items)) {
