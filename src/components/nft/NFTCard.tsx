@@ -24,7 +24,7 @@ import { useRouter } from "next/navigation";
 import { useNFTUserStats } from '@/contexts/nft-stats/NFTStatsContext';
 import { devLog } from '@/utils';
 import type { AggregatedNFT } from '@/types/core/core-nft-modern';
-import OptimizedNFTImage from './OptimizedNFTImage';
+
 import { NFTCardHeader } from './NFTCard/NFTCardHeader';
 import { NFTCardImage } from './NFTCard/NFTCardImage';
 import { NFTCardFooter } from './NFTCard/NFTCardFooter';
@@ -261,8 +261,6 @@ export function NFTCard(props: NFTCardAllProps) {
   // ===== PROPS NORMALIZATION =====
 
   const {
-    showStats = true,
-    className = "",
     priority = false,
     enableInsights = true
   } = props;
@@ -274,26 +272,10 @@ export function NFTCard(props: NFTCardAllProps) {
   const contractAddress = nft.core.contractAddress;
   const tokenId = nft.core.tokenId;
 
-  // Early return if essential props are missing
-  if (!contractAddress || !tokenId) {
-    devLog.error('NFTCard: Missing contractAddress or tokenId', { contractAddress, tokenId });
-    return null;
-  }
-
-  // ===== HOOKS =====
+  // ===== HOOKS (must be called before any early returns) =====
 
   // Get stats (likes, watchlist, etc.)
-  const { stats, loading: statsLoading } = useNFTUserStats(contractAddress, tokenId);
-
-  // ===== COMPUTED VALUES =====
-
-  // Extract display data
-  const imageUrl = nft.meta?.image || null;
-  const customTitle = nft.insight?.customTitle || null;
-  const nftName = nft.meta?.name || null;
-  const contractSymbol = nft.core.symbol || null;
-  const contractName = isLegacy ? (props.contract?.name || props.contract?.contractName) : null;
-  const rarity = nft.insight?.rarity || null;
+  const { stats } = useNFTUserStats(contractAddress, tokenId);
 
   // Categories and descriptions
   const categories = useMemo(() => {
@@ -310,6 +292,35 @@ export function NFTCard(props: NFTCardAllProps) {
           .filter((desc) => desc.length > 0)
       : [];
   }, [nft.insight?.cardDescription]);
+
+  // Rarity background color - extract rarity first for hook dependency
+  const rarity = nft.insight?.rarity || null;
+  const rarityBg = useMemo(() =>
+    getRarityBackground(rarity, enableInsights),
+    [rarity, enableInsights]
+  );
+
+  // Event handler hook
+  const handleClick = useCallback(() => {
+    router.push(`/nft/${contractAddress}/${tokenId}`);
+  }, [router, contractAddress, tokenId]);
+
+  // ===== VALIDATION (after all hooks) =====
+
+  // Early return if essential props are missing
+  if (!contractAddress || !tokenId) {
+    devLog.error('NFTCard: Missing contractAddress or tokenId', { contractAddress, tokenId });
+    return null;
+  }
+
+  // ===== COMPUTED VALUES =====
+
+  // Extract display data
+  const imageUrl = nft.meta?.image || null;
+  const customTitle = nft.insight?.customTitle || null;
+  const nftName = nft.meta?.name || null;
+  const contractSymbol = nft.core.symbol || null;
+  const contractName = isLegacy ? (props.contract?.name || props.contract?.contractName) : null;
 
   // Listing data
   const isListed = isLegacy
@@ -378,17 +389,9 @@ export function NFTCard(props: NFTCardAllProps) {
   const likeCount = stats?.likeCount || 0;
   const averageRating = stats?.averageRating || null;
 
-  // Rarity background color
-  const rarityBg = useMemo(() =>
-    getRarityBackground(rarity, enableInsights),
-    [rarity, enableInsights]
-  );
-
   // ===== EVENT HANDLERS =====
 
-  const handleClick = useCallback(() => {
-    router.push(`/nft/${contractAddress}/${tokenId}`);
-  }, [router, contractAddress, tokenId]);
+  // handleClick is defined above in hooks section
 
   // ===== LOADING STATE =====
 

@@ -9,7 +9,7 @@
 import { useState, useEffect } from 'react';
 import { useWETH } from '@/hooks/tokens';
 import { useMarketplaceContracts } from '@/hooks/marketplace';
-import { LoadingState, ButtonSpinner } from '@/components/core/Loading';
+import { ButtonSpinner } from '@/components/core/Loading';
 import { devLog } from '@/utils';
 
 export function WETHConverter() {
@@ -21,7 +21,6 @@ export function WETHConverter() {
         ethBalance, 
         wethBalance, 
         allowance,
-        hasEnoughAllowance,
         isWrapping, 
         isUnwrapping,
         isApproving,

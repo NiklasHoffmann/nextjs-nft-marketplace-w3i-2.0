@@ -1,15 +1,15 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
-import Image from 'next/image';
+import React, { useState, useEffect } from 'react';
+
 import type { NFTFilters, NFTSortOptions } from '@/types/marketplace';
 
 interface NFTFilterSidebarProps {
     onFiltersChange: (filters: NFTFilters) => void;
     onSortChange: (sort: NFTSortOptions) => void;
     currentSort: NFTSortOptions;
-    totalItems: number;
-    filteredCount: number;
+    _totalItems: number;
+    _filteredCount: number;
 }
 
 const AVAILABLE_CATEGORIES = [
@@ -93,8 +93,8 @@ export function NFTFilterSidebar({
     onFiltersChange,
     onSortChange,
     currentSort,
-    totalItems,
-    filteredCount
+    _totalItems,
+    _filteredCount
 }: NFTFilterSidebarProps) {
     const [filters, setFilters] = useState<NFTFilters>({
         categories: [],
@@ -117,10 +117,6 @@ export function NFTFilterSidebar({
     });
 
     const [isOpen, setIsOpen] = useState(false);
-    const [isHovering, setIsHovering] = useState(false);
-
-    // Track rotation per field for correct direction
-    const [fieldRotations, setFieldRotations] = useState<Record<string, number>>({});
 
     // Collapsible sections state
     const [expandedSections, setExpandedSections] = useState({
@@ -142,12 +138,6 @@ export function NFTFilterSidebar({
     }, [localSearchTerm]);
 
     // Debounce numeric filter updates (500ms delay)
-    // Memoize dependencies to prevent unnecessary re-renders
-    const numericFiltersString = useMemo(
-        () => JSON.stringify(localNumericFilters),
-        [localNumericFilters]
-    );
-
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             setFilters((prev: NFTFilters) => ({
@@ -157,15 +147,12 @@ export function NFTFilterSidebar({
         }, 500);
 
         return () => clearTimeout(timeoutId);
-    }, [numericFiltersString]); // Only depend on stringified version
+    }, [localNumericFilters]);
 
     // Update parent when filters change (debounced for search and numeric inputs)
-    // Use JSON.stringify to do deep comparison and avoid unnecessary calls
-    const filtersString = useMemo(() => JSON.stringify(filters), [filters]);
-
     useEffect(() => {
         onFiltersChange(filters);
-    }, [filtersString]); // Only trigger when filter values actually change
+    }, [filters, onFiltersChange]);
 
     const updateFilters = (updates: Partial<NFTFilters>) => {
         const newFilters = { ...filters, ...updates };
@@ -176,25 +163,6 @@ export function NFTFilterSidebar({
     const updateSort = (field: NFTSortOptions['field']) => {
         const newDirection = currentSort.field === field && currentSort.direction === 'desc' ? 'asc' as const : 'desc' as const;
         onSortChange({ field, direction: newDirection });
-    };
-
-    const clearAllFilters = () => {
-        setFilters({
-            categories: [],
-            tokenStandards: [],
-            rarities: [],
-            searchTerm: '',
-        });
-        setLocalSearchTerm('');
-        setLocalNumericFilters({
-            priceMin: undefined,
-            priceMax: undefined,
-            minRating: undefined,
-            minViews: undefined,
-            minLikes: undefined,
-            minWatchlistCount: undefined,
-        });
-        onSortChange({ field: 'price', direction: 'desc' });
     };
 
     const toggleCategory = (category: string) => {
@@ -340,7 +308,6 @@ export function NFTFilterSidebar({
     const handleFilterButtonMouseEnter = () => {
         // Nur auf Desktop (größer als md breakpoint)
         if (window.innerWidth >= 768) {
-            setIsHovering(true);
             setIsOpen(true);
         }
     };
@@ -348,31 +315,21 @@ export function NFTFilterSidebar({
     const handleFilterButtonMouseLeave = () => {
         // Nur auf Desktop
         if (window.innerWidth >= 768) {
-            setIsHovering(false);
             // Kleine Verzögerung bevor Panel schließt
             setTimeout(() => {
-                setIsHovering(prev => {
-                    if (!prev) setIsOpen(false);
-                    return prev;
-                });
+                setIsOpen(false);
             }, 300);
         }
     };
 
     const handlePanelMouseEnter = () => {
-        if (window.innerWidth >= 768) {
-            setIsHovering(true);
-        }
+        // Panel open, do nothing
     };
 
     const handlePanelMouseLeave = () => {
         if (window.innerWidth >= 768) {
-            setIsHovering(false);
             setTimeout(() => {
-                setIsHovering(prev => {
-                    if (!prev) setIsOpen(false);
-                    return prev;
-                });
+                setIsOpen(false);
             }, 300);
         }
     };

@@ -193,6 +193,9 @@ const OptimizedNFTImage = memo(({
     disableVisualEffects = false,
     tiltRotation = { rotateX: 0, rotateY: 0 },
 }: OptimizedNFTImageProps) => {
+    void sizes;
+    void blurDataURL;
+
     const normalizedImageUrl = imageUrl?.trim() || '';
     // `fill` images often receive default width/height props (256x256),
     // which can under-select a too-small variant and look pixelated after lazy load.
@@ -227,7 +230,6 @@ const OptimizedNFTImage = memo(({
     const [hasError, setHasError] = useState(imageUrls.length === 0);
     const [currentImageUrl, setCurrentImageUrl] = useState(() => imageUrls[initialFallbackIndex] || '');
     const [fallbackIndex, setFallbackIndex] = useState(initialFallbackIndex);
-    const [aspectRatio, setAspectRatio] = useState<number | null>(null);
     const [isIntersecting, setIsIntersecting] = useState(priority || isCachedInitially);
     const [hasBeenVisible, setHasBeenVisible] = useState(isCachedInitially);
     const [retryAttempt, setRetryAttempt] = useState(0);
@@ -308,11 +310,10 @@ const OptimizedNFTImage = memo(({
         setIsLoading(!isCached);
     }, [selectedVariantSource, normalizedImageUrl, variantWidth]);
 
-    const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-        const img = e.currentTarget;
-        const ratio = img.naturalWidth / img.naturalHeight;
+    const handleImageLoad = useCallback((_e: React.SyntheticEvent<HTMLImageElement>) => {
+        // const _img = e.currentTarget; // No longer needed, aspect ratio state removed
         imageLoadCache.set(currentImageUrl, true);
-        setAspectRatio(ratio);
+        // setAspectRatio has been removed - aspect ratio state no longer exists
         setIsLoading(false);
     }, [currentImageUrl]);
 

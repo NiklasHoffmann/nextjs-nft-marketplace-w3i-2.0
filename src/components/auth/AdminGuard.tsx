@@ -1,8 +1,7 @@
 ﻿"use client";
 
 import { useAccount, useSignMessage } from 'wagmi';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback } from 'react';
 import { isAdminAddress, APP_LOCK_ENABLED } from '@/config/admin';
 import { Web3ConnectButton } from '@/components/layout/Web3ConnectButton';
 import { LoadingState, ButtonSpinner } from '@/components/core/Loading';
@@ -10,8 +9,7 @@ import { devLog } from '@/utils';
 
 interface AdminGuardProps {
     children: React.ReactNode;
-    requireAdmin?: boolean; // Wenn true, wird immer Admin-Zugriff benötigt
-    fallbackRoute?: string; // Wohin soll umgeleitet werden?
+    requireAdmin?: boolean;
 }
 
 /**
@@ -21,10 +19,8 @@ interface AdminGuardProps {
 export function AdminGuard({
     children,
     requireAdmin = false,
-    fallbackRoute = '/'
 }: AdminGuardProps) {
     const { address, isConnected } = useAccount();
-    const router = useRouter();
     const { signMessageAsync } = useSignMessage();
 
     // If no admin check is required (APP_LOCK_ENABLED=false and requireAdmin=false),
@@ -35,15 +31,10 @@ export function AdminGuard({
     const [isSigning, setIsSigning] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Prüfe Session beim Mount und bei Adress-Änderung
-    useEffect(() => {
-        if (needsAdmin) checkSession();
-    }, [address, isConnected]);
-
     /**
      * Prüft ob eine gültige Admin-Session existiert
      */
-    const checkSession = async () => {
+    const checkSession = useCallback(async () => {
         setError(null);
         setIsChecking(true);
 
@@ -88,7 +79,12 @@ export function AdminGuard({
             setIsAuthorized(false);
             setIsChecking(false);
         }
-    };
+    }, [isConnected, address]);
+
+    // Prüfe Session beim Mount und bei Adress-Änderung
+    useEffect(() => {
+        if (needsAdmin) checkSession();
+    }, [address, isConnected, needsAdmin, checkSession]);
 
     /**
      * Führt den Signatur-Authentifizierungs-Flow durch

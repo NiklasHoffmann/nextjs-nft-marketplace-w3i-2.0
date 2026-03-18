@@ -30,7 +30,6 @@ interface StatCardProps {
 // Constants for consistent sizing
 const COMPACT_HEIGHT = 'h-12'; // 48px
 const COMPACT_FONT_SIZE = 'text-base';
-const NORMAL_FONT_SIZE = 'text-xl';
 
 const variantStyles: Record<StatVariant, { iconBg: string; textColor: string; cardBg?: string; cardBorder?: string }> = {
     green: { iconBg: 'bg-green-100', textColor: 'text-green-600' },
