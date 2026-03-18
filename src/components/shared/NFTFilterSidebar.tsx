@@ -8,8 +8,8 @@ interface NFTFilterSidebarProps {
     onFiltersChange: (filters: NFTFilters) => void;
     onSortChange: (sort: NFTSortOptions) => void;
     currentSort: NFTSortOptions;
-    _totalItems: number;
-    _filteredCount: number;
+    totalItems: number;
+    filteredCount: number;
 }
 
 const AVAILABLE_CATEGORIES = [
@@ -93,8 +93,8 @@ export function NFTFilterSidebar({
     onFiltersChange,
     onSortChange,
     currentSort,
-    _totalItems,
-    _filteredCount
+    totalItems,
+    filteredCount
 }: NFTFilterSidebarProps) {
     const [filters, setFilters] = useState<NFTFilters>({
         categories: [],
@@ -408,13 +408,10 @@ export function NFTFilterSidebar({
             >
                 {/* Header */}
                 <div className="sticky top-0 bg-white border-b border-gray-200 p-4 z-10">
-                    {/* Disable Header Title for more compact design */}
-                    {/*
                     <h3 className="text-sm font-bold text-gray-900">Filter & Sortierung</h3>
                     <p className="text-xs text-gray-600 mt-1">
                         {filteredCount} von {totalItems} NFTs
-                    </p> 
-                    */}
+                    </p>
                     {/* Active Filter Chips */}
                     <div className="flex flex-wrap gap-2 items-start">
                         {getActiveFilterChips().map((chip, index) => {
