@@ -27,7 +27,6 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY --from=builder /app/instrumentation.ts ./instrumentation.ts
-COPY --from=builder /app/sentry.client.config.ts ./sentry.client.config.ts
 COPY --from=builder /app/sentry.edge.config.ts ./sentry.edge.config.ts
 COPY --from=builder /app/sentry.server.config.ts ./sentry.server.config.ts
 COPY --from=builder /app/postcss.config.mjs ./postcss.config.mjs
@@ -48,7 +47,6 @@ COPY --from=source /app/public ./public
 COPY --from=source /app/instrumentation.ts ./instrumentation.ts
 COPY --from=source /app/next.config.ts ./next.config.ts
 COPY --from=source /app/next-env.d.ts ./next-env.d.ts
-COPY --from=source /app/sentry.client.config.ts ./sentry.client.config.ts
 COPY --from=source /app/sentry.edge.config.ts ./sentry.edge.config.ts
 COPY --from=source /app/sentry.server.config.ts ./sentry.server.config.ts
 CMD ["npm", "run", "worker:start"]
