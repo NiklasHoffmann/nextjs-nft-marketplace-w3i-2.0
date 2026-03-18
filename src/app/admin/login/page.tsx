@@ -27,7 +27,9 @@ export default function AdminLoginPage() {
     const confirmSession = useCallback(async (targetAddress: string): Promise<boolean> => {
         const normalizedTarget = targetAddress.toLowerCase();
 
-        for (let attempt = 0; attempt < 5; attempt++) {
+        // WalletConnect/QR flows can propagate cookies slightly later in some browsers (especially private mode).
+        // Keep this as best-effort confirmation, not a hard blocker after successful signature verification.
+        for (let attempt = 0; attempt < 12; attempt++) {
             try {
                 const response = await fetch('/api/auth/session', {
                     credentials: 'include',
@@ -45,7 +47,7 @@ export default function AdminLoginPage() {
                 devLog.warn('Session confirmation failed:', error);
             }
 
-            await new Promise(resolve => setTimeout(resolve, 250));
+            await new Promise(resolve => setTimeout(resolve, 300));
         }
 
         return false;
@@ -231,7 +233,10 @@ export default function AdminLoginPage() {
 
             const hasConfirmedSession = await confirmSession(address);
             if (!hasConfirmedSession) {
-                throw new Error('Session konnte nicht bestaetigt werden. Bitte erneut versuchen.');
+                devLog.warn('Session not confirmed immediately after verify; proceeding with optimistic redirect', {
+                    address: address.toLowerCase(),
+                    connector: connector?.name || 'unknown'
+                });
             }
 
             setShowSuccess(true);
