@@ -1,9 +1,8 @@
 import { http, webSocket, fallback } from 'wagmi'
 import { mainnet, polygon, base, sepolia } from 'wagmi/chains'
-import { connectorsForWallets } from '@rainbow-me/rainbowkit'
+import { connectorsForWallets, getDefaultWallets } from '@rainbow-me/rainbowkit'
 import {
     injectedWallet,
-    walletConnectWallet,
     coinbaseWallet,
 } from '@rainbow-me/rainbowkit/wallets'
 import { createConfig } from 'wagmi'
@@ -34,23 +33,29 @@ if (!projectId) {
     devLog.warn('📝 Erstelle eine Project ID auf https://cloud.walletconnect.com')
 }
 
-// Simplified Connector-Konfiguration - Use injected wallet instead of MetaMask SDK
-const connectors = connectorsForWallets(
-    [
-        {
-            groupName: 'Recommended',
-            wallets: [
-                injectedWallet,
-                ...(projectId ? [walletConnectWallet] : []), // Nur hinzufügen wenn Project ID verfügbar
-                coinbaseWallet,
-            ],
-        },
-    ],
-    {
+// Wallet setup:
+// - With WalletConnect projectId: use RainbowKit default wallet list (broad support)
+// - Without projectId: keep deterministic injected/coinbase fallback
+const connectors = projectId
+    ? getDefaultWallets({
         appName,
-        projectId: projectId || '', // Leerer String als Fallback
-    }
-)
+        projectId,
+    }).connectors
+    : connectorsForWallets(
+        [
+            {
+                groupName: 'Recommended',
+                wallets: [
+                    injectedWallet,
+                    coinbaseWallet,
+                ],
+            },
+        ],
+        {
+            appName,
+            projectId: '',
+        }
+    )
 
 export const wagmiConfig = createConfig({
     connectors,
