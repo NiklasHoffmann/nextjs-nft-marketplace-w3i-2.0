@@ -24,7 +24,7 @@ export const NFTCardImage = memo<NFTCardImageProps>(({
 
     if (hasImage && !hasDescription) {
         return (
-            <div className="h-full w-full min-w-0">
+            <div className="h-full w-full min-w-0 flex-1">
                 <div className="rounded-md border-2 border-white/50 overflow-hidden relative h-full w-full">
                     <OptimizedNFTImage
                         imageUrl={imageUrl ?? ''}
@@ -43,7 +43,7 @@ export const NFTCardImage = memo<NFTCardImageProps>(({
 
     if (!hasImage && hasDescription) {
         return (
-            <div className="h-full w-full min-w-0">
+            <div className="h-full w-full min-w-0 flex-1">
                 <div
                     className="bg-white/95 backdrop-blur-sm pr-1 pt-1 rounded-md shadow-lg text-xs h-full overflow-hidden text-right break-words hyphens-auto"
                     lang="de"
@@ -59,7 +59,7 @@ export const NFTCardImage = memo<NFTCardImageProps>(({
     }
 
     return (
-        <div className="grid grid-cols-2 gap-1 h-full min-w-0">
+        <div className="grid grid-cols-2 gap-1 h-full w-full min-w-0 flex-1">
             <div className="h-full overflow-hidden">
                 <div className="rounded-md border-2 border-white/50 overflow-hidden relative h-full w-full">
                     <OptimizedNFTImage

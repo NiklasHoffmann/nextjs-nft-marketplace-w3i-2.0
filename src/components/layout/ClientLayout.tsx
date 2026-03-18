@@ -15,7 +15,7 @@ import { APP_LOCK_ENABLED } from '@/config/admin';
 import { MarketplaceEventsProvider, EventConnectionStatus } from "@/providers/MarketplaceEventsProvider";
 import AdminNavbar from '@/app/admin/components/AdminNavbar';
 import Web3Provider from './Web3Provider';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { devLog } from '@/utils';
 import * as Sentry from '@sentry/nextjs';
 
@@ -104,19 +104,17 @@ const shouldReloadForChunkError = (pathname: string): boolean => {
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const isDevelopment = process.env.NODE_ENV === 'development';
   const pathname = usePathname() || '';
+  const router = useRouter();
   const isAdminRoute = pathname.startsWith('/admin');
   // Admin routes are protected by middleware + app/admin/layout.tsx (AdminAuthGuard).
   // Keep the global AdminGuard only for full app-lock mode on non-admin pages.
   const needsAdminGuard = APP_LOCK_ENABLED && !isAdminRoute;
 
-  const needsWalletNFTs =
-    pathname.startsWith('/sell') ||
-    pathname.startsWith('/wallet') ||
-    pathname.startsWith('/nft/');
+  // Keep providers persistent across all public pages to avoid cache resets and refetches
+  // when navigating between marketplace, nft detail, wallet, sell, etc.
+  const needsWalletNFTs = !isAdminRoute;
 
-  const needsCollections =
-    pathname.startsWith('/marketplace') ||
-    pathname.startsWith('/collection/');
+  const needsCollections = !isAdminRoute;
 
   const needsMarketplaceItems = !isAdminRoute;
 
@@ -171,6 +169,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       window.removeEventListener('unhandledrejection', onUnhandledRejection);
     };
   }, [pathname]);
+
+  React.useEffect(() => {
+    if (isAdminRoute) return;
+
+    // Warm key public routes so return-navigation feels instant.
+    const prefetchRoutes = ['/marketplace', '/wallet', '/sell', '/cart'] as const;
+    prefetchRoutes.forEach((route) => {
+      router.prefetch(route);
+    });
+  }, [isAdminRoute, router]);
   
   return (
     <ErrorBoundary

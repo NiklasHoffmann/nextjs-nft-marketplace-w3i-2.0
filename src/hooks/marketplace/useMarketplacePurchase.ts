@@ -120,14 +120,49 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
 
       onProgress?.('pending', hash);
 
-      // Manually check the transaction receipt
-      // This helps catch reverted transactions immediately
+      // Robust confirmation path for mobile wallet flows:
+      // 1) Normal waitForTransactionReceipt
+      // 2) Fallback polling via getTransactionReceipt
       if (publicClient) {
-        devLog.info('Waiting for transaction receipt:', hash);
-        const receipt = await publicClient.waitForTransactionReceipt({
-          hash,
-          timeout: 120_000 // 2 minutes
-        });
+        const waitForReceiptWithFallback = async () => {
+          try {
+            devLog.info('Waiting for transaction receipt (primary):', hash);
+            return await publicClient.waitForTransactionReceipt({
+              hash,
+              confirmations: 1,
+              timeout: 120_000,
+              pollingInterval: 1_500,
+            });
+          } catch (primaryError) {
+            devLog.warn('Primary receipt wait failed, switching to fallback polling:', primaryError);
+          }
+
+          const fallbackDeadlineMs = Date.now() + 180_000;
+          let attempts = 0;
+
+          while (Date.now() < fallbackDeadlineMs) {
+            attempts += 1;
+            try {
+              const fallbackReceipt = await publicClient.getTransactionReceipt({ hash });
+              if (fallbackReceipt) {
+                devLog.info('Fallback receipt resolved:', { attempts, hash });
+                return fallbackReceipt;
+              }
+            } catch (fallbackError) {
+              // Common while tx is still pending or RPC propagation is delayed
+              devLog.warn('Fallback receipt poll attempt failed:', {
+                attempts,
+                message: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+              });
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 3_000));
+          }
+
+          throw new Error(`Transaction confirmation timeout. Hash: ${hash}`);
+        };
+
+        const receipt = await waitForReceiptWithFallback();
 
         devLog.info('Transaction receipt:', {
           status: receipt.status,
@@ -142,6 +177,9 @@ export function useMarketplacePurchase(marketplaceAddress: string) {
           throw new Error(errorMsg);
         }
 
+        onProgress?.('success', hash);
+      } else {
+        devLog.warn('No publicClient available for receipt tracking; proceeding after tx submission', { hash });
         onProgress?.('success', hash);
       }
 
