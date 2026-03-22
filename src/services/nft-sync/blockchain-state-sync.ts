@@ -101,8 +101,44 @@ export interface BlockchainState {
     totalSupply?: number | null;
 }
 
+interface ContractMetadataCacheEntry {
+    name: string | null;
+    symbol: string | null;
+    expiresAt: number;
+}
+
+const CONTRACT_METADATA_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const contractMetadataCache = new Map<string, ContractMetadataCacheEntry>();
+
 export class BlockchainStateSync {
     private client;
+
+    private getCachedContractMetadata(contractAddress: string): ContractMetadataCacheEntry | null {
+        const key = contractAddress.toLowerCase();
+        const cached = contractMetadataCache.get(key);
+        if (!cached) {
+            return null;
+        }
+
+        if (cached.expiresAt <= Date.now()) {
+            contractMetadataCache.delete(key);
+            return null;
+        }
+
+        return cached;
+    }
+
+    private setCachedContractMetadata(
+        contractAddress: string,
+        name: string | null,
+        symbol: string | null
+    ): void {
+        contractMetadataCache.set(contractAddress.toLowerCase(), {
+            name,
+            symbol,
+            expiresAt: Date.now() + CONTRACT_METADATA_CACHE_TTL_MS,
+        });
+    }
 
     private async safeReadContract<T>(params: {
         address: `0x${string}`;
@@ -224,17 +260,28 @@ export class BlockchainStateSync {
                 tokenStandard
             };
 
-            const contractName = await this.safeReadContract<string>({
-                address: contractAddress as `0x${string}`,
-                abi: CONTRACT_METADATA_ABI,
-                functionName: 'name'
-            });
+            const cachedMetadata = this.getCachedContractMetadata(contractAddress);
+            let contractName = cachedMetadata?.name ?? null;
+            let contractSymbol = cachedMetadata?.symbol ?? null;
 
-            const contractSymbol = await this.safeReadContract<string>({
-                address: contractAddress as `0x${string}`,
-                abi: CONTRACT_METADATA_ABI,
-                functionName: 'symbol'
-            });
+            if (!cachedMetadata) {
+                const [fetchedName, fetchedSymbol] = await Promise.all([
+                    this.safeReadContract<string>({
+                        address: contractAddress as `0x${string}`,
+                        abi: CONTRACT_METADATA_ABI,
+                        functionName: 'name'
+                    }),
+                    this.safeReadContract<string>({
+                        address: contractAddress as `0x${string}`,
+                        abi: CONTRACT_METADATA_ABI,
+                        functionName: 'symbol'
+                    })
+                ]);
+
+                contractName = fetchedName;
+                contractSymbol = fetchedSymbol;
+                this.setCachedContractMetadata(contractAddress, contractName, contractSymbol);
+            }
 
             let totalSupply: number | null = null;
             if (tokenStandard === 'ERC721') {
