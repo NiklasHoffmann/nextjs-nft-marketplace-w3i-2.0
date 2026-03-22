@@ -157,36 +157,39 @@ export class BlockchainStateSync {
             let approved = '';
             let tokenStandard: 'ERC721' | 'ERC1155' = 'ERC721';
 
-            try {
-                const [ownerResult, approvedResult] = await Promise.all([
-                    this.client.readContract({
-                        address: contractAddress as `0x${string}`,
-                        abi: ERC721_ABI,
-                        functionName: 'ownerOf',
-                        args: [BigInt(tokenId)]
-                    }),
-                    this.client.readContract({
-                        address: contractAddress as `0x${string}`,
-                        abi: ERC721_ABI,
-                        functionName: 'getApproved',
-                        args: [BigInt(tokenId)]
-                    })
-                ]);
+            // Determine token standard conservatively:
+            // only mark as ERC1155 when uri(tokenId) succeeds.
+            const ownerResult = await this.safeReadContract<string>({
+                address: contractAddress as `0x${string}`,
+                abi: ERC721_ABI,
+                functionName: 'ownerOf',
+                args: [BigInt(tokenId)]
+            });
 
-                owner = ownerResult as string;
-                approved = approvedResult as string;
-            } catch (error) {
-                tokenStandard = 'ERC1155';
+            if (ownerResult) {
+                tokenStandard = 'ERC721';
+                owner = ownerResult;
 
-                try {
-                    await this.client.readContract({
-                        address: contractAddress as `0x${string}`,
-                        abi: ERC1155_ABI,
-                        functionName: 'uri',
-                        args: [BigInt(tokenId)]
-                    });
-                } catch (uriError) {
-                    devLog.warn('  ⚠️ Could not resolve token standard:', uriError);
+                const approvedResult = await this.safeReadContract<string>({
+                    address: contractAddress as `0x${string}`,
+                    abi: ERC721_ABI,
+                    functionName: 'getApproved',
+                    args: [BigInt(tokenId)]
+                });
+
+                approved = approvedResult || '';
+            } else {
+                const uriResult = await this.safeReadContract<string>({
+                    address: contractAddress as `0x${string}`,
+                    abi: ERC1155_ABI,
+                    functionName: 'uri',
+                    args: [BigInt(tokenId)]
+                });
+
+                if (uriResult) {
+                    tokenStandard = 'ERC1155';
+                } else {
+                    devLog.warn('  ⚠️ Could not confirm token standard via ownerOf or uri; defaulting to ERC721 handling');
                 }
 
                 // ERC1155 has no ownerOf/getApproved. Use known seller/owner as approval check owner.
