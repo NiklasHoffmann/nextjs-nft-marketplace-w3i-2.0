@@ -18,6 +18,8 @@ import {
     updateNFTOwnership,
     upsertNFTMetadata
 } from '@/lib/db';
+import { incrementRequestCounter } from '@/lib/monitoring/request-counter';
+import { getSharedCacheValue, setSharedCacheValue } from '@/lib/redis/shared-cache';
 import type { NFTMetadataSyncResult } from '@/types';
 import { fetchComprehensiveNFTDataNew } from '@/services/blockchain/nft-fetcher';
 import { devLog } from '@/utils';
@@ -28,7 +30,8 @@ interface NFTIdentifier {
     tokenId: string;
 }
 
-const SYNC_RESULT_TTL_MS = 20_000;
+const SYNC_RESULT_TTL_MS = 120_000;
+const SYNC_RESULT_SHARED_CACHE_TTL_SECONDS = Math.ceil(SYNC_RESULT_TTL_MS / 1000);
 
 interface SyncCacheEntry {
     result: NFTMetadataSyncResult;
@@ -37,6 +40,10 @@ interface SyncCacheEntry {
 
 const syncInFlight = new Map<string, Promise<NFTMetadataSyncResult>>();
 const syncResultCache = new Map<string, SyncCacheEntry>();
+
+function buildSyncSharedCacheKey(walletAddress: string): string {
+    return `wallet-sync:${walletAddress.toLowerCase()}`;
+}
 
 function cleanupSyncCache(): void {
     const now = Date.now();
@@ -49,6 +56,8 @@ function cleanupSyncCache(): void {
 
 async function discoverNFTsViaAlchemy(walletAddress: string): Promise<NFTIdentifier[]> {
     try {
+        incrementRequestCounter('alchemy.discovery.user_sync.attempt');
+
         const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || process.env.ALCHEMY_API_KEY;
         if (!apiKey) {
             throw new Error('Alchemy API key not configured');
@@ -65,8 +74,11 @@ async function discoverNFTsViaAlchemy(walletAddress: string): Promise<NFTIdentif
         );
 
         if (!response.ok) {
+            incrementRequestCounter('alchemy.discovery.user_sync.error');
             throw new Error(`Alchemy API error: ${response.status}`);
         }
+
+        incrementRequestCounter('alchemy.discovery.user_sync.success');
 
         const data = await response.json();
 
@@ -109,6 +121,16 @@ export const POST = apiHandler(async (request: NextRequest) => {
     const cachedSync = syncResultCache.get(walletAddress);
     if (cachedSync && cachedSync.expiresAt > Date.now()) {
         return apiSuccess(cachedSync.result);
+    }
+
+    const sharedCacheKey = buildSyncSharedCacheKey(walletAddress);
+    const sharedCachedSync = await getSharedCacheValue<NFTMetadataSyncResult>(sharedCacheKey);
+    if (sharedCachedSync) {
+        syncResultCache.set(walletAddress, {
+            result: sharedCachedSync,
+            expiresAt: Date.now() + SYNC_RESULT_TTL_MS,
+        });
+        return apiSuccess(sharedCachedSync);
     }
 
     const existingSync = syncInFlight.get(walletAddress);
@@ -344,6 +366,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
             result,
             expiresAt: Date.now() + SYNC_RESULT_TTL_MS,
         });
+        await setSharedCacheValue(sharedCacheKey, result, SYNC_RESULT_SHARED_CACHE_TTL_SECONDS);
         return apiSuccess(result);
     } finally {
         syncInFlight.delete(walletAddress);

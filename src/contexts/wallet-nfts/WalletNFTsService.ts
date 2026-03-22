@@ -89,6 +89,49 @@ export interface WalletNFT extends ExternalNFT {
 }
 
 export class WalletNFTsService {
+    private static readonly BACKGROUND_SYNC_COOLDOWN_MS = 120_000;
+    private static readonly lastBackgroundSyncByWallet = new Map<string, number>();
+    private static readonly backgroundSyncInFlight = new Map<string, Promise<void>>();
+
+    private static triggerBackgroundSync(walletAddress: string): void {
+        const normalizedWallet = walletAddress.toLowerCase();
+
+        if (this.backgroundSyncInFlight.has(normalizedWallet)) {
+            devLog.info('wallet-nfts', `⏸️ Background sync already running for ${normalizedWallet.slice(0, 10)}...`);
+            return;
+        }
+
+        const now = Date.now();
+        const lastSyncAt = this.lastBackgroundSyncByWallet.get(normalizedWallet) || 0;
+        const elapsed = now - lastSyncAt;
+
+        if (elapsed < this.BACKGROUND_SYNC_COOLDOWN_MS) {
+            const waitSeconds = Math.ceil((this.BACKGROUND_SYNC_COOLDOWN_MS - elapsed) / 1000);
+            devLog.info('wallet-nfts', `⏱️ Skipping background sync (cooldown ${waitSeconds}s remaining)`);
+            return;
+        }
+
+        this.lastBackgroundSyncByWallet.set(normalizedWallet, now);
+
+        const syncPromise = fetch('/api/user/nfts/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+            .then(res => res.json())
+            .then(syncResult => {
+                if (syncResult.success) {
+                    const { new: newCount, transferred, updated } = syncResult.data;
+                    devLog.success(`Background sync complete: ${newCount} new, ${transferred} transferred, ${updated} updated`);
+                }
+            })
+            .catch(err => devLog.warn('Background sync failed:', err))
+            .finally(() => {
+                this.backgroundSyncInFlight.delete(normalizedWallet);
+            });
+
+        this.backgroundSyncInFlight.set(normalizedWallet, syncPromise);
+    }
+
     /**
      * Fetch NFTs for the connected wallet from DB-first approach
      */
@@ -183,18 +226,7 @@ export class WalletNFTsService {
 
                 // Step 2: Background sync (verify ownership)
                 devLog.info('🔄 Step 2/2: Background sync starting...');
-                fetch(`/api/user/nfts/sync?userId=${walletAddress}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                })
-                    .then(res => res.json())
-                    .then(syncResult => {
-                        if (syncResult.success) {
-                            const { new: newCount, transferred, updated } = syncResult.data;
-                            devLog.success(`Background sync complete: ${newCount} new, ${transferred} transferred, ${updated} updated`);
-                        }
-                    })
-                    .catch(err => devLog.warn('Background sync failed:', err));
+                this.triggerBackgroundSync(walletAddress);
 
                 devLog.success('[WalletNFTsService] ========== SUCCESS (DB Cache) ==========\n');
                 return walletNFTs;
@@ -217,13 +249,29 @@ export class WalletNFTsService {
         }
 
         const externalNFTsRaw = result.data;
+        const nestedPayload = externalNFTsRaw && typeof externalNFTsRaw === 'object'
+            ? ((externalNFTsRaw as any).data ?? (externalNFTsRaw as any).nfts)
+            : null;
+
         const externalNFTs: ExternalNFT[] = Array.isArray(externalNFTsRaw)
             ? externalNFTsRaw
-            : Array.isArray(externalNFTsRaw?.nfts)
-                ? externalNFTsRaw.nfts
-                : [];
+            : Array.isArray((externalNFTsRaw as any)?.nfts)
+                ? (externalNFTsRaw as any).nfts
+                : Array.isArray((externalNFTsRaw as any)?.data)
+                    ? (externalNFTsRaw as any).data
+                    : Array.isArray((externalNFTsRaw as any)?.data?.nfts)
+                        ? (externalNFTsRaw as any).data.nfts
+                        : Array.isArray(nestedPayload)
+                            ? nestedPayload
+                            : [];
 
-        if (!Array.isArray(externalNFTsRaw) && !Array.isArray(externalNFTsRaw?.nfts)) {
+        if (
+            !Array.isArray(externalNFTsRaw)
+            && !Array.isArray((externalNFTsRaw as any)?.nfts)
+            && !Array.isArray((externalNFTsRaw as any)?.data)
+            && !Array.isArray((externalNFTsRaw as any)?.data?.nfts)
+            && !Array.isArray(nestedPayload)
+        ) {
             devLog.warn('Unexpected /api/wallet/nfts payload shape, defaulting to empty array', {
                 type: typeof externalNFTsRaw,
                 keys: externalNFTsRaw && typeof externalNFTsRaw === 'object' ? Object.keys(externalNFTsRaw) : []
@@ -274,11 +322,7 @@ export class WalletNFTsService {
         devLog.info('⏳ Step 3/3: Saving to DB and caching...');
 
         // Trigger sync to save to DB
-        fetch(`/api/user/nfts/sync`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ walletAddress })
-        }).catch(err => devLog.warn('Failed to save to DB:', err));
+        this.triggerBackgroundSync(walletAddress);
 
         const totalDuration = Date.now();
         devLog.success('Step 3/3 Complete: Data cached & saved to DB');

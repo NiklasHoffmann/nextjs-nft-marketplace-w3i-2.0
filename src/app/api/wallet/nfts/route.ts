@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { apiBadRequest, apiHandler, apiSuccess } from '@/lib/api';
 import { getWalletNFTsFromBlockchain, getKnownContractAddresses } from '@/lib/blockchain';
+import { incrementRequestCounter } from '@/lib/monitoring/request-counter';
 import { getSharedCacheValue, setSharedCacheValue } from '@/lib/redis/shared-cache';
 import type { Address } from 'viem';
 import { devLog } from '@/utils';
@@ -91,6 +92,8 @@ function cleanupWalletNftsCache(): void {
  */
 async function discoverNFTsViaAlchemy(walletAddress: string): Promise<NFTIdentifier[]> {
     try {
+        incrementRequestCounter('alchemy.discovery.wallet_nfts.attempt');
+
         const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || process.env.ALCHEMY_API_KEY;
         if (!apiKey) {
             throw new Error('Alchemy API key not configured. Please set NEXT_PUBLIC_ALCHEMY_API_KEY in .env.local');
@@ -110,10 +113,13 @@ async function discoverNFTsViaAlchemy(walletAddress: string): Promise<NFTIdentif
         );
 
         if (!response.ok) {
+            incrementRequestCounter('alchemy.discovery.wallet_nfts.error');
             const errorText = await response.text();
             devLog.error('? Alchemy API error:', response.status, errorText);
             throw new Error(`Alchemy API error: ${response.status} - ${errorText}`);
         }
+
+        incrementRequestCounter('alchemy.discovery.wallet_nfts.success');
 
         const data = await response.json();
 

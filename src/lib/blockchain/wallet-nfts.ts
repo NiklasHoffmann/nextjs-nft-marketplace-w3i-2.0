@@ -8,6 +8,7 @@
 import { createPublicClient, decodeEventLog, http, type Address } from 'viem';
 import { sepolia } from 'viem/chains';
 import { getEnrichedNFTsCollection } from '@/lib/mongodb';
+import { incrementRequestCounter } from '@/lib/monitoring/request-counter';
 import { devLog } from '@/utils';
 
 // ERC-721 ABI fragments we need
@@ -90,8 +91,8 @@ interface NFTMetadata {
     }>;
 }
 
-const ALCHEMY_FREE_TIER_LOG_RANGE = BigInt(9);
-const MAX_EVENT_LOG_REQUESTS = BigInt(200);
+const EVENT_LOG_BLOCK_RANGE = BigInt(2_000);
+const MAX_EVENT_LOG_REQUESTS = BigInt(20);
 
 /**
  * Create public client with configured RPC endpoints
@@ -350,14 +351,14 @@ async function getTokenIdsFromEvents(
     try {
         const latestBlock = await client.getBlockNumber();
 
-        // Query Transfer events in small chunks (Alchemy free tier safe)
+        // Query Transfer events in balanced chunks to reduce RPC call count
         const logs: Awaited<ReturnType<typeof client.getLogs>> = [];
         let toBlock = latestBlock;
         let requestCount = BigInt(0);
 
         while (requestCount < MAX_EVENT_LOG_REQUESTS) {
-            const fromBlock = toBlock > ALCHEMY_FREE_TIER_LOG_RANGE
-                ? toBlock - ALCHEMY_FREE_TIER_LOG_RANGE
+            const fromBlock = toBlock > EVENT_LOG_BLOCK_RANGE
+                ? toBlock - EVENT_LOG_BLOCK_RANGE
                 : BigInt(0);
 
             const chunkLogs = await client.getLogs({
@@ -377,6 +378,8 @@ async function getTokenIdsFromEvents(
                 fromBlock,
                 toBlock,
             });
+
+            incrementRequestCounter('rpc.getLogs.transfer_query');
 
             logs.push(...chunkLogs);
             requestCount += BigInt(1);
@@ -428,6 +431,7 @@ async function getTokenIdsFromEvents(
                     functionName: 'ownerOf',
                     args: [tokenId],
                 });
+                incrementRequestCounter('rpc.readContract.ownerOf_verification');
                 if (owner.toLowerCase() === walletAddress.toLowerCase()) {
                     return tokenId;
                 }

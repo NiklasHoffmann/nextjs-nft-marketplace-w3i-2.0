@@ -149,6 +149,13 @@ interface SystemMetrics {
     };
 }
 
+interface RequestCounterSnapshot {
+    key: string;
+    total: number;
+    windowCount: number;
+    windowStartedAt: number;
+}
+
 type RefreshMode = 'manual' | '30s' | '60s';
 
 type AlertLevel = 'critical' | 'warning' | 'info';
@@ -158,9 +165,12 @@ interface AlertItem {
     message: string;
 }
 
+type CounterSeverity = 'ok' | 'warning' | 'critical';
+
 export default function AdminSystemDiagnostics() {
     const [health, setHealth] = useState<SystemHealth | null>(null);
     const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
+    const [requestCounters, setRequestCounters] = useState<RequestCounterSnapshot[]>([]);
     const [refreshMode, setRefreshMode] = useState<RefreshMode>('manual');
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
@@ -174,14 +184,16 @@ export default function AdminSystemDiagnostics() {
     const fetchAll = useCallback(async () => {
         try {
             setIsRefreshing(true);
-            const [healthResponse, metricsResponse] = await Promise.all([
+            const [healthResponse, metricsResponse, countersResponse] = await Promise.all([
                 fetch('/api/admin/system/health', { cache: 'no-store' }),
-                fetch('/api/admin/system/metrics', { cache: 'no-store' })
+                fetch('/api/admin/system/metrics', { cache: 'no-store' }),
+                fetch('/api/admin/system/request-counters', { cache: 'no-store' })
             ]);
 
-            const [healthData, metricsData] = await Promise.all([
+            const [healthData, metricsData, countersData] = await Promise.all([
                 healthResponse.json(),
-                metricsResponse.json()
+                metricsResponse.json(),
+                countersResponse.json()
             ]);
 
             if (healthResponse.ok) {
@@ -189,6 +201,9 @@ export default function AdminSystemDiagnostics() {
             }
             if (metricsResponse.ok) {
                 setMetrics(metricsData.data);
+            }
+            if (countersResponse.ok) {
+                setRequestCounters(Array.isArray(countersData?.data?.counters) ? countersData.data.counters : []);
             }
 
             setLastUpdatedAt(Date.now());
@@ -261,6 +276,51 @@ export default function AdminSystemDiagnostics() {
         const date = value instanceof Date ? value : new Date(value);
         if (Number.isNaN(date.getTime())) return null;
         return Date.now() - date.getTime();
+    };
+
+    const getCounterSeverity = (counter: RequestCounterSnapshot): CounterSeverity => {
+        const key = counter.key;
+        const count = counter.windowCount;
+
+        if (key.includes('.error')) {
+            if (count >= 10) return 'critical';
+            if (count >= 3) return 'warning';
+            return 'ok';
+        }
+
+        if (key.includes('alchemy.discovery')) {
+            if (count >= 120) return 'critical';
+            if (count >= 60) return 'warning';
+            return 'ok';
+        }
+
+        if (key === 'rpc.getLogs.transfer_query') {
+            if (count >= 400) return 'critical';
+            if (count >= 200) return 'warning';
+            return 'ok';
+        }
+
+        if (key === 'rpc.readContract.ownerOf_verification') {
+            if (count >= 1000) return 'critical';
+            if (count >= 500) return 'warning';
+            return 'ok';
+        }
+
+        if (count >= 250) return 'critical';
+        if (count >= 100) return 'warning';
+        return 'ok';
+    };
+
+    const getCounterSeverityClass = (severity: CounterSeverity) => {
+        if (severity === 'critical') return 'bg-red-100 text-red-700';
+        if (severity === 'warning') return 'bg-amber-100 text-amber-700';
+        return 'bg-emerald-100 text-emerald-700';
+    };
+
+    const getCounterSeverityLabel = (severity: CounterSeverity) => {
+        if (severity === 'critical') return 'CRITICAL';
+        if (severity === 'warning') return 'WARNING';
+        return 'OK';
     };
 
     const alerts = useMemo<AlertItem[]>(() => {
@@ -812,6 +872,60 @@ export default function AdminSystemDiagnostics() {
                         </pre>
                     </details>
                 </div>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-6 mt-8">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                    <h2 className="text-lg font-semibold text-gray-900">Alchemy/RPC Request Counters</h2>
+                    <span className="text-xs text-gray-500">Rolling window: 10 min</span>
+                </div>
+
+                <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">OK</span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">WARNING</span>
+                    <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">CRITICAL</span>
+                    <span className="text-gray-400">Thresholds sind key-basiert (Alchemy, RPC, Errors).</span>
+                </div>
+
+                {requestCounters.length === 0 ? (
+                    <p className="text-sm text-gray-500">Noch keine Counter-Daten vorhanden.</p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="text-left text-gray-500 border-b border-gray-100">
+                                    <th className="py-2 pr-3 font-medium">Key</th>
+                                    <th className="py-2 pr-3 font-medium">Status</th>
+                                    <th className="py-2 pr-3 font-medium">Window (10m)</th>
+                                    <th className="py-2 pr-3 font-medium">Total</th>
+                                    <th className="py-2 font-medium">Window Start</th>
+                                </tr>
+                            </thead>
+                            <tbody className="text-gray-800">
+                                {requestCounters.map((counter) => {
+                                    const severity = getCounterSeverity(counter);
+                                    return (
+                                    <tr key={counter.key} className="border-b border-gray-50 last:border-b-0">
+                                        <td className="py-2 pr-3 font-medium">{counter.key}</td>
+                                        <td className="py-2 pr-3">
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${getCounterSeverityClass(severity)}`}>
+                                                {getCounterSeverityLabel(severity)}
+                                            </span>
+                                        </td>
+                                        <td className="py-2 pr-3">
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${getCounterSeverityClass(severity)}`}>
+                                                {counter.windowCount.toLocaleString()}
+                                            </span>
+                                        </td>
+                                        <td className="py-2 pr-3">{counter.total.toLocaleString()}</td>
+                                        <td className="py-2">{formatDateTime(counter.windowStartedAt)}</td>
+                                    </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
         </AdminPageShell>
     );
