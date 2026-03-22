@@ -61,7 +61,7 @@ interface WalletNFTsContextType {
 const WalletNFTsContext = createContext<WalletNFTsContextType | undefined>(undefined);
 
 export function WalletNFTsProvider({ children }: { children: React.ReactNode }) {
-    const { address, isConnected } = useAccount();
+    const { address } = useAccount();
     const [state, setState] = useState<WalletNFTsState>(WalletNFTsCache.createInitialState());
     const cache = useMemo(() => new WalletNFTsCache(), []);
     const listingRetryScheduler = useMemo(() => createDebouncedScheduler(), []);
@@ -101,11 +101,11 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
     }, [cache]);
 
     /**
-     * Auto-load NFTs when wallet connects
+     * Auto-load NFTs as soon as wallet address is available
      * Implements Stale-While-Revalidate pattern for better UX
      */
     useEffect(() => {
-        if (!isConnected || !address) {
+        if (!address) {
             setState(WalletNFTsCache.createInitialState());
             return;
         }
@@ -133,7 +133,7 @@ export function WalletNFTsProvider({ children }: { children: React.ReactNode }) 
         // Fetch fresh data (no cache)
         devLog.info('wallet-nfts', '🔄 [WalletNFTsContext] Cache miss, fetching fresh data');
         fetchWalletNFTs(address);
-    }, [address, isConnected, fetchWalletNFTs, cache]);
+    }, [address, fetchWalletNFTs, cache]);
 
     /**
      * Refresh NFTs
