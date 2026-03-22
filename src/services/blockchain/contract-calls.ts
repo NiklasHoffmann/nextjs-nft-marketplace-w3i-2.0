@@ -21,6 +21,11 @@ interface CallResult<T> {
     rpcUsed?: number;
 }
 
+function isDeterministicRevert(error: unknown): boolean {
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+    return message.includes('execution reverted') || message.includes('revert');
+}
+
 /**
  * F�hrt einen einzelnen Contract Call mit Fallback-Unterst�tzung durch
  */
@@ -70,6 +75,15 @@ export async function executeContractCallWithFallback<T>(
         } catch (error) {
             lastError = error as Error;
             const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+
+            if (isDeterministicRevert(error)) {
+                devLog.warn('contract-calls', `⚠️ ${functionName}: deterministic revert, skipping retries`);
+                return {
+                    success: false,
+                    error: errorMsg
+                };
+            }
+
             devLog.warn('contract-calls', `?? ${functionName}: RPC endpoint ${i + 1} failed: ${errorMsg}`);
 
             if (i < clients.length - 1) {
