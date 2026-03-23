@@ -5,7 +5,7 @@
  * Uses Transfer events and contract calls to discover owned NFTs
  */
 
-import { createPublicClient, decodeEventLog, http, type Address } from 'viem';
+import { createPublicClient, decodeEventLog, fallback, http, type Address } from 'viem';
 import { sepolia } from 'viem/chains';
 import { getEnrichedNFTsCollection } from '@/lib/mongodb';
 import { incrementRequestCounter } from '@/lib/monitoring/request-counter';
@@ -98,14 +98,29 @@ const MAX_EVENT_LOG_REQUESTS = BigInt(20);
  * Create public client with configured RPC endpoints
  */
 function createClient() {
-    const rpcUrl = process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL ||
-        'https://rpc.sepolia.org'; // Free public RPC as fallback
+    const candidateRpcUrls = [
+        // Prefer non-Alchemy endpoints first for rate-limit resilience.
+        process.env.INFURA_URL,
+        'https://ethereum-sepolia-rpc.publicnode.com',
+        'https://rpc.sepolia.org',
+        process.env.JSON_RPC_URL,
+        process.env.ALCHEMY_URL,
+        process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL,
+    ].filter(Boolean) as string[];
 
-    devLog.info(`🔗 [Blockchain] Using RPC: ${rpcUrl.substring(0, 40)}...`);
+    const rpcUrls = [...new Set(candidateRpcUrls)];
+
+    if (rpcUrls.length === 0) {
+        rpcUrls.push('https://rpc.sepolia.org');
+    }
+
+    devLog.info(`🔗 [Blockchain] Using RPC fallback chain (${rpcUrls.length} endpoints), primary=${rpcUrls[0]?.substring(0, 40)}...`);
 
     return createPublicClient({
         chain: sepolia,
-        transport: http(rpcUrl),
+        transport: fallback(
+            rpcUrls.map((url) => http(url, { timeout: 12000 }))
+        ),
     });
 }
 
