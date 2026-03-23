@@ -254,7 +254,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }, [address, isConnected, getLocalStorageItems, loadFromLocalStorage]);
 
     // Sync cart to storage (localStorage + MongoDB if connected)
-    const syncCart = useCallback((updatedItems: CartItem[]) => {
+    const syncCart = useCallback((updatedItems: CartItem[], options: { immediate?: boolean } = {}) => {
         // Do not wipe persisted cart during initial hydration.
         if (!isLoaded && updatedItems.length === 0) {
             return;
@@ -279,14 +279,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 clearTimeout(syncTimeoutRef.current);
             }
 
-            // Debounce DB sync (500ms)
-            syncTimeoutRef.current = setTimeout(() => {
+            const enqueueSync = () => {
                 devLog.info('cart', '📡 Queuing DB sync for:', address);
                 syncQueueRef.current?.enqueue(
                     `cart-${address}`,
                     { walletAddress: address, items: updatedItems }
                 );
-            }, 500);
+            };
+
+            if (options.immediate) {
+                // Critical cart mutations (e.g. remove) should persist immediately
+                // so a quick reload cannot restore stale DB content.
+                enqueueSync();
+                return;
+            }
+
+            // Debounce DB sync (500ms)
+            syncTimeoutRef.current = setTimeout(enqueueSync, 500);
         }
     }, [isLoaded, isConnected, address, remoteSyncEnabled]);
 
@@ -369,8 +378,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }, [items]);
 
     const removeFromCart = useCallback((listingId: string) => {
-        setItems(prev => prev.filter(item => item.listingId !== listingId));
-    }, []);
+        setItems(prev => {
+            const nextItems = prev.filter(item => item.listingId !== listingId);
+            syncCart(nextItems, { immediate: true });
+            return nextItems;
+        });
+    }, [syncCart]);
 
     const clearCart = useCallback(async () => {
         setItems([]);
