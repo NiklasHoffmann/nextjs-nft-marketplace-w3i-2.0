@@ -15,6 +15,7 @@ import { devLog } from '@/utils';
 export default function WalletLayout({ children }: { children: ReactNode }) {
     const { address, isConnected, chain } = useAccount();
     const chainId = chain?.id || 11155111;
+    const [mounted, setMounted] = useState(false);
 
     const [filters, setFilters] = useState<NFTFilters>({
         categories: [],
@@ -83,6 +84,10 @@ export default function WalletLayout({ children }: { children: ReactNode }) {
     }), [filters, sort, handleFiltersChange, handleSortChange, total, filteredCount]);
 
     useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    useEffect(() => {
         let isMounted = true;
 
         async function calculateTotalUSD() {
@@ -122,6 +127,11 @@ export default function WalletLayout({ children }: { children: ReactNode }) {
             isMounted = false;
         };
     }, [chainId, listedPricesByToken, convertTokenToUSD, convertFromUSD, formatPrice]);
+
+    // Keep first server/client render deterministic, then branch on wallet state.
+    if (!mounted) {
+        return <>{children}</>;
+    }
 
     // Only render header if connected
     if (!isConnected || !address) {

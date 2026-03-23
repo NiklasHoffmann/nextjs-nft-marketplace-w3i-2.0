@@ -45,6 +45,42 @@ interface NFTIdentifier {
     tokenId: string;
 }
 
+function normalizeIdentifiers(rawItems: unknown[], source: 'alchemy' | 'moralis'): NFTIdentifier[] {
+    const normalized = rawItems
+        .map((item: any) => {
+            const contractAddress = source === 'alchemy'
+                ? (item?.contract?.address || item?.contractAddress)
+                : item?.token_address;
+            const tokenId = source === 'alchemy'
+                ? (item?.tokenId || item?.id?.tokenId)
+                : item?.token_id;
+
+            if (!contractAddress || tokenId === undefined || tokenId === null) {
+                return null;
+            }
+
+            // Discovery payload is intentionally limited to wallet ownership identifiers.
+            return {
+                contractAddress: String(contractAddress).toLowerCase(),
+                tokenId: String(tokenId),
+            };
+        })
+        .filter(Boolean) as NFTIdentifier[];
+
+    const sample = normalized.slice(0, 10).map((nft) => `${nft.contractAddress}:${nft.tokenId}`);
+    devLog.info(`🧭 [Discovery:${source}] Loaded ${normalized.length} wallet NFT identifiers`);
+    devLog.info(`   ↳ Identifiers sample (${sample.length}):`, sample);
+
+    return normalized;
+}
+
+function mapDiscoveredToFallbackNFTs(discovered: NFTIdentifier[]): ExternalNFT[] {
+    return discovered.map((nft) => ({
+        contractAddress: nft.contractAddress,
+        tokenId: nft.tokenId,
+    }));
+}
+
 const WALLET_NFTS_CACHE_TTL_MS = 15_000;
 const WALLET_NFTS_SHARED_CACHE_TTL_SECONDS = Math.ceil(WALLET_NFTS_CACHE_TTL_MS / 1000);
 const WALLET_NFTS_MAX_CACHE_ENTRIES = 500;
@@ -138,21 +174,7 @@ async function discoverNFTsViaAlchemy(walletAddress: string): Promise<NFTIdentif
         devLog.info('');
 
         // Only extract contract + tokenId (minimal data)
-        const nfts = data.ownedNfts?.map((nft: any) => {
-            // CRITICAL FIX: Alchemy v3 has contract.address (NOT contract itself)
-            const contractAddress = nft.contract?.address || nft.contractAddress;
-            const tokenId = nft.tokenId || nft.id?.tokenId;
-
-            if (!contractAddress || !tokenId) {
-                devLog.warn(`?? Skipping NFT with missing data. Contract:`, nft.contract, `TokenId:`, tokenId);
-                return null;
-            }
-
-            return {
-                contractAddress: contractAddress.toLowerCase(),
-                tokenId: tokenId.toString(), // Ensure string
-            };
-        }).filter(Boolean) || [];
+        const nfts = normalizeIdentifiers(Array.isArray(data.ownedNfts) ? data.ownedNfts : [], 'alchemy');
 
         devLog.info(`? [Alchemy Discovery] Mapped ${nfts.length} NFTs`);
         return nfts as NFTIdentifier[];
@@ -195,22 +217,7 @@ async function discoverNFTsViaMoralis(walletAddress: string): Promise<NFTIdentif
 
     const data = await response.json();
     const result = Array.isArray(data?.result) ? data.result : [];
-
-    return result
-        .map((nft: any) => {
-            const contractAddress = nft?.token_address;
-            const tokenId = nft?.token_id;
-
-            if (!contractAddress || tokenId === undefined || tokenId === null) {
-                return null;
-            }
-
-            return {
-                contractAddress: String(contractAddress).toLowerCase(),
-                tokenId: String(tokenId),
-            };
-        })
-        .filter(Boolean) as NFTIdentifier[];
+    return normalizeIdentifiers(result, 'moralis');
 }
 
 /**
@@ -474,9 +481,16 @@ export const GET = apiHandler(async (request: NextRequest) => {
                             }));
 
                             devLog.info(`? Additional NFTs: ${alchemyNFTs.length} NFTs fetched via blockchain+IPFS`);
+
+                            // If on-chain metadata fetch returns empty (e.g. non-enumerable/non-ERC721),
+                            // keep at least the discovered identifiers so wallet view is not empty.
+                            if (alchemyNFTs.length === 0) {
+                                devLog.warn('?? Additional metadata fetch returned 0 NFTs, using discovery fallback items');
+                                alchemyNFTs = mapDiscoveredToFallbackNFTs(unknownNFTs);
+                            }
                         } catch (fetchError) {
                             devLog.error('? Failed to fetch additional NFTs:', fetchError);
-                            alchemyNFTs = [];
+                            alchemyNFTs = mapDiscoveredToFallbackNFTs(unknownNFTs);
                         }
                     }
                 } else {
@@ -519,6 +533,11 @@ export const GET = apiHandler(async (request: NextRequest) => {
                             }));
 
                             devLog.info(`? Moralis fallback fetched ${alchemyNFTs.length} additional NFTs`);
+
+                            if (alchemyNFTs.length === 0) {
+                                devLog.warn('?? Moralis metadata fetch returned 0 NFTs, using discovery fallback items');
+                                alchemyNFTs = mapDiscoveredToFallbackNFTs(unknownNFTs);
+                            }
                         }
                     } catch (moralisFallbackError) {
                         devLog.warn('?? Moralis discovery fallback failed, keeping blockchain-only result', moralisFallbackError);
@@ -577,6 +596,9 @@ export const GET = apiHandler(async (request: NextRequest) => {
                 usedSource = 'alchemy';
                 devLog.info(`? Alchemy-only: ${nfts.length} NFTs in ${Date.now() - startTime}ms`);
             }
+
+            devLog.info(`🧾 [Wallet NFTs API] Final source=${usedSource}, total=${nfts.length}`);
+            devLog.info('   ↳ Final identifier sample:', nfts.slice(0, 10).map((nft) => `${nft.contractAddress}:${nft.tokenId}`));
 
             // Empty result is OK (wallet might be empty)
 

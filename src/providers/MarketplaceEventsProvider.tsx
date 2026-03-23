@@ -201,22 +201,30 @@ export function useMarketplaceEventsContext(): MarketplaceEventsContextValue {
  */
 export function EventConnectionStatus() {
     const { isConnected, eventsReceived } = useMarketplaceEventsContext();
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    const effectiveConnected = mounted ? isConnected : false;
+    const effectiveEventsReceived = mounted ? eventsReceived : 0;
 
     return (
         <div
             className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-3 py-2 bg-gray-900/90 text-white text-sm rounded-lg shadow-lg backdrop-blur-sm"
-            title={isConnected ? `Connected • ${eventsReceived} events` : 'Disconnected'}
+            title={effectiveConnected ? `Connected • ${effectiveEventsReceived} events` : 'Disconnected'}
         >
             <div
-                className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+                className={`w-2 h-2 rounded-full ${effectiveConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
                     }`}
             />
             <span className="font-medium">
-                {isConnected ? 'Live' : 'Offline'}
+                {effectiveConnected ? 'Live' : 'Offline'}
             </span>
-            {isConnected && eventsReceived > 0 && (
+            {effectiveConnected && effectiveEventsReceived > 0 && (
                 <span className="text-gray-400 text-xs">
-                    {eventsReceived}
+                    {effectiveEventsReceived}
                 </span>
             )}
         </div>
