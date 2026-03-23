@@ -111,6 +111,7 @@ async function discoverNFTsViaAlchemy(walletAddress: string): Promise<NFTIdentif
 export const POST = apiHandler(async (request: NextRequest) => {
     // Get authenticated wallet address from withAuth middleware
     const walletAddress = request.userAddress?.toLowerCase();
+    const forceSync = request.nextUrl.searchParams.get('force') === 'true';
 
     if (!walletAddress) {
         throw new BadRequestError('Authentication required');
@@ -118,25 +119,31 @@ export const POST = apiHandler(async (request: NextRequest) => {
 
     cleanupSyncCache();
 
-    const cachedSync = syncResultCache.get(walletAddress);
-    if (cachedSync && cachedSync.expiresAt > Date.now()) {
-        return apiSuccess(cachedSync.result);
+    if (!forceSync) {
+        const cachedSync = syncResultCache.get(walletAddress);
+        if (cachedSync && cachedSync.expiresAt > Date.now()) {
+            return apiSuccess(cachedSync.result);
+        }
     }
 
     const sharedCacheKey = buildSyncSharedCacheKey(walletAddress);
-    const sharedCachedSync = await getSharedCacheValue<NFTMetadataSyncResult>(sharedCacheKey);
-    if (sharedCachedSync) {
-        syncResultCache.set(walletAddress, {
-            result: sharedCachedSync,
-            expiresAt: Date.now() + SYNC_RESULT_TTL_MS,
-        });
-        return apiSuccess(sharedCachedSync);
+    if (!forceSync) {
+        const sharedCachedSync = await getSharedCacheValue<NFTMetadataSyncResult>(sharedCacheKey);
+        if (sharedCachedSync) {
+            syncResultCache.set(walletAddress, {
+                result: sharedCachedSync,
+                expiresAt: Date.now() + SYNC_RESULT_TTL_MS,
+            });
+            return apiSuccess(sharedCachedSync);
+        }
     }
 
-    const existingSync = syncInFlight.get(walletAddress);
-    if (existingSync) {
-        const result = await existingSync;
-        return apiSuccess(result);
+    if (!forceSync) {
+        const existingSync = syncInFlight.get(walletAddress);
+        if (existingSync) {
+            const result = await existingSync;
+            return apiSuccess(result);
+        }
     }
 
     const syncPromise = (async (): Promise<NFTMetadataSyncResult> => {

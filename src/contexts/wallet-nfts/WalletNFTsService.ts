@@ -93,8 +93,23 @@ export class WalletNFTsService {
     private static readonly lastBackgroundSyncByWallet = new Map<string, number>();
     private static readonly backgroundSyncInFlight = new Map<string, Promise<void>>();
 
-    private static triggerBackgroundSync(walletAddress: string): void {
+    private static async performSync(walletAddress: string, force: boolean = false): Promise<void> {
+        const syncUrl = force ? '/api/user/nfts/sync?force=true' : '/api/user/nfts/sync';
+        const response = await fetch(syncUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const syncResult = await response.json();
+        if (syncResult?.success) {
+            const { new: newCount, transferred, updated } = syncResult.data || {};
+            devLog.success(`Background sync complete: ${newCount || 0} new, ${transferred || 0} transferred, ${updated || 0} updated`);
+        }
+    }
+
+    private static triggerBackgroundSync(walletAddress: string, options: { force?: boolean } = {}): void {
         const normalizedWallet = walletAddress.toLowerCase();
+        const force = options.force === true;
 
         if (this.backgroundSyncInFlight.has(normalizedWallet)) {
             devLog.info('wallet-nfts', `⏸️ Background sync already running for ${normalizedWallet.slice(0, 10)}...`);
@@ -105,7 +120,7 @@ export class WalletNFTsService {
         const lastSyncAt = this.lastBackgroundSyncByWallet.get(normalizedWallet) || 0;
         const elapsed = now - lastSyncAt;
 
-        if (elapsed < this.BACKGROUND_SYNC_COOLDOWN_MS) {
+        if (!force && elapsed < this.BACKGROUND_SYNC_COOLDOWN_MS) {
             const waitSeconds = Math.ceil((this.BACKGROUND_SYNC_COOLDOWN_MS - elapsed) / 1000);
             devLog.info('wallet-nfts', `⏱️ Skipping background sync (cooldown ${waitSeconds}s remaining)`);
             return;
@@ -113,17 +128,7 @@ export class WalletNFTsService {
 
         this.lastBackgroundSyncByWallet.set(normalizedWallet, now);
 
-        const syncPromise = fetch('/api/user/nfts/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        })
-            .then(res => res.json())
-            .then(syncResult => {
-                if (syncResult.success) {
-                    const { new: newCount, transferred, updated } = syncResult.data;
-                    devLog.success(`Background sync complete: ${newCount} new, ${transferred} transferred, ${updated} updated`);
-                }
-            })
+        const syncPromise = this.performSync(walletAddress, force)
             .catch(err => devLog.warn('Background sync failed:', err))
             .finally(() => {
                 this.backgroundSyncInFlight.delete(normalizedWallet);
@@ -135,9 +140,18 @@ export class WalletNFTsService {
     /**
      * Fetch NFTs for the connected wallet from DB-first approach
      */
-    static async fetchWalletNFTs(walletAddress: string): Promise<WalletNFT[]> {
+    static async fetchWalletNFTs(walletAddress: string, options: { forceSync?: boolean } = {}): Promise<WalletNFT[]> {
         devLog.info('\n🔵 [WalletNFTsService] ========== START (DB-First) ==========');
         devLog.info(`📍 Wallet: ${walletAddress}`);
+
+        if (options.forceSync) {
+            devLog.info('🔄 Force sync requested - syncing first and bypassing cooldown/cache...');
+            try {
+                await this.performSync(walletAddress, true);
+            } catch (syncError) {
+                devLog.warn('wallet-nfts', '⚠️ Force sync failed, falling back to DB snapshot', syncError);
+            }
+        }
 
         // Step 1: Fast load from DB (instant)
         devLog.info('⚡ Step 1/2: Loading from database (instant)...');

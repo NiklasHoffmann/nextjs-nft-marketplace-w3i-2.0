@@ -46,6 +46,7 @@ export function useWalletNFTsV2({
     const abortControllerRef = useRef<AbortController | null>(null);
     const lastFetchRef = useRef<number>(0);
     const previousAddressRef = useRef<string | null>(null);
+    const lastHiddenAtRef = useRef<number>(Date.now());
 
     useEffect(() => {
         const normalizedAddress = walletAddress?.toLowerCase() || null;
@@ -65,7 +66,7 @@ export function useWalletNFTsV2({
         previousAddressRef.current = normalizedAddress;
     }, [walletAddress, autoFetch]);
 
-    const fetchNFTs = useCallback(async () => {
+    const fetchNFTs = useCallback(async (forceSync: boolean = false) => {
         if (!walletAddress) {
             // Don't clear NFTs or change loading state if no wallet address
             // This prevents flashing when wallet is reconnecting
@@ -95,7 +96,7 @@ export function useWalletNFTsV2({
 
         const now = Date.now();
 
-        if (now - lastFetchRef.current < 3000) {
+        if (!forceSync && now - lastFetchRef.current < 3000) {
             return;
         }
 
@@ -110,7 +111,9 @@ export function useWalletNFTsV2({
         setError(null);
 
         const requestPromise = (async () => {
-            const walletNFTs = await WalletNFTsService.fetchWalletNFTs(walletAddress);
+            const walletNFTs = await WalletNFTsService.fetchWalletNFTs(walletAddress, {
+                forceSync
+            });
             if (controller.signal.aborted) {
                 return;
             }
@@ -155,9 +158,35 @@ export function useWalletNFTsV2({
     // Auto-fetch when wallet address becomes available
     useEffect(() => {
         if (autoFetch && walletAddress) {
-            fetchNFTs();
+            fetchNFTs(false);
         }
     }, [autoFetch, walletAddress, fetchNFTs]);
+
+    useEffect(() => {
+        if (!walletAddress) return;
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                lastHiddenAtRef.current = Date.now();
+                return;
+            }
+
+            const hiddenDuration = Date.now() - lastHiddenAtRef.current;
+            if (hiddenDuration > 5000) {
+                void fetchNFTs(true);
+            }
+        };
+
+        if (typeof document !== 'undefined') {
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+        }
+
+        return () => {
+            if (typeof document !== 'undefined') {
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+            }
+        };
+    }, [walletAddress, fetchNFTs]);
 
     return {
         nfts,
@@ -166,6 +195,6 @@ export function useWalletNFTsV2({
         total: stats.total,
         listed: stats.listed,
         unlisted: stats.unlisted,
-        refresh: fetchNFTs
+        refresh: () => fetchNFTs(true)
     };
 }
