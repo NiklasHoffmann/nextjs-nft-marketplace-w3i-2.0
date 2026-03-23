@@ -1,8 +1,9 @@
-﻿// utils/04-blockchain/03-blockchain-contract-calls.ts
-import { createPublicClient, http, type PublicClient } from 'viem';
-import { sepolia } from 'viem/chains';
-import { devLog } from '@/utils';
-import { createFallbackClients, getTimeoutConfig } from './rpc-config';
+﻿import { devLog } from '@/utils';
+import {
+    createFallbackClientEntries,
+    getTimeoutConfig,
+    markRpcEndpointRateLimited,
+} from './rpc-config';
 
 interface ContractCallOptions {
     address: `0x${string}`;
@@ -19,6 +20,45 @@ interface CallResult<T> {
     data?: T;
     error?: string;
     rpcUsed?: number;
+}
+
+const RPC_FAILURE_LOG_THROTTLE_MS = 30000;
+const rpcFailureLogState = new Map<string, { lastLoggedAt: number; suppressed: number }>();
+
+function isRateLimitError(error: unknown): boolean {
+    const safeError = error as any;
+    const details = typeof safeError?.details === 'string' ? safeError.details : '';
+    const shortMessage = typeof safeError?.shortMessage === 'string' ? safeError.shortMessage : '';
+    const message = error instanceof Error ? error.message : String(error ?? '');
+    const text = `${message} ${shortMessage} ${details}`.toLowerCase();
+    return text.includes('429') || text.includes('too many requests') || text.includes('rate limit');
+}
+
+function extractShortErrorMessage(error: unknown): string {
+    const safeError = error as any;
+    const shortMessage = typeof safeError?.shortMessage === 'string' ? safeError.shortMessage : '';
+    const details = typeof safeError?.details === 'string' ? safeError.details : '';
+    const message = error instanceof Error ? error.message : String(error ?? 'Unknown error');
+
+    const candidate = shortMessage || details || message;
+    return candidate.split('\n')[0]?.trim() || 'Unknown error';
+}
+
+function logRpcFailureThrottled(functionName: string, endpointLabel: string, summary: string): void {
+    const key = `${functionName}:${endpointLabel}:${summary}`;
+    const now = Date.now();
+    const state = rpcFailureLogState.get(key);
+
+    if (state && now - state.lastLoggedAt < RPC_FAILURE_LOG_THROTTLE_MS) {
+        state.suppressed += 1;
+        rpcFailureLogState.set(key, state);
+        return;
+    }
+
+    const suppressed = state?.suppressed || 0;
+    const suffix = suppressed > 0 ? ` (suppressed ${suppressed} similar logs)` : '';
+    devLog.warn('contract-calls', `?? ${functionName}: ${endpointLabel} failed: ${summary}${suffix}`);
+    rpcFailureLogState.set(key, { lastLoggedAt: now, suppressed: 0 });
 }
 
 function isDeterministicRevert(error: unknown): boolean {
@@ -41,19 +81,19 @@ export async function executeContractCallWithFallback<T>(
         maxRetries = 3
     } = options;
 
-    const clients = createFallbackClients();
+    const clientEntries = createFallbackClientEntries();
     let lastError: Error | null = null;
 
-    for (let i = 0; i < Math.min(clients.length, maxRetries); i++) {
+    for (let i = 0; i < Math.min(clientEntries.length, maxRetries); i++) {
         try {
-            const client = clients[i];
-            if (!client) continue;
+            const entry = clientEntries[i];
+            if (!entry?.client) continue;
 
             const timeoutPromise = new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error(`${functionName} timeout after ${timeout}ms`)), timeout)
             );
 
-            const callPromise = client.readContract({
+            const callPromise = entry.client.readContract({
                 address,
                 abi,
                 functionName,
@@ -74,19 +114,25 @@ export async function executeContractCallWithFallback<T>(
 
         } catch (error) {
             lastError = error as Error;
-            const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+            const entry = clientEntries[i];
+            const endpointLabel = `RPC endpoint ${i + 1}${entry?.url ? ` (${entry.url})` : ''}`;
+            const errorSummary = extractShortErrorMessage(error);
 
             if (isDeterministicRevert(error)) {
-                devLog.warn('contract-calls', `⚠️ ${functionName}: deterministic revert, skipping retries`);
+                logRpcFailureThrottled(functionName, 'deterministic-revert', 'deterministic revert, skipping retries');
                 return {
                     success: false,
-                    error: errorMsg
+                    error: errorSummary
                 };
             }
 
-            devLog.warn('contract-calls', `?? ${functionName}: RPC endpoint ${i + 1} failed: ${errorMsg}`);
+            if (entry?.url && isRateLimitError(error)) {
+                markRpcEndpointRateLimited(entry.url);
+            }
 
-            if (i < clients.length - 1) {
+            logRpcFailureThrottled(functionName, endpointLabel, errorSummary);
+
+            if (i < clientEntries.length - 1) {
                 // Progressive delay: 500ms, 1000ms, 1500ms
                 const delay = 500 * (i + 1);
                 await new Promise(resolve => setTimeout(resolve, delay));

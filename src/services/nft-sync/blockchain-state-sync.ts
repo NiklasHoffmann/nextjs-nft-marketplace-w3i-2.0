@@ -11,10 +11,10 @@
  * - Before listing creation (ensure current state)
  */
 
-import { createPublicClient, http } from 'viem';
-import { sepolia } from 'viem/chains';
+import type { Address } from 'viem';
 import { getCollection } from '@/lib/mongodb';
 import { devLog } from '@/utils';
+import { executeContractCallWithFallback } from '@/services/blockchain/contract-calls';
 
 const ERC721_ABI = [
     {
@@ -107,11 +107,25 @@ interface ContractMetadataCacheEntry {
     expiresAt: number;
 }
 
+interface TotalSupplyCacheEntry {
+    value: number | null;
+    expiresAt: number;
+}
+
 const CONTRACT_METADATA_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const TOTAL_SUPPLY_CACHE_TTL_MS = 10 * 60 * 1000;
 const contractMetadataCache = new Map<string, ContractMetadataCacheEntry>();
+const totalSupplyCache = new Map<string, TotalSupplyCacheEntry>();
+const APPROVAL_CACHE_TTL_MS = 2 * 60 * 1000;
+
+interface ApprovalCacheEntry {
+    value: boolean;
+    expiresAt: number;
+}
 
 export class BlockchainStateSync {
-    private client;
+    private approvalCache = new Map<string, ApprovalCacheEntry>();
+    private lastApprovalRateLimitWarningAt = 0;
 
     private getCachedContractMetadata(contractAddress: string): ContractMetadataCacheEntry | null {
         const key = contractAddress.toLowerCase();
@@ -140,28 +154,72 @@ export class BlockchainStateSync {
         });
     }
 
+    private getCachedTotalSupply(contractAddress: string): number | null | undefined {
+        const key = contractAddress.toLowerCase();
+        const cached = totalSupplyCache.get(key);
+        if (!cached) return undefined;
+
+        if (cached.expiresAt <= Date.now()) {
+            totalSupplyCache.delete(key);
+            return undefined;
+        }
+
+        return cached.value;
+    }
+
+    private setCachedTotalSupply(contractAddress: string, value: number | null): void {
+        totalSupplyCache.set(contractAddress.toLowerCase(), {
+            value,
+            expiresAt: Date.now() + TOTAL_SUPPLY_CACHE_TTL_MS,
+        });
+    }
+
     private async safeReadContract<T>(params: {
         address: `0x${string}`;
         abi: any;
         functionName: string;
         args?: readonly unknown[];
     }): Promise<T | null> {
-        try {
-            return await this.client.readContract({
-                address: params.address,
-                abi: params.abi,
-                functionName: params.functionName as any,
-                args: (params.args ?? []) as any
-            }) as T;
-        } catch {
+        const result = await executeContractCallWithFallback<T>({
+            address: params.address,
+            abi: params.abi,
+            functionName: params.functionName,
+            args: (params.args ?? []) as any[],
+            callType: 'optional',
+        });
+
+        if (!result.success) {
             return null;
         }
+
+        return result.data ?? null;
     }
 
     constructor() {
-        this.client = createPublicClient({
-            chain: sepolia,
-            transport: http(process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || 'https://rpc.sepolia.org')
+    }
+
+    private getApprovalCacheKey(contractAddress: string, owner: string, operator: string): string {
+        return `${contractAddress.toLowerCase()}:${owner.toLowerCase()}:${operator.toLowerCase()}`;
+    }
+
+    private getCachedApproval(contractAddress: string, owner: string, operator: string): boolean | null {
+        const key = this.getApprovalCacheKey(contractAddress, owner, operator);
+        const cached = this.approvalCache.get(key);
+        if (!cached) return null;
+
+        if (cached.expiresAt <= Date.now()) {
+            this.approvalCache.delete(key);
+            return null;
+        }
+
+        return cached.value;
+    }
+
+    private setCachedApproval(contractAddress: string, owner: string, operator: string, value: boolean): void {
+        const key = this.getApprovalCacheKey(contractAddress, owner, operator);
+        this.approvalCache.set(key, {
+            value,
+            expiresAt: Date.now() + APPROVAL_CACHE_TTL_MS,
         });
     }
 
@@ -240,15 +298,27 @@ export class BlockchainStateSync {
             const approvalOwner = owner || fallbackOwner;
 
             if (marketplaceAddress && approvalOwner) {
-                try {
-                    isApprovedForAll = await this.client.readContract({
+                const cachedApproval = this.getCachedApproval(contractAddress, approvalOwner, marketplaceAddress);
+                if (cachedApproval !== null) {
+                    isApprovedForAll = cachedApproval;
+                } else {
+                    const approvalResult = await this.safeReadContract<boolean>({
                         address: contractAddress as `0x${string}`,
                         abi: tokenStandard === 'ERC1155' ? ERC1155_ABI : ERC721_ABI,
                         functionName: 'isApprovedForAll',
-                        args: [approvalOwner as `0x${string}`, marketplaceAddress as `0x${string}`]
+                        args: [approvalOwner as Address, marketplaceAddress as Address]
                     });
-                } catch (error) {
-                    devLog.warn(`  ⚠️ Could not check isApprovedForAll:`, error);
+
+                    if (approvalResult !== null) {
+                        isApprovedForAll = approvalResult;
+                        this.setCachedApproval(contractAddress, approvalOwner, marketplaceAddress, approvalResult);
+                    } else {
+                        const now = Date.now();
+                        if (now - this.lastApprovalRateLimitWarningAt > 30000) {
+                            this.lastApprovalRateLimitWarningAt = now;
+                            devLog.warn('  ⚠️ Could not check isApprovedForAll (RPC busy/rate-limited). Using fallback false.');
+                        }
+                    }
                 }
             }
 
@@ -285,20 +355,26 @@ export class BlockchainStateSync {
 
             let totalSupply: number | null = null;
             if (tokenStandard === 'ERC721') {
-                const erc721Supply = await this.safeReadContract<bigint>({
-                    address: contractAddress as `0x${string}`,
-                    abi: [
-                        {
-                            name: 'totalSupply',
-                            type: 'function',
-                            stateMutability: 'view',
-                            inputs: [],
-                            outputs: [{ name: '', type: 'uint256' }],
-                        }
-                    ] as const,
-                    functionName: 'totalSupply'
-                });
-                totalSupply = erc721Supply !== null ? Number(erc721Supply) : null;
+                const cachedSupply = this.getCachedTotalSupply(contractAddress);
+                if (cachedSupply !== undefined) {
+                    totalSupply = cachedSupply;
+                } else {
+                    const erc721Supply = await this.safeReadContract<bigint>({
+                        address: contractAddress as `0x${string}`,
+                        abi: [
+                            {
+                                name: 'totalSupply',
+                                type: 'function',
+                                stateMutability: 'view',
+                                inputs: [],
+                                outputs: [{ name: '', type: 'uint256' }],
+                            }
+                        ] as const,
+                        functionName: 'totalSupply'
+                    });
+                    totalSupply = erc721Supply !== null ? Number(erc721Supply) : null;
+                    this.setCachedTotalSupply(contractAddress, totalSupply);
+                }
             } else {
                 const erc1155Supply = await this.safeReadContract<bigint>({
                     address: contractAddress as `0x${string}`,

@@ -1,6 +1,6 @@
 // utils/04-blockchain/05-blockchain-rpc-config.ts
-import { createPublicClient, http, type PublicClient, type Chain, type Transport } from 'viem';
-import { sepolia, mainnet } from 'viem/chains';
+import { createPublicClient, http, type PublicClient, type Chain } from 'viem';
+import { sepolia } from 'viem/chains';
 import { devLog } from '@/utils';
 
 interface RPCEndpointConfig {
@@ -17,11 +17,33 @@ interface ChainRPCConfig {
     timeoutMs: number;
 }
 
+export interface FallbackRPCClientEntry {
+    url: string;
+    client: PublicClient;
+}
+
+const ENDPOINT_RATE_LIMIT_COOLDOWN_MS = 120000;
+const endpointCooldownUntil = new Map<string, number>();
+
+function isEndpointCoolingDown(url: string, now: number = Date.now()): boolean {
+    const cooldownUntil = endpointCooldownUntil.get(url) || 0;
+    if (cooldownUntil <= now) {
+        endpointCooldownUntil.delete(url);
+        return false;
+    }
+
+    return true;
+}
+
+export function markRpcEndpointRateLimited(url: string, cooldownMs: number = ENDPOINT_RATE_LIMIT_COOLDOWN_MS): void {
+    endpointCooldownUntil.set(url, Date.now() + cooldownMs);
+}
+
 /**
  * Robuste RPC-Konfiguration mit mehreren Backup-Endpoints
  */
 export function getRPCEndpoints(): string[] {
-    const endpoints = [
+    const configuredEndpoints = [
         process.env.ALCHEMY_URL,
         process.env.INFURA_URL,
         'https://ethereum-sepolia-rpc.publicnode.com',
@@ -30,12 +52,18 @@ export function getRPCEndpoints(): string[] {
         'https://sepolia.drpc.org'
     ].filter(Boolean) as string[];
 
+    const endpoints = [...new Set(configuredEndpoints)];
+
     if (endpoints.length === 0) {
         devLog.warn('rpc-config', '⚠️ No RPC endpoints configured! Using fallback.');
         endpoints.push('https://rpc.sepolia.org');
     }
 
-    return endpoints;
+    const now = Date.now();
+    const healthy = endpoints.filter((url) => !isEndpointCoolingDown(url, now));
+    const cooling = endpoints.filter((url) => isEndpointCoolingDown(url, now));
+
+    return [...healthy, ...cooling];
 }
 
 /**
@@ -74,17 +102,25 @@ export function createRobustPublicClient(config?: Partial<ChainRPCConfig>): Publ
  * Erstellt mehrere Clients für Fallback-Strategien
  */
 export function createFallbackClients(config?: Partial<ChainRPCConfig>): PublicClient[] {
+    return createFallbackClientEntries(config).map((entry) => entry.client);
+}
+
+/**
+ * Erstellt mehrere Clients mit URL-Metadaten für erweiterte Fallback-Strategien
+ */
+export function createFallbackClientEntries(config?: Partial<ChainRPCConfig>): FallbackRPCClientEntry[] {
     const chainConfig = getChainConfig();
     const finalConfig = { ...chainConfig, ...config };
 
-    return finalConfig.rpcUrls.map(rpcUrl =>
-        createPublicClient({
+    return finalConfig.rpcUrls.map((rpcUrl) => ({
+        url: rpcUrl,
+        client: createPublicClient({
             chain: finalConfig.chain,
             transport: http(rpcUrl, {
                 timeout: finalConfig.timeoutMs,
             }),
-        })
-    );
+        }),
+    }));
 }
 
 /**

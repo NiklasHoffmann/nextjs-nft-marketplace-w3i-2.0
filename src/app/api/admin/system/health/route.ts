@@ -175,17 +175,29 @@ async function handler(req: NextRequest) {
     ]);
 
     // 6. Image enrichment coverage
-    const missingImageFieldsQuery = {
+    const imageSourceQuery = {
         $or: [
-            { 'metadata.images.thumb': { $exists: false } },
-            { 'metadata.images.small': { $exists: false } },
-            { 'metadata.images.card': { $exists: false } },
-            { 'metadata.images.detail': { $exists: false } },
-            { 'metadata.imageMeta.width': { $exists: false } },
-            { 'metadata.imageMeta.height': { $exists: false } },
-            { 'metadata.imageMeta.mimeType': { $exists: false } },
-            { 'metadata.blurDataURL': { $exists: false } },
-            { 'metadata.blurDataURL': null },
+            { 'metadata.image': { $exists: true, $nin: [null, ''] } },
+            { 'metadata.imageOriginal': { $exists: true, $nin: [null, ''] } },
+        ],
+    };
+
+    const missingImageFieldsQuery = {
+        $and: [
+            imageSourceQuery,
+            {
+                $or: [
+                    { 'metadata.images.thumb': { $exists: false } },
+                    { 'metadata.images.small': { $exists: false } },
+                    { 'metadata.images.card': { $exists: false } },
+                    { 'metadata.images.detail': { $exists: false } },
+                    { 'metadata.imageMeta.width': { $exists: false } },
+                    { 'metadata.imageMeta.height': { $exists: false } },
+                    { 'metadata.imageMeta.mimeType': { $exists: false } },
+                    { 'metadata.blurDataURL': { $exists: false } },
+                    { 'metadata.blurDataURL': null },
+                ],
+            },
         ],
     };
 
@@ -207,12 +219,7 @@ async function handler(req: NextRequest) {
         missingImageSample,
     ] = await Promise.all([
         nftMetadataCollection.countDocuments({}),
-        nftMetadataCollection.countDocuments({
-            $or: [
-                { 'metadata.image': { $exists: true, $nin: [null, ''] } },
-                { 'metadata.imageOriginal': { $exists: true, $nin: [null, ''] } },
-            ],
-        }),
+        nftMetadataCollection.countDocuments(imageSourceQuery),
         nftMetadataCollection.countDocuments(missingImageFieldsQuery),
         nftMetadataCollection.countDocuments({
             'metadata.blurDataURL': { $regex: '^data:image/svg\\+xml;base64,', $options: 'i' },
@@ -270,6 +277,7 @@ async function handler(req: NextRequest) {
     ]);
 
     const enrichedDocs = Math.max(0, docsWithImageSource - missingImageFieldsCount);
+    const docsWithoutImageSource = Math.max(0, totalNftMetadataDocs - docsWithImageSource);
     const enrichmentCoverage = docsWithImageSource > 0
         ? Number(((enrichedDocs / docsWithImageSource) * 100).toFixed(2))
         : 100;
@@ -396,6 +404,7 @@ async function handler(req: NextRequest) {
         images: {
             totalNftMetadataDocs,
             docsWithImageSource,
+            docsWithoutImageSource,
             enrichedDocs,
             missingImageFieldsCount,
             enrichmentCoverage,

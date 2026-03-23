@@ -222,7 +222,14 @@ export const POST = apiHandler(async (request: NextRequest) => {
                         );
 
                         if (!blockchainData) {
-                            throw new Error('No data returned from blockchain');
+                            const message = 'Blockchain data unavailable (likely nonexistent token or stale listing)';
+                            devLog.warn(`    ⚠️  ${message}: ${nft.contractAddress}/${nft.tokenId}`);
+                            result.errors.push({
+                                contractAddress: nft.contractAddress,
+                                tokenId: nft.tokenId,
+                                error: message
+                            });
+                            return;
                         }
 
                         // Fetch metadata from tokenURI if available

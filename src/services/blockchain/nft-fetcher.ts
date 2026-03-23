@@ -27,6 +27,11 @@ interface BlockchainNFTData {
     tokenStandard?: 'ERC721' | 'ERC1155';
 }
 
+function isLikelyRevertError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+    return message.includes('execution reverted') || message.includes('revert');
+}
+
 function normalizeErc1155TokenUri(tokenUri: string, tokenId: bigint): string {
     const hexTokenId = tokenId.toString(16).padStart(64, '0');
     return tokenUri.replace(/\{id\}/gi, hexTokenId);
@@ -215,7 +220,7 @@ export async function fetchComprehensiveNFTDataNew(
             }
 
             if (!resolvedTokenUri) {
-                devLog.error('nft-fetcher', '❌ tokenURI/uri call failed');
+                devLog.warn('nft-fetcher', 'tokenURI/uri unavailable for this token - skipping metadata enrichment');
                 return undefined;
             }
 
@@ -345,6 +350,11 @@ export async function fetchComprehensiveNFTDataNew(
         };
 
     } catch (error) {
+        if (isLikelyRevertError(error)) {
+            devLog.warn('nft-fetcher', 'Deterministic revert while reading NFT data - token likely nonexistent or stale listing');
+            return undefined;
+        }
+
         devLog.error('nft-fetcher', 'Error fetching comprehensive NFT data:', error);
         return undefined;
     }

@@ -277,6 +277,12 @@ export interface EventListenerState {
     reconnectAttempts: number;
     /** Keepalive failure count */
     keepaliveFailures: number;
+    /** Consecutive connection failure count */
+    consecutiveConnectionFailures?: number;
+    /** Circuit breaker currently active */
+    circuitBreakerActive?: boolean;
+    /** Circuit breaker unlock timestamp (epoch ms) */
+    circuitBreakerUntil?: number | null;
     /** Active event subscriptions */
     activeSubscriptions: MarketplaceEventName[];
 }

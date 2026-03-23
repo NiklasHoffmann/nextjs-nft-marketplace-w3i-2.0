@@ -82,6 +82,11 @@ function normalizeErc1155TokenUri(tokenUri: string, tokenId: bigint): string {
     return tokenUri.replace(/\{id\}/gi, hexTokenId);
 }
 
+function isLikelyRevertError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+    return message.includes('execution reverted') || message.includes('revert');
+}
+
 export class IPFSMetadataLazySync {
 
     /**
@@ -258,18 +263,27 @@ export class IPFSMetadataLazySync {
                 });
 
                 return { tokenURI: tokenURI as string, tokenStandard: 'ERC721' };
-            } catch (error) {
-                const tokenURI = await client.readContract({
-                    address: contractAddress as `0x${string}`,
-                    abi: ERC1155_ABI,
-                    functionName: 'uri',
-                    args: [tokenIdBigInt]
-                });
+            } catch (erc721Error) {
+                try {
+                    const tokenURI = await client.readContract({
+                        address: contractAddress as `0x${string}`,
+                        abi: ERC1155_ABI,
+                        functionName: 'uri',
+                        args: [tokenIdBigInt]
+                    });
 
-                return {
-                    tokenURI: normalizeErc1155TokenUri(tokenURI as string, tokenIdBigInt),
-                    tokenStandard: 'ERC1155'
-                };
+                    return {
+                        tokenURI: normalizeErc1155TokenUri(tokenURI as string, tokenIdBigInt),
+                        tokenStandard: 'ERC1155'
+                    };
+                } catch (erc1155Error) {
+                    if (isLikelyRevertError(erc721Error) || isLikelyRevertError(erc1155Error)) {
+                        devLog.warn(`  ⚠️ tokenURI/uri unavailable for ${contractAddress}/${tokenId} (likely nonexistent token)`);
+                        return null;
+                    }
+
+                    throw erc1155Error;
+                }
             }
 
         } catch (error) {

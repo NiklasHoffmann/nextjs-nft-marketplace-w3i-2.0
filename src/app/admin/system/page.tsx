@@ -32,6 +32,7 @@ interface SystemHealth {
     images?: {
         totalNftMetadataDocs: number;
         docsWithImageSource: number;
+        docsWithoutImageSource?: number;
         enrichedDocs: number;
         missingImageFieldsCount: number;
         enrichmentCoverage: number;
@@ -85,6 +86,9 @@ interface SystemMetrics {
             lastEventAt?: string | number | Date | null;
             reconnectAttempts?: number;
             keepaliveFailures?: number;
+            consecutiveConnectionFailures?: number;
+            circuitBreakerActive?: boolean;
+            circuitBreakerUntil?: string | number | Date | null;
             activeSubscriptions?: string[];
             message?: string;
         };
@@ -166,14 +170,17 @@ interface AlertItem {
 }
 
 type CounterSeverity = 'ok' | 'warning' | 'critical';
+type DetailSection = 'health' | 'metrics' | 'images' | 'alerts' | 'sync' | 'events' | 'raw' | 'counters';
 
 export default function AdminSystemDiagnostics() {
     const [health, setHealth] = useState<SystemHealth | null>(null);
     const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
     const [requestCounters, setRequestCounters] = useState<RequestCounterSnapshot[]>([]);
     const [refreshMode, setRefreshMode] = useState<RefreshMode>('manual');
+    const [activeSection, setActiveSection] = useState<DetailSection>('health');
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+    const [nowTs, setNowTs] = useState<number>(Date.now());
 
     const refreshIntervalMs = useMemo(() => {
         if (refreshMode === '30s') return 30_000;
@@ -224,6 +231,14 @@ export default function AdminSystemDiagnostics() {
         return () => window.clearInterval(interval);
     }, [refreshIntervalMs, fetchAll]);
 
+    useEffect(() => {
+        const interval = window.setInterval(() => {
+            setNowTs(Date.now());
+        }, 1000);
+
+        return () => window.clearInterval(interval);
+    }, []);
+
     const formatUptime = (seconds: number) => {
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
@@ -251,6 +266,20 @@ export default function AdminSystemDiagnostics() {
         const minutes = Math.round(ms / 60000);
         if (minutes <= 1) return `${Math.round(ms / 1000)} s`;
         return `${minutes} min`;
+    };
+
+    const formatRemainingDuration = (until?: string | number | Date | null) => {
+        if (!until) return '—';
+        const target = until instanceof Date ? until.getTime() : new Date(until).getTime();
+        if (!Number.isFinite(target)) return '—';
+
+        const diffMs = target - nowTs;
+        if (diffMs <= 0) return 'ready';
+
+        const totalSeconds = Math.ceil(diffMs / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     };
 
     const getAlertBadgeClass = (level: AlertLevel) => {
@@ -343,6 +372,9 @@ export default function AdminSystemDiagnostics() {
         if ((eventListener?.keepaliveFailures ?? 0) > 0) {
             items.push({ level: 'warning', message: `Event listener keepalive failures: ${eventListener?.keepaliveFailures}.` });
         }
+        if (eventListener?.circuitBreakerActive) {
+            items.push({ level: 'critical', message: 'Event listener circuit breaker is active (websocket reconnect paused).' });
+        }
 
         const graphErrors = metrics?.syncService?.graphSync?.consecutiveErrors ?? 0;
         if (graphErrors >= 5) {
@@ -391,6 +423,26 @@ export default function AdminSystemDiagnostics() {
         return items;
     }, [health, metrics]);
 
+    const criticalAlertsCount = useMemo(
+        () => alerts.filter((alert) => alert.level === 'critical').length,
+        [alerts]
+    );
+
+    const warningAlertsCount = useMemo(
+        () => alerts.filter((alert) => alert.level === 'warning').length,
+        [alerts]
+    );
+
+    const criticalCounterCount = useMemo(
+        () => requestCounters.filter((counter) => getCounterSeverity(counter) === 'critical').length,
+        [requestCounters]
+    );
+
+    const warningCounterCount = useMemo(
+        () => requestCounters.filter((counter) => getCounterSeverity(counter) === 'warning').length,
+        [requestCounters]
+    );
+
     return (
         <AdminPageShell>
             <div className="mb-6">
@@ -432,6 +484,122 @@ export default function AdminSystemDiagnostics() {
                 </div>
             </div>
 
+            <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                    <h2 className="text-lg font-semibold text-gray-900">Hauptuebersicht</h2>
+                    <span className="text-xs text-gray-500">Klick auf eine Kennzahl fuer Details</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
+                    <button
+                        type="button"
+                        onClick={() => setActiveSection('health')}
+                        className="rounded-md border border-gray-200 bg-gray-50 p-3 text-left hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                    >
+                        <div className="text-xs text-gray-500">DB Latency</div>
+                        <div className="text-lg font-semibold text-gray-900">
+                            {health ? `${health.database.latency} ms` : '—'}
+                        </div>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setActiveSection('health')}
+                        className="rounded-md border border-gray-200 bg-gray-50 p-3 text-left hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                    >
+                        <div className="text-xs text-gray-500">Subgraph</div>
+                        <div className="text-lg font-semibold text-gray-900">
+                            {health ? formatSyncTime(health.subgraph.minutesSinceLastSync) : '—'}
+                        </div>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setActiveSection('metrics')}
+                        className="rounded-md border border-gray-200 bg-gray-50 p-3 text-left hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                    >
+                        <div className="text-xs text-gray-500">Memory RSS</div>
+                        <div className="text-lg font-semibold text-gray-900">
+                            {metrics ? `${metrics.process.memoryRssMb} MB` : '—'}
+                        </div>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setActiveSection('images')}
+                        className="rounded-md border border-gray-200 bg-gray-50 p-3 text-left hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                    >
+                        <div className="text-xs text-gray-500">Image Coverage</div>
+                        <div className="text-lg font-semibold text-gray-900">
+                            {health?.images ? `${health.images.enrichmentCoverage}%` : '—'}
+                        </div>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setActiveSection('alerts')}
+                        className="rounded-md border border-gray-200 bg-gray-50 p-3 text-left hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                    >
+                        <div className="text-xs text-gray-500">Critical Alerts</div>
+                        <div className="text-lg font-semibold text-gray-900">{criticalAlertsCount}</div>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setActiveSection('alerts')}
+                        className="rounded-md border border-gray-200 bg-gray-50 p-3 text-left hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                    >
+                        <div className="text-xs text-gray-500">Warning Alerts</div>
+                        <div className="text-lg font-semibold text-gray-900">{warningAlertsCount}</div>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setActiveSection('counters')}
+                        className="rounded-md border border-gray-200 bg-gray-50 p-3 text-left hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                    >
+                        <div className="text-xs text-gray-500">Critical Counters</div>
+                        <div className="text-lg font-semibold text-gray-900">{criticalCounterCount}</div>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setActiveSection('counters')}
+                        className="rounded-md border border-gray-200 bg-gray-50 p-3 text-left hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                    >
+                        <div className="text-xs text-gray-500">Warning Counters</div>
+                        <div className="text-lg font-semibold text-gray-900">{warningCounterCount}</div>
+                    </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                    {([
+                        ['health', 'Health'],
+                        ['metrics', 'Metrics'],
+                        ['images', 'Image Enrichment'],
+                        ['alerts', 'Alerts'],
+                        ['sync', 'Marketplace Sync'],
+                        ['events', 'Event Listener'],
+                        ['counters', 'Request Counters'],
+                        ['raw', 'Raw JSON'],
+                    ] as Array<[DetailSection, string]>).map(([section, label]) => (
+                        <button
+                            key={section}
+                            type="button"
+                            onClick={() => setActiveSection(section)}
+                            className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                                activeSection === section
+                                    ? 'border-blue-300 bg-blue-50 text-blue-700'
+                                    : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800'
+                            }`}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {activeSection === 'health' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">Health Status</h2>
@@ -476,7 +644,11 @@ export default function AdminSystemDiagnostics() {
                         </div>
                     </div>
                 </div>
+            </div>
+            )}
 
+            {activeSection === 'metrics' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">System Metrics</h2>
                     <div className="space-y-3 text-sm">
@@ -525,7 +697,9 @@ export default function AdminSystemDiagnostics() {
                     </div>
                 </div>
             </div>
+            )}
 
+            {activeSection === 'images' && (
             <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
                 <div className="mb-4 flex items-center justify-between gap-3">
                     <h2 className="text-lg font-semibold text-gray-900">Image Enrichment Health</h2>
@@ -534,7 +708,7 @@ export default function AdminSystemDiagnostics() {
                     </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
                     <div className="rounded-md border border-gray-100 bg-gray-50 p-3">
                         <div className="text-xs text-gray-500">Coverage</div>
                         <div className="text-base font-semibold text-gray-900">
@@ -545,6 +719,12 @@ export default function AdminSystemDiagnostics() {
                         <div className="text-xs text-gray-500">Missing Fields</div>
                         <div className="text-base font-semibold text-gray-900">
                             {health?.images ? health.images.missingImageFieldsCount.toLocaleString() : '—'}
+                        </div>
+                    </div>
+                    <div className="rounded-md border border-gray-100 bg-gray-50 p-3">
+                        <div className="text-xs text-gray-500">Without Image Source</div>
+                        <div className="text-base font-semibold text-gray-900">
+                            {health?.images ? (health.images.docsWithoutImageSource ?? 0).toLocaleString() : '—'}
                         </div>
                     </div>
                     <div className="rounded-md border border-gray-100 bg-gray-50 p-3">
@@ -651,7 +831,9 @@ export default function AdminSystemDiagnostics() {
                     </p>
                 </div>
             </div>
+            )}
 
+            {activeSection === 'alerts' && (
             <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Service Alerts</h2>
                 {alerts.length === 0 ? (
@@ -669,7 +851,9 @@ export default function AdminSystemDiagnostics() {
                     </div>
                 )}
             </div>
+            )}
 
+            {activeSection === 'sync' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">Marketplace Sync</h2>
@@ -801,7 +985,11 @@ export default function AdminSystemDiagnostics() {
                         </div>
                     </div>
                 </div>
+            </div>
+            )}
 
+            {activeSection === 'events' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">Event Listener</h2>
                     <div className="space-y-3 text-sm">
@@ -833,6 +1021,24 @@ export default function AdminSystemDiagnostics() {
                             <span>Keepalive Failures</span>
                             <span>{metrics?.syncService?.eventListener?.keepaliveFailures ?? '—'}</span>
                         </div>
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span>Consecutive Failures</span>
+                            <span>{metrics?.syncService?.eventListener?.consecutiveConnectionFailures ?? '—'}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span>Circuit Breaker</span>
+                            <span>
+                                {metrics?.syncService?.eventListener?.circuitBreakerActive ? 'active' : 'inactive'}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span>Circuit Until</span>
+                            <span>{formatDateTime(metrics?.syncService?.eventListener?.circuitBreakerUntil)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span>Circuit Countdown</span>
+                            <span>{formatRemainingDuration(metrics?.syncService?.eventListener?.circuitBreakerUntil)}</span>
+                        </div>
                         <div className="pt-2 border-t border-gray-100 text-xs text-gray-500">
                             <div className="mb-1">Subscriptions</div>
                             <div className="flex flex-wrap gap-2">
@@ -851,7 +1057,9 @@ export default function AdminSystemDiagnostics() {
                     </div>
                 </div>
             </div>
+            )}
 
+            {activeSection === 'raw' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">Health JSON</h2>
@@ -873,7 +1081,9 @@ export default function AdminSystemDiagnostics() {
                     </details>
                 </div>
             </div>
+            )}
 
+            {activeSection === 'counters' && (
             <div className="bg-white border border-gray-200 rounded-lg p-6 mt-8">
                 <div className="mb-4 flex items-center justify-between gap-3">
                     <h2 className="text-lg font-semibold text-gray-900">Alchemy/RPC Request Counters</h2>
@@ -927,6 +1137,7 @@ export default function AdminSystemDiagnostics() {
                     </div>
                 )}
             </div>
+            )}
         </AdminPageShell>
     );
 }

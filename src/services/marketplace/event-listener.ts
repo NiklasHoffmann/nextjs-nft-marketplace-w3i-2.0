@@ -53,6 +53,10 @@ const MARKETPLACE_EVENT_ABI = [
 const MAX_RECONNECT_ATTEMPTS = 10;
 const INITIAL_RECONNECT_DELAY = 1000; // 1s
 const MAX_RECONNECT_DELAY = 60000; // 60s
+const RATE_LIMIT_RECONNECT_DELAY = 30000; // 30s floor for 429/non-101 failures
+const STABLE_CONNECTION_WINDOW_MS = 20000; // 20s stable runtime before resetting backoff
+const CIRCUIT_BREAKER_FAILURE_THRESHOLD = 5;
+const CIRCUIT_BREAKER_COOLDOWN_MS = 5 * 60 * 1000;
 const EVENT_DEDUP_WINDOW = 5000; // 5s - prevent duplicate event processing
 const KEEPALIVE_INTERVAL = 300000; // 5 min - send keepalive to prevent WebSocket timeout
 const KEEPALIVE_MAX_BACKOFF = 900000; // 15 min max backoff
@@ -69,7 +73,8 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
 
     // Configuration
     private marketplaceAddress: Address;
-    private wsUrl: string;
+    private wsUrls: string[];
+    private wsUrlIndex = 0;
     private config: EventListenerConfig = {};
 
     // Statistics
@@ -84,6 +89,9 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
     // Reconnection
     private reconnectTimeout: NodeJS.Timeout | null = null;
     private isReconnecting = false;
+    private connectedAt: number | null = null;
+    private consecutiveConnectionFailures = 0;
+    private circuitBreakerUntil: number | null = null;
 
     // Keepalive (prevent WebSocket timeout)
     private keepaliveInterval: NodeJS.Timeout | null = null;
@@ -95,25 +103,42 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
     private lastErrorSignature: string | null = null;
     private lastErrorAt = 0;
 
+    private extractErrorText(error: unknown): string {
+        const safeError = error as any;
+        const metaMessages = Array.isArray(safeError?.metaMessages) ? safeError.metaMessages.join(' ') : '';
+        const details = typeof safeError?.details === 'string' ? safeError.details : '';
+        const shortMessage = typeof safeError?.shortMessage === 'string' ? safeError.shortMessage : '';
+        const causeMessage = typeof safeError?.cause?.message === 'string' ? safeError.cause.message : '';
+        const ownMessage = typeof safeError?.message === 'string' ? safeError.message : '';
+        return [ownMessage, shortMessage, details, metaMessages, causeMessage].join(' ').toLowerCase();
+    }
+
+    private isRateLimitedError(error: unknown): boolean {
+        const text = this.extractErrorText(error);
+        return text.includes('429') || text.includes('too many requests') || text.includes('rate limit') || text.includes('non-101 status code');
+    }
+
     constructor(marketplaceAddress: Address, wsUrl?: string) {
         this.marketplaceAddress = marketplaceAddress;
 
-        // Use provided URL or fall back to env vars
-        this.wsUrl = wsUrl
-            || process.env.NEXT_PUBLIC_ALCHEMY_URL_WSS
-            || process.env.ALCHEMY_URL_WSS
-            || process.env.NEXT_PUBLIC_INFURA_URL_WSS
-            || process.env.INFURA_URL_WSS
-            || '';
+        const resolvedWsUrls = [
+            wsUrl,
+            process.env.NEXT_PUBLIC_ALCHEMY_URL_WSS,
+            process.env.ALCHEMY_URL_WSS,
+            process.env.NEXT_PUBLIC_INFURA_URL_WSS,
+            process.env.INFURA_URL_WSS,
+        ].filter((value): value is string => Boolean(value && value.trim()));
+
+        this.wsUrls = [...new Set(resolvedWsUrls)];
 
         devLog.log('🔍 [EventListener] Constructor Debug:');
         devLog.log('   Marketplace Address:', marketplaceAddress);
         devLog.log('   Provided WSS URL:', wsUrl || 'none');
         devLog.log('   NEXT_PUBLIC_ALCHEMY_URL_WSS:', process.env.NEXT_PUBLIC_ALCHEMY_URL_WSS || 'not set');
         devLog.log('   NEXT_PUBLIC_INFURA_URL_WSS:', process.env.NEXT_PUBLIC_INFURA_URL_WSS || 'not set');
-        devLog.log('   Final WSS URL:', this.wsUrl || 'NONE - SERVICE WILL NOT WORK!');
+        devLog.log('   Configured WSS URLs:', this.wsUrls.length > 0 ? this.wsUrls : 'NONE - SERVICE WILL NOT WORK!');
 
-        if (!this.wsUrl) {
+        if (this.wsUrls.length === 0) {
             devLog.error('❌ [EventListener] No WebSocket URL configured. Service will not work.');
             devLog.error('   Please set NEXT_PUBLIC_ALCHEMY_URL_WSS or NEXT_PUBLIC_INFURA_URL_WSS in .env.local');
         }
@@ -140,7 +165,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             return;
         }
 
-        if (!this.wsUrl) {
+        if (this.wsUrls.length === 0) {
             throw new Error('WebSocket URL not configured');
         }
 
@@ -149,7 +174,6 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
 
         devLog.log('🚀 [EventListener] Starting...');
         devLog.log(`   Marketplace: ${this.marketplaceAddress}`);
-        devLog.log(`   WebSocket: ${this.wsUrl.substring(0, 50)}...`);
 
         await this.connect();
 
@@ -197,6 +221,9 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             this.reconnectTimeout = null;
         }
 
+        this.consecutiveConnectionFailures = 0;
+        this.circuitBreakerUntil = null;
+
         // Clear processed events
         this.processedEvents.clear();
 
@@ -214,6 +241,9 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             lastEventAt: this.lastEventAt,
             reconnectAttempts: this.reconnectAttempts,
             keepaliveFailures: this.keepaliveFailures,
+            consecutiveConnectionFailures: this.consecutiveConnectionFailures,
+            circuitBreakerActive: this.circuitBreakerUntil !== null && this.circuitBreakerUntil > Date.now(),
+            circuitBreakerUntil: this.circuitBreakerUntil,
             activeSubscriptions: this.getActiveEventNames()
         };
     }
@@ -247,9 +277,11 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
      * Connect to WebSocket and start watching events
      */
     private async connect(): Promise<void> {
+        const wsUrl = this.wsUrls[this.wsUrlIndex];
         const environment = typeof window === 'undefined' ? 'SERVER' : 'CLIENT';
         devLog.log(`🔌 [EventListener ${environment}] Attempting to connect...`);
-        devLog.log('   WSS URL:', this.wsUrl);
+        devLog.log('   WSS URL:', wsUrl || 'none');
+        devLog.log(`   WSS Provider Index: ${this.wsUrlIndex + 1}/${this.wsUrls.length}`);
         devLog.log('   Chain:', sepolia.name);
         devLog.log('   Marketplace:', this.marketplaceAddress);
 
@@ -258,7 +290,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             devLog.log(`📡 [EventListener ${environment}] Creating WebSocket client...`);
             this.client = createPublicClient({
                 chain: sepolia,
-                transport: webSocket(this.wsUrl, {
+                transport: webSocket(wsUrl, {
                     reconnect: false, // We handle reconnection ourselves
                     timeout: 30000,
                     retryCount: 3,
@@ -284,7 +316,9 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
             devLog.log(`✓ Event watcher started (${environment})`);
 
             this.isConnected = true;
-            this.reconnectAttempts = 0;
+            this.connectedAt = Date.now();
+            this.consecutiveConnectionFailures = 0;
+            this.circuitBreakerUntil = null;
 
             devLog.log(`✅ [EventListener ${environment}] WebSocket connected successfully!`);
             devLog.log('   Status: CONNECTED');
@@ -327,6 +361,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
 
         this.client = null;
         this.isConnected = false;
+        this.connectedAt = null;
 
         // Notify connection change
         this.config.onConnectionChange?.(false);
@@ -806,7 +841,7 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
                 errorName,
                 shortMessage,
                 hasStack: !!safeError?.stack,
-                wsUrl: this.wsUrl?.substring(0, 50) + '...'
+                wsUrl: this.wsUrls[this.wsUrlIndex]?.substring(0, 50) + '...'
             });
 
             this.lastErrorSignature = signature;
@@ -820,7 +855,9 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
 
         // Only reconnect on actual connection failures (not normal close events)
         if (this.isActive && isConnectionError && !isEmptyError) {
-            devLog.warn('⚠️ [EventListener] Connection lost, attempting reconnect...');
+            if (!isThrottledDuplicate) {
+                devLog.warn('⚠️ [EventListener] Connection lost, attempting reconnect...');
+            }
             this.handleConnectionFailure(error as Error);
         }
     }
@@ -844,13 +881,57 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
         }
 
         this.isReconnecting = true;
+
+        const connectionWasStable = this.connectedAt !== null && (Date.now() - this.connectedAt) >= STABLE_CONNECTION_WINDOW_MS;
+        if (connectionWasStable) {
+            this.reconnectAttempts = 0;
+            this.consecutiveConnectionFailures = 0;
+        }
+
+        this.consecutiveConnectionFailures += 1;
+
+        if (this.consecutiveConnectionFailures >= CIRCUIT_BREAKER_FAILURE_THRESHOLD) {
+            const cooldownMs = CIRCUIT_BREAKER_COOLDOWN_MS;
+            this.circuitBreakerUntil = Date.now() + cooldownMs;
+
+            devLog.warn(
+                `⏸️ [EventListener] Circuit breaker active after ${this.consecutiveConnectionFailures} failures. Pausing reconnects for ${Math.round(cooldownMs / 1000)}s.`
+            );
+
+            this.reconnectTimeout = setTimeout(async () => {
+                this.isReconnecting = false;
+                this.reconnectAttempts = 0;
+                this.consecutiveConnectionFailures = 0;
+                this.circuitBreakerUntil = null;
+
+                if (this.isActive) {
+                    devLog.log('▶️ [EventListener] Circuit breaker cooldown complete. Retrying connection...');
+                    await this.connect();
+                }
+            }, cooldownMs);
+
+            return;
+        }
+
         this.reconnectAttempts++;
 
         // Exponential backoff
-        const delay = Math.min(
+        let delay = Math.min(
             INITIAL_RECONNECT_DELAY * Math.pow(2, this.reconnectAttempts - 1),
             MAX_RECONNECT_DELAY
         );
+
+        if (this.isRateLimitedError(error)) {
+            delay = Math.max(delay, RATE_LIMIT_RECONNECT_DELAY);
+        }
+
+        // Add a tiny jitter to avoid synchronized reconnect bursts.
+        delay += Math.floor(Math.random() * 500);
+
+        if (this.wsUrls.length > 1) {
+            this.wsUrlIndex = (this.wsUrlIndex + 1) % this.wsUrls.length;
+            devLog.log(`🔁 [EventListener] Rotating WebSocket endpoint to index ${this.wsUrlIndex + 1}/${this.wsUrls.length}`);
+        }
 
         devLog.log(`🔄 [EventListener] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
 
@@ -903,12 +984,30 @@ export class MarketplaceEventListenerService implements IMarketplaceEventListene
 
 // ===== SINGLETON INSTANCE =====
 
-let globalEventListener: MarketplaceEventListenerService | null = null;
+const GLOBAL_EVENT_LISTENER_KEY = '__marketplaceEventListenerSingleton';
+
+function getGlobalEventListenerSingleton(): MarketplaceEventListenerService | null {
+    const store = globalThis as typeof globalThis & {
+        [GLOBAL_EVENT_LISTENER_KEY]?: MarketplaceEventListenerService | null;
+    };
+
+    return store[GLOBAL_EVENT_LISTENER_KEY] || null;
+}
+
+function setGlobalEventListenerSingleton(listener: MarketplaceEventListenerService | null): void {
+    const store = globalThis as typeof globalThis & {
+        [GLOBAL_EVENT_LISTENER_KEY]?: MarketplaceEventListenerService | null;
+    };
+
+    store[GLOBAL_EVENT_LISTENER_KEY] = listener;
+}
 
 /**
  * Get or create global event listener instance
  */
 export function getMarketplaceEventListener(marketplaceAddress: Address, wsUrl?: string): MarketplaceEventListenerService {
+    let globalEventListener = getGlobalEventListenerSingleton();
+
     devLog.log('🔍 [Singleton] getMarketplaceEventListener called');
     devLog.log('   Current instance exists:', !!globalEventListener);
     devLog.log('   Requested marketplace:', marketplaceAddress);
@@ -918,6 +1017,7 @@ export function getMarketplaceEventListener(marketplaceAddress: Address, wsUrl?:
     if (!globalEventListener) {
         devLog.log('   ➡️ Creating NEW singleton instance');
         globalEventListener = new MarketplaceEventListenerService(marketplaceAddress, wsUrl);
+        setGlobalEventListenerSingleton(globalEventListener);
     } else {
         devLog.log('   ➡️ Returning EXISTING singleton instance');
     }
@@ -928,10 +1028,12 @@ export function getMarketplaceEventListener(marketplaceAddress: Address, wsUrl?:
  * Destroy global event listener
  */
 export async function destroyMarketplaceEventListener(): Promise<void> {
+    const globalEventListener = getGlobalEventListenerSingleton();
+
     if (globalEventListener) {
         devLog.log('🗑️ [Singleton] Destroying existing event listener');
         await globalEventListener.stop();
-        globalEventListener = null;
+        setGlobalEventListenerSingleton(null);
         devLog.log('✅ [Singleton] Event listener destroyed');
     }
 }
