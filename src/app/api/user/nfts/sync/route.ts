@@ -18,10 +18,12 @@ import {
     updateNFTOwnership,
     upsertNFTMetadata
 } from '@/lib/db';
+import { getKnownContractAddresses, getWalletNFTsFromBlockchain } from '@/lib/blockchain';
 import { incrementRequestCounter } from '@/lib/monitoring/request-counter';
 import { getSharedCacheValue, setSharedCacheValue } from '@/lib/redis/shared-cache';
 import type { NFTMetadataSyncResult } from '@/types';
 import { fetchComprehensiveNFTDataNew } from '@/services/blockchain/nft-fetcher';
+import type { Address } from 'viem';
 import { devLog } from '@/utils';
 
 // Lightweight NFT discovery from Alchemy
@@ -102,6 +104,92 @@ async function discoverNFTsViaAlchemy(walletAddress: string): Promise<NFTIdentif
     }
 }
 
+async function discoverNFTsViaMoralis(walletAddress: string): Promise<NFTIdentifier[]> {
+    incrementRequestCounter('moralis.discovery.user_sync.attempt');
+
+    const apiKey = process.env.MORALIS_API_KEY;
+    if (!apiKey) {
+        throw new Error('Moralis API key not configured');
+    }
+
+    const chain = process.env.MORALIS_CHAIN || 'sepolia';
+    const response = await fetch(
+        `https://deep-index.moralis.io/api/v2.2/${walletAddress}/nft?chain=${chain}&format=decimal&media_items=false`,
+        {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-API-Key': apiKey
+            }
+        }
+    );
+
+    if (!response.ok) {
+        incrementRequestCounter('moralis.discovery.user_sync.error');
+        throw new Error(`Moralis API error: ${response.status}`);
+    }
+
+    incrementRequestCounter('moralis.discovery.user_sync.success');
+
+    const data = await response.json();
+    const result = Array.isArray(data?.result) ? data.result : [];
+
+    return result.map((nft: any) => {
+        const contractAddress = nft?.token_address;
+        const tokenId = nft?.token_id;
+
+        if (!contractAddress || tokenId === undefined || tokenId === null) {
+            return null;
+        }
+
+        return {
+            contractAddress: String(contractAddress).toLowerCase(),
+            tokenId: String(tokenId),
+        };
+    }).filter(Boolean) as NFTIdentifier[];
+}
+
+async function discoverNFTsViaKnownContracts(walletAddress: string): Promise<NFTIdentifier[]> {
+    const knownContracts = await getKnownContractAddresses();
+    if (knownContracts.length === 0) {
+        return [];
+    }
+
+    const nfts = await getWalletNFTsFromBlockchain(walletAddress as Address, knownContracts as Address[]);
+
+    return nfts
+        .map((nft) => {
+            if (!nft.contractAddress || nft.tokenId === undefined || nft.tokenId === null) {
+                return null;
+            }
+
+            return {
+                contractAddress: String(nft.contractAddress).toLowerCase(),
+                tokenId: String(nft.tokenId),
+            };
+        })
+        .filter(Boolean) as NFTIdentifier[];
+}
+
+async function discoverNFTsWithFallback(walletAddress: string): Promise<{ nfts: NFTIdentifier[]; source: 'alchemy' | 'moralis' | 'blockchain'; }> {
+    try {
+        const nfts = await discoverNFTsViaAlchemy(walletAddress);
+        return { nfts, source: 'alchemy' };
+    } catch (alchemyError) {
+        devLog.warn('⚠️ [NFT Sync] Alchemy discovery failed, trying Moralis fallback', alchemyError);
+    }
+
+    try {
+        const nfts = await discoverNFTsViaMoralis(walletAddress);
+        return { nfts, source: 'moralis' };
+    } catch (moralisError) {
+        devLog.warn('⚠️ [NFT Sync] Moralis discovery failed, trying blockchain fallback', moralisError);
+    }
+
+    const nfts = await discoverNFTsViaKnownContracts(walletAddress);
+    return { nfts, source: 'blockchain' };
+}
+
 /**
  * POST /api/user/nfts/sync
  * 
@@ -151,11 +239,11 @@ export const POST = apiHandler(async (request: NextRequest) => {
 
         devLog.info(`🔄 [NFT Sync] Starting sync for wallet: ${walletAddress}`);
 
-        // STEP 1: Discovery - Get current NFTs from Alchemy (cheap, no metadata)
-        devLog.debug('📡 [NFT Sync] Fetching NFT list from Alchemy (discovery only)...');
-        const alchemyNFTs = await discoverNFTsViaAlchemy(walletAddress);
+        // STEP 1: Discovery - Alchemy first, then Moralis, then known-contract blockchain fallback.
+        devLog.debug('📡 [NFT Sync] Fetching NFT list with fallback discovery...');
+        const { nfts: discoveredNFTs, source: discoverySource } = await discoverNFTsWithFallback(walletAddress);
 
-        devLog.debug(`✅ [NFT Sync] Found ${alchemyNFTs.length} NFTs in wallet`);
+        devLog.debug(`✅ [NFT Sync] Found ${discoveredNFTs.length} NFTs in wallet (source: ${discoverySource})`);
 
         // STEP 2: Get existing NFTs from database
         devLog.debug('🗄️  [NFT Sync] Checking database for existing NFTs...');
@@ -171,19 +259,19 @@ export const POST = apiHandler(async (request: NextRequest) => {
         const existingToUpdate: Array<{ contractAddress: string; tokenId: string }> = [];
         const currentNFTKeys = new Set<string>();
 
-        for (const alchemyNFT of alchemyNFTs) {
-            const key = `${alchemyNFT.contractAddress.toLowerCase()}-${alchemyNFT.tokenId}`;
+        for (const discoveredNFT of discoveredNFTs) {
+            const key = `${discoveredNFT.contractAddress.toLowerCase()}-${discoveredNFT.tokenId}`;
             currentNFTKeys.add(key);
 
             if (existingMap.has(key)) {
                 existingToUpdate.push({
-                    contractAddress: alchemyNFT.contractAddress.toLowerCase(),
-                    tokenId: alchemyNFT.tokenId
+                    contractAddress: discoveredNFT.contractAddress.toLowerCase(),
+                    tokenId: discoveredNFT.tokenId
                 });
             } else {
                 newNFTs.push({
-                    contractAddress: alchemyNFT.contractAddress.toLowerCase(),
-                    tokenId: alchemyNFT.tokenId
+                    contractAddress: discoveredNFT.contractAddress.toLowerCase(),
+                    tokenId: discoveredNFT.tokenId
                 });
             }
         }
@@ -199,7 +287,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
   - Transferred out: ${transferredNFTs.length}`);
 
         const result: NFTMetadataSyncResult = {
-            total: alchemyNFTs.length,
+            total: discoveredNFTs.length,
             new: 0,
             updated: 0,
             transferred: 0,
