@@ -355,6 +355,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     filters.seller,
     filters.isListed,
     filters.category,
+    filters.tokenStandard,
     filters.rarity,
     filters.tags?.join(','),
     filters.minRating,
@@ -368,11 +369,15 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
   ]);
 
   /**
-   * Refetch current page
+   * Refetch list from first page.
+   *
+   * This avoids replacing accumulated infinite-scroll data with only the
+   * current page slice when returning from background/tab switches.
    */
   const refetch = useCallback(async () => {
-    await fetchItems(page, false);
-  }, [page, fetchItems]);
+    setPage(1);
+    await fetchItems(1, false);
+  }, [fetchItems]);
 
   /**
    * Load next page (append to current items)
@@ -444,6 +449,7 @@ export function useMarketplaceItems(options: UseMarketplaceItemsOptions = {}): U
     filters.seller,
     filters.isListed,
     JSON.stringify(filters.category), // Handle arrays
+    JSON.stringify(filters.tokenStandard), // Handle arrays
     JSON.stringify(filters.rarity),   // Handle arrays
     JSON.stringify(filters.tags),     // Handle arrays
     filters.minRating,

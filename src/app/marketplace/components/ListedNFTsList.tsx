@@ -44,6 +44,7 @@ interface ListedNFTsListPropsExtended extends ListedNFTsListProps {
 export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _onStatsUpdate, onFiltersChange }: ListedNFTsListPropsExtended = {}) {
     const loadMoreRef = useRef<HTMLDivElement>(null);
     const isLoadingMore = useRef(false);
+    const isRefreshInFlight = useRef(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
     const [loadingMode, setLoadingMode] = useState<'refresh' | 'load-more' | null>(null);
     const [showReloadNotification, setShowReloadNotification] = useState(false);
@@ -148,8 +149,17 @@ export function ListedNFTsList({ externalFilters, externalSort, onStatsUpdate: _
     });
 
     const runRefresh = useCallback(async () => {
+        if (isRefreshInFlight.current) {
+            return;
+        }
+
+        isRefreshInFlight.current = true;
         setLoadingMode('refresh');
-        await refetch();
+        try {
+            await refetch();
+        } finally {
+            isRefreshInFlight.current = false;
+        }
     }, [refetch]);
 
     const runLoadMore = useCallback(async () => {
