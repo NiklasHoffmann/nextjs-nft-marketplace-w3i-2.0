@@ -163,6 +163,57 @@ async function discoverNFTsViaAlchemy(walletAddress: string): Promise<NFTIdentif
 }
 
 /**
+ * Moralis lightweight discovery fallback (contract + tokenId only)
+ */
+async function discoverNFTsViaMoralis(walletAddress: string): Promise<NFTIdentifier[]> {
+    incrementRequestCounter('moralis.discovery.wallet_nfts.attempt');
+
+    const apiKey = process.env.MORALIS_API_KEY;
+    if (!apiKey) {
+        throw new Error('Moralis API key not configured. Add MORALIS_API_KEY to .env.local');
+    }
+
+    const chain = process.env.MORALIS_CHAIN || 'sepolia';
+    const response = await fetch(
+        `https://deep-index.moralis.io/api/v2.2/${walletAddress}/nft?chain=${chain}&format=decimal&media_items=false`,
+        {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-API-Key': apiKey
+            }
+        }
+    );
+
+    if (!response.ok) {
+        incrementRequestCounter('moralis.discovery.wallet_nfts.error');
+        const errorText = await response.text();
+        throw new Error(`Moralis API error: ${response.status} - ${errorText}`);
+    }
+
+    incrementRequestCounter('moralis.discovery.wallet_nfts.success');
+
+    const data = await response.json();
+    const result = Array.isArray(data?.result) ? data.result : [];
+
+    return result
+        .map((nft: any) => {
+            const contractAddress = nft?.token_address;
+            const tokenId = nft?.token_id;
+
+            if (!contractAddress || tokenId === undefined || tokenId === null) {
+                return null;
+            }
+
+            return {
+                contractAddress: String(contractAddress).toLowerCase(),
+                tokenId: String(tokenId),
+            };
+        })
+        .filter(Boolean) as NFTIdentifier[];
+}
+
+/**
  * DEPRECATED: Old Alchemy with full metadata
  * Use discoverNFTsViaAlchemy() + blockchain fetching instead
  */
@@ -431,7 +482,47 @@ export const GET = apiHandler(async (request: NextRequest) => {
                 } else {
                     devLog.error('? Alchemy discovery failed:', alchemyDiscoveryResult.reason);
                     devLog.error('   Error details:', JSON.stringify(alchemyDiscoveryResult.reason, null, 2));
-                    // No fallback - blockchain-only mode is fine
+
+                    // Fallback 1: Moralis discovery (if key configured)
+                    try {
+                        devLog.info('?? [Hybrid] Trying Moralis discovery fallback...');
+                        const moralisDiscoveredNFTs = await discoverNFTsViaMoralis(walletAddress);
+                        devLog.info(`? Moralis Discovery: ${moralisDiscoveredNFTs.length} NFTs found`);
+
+                        const knownKeys = new Set(
+                            blockchainNFTs.map(nft => `${nft.contractAddress.toLowerCase()}-${nft.tokenId}`)
+                        );
+
+                        const unknownNFTs = moralisDiscoveredNFTs.filter(nft => {
+                            const key = `${nft.contractAddress.toLowerCase()}-${nft.tokenId}`;
+                            return !knownKeys.has(key);
+                        });
+
+                        if (unknownNFTs.length > 0) {
+                            const unknownContracts = [...new Set(unknownNFTs.map(n => n.contractAddress))] as Address[];
+                            const additionalNFTs = await getWalletNFTsFromBlockchain(
+                                walletAddress as Address,
+                                unknownContracts
+                            );
+
+                            alchemyNFTs = additionalNFTs.map(nft => ({
+                                contractAddress: nft.contractAddress,
+                                tokenId: nft.tokenId,
+                                name: nft.name,
+                                description: nft.description,
+                                image: nft.image,
+                                animationUrl: undefined,
+                                attributes: [],
+                                contractName: nft.contractName,
+                                contractSymbol: nft.contractSymbol,
+                                tokenType: 'ERC721' as const,
+                            }));
+
+                            devLog.info(`? Moralis fallback fetched ${alchemyNFTs.length} additional NFTs`);
+                        }
+                    } catch (moralisFallbackError) {
+                        devLog.warn('?? Moralis discovery fallback failed, keeping blockchain-only result', moralisFallbackError);
+                    }
                 }
             }
             // SEQUENTIAL execution for specific source modes
