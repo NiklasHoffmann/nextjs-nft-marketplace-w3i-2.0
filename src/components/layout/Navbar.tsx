@@ -78,6 +78,9 @@ export default function Navbar() {
         address: address,
     });
 
+    // Prefer address presence over transient isConnected glitches during reconnect cycles
+    const hasConnectedAccount = mounted && Boolean(address);
+
     // Check if user has admin access
     const isAdmin = mounted ? hasAdminAccess(address) : false;
 
@@ -235,7 +238,7 @@ export default function Navbar() {
                     {/* Currency Selector - TEMPORARILY DISABLED */}
                     <CurrencySelector />
                     {/* Wallet Section */}
-                    {mounted && isConnected && address ? (
+                    {hasConnectedAccount ? (
                         /* Connected: Show Wallet Dropdown with same styling as Currency Selector */
                         <div className="relative" ref={dropdownRef}>
                             {/* Wallet Button (matches Currency Selector styling) */}
@@ -252,7 +255,7 @@ export default function Navbar() {
                                 {/* Wallet Info */}
                                 <div className="flex items-center gap-2 min-w-0 flex-1">
                                     <span className="text-sm font-medium text-gray-700 truncate">
-                                        {formatAddress(address)}
+                                        {address ? formatAddress(address) : 'Wallet'}
                                     </span>
                                     <span className="text-sm text-gray-500 whitespace-nowrap">
                                         {formatBalance(balance)} ETH
@@ -281,7 +284,7 @@ export default function Navbar() {
                                                 <span className="text-sm font-medium text-green-700">Wallet Connected</span>
                                             </div>
                                             <div className="text-xs text-green-600 font-mono break-all">
-                                                {address}
+                                                {address ?? '—'}
                                             </div>
                                             <div className="text-sm text-green-700 mt-1">
                                                 Balance: {formatBalance(balance)} ETH
@@ -312,7 +315,7 @@ export default function Navbar() {
                                             </div>
 
                                             {/* Admin Link (only show for admins) */}
-                                            {isConnected && isAdmin && (
+                                            {isAdmin && (
                                                 <div className="mb-3">
                                                     <Link
                                                         href="/admin/login"
@@ -485,7 +488,7 @@ export default function Navbar() {
                         </div>
 
                         {/* Wallet Section */}
-                        {mounted && isConnected && address ? (
+                        {hasConnectedAccount ? (
                             <div className="p-6 border-t border-gray-200">
                                 {/* Wallet Status */}
                                 <div className="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
@@ -494,7 +497,7 @@ export default function Navbar() {
                                         <span className="text-sm font-medium text-green-700">Wallet Connected</span>
                                     </div>
                                     <div className="text-xs text-green-600 font-mono break-all mb-2">
-                                        {address}
+                                        {address ?? '—'}
                                     </div>
                                     <div className="text-sm text-green-700">
                                         Balance: {formatBalance(balance)} ETH

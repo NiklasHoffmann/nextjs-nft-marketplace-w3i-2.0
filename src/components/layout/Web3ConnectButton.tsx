@@ -1,7 +1,18 @@
 ﻿'use client'
 import { ConnectButton as RBConnect } from '@rainbow-me/rainbowkit'
+import { useEffect, useState } from 'react'
 
 export function Web3ConnectButton() {
+    const [forceReadyFallback, setForceReadyFallback] = useState(false)
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            setForceReadyFallback(true)
+        }, 2500)
+
+        return () => window.clearTimeout(timer)
+    }, [])
+
     return (
         <div className="flex items-center w-full">
             <RBConnect.Custom>
@@ -15,25 +26,29 @@ export function Web3ConnectButton() {
                     mounted,
                 }) => {
                     const ready = mounted && authenticationStatus !== 'loading';
+                    const uiReady = ready || forceReadyFallback;
                     const connected =
-                        ready &&
+                        uiReady &&
                         account &&
                         chain &&
                         (!authenticationStatus || authenticationStatus === 'authenticated');
 
                     return (
-                        <div
-                            className="w-full"
-                            {...(!ready && {
-                                'aria-hidden': true,
-                                style: {
-                                    opacity: 0,
-                                    pointerEvents: 'none',
-                                    userSelect: 'none',
-                                },
-                            })}
-                        >
+                        <div className="w-full">
                             {(() => {
+                                if (!uiReady) {
+                                    return (
+                                        <button
+                                            type="button"
+                                            disabled
+                                            className="w-full h-10 px-6 bg-gray-200 text-gray-500 rounded-lg font-semibold cursor-wait flex items-center justify-center gap-2"
+                                            aria-busy="true"
+                                        >
+                                            Wallet initialisiert...
+                                        </button>
+                                    );
+                                }
+
                                 if (!connected) {
                                     return (
                                         <button
