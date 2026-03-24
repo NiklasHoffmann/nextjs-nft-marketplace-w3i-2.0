@@ -16,6 +16,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useAccount } from 'wagmi';
 import { useMarketplaceItems } from '@/contexts/marketplace-items';
 import { useWalletNFTs } from '@/contexts/wallet-nfts';
 import { onDataInvalidation, type InvalidationEventDetail } from '@/services/validation';
@@ -41,6 +42,7 @@ interface UseMarketplaceItemDetailReturn {
  */
 export function useMarketplaceItemDetail(options: UseMarketplaceItemDetailOptions): UseMarketplaceItemDetailReturn {
     const { contractAddress, tokenId, autoFetch = true } = options;
+    const { address: connectedAddress } = useAccount();
 
     const [nft, setNFT] = useState<EnrichedNFTDocument | null>(null);
     const [loading, setLoading] = useState(autoFetch);
@@ -82,7 +84,8 @@ export function useMarketplaceItemDetail(options: UseMarketplaceItemDetailOption
         setError(null);
 
         try {
-            let response = await fetch(`/api/nft/detail?contractAddress=${contractAddress}&tokenId=${tokenId}`, {
+            const ownerQuery = connectedAddress ? `&ownerAddress=${connectedAddress}` : '';
+            let response = await fetch(`/api/nft/detail?contractAddress=${contractAddress}&tokenId=${tokenId}${ownerQuery}`, {
                 cache: 'no-store'
             });
 
@@ -201,7 +204,7 @@ export function useMarketplaceItemDetail(options: UseMarketplaceItemDetailOption
             if (needsApprovalRefresh) {
                 devLog.info('🔄 [useMarketplaceItemDetail] Forcing refresh for ERC1155 approval check...');
                 const refreshedResponse = await fetch(
-                    `/api/nft/detail?contractAddress=${contractAddress}&tokenId=${tokenId}&refresh=true`,
+                    `/api/nft/detail?contractAddress=${contractAddress}&tokenId=${tokenId}&refresh=true${ownerQuery}`,
                     { cache: 'no-store' }
                 );
 
@@ -251,6 +254,8 @@ export function useMarketplaceItemDetail(options: UseMarketplaceItemDetailOption
                     symbol: nftData.contract?.symbol || null,
                     totalSupply: nftData.contract?.totalSupply || null,
                     ownerBalance: nftData.contract?.ownerBalance || null,
+                    ownershipBalances: nftData.contract?.ownershipBalances || null,
+                    holderCount: nftData.contract?.holderCount || null,
                     contractType: nftData.contract?.contractType || null,
                     approvedAddress: null, // Deprecated - use blockchain.approved
                     approved: null, // Deprecated - use blockchain.approved
@@ -317,7 +322,7 @@ export function useMarketplaceItemDetail(options: UseMarketplaceItemDetailOption
         } finally {
             setLoading(false);
         }
-    }, [contractAddress, tokenId, createCacheKey, cache, walletNFTs]);
+    }, [contractAddress, tokenId, createCacheKey, cache, walletNFTs, connectedAddress]);
 
     /**
      * Auto-fetch on mount if enabled

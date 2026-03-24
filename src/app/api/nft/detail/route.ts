@@ -32,12 +32,16 @@ export const GET = apiHandler(async (request: NextRequest) => {
     const contractAddress = getQueryParam(request, 'contractAddress');
     const tokenId = getQueryParam(request, 'tokenId');
     const forceRefresh = getQueryParam(request, 'refresh') === 'true';
+    const ownerAddressParam = getQueryParam(request, 'ownerAddress');
 
     if (!contractAddress || !tokenId) {
         throw new BadRequestError('Missing contractAddress or tokenId');
     }
 
     const normalizedAddress = contractAddress.toLowerCase();
+    const normalizedOwnerAddress = ownerAddressParam && /^0x[a-fA-F0-9]{40}$/.test(ownerAddressParam)
+        ? ownerAddressParam.toLowerCase()
+        : null;
 
     // Step 1: Get from nft_metadata
     const nftMetadata = await getCollection('nft_metadata');
@@ -125,6 +129,73 @@ export const GET = apiHandler(async (request: NextRequest) => {
     // Prepare response
     const metadataImageSource = nft?.metadata?.imageOriginal || nft?.metadata?.image || '';
     const computedVariants = metadataImageSource ? buildNFTImageVariants(metadataImageSource) : {};
+    const ownershipBalances = nft?.ownershipBalances && typeof nft.ownershipBalances === 'object'
+        ? Object.entries(nft.ownershipBalances as Record<string, unknown>)
+            .reduce<Record<string, number>>((acc, [address, value]) => {
+                const parsed = typeof value === 'number'
+                    ? value
+                    : typeof value === 'string'
+                        ? parseInt(value, 10)
+                        : NaN;
+
+                if (/^0x[a-f0-9]{40}$/i.test(address) && Number.isFinite(parsed) && parsed > 0) {
+                    acc[address.toLowerCase()] = parsed;
+                }
+
+                return acc;
+            }, {})
+        : {};
+
+    const tokenStandard = nft?.contract?.contractType || listing?.tokenStandard || null;
+    const effectiveOwnershipBalances = { ...ownershipBalances };
+    const contractOwner = typeof nft?.contract?.owner === 'string' ? nft.contract.owner.toLowerCase() : null;
+
+    if (tokenStandard === 'ERC1155') {
+        const contractOwnerBalance = typeof nft?.contract?.ownerBalance === 'number' && Number.isFinite(nft.contract.ownerBalance)
+            ? Math.max(nft.contract.ownerBalance, 0)
+            : null;
+
+        if (contractOwner && contractOwnerBalance !== null && contractOwnerBalance > 0) {
+            effectiveOwnershipBalances[contractOwner] = Math.max(
+                effectiveOwnershipBalances[contractOwner] || 0,
+                contractOwnerBalance
+            );
+        }
+    }
+
+    const topHolderEntry = Object.entries(effectiveOwnershipBalances)
+        .sort((a, b) => (b[1] || 0) - (a[1] || 0))[0];
+    const topHolderAddress = topHolderEntry?.[0] || null;
+
+    const resolvedDisplayOwner = tokenStandard === 'ERC1155'
+        ? (
+            (normalizedOwnerAddress && (effectiveOwnershipBalances[normalizedOwnerAddress] || 0) > 0
+                ? normalizedOwnerAddress
+                : null)
+            || (contractOwner && (effectiveOwnershipBalances[contractOwner] || 0) > 0 ? contractOwner : null)
+            || topHolderAddress
+            || contractOwner
+            || (typeof nft?.blockchain?.owner === 'string' ? nft.blockchain.owner.toLowerCase() : null)
+        )
+        : (typeof nft?.blockchain?.owner === 'string'
+            ? nft.blockchain.owner
+            : (typeof nft?.contract?.owner === 'string' ? nft.contract.owner : null));
+
+    const ownerBalanceFromMap = normalizedOwnerAddress
+        ? effectiveOwnershipBalances[normalizedOwnerAddress] ?? null
+        : null;
+
+    const ownerHolderCount = Object.keys(effectiveOwnershipBalances).length;
+    const totalKnownBalance = Object.values(effectiveOwnershipBalances)
+        .reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
+
+    const displayOwnerBalance = resolvedDisplayOwner
+        ? effectiveOwnershipBalances[resolvedDisplayOwner] ?? null
+        : null;
+
+    const resolvedOwnerBalance = tokenStandard === 'ERC1155'
+        ? (ownerBalanceFromMap ?? displayOwnerBalance ?? nft?.contract?.ownerBalance ?? null)
+        : (nft?.contract?.ownerBalance ?? null);
     const resolvedMetadata = nft?.metadata ? {
         ...nft.metadata,
         imageOriginal: nft.metadata.imageOriginal || metadataImageSource || null,
@@ -163,6 +234,15 @@ export const GET = apiHandler(async (request: NextRequest) => {
             symbol: null,
             address: contractAddress,
             tokenURI: null
+        },
+
+        ownership: {
+            tokenStandard,
+            ownerAddress: normalizedOwnerAddress,
+            ownerBalance: resolvedOwnerBalance,
+            holderCount: ownerHolderCount,
+            totalKnownBalance,
+            balances: effectiveOwnershipBalances,
         },
 
         // Blockchain state (cached 5min)
@@ -258,6 +338,20 @@ export const GET = apiHandler(async (request: NextRequest) => {
         cached: !blockchainStale,
         loadTime: Date.now() - startTime
     };
+
+    // Normalize contract ownerBalance for UI to the selected owner in ERC1155 mode.
+    if (response.contract) {
+        response.contract.ownerBalance = resolvedOwnerBalance;
+        response.contract.ownershipBalances = effectiveOwnershipBalances;
+        response.contract.holderCount = ownerHolderCount;
+        if (tokenStandard === 'ERC1155') {
+            response.contract.owner = resolvedDisplayOwner;
+        }
+    }
+
+    if (response.blockchain && tokenStandard === 'ERC1155') {
+        response.blockchain.owner = resolvedDisplayOwner;
+    }
 
     // View count is tracked via POST /api/nft/stats to avoid double counting
 

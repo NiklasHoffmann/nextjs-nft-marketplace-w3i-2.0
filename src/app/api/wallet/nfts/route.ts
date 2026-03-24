@@ -1,8 +1,10 @@
 import { NextRequest } from 'next/server';
 import { apiBadRequest, apiHandler, apiSuccess } from '@/lib/api';
 import { getWalletNFTsFromBlockchain, getKnownContractAddresses } from '@/lib/blockchain';
+import { upsertNFTMetadata } from '@/lib/db';
 import { incrementRequestCounter } from '@/lib/monitoring/request-counter';
 import { getSharedCacheValue, setSharedCacheValue } from '@/lib/redis/shared-cache';
+import { fetchComprehensiveNFTDataNew } from '@/services/blockchain/nft-fetcher';
 import type { Address } from 'viem';
 import { devLog } from '@/utils';
 
@@ -43,6 +45,193 @@ interface WalletNFTsCacheEntry {
 interface NFTIdentifier {
     contractAddress: string;
     tokenId: string;
+}
+
+function normalizeMetadataUri(tokenURI: string, tokenId: string): string {
+    let normalized = tokenURI.trim();
+
+    try {
+        const hexTokenId = BigInt(tokenId).toString(16).padStart(64, '0').toLowerCase();
+        normalized = normalized
+            .replace(/\{id\}/gi, hexTokenId)
+            .replace(/%7Bid%7D/gi, hexTokenId);
+    } catch {
+        // Keep original URI when tokenId cannot be parsed.
+    }
+
+    if (normalized.startsWith('ipfs://')) {
+        return normalized.replace('ipfs://', 'https://ipfs.io/ipfs/');
+    }
+
+    return normalized;
+}
+
+function hasFetchedMetadataPayload(metadata: {
+    name: string | null;
+    description: string | null;
+    image: string | null;
+    attributes: Array<{ trait_type: string; value: string | number }>;
+}): boolean {
+    const hasName = typeof metadata.name === 'string' && metadata.name.trim().length > 0;
+    const hasDescription = typeof metadata.description === 'string' && metadata.description.trim().length > 0;
+    const hasImage = typeof metadata.image === 'string' && metadata.image.trim().length > 0;
+    const hasAttributes = Array.isArray(metadata.attributes) && metadata.attributes.length > 0;
+
+    return hasName || hasDescription || hasImage || hasAttributes;
+}
+
+async function fetchMetadataFromTokenURI(tokenURI: string | null, tokenId: string): Promise<{
+    name: string | null;
+    description: string | null;
+    image: string | null;
+    attributes: Array<{ trait_type: string; value: string | number }>;
+}> {
+    if (!tokenURI || typeof tokenURI !== 'string' || tokenURI.trim().length === 0) {
+        return {
+            name: null,
+            description: null,
+            image: null,
+            attributes: []
+        };
+    }
+
+    try {
+        const metadataURL = normalizeMetadataUri(tokenURI, tokenId);
+        const metadataResponse = await fetch(metadataURL, {
+            signal: AbortSignal.timeout(5000)
+        });
+
+        if (!metadataResponse.ok) {
+            return {
+                name: null,
+                description: null,
+                image: null,
+                attributes: []
+            };
+        }
+
+        const metadataJson = await metadataResponse.json();
+        return {
+            name: metadataJson?.name || null,
+            description: metadataJson?.description || null,
+            image: metadataJson?.image || null,
+            attributes: Array.isArray(metadataJson?.attributes) ? metadataJson.attributes : []
+        };
+    } catch {
+        return {
+            name: null,
+            description: null,
+            image: null,
+            attributes: []
+        };
+    }
+}
+
+async function persistWalletNFTsToDatabase(walletAddress: string, nfts: ExternalNFT[]): Promise<void> {
+    if (!Array.isArray(nfts) || nfts.length === 0) {
+        return;
+    }
+
+    const normalizedWallet = walletAddress.toLowerCase();
+    const deduped = Array.from(
+        new Map(
+            nfts
+                .filter((nft) => nft.contractAddress && nft.tokenId !== undefined && nft.tokenId !== null)
+                .map((nft) => {
+                    const contractAddress = String(nft.contractAddress).toLowerCase();
+                    const tokenId = String(nft.tokenId);
+                    return [`${contractAddress}-${tokenId}`, { contractAddress, tokenId }];
+                })
+        ).values()
+    );
+
+    if (deduped.length === 0) {
+        return;
+    }
+
+    devLog.info(`💾 [Wallet NFTs API] Persisting ${deduped.length} NFTs for ${normalizedWallet}`);
+
+    // Phase 1: Ensure every discovered NFT exists in DB immediately.
+    await Promise.all(
+        deduped.map(({ contractAddress, tokenId }) =>
+            upsertNFTMetadata(contractAddress, tokenId, {
+                ownershipBalances: {
+                    [normalizedWallet]: 1,
+                },
+                lastVerified: new Date().toISOString()
+            } as any)
+        )
+    );
+
+    // Phase 2: Fill missing contract/metadata fields now.
+    const batchSize = 3;
+    for (let i = 0; i < deduped.length; i += batchSize) {
+        const batch = deduped.slice(i, i + batchSize);
+
+        await Promise.all(
+            batch.map(async ({ contractAddress, tokenId }) => {
+                try {
+                    const blockchainData = await fetchComprehensiveNFTDataNew(
+                        contractAddress,
+                        tokenId,
+                        normalizedWallet
+                    );
+
+                    if (!blockchainData) {
+                        return;
+                    }
+
+                    const metadata = await fetchMetadataFromTokenURI(blockchainData.tokenURI || null, tokenId);
+                    const tokenStandard = blockchainData.tokenStandard || null;
+                    const parsedOwnerBalance = blockchainData.ownerBalance
+                        ? parseInt(blockchainData.ownerBalance)
+                        : null;
+                    const erc1155Balance = parsedOwnerBalance !== null && Number.isFinite(parsedOwnerBalance)
+                        ? Math.max(parsedOwnerBalance, 0)
+                        : 1;
+
+                    const updatePayload: any = {
+                        contract: {
+                            name: blockchainData.contractName || null,
+                            symbol: blockchainData.contractSymbol || null,
+                            totalSupply: blockchainData.totalSupply ? parseInt(blockchainData.totalSupply) : null,
+                            contractType: tokenStandard,
+                            tokenURI: blockchainData.tokenURI || null,
+                            owner: blockchainData.owner || normalizedWallet,
+                            ownerBalance: parsedOwnerBalance,
+                            approved: blockchainData.approvedAddress || null
+                        },
+                        lastVerified: new Date().toISOString(),
+                    };
+
+                    if (tokenStandard === 'ERC1155') {
+                        updatePayload[`ownershipBalances.${normalizedWallet}`] = erc1155Balance;
+                    } else {
+                        updatePayload.currentOwner = normalizedWallet;
+                        updatePayload['blockchain.owner'] = blockchainData.owner || normalizedWallet;
+                    }
+
+                    if (hasFetchedMetadataPayload(metadata)) {
+                        updatePayload.metadata = metadata;
+                        const metadataUpdateTimestamp = new Date().toISOString();
+                        updatePayload.lastMetadataUpdate = metadataUpdateTimestamp;
+                        updatePayload.metadataLastUpdated = metadataUpdateTimestamp;
+                    }
+
+                    await upsertNFTMetadata(contractAddress, tokenId, updatePayload);
+                } catch (error) {
+                    devLog.warn(
+                        `⚠️ [Wallet NFTs API] Persist enrichment failed for ${contractAddress}/${tokenId}`,
+                        error
+                    );
+                }
+            })
+        );
+
+        if (i + batchSize < deduped.length) {
+            await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+    }
 }
 
 function normalizeIdentifiers(rawItems: unknown[], source: 'alchemy' | 'moralis'): NFTIdentifier[] {
@@ -88,8 +277,9 @@ const WALLET_NFTS_MAX_CACHE_ENTRIES = 500;
 const walletNftsResponseCache = new Map<string, WalletNFTsCacheEntry>();
 const walletNftsInFlight = new Map<string, Promise<WalletNFTsResponse>>();
 
-function buildWalletCacheKey(walletAddress: string, source: string): string {
-    return `${walletAddress.toLowerCase()}:${source}`;
+function buildWalletCacheKey(walletAddress: string, source: string, skipPersist: boolean): string {
+    const mode = skipPersist ? 'no-persist' : 'persist';
+    return `${walletAddress.toLowerCase()}:${source}:${mode}`;
 }
 
 function buildSharedWalletCacheKey(cacheKey: string): string {
@@ -339,6 +529,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
     const { searchParams } = new URL(request.url);
     const walletAddress = searchParams.get('address');
     const source = searchParams.get('source') || 'auto'; // 'alchemy', 'moralis', 'auto'
+    const skipPersist = searchParams.get('skipPersist') === 'true';
 
     // Validation
     if (!walletAddress) {
@@ -351,7 +542,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
     cleanupWalletNftsCache();
 
-    const cacheKey = buildWalletCacheKey(walletAddress, source);
+    const cacheKey = buildWalletCacheKey(walletAddress, source, skipPersist);
     const now = Date.now();
 
     const cachedEntry = walletNftsResponseCache.get(cacheKey);
@@ -456,42 +647,11 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
                     devLog.info(`  ? ${unknownNFTs.length} unknown NFTs (not in marketplace contracts)`);
 
-                    // Step 4: Fetch metadata for unknown NFTs via blockchain + IPFS
+                    // Step 4: Discovery-only contract for unknown NFTs.
+                    // Metadata enrichment happens via standard DB sync worker path.
                     if (unknownNFTs.length > 0) {
-                        const unknownContracts = [...new Set(unknownNFTs.map(n => n.contractAddress))] as Address[];
-                        devLog.info(`  ? Fetching metadata from ${unknownContracts.length} additional contracts...`);
-
-                        try {
-                            const additionalNFTs = await getWalletNFTsFromBlockchain(
-                                walletAddress as Address,
-                                unknownContracts
-                            );
-
-                            alchemyNFTs = additionalNFTs.map(nft => ({
-                                contractAddress: nft.contractAddress,
-                                tokenId: nft.tokenId,
-                                name: nft.name,
-                                description: nft.description,
-                                image: nft.image,
-                                animationUrl: undefined,
-                                attributes: [],
-                                contractName: nft.contractName,
-                                contractSymbol: nft.contractSymbol,
-                                tokenType: 'ERC721' as const,
-                            }));
-
-                            devLog.info(`? Additional NFTs: ${alchemyNFTs.length} NFTs fetched via blockchain+IPFS`);
-
-                            // If on-chain metadata fetch returns empty (e.g. non-enumerable/non-ERC721),
-                            // keep at least the discovered identifiers so wallet view is not empty.
-                            if (alchemyNFTs.length === 0) {
-                                devLog.warn('?? Additional metadata fetch returned 0 NFTs, using discovery fallback items');
-                                alchemyNFTs = mapDiscoveredToFallbackNFTs(unknownNFTs);
-                            }
-                        } catch (fetchError) {
-                            devLog.error('? Failed to fetch additional NFTs:', fetchError);
-                            alchemyNFTs = mapDiscoveredToFallbackNFTs(unknownNFTs);
-                        }
+                        alchemyNFTs = mapDiscoveredToFallbackNFTs(unknownNFTs);
+                        devLog.info(`  ? Discovery-only fallback: ${alchemyNFTs.length} unknown NFTs queued for DB enrichment`);
                     }
                 } else {
                     devLog.error('? Alchemy discovery failed:', alchemyDiscoveryResult.reason);
@@ -513,31 +673,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
                         });
 
                         if (unknownNFTs.length > 0) {
-                            const unknownContracts = [...new Set(unknownNFTs.map(n => n.contractAddress))] as Address[];
-                            const additionalNFTs = await getWalletNFTsFromBlockchain(
-                                walletAddress as Address,
-                                unknownContracts
-                            );
-
-                            alchemyNFTs = additionalNFTs.map(nft => ({
-                                contractAddress: nft.contractAddress,
-                                tokenId: nft.tokenId,
-                                name: nft.name,
-                                description: nft.description,
-                                image: nft.image,
-                                animationUrl: undefined,
-                                attributes: [],
-                                contractName: nft.contractName,
-                                contractSymbol: nft.contractSymbol,
-                                tokenType: 'ERC721' as const,
-                            }));
-
-                            devLog.info(`? Moralis fallback fetched ${alchemyNFTs.length} additional NFTs`);
-
-                            if (alchemyNFTs.length === 0) {
-                                devLog.warn('?? Moralis metadata fetch returned 0 NFTs, using discovery fallback items');
-                                alchemyNFTs = mapDiscoveredToFallbackNFTs(unknownNFTs);
-                            }
+                            alchemyNFTs = mapDiscoveredToFallbackNFTs(unknownNFTs);
+                            devLog.info(`? Moralis discovery-only fallback queued ${alchemyNFTs.length} NFTs for DB enrichment`);
                         }
                     } catch (moralisFallbackError) {
                         devLog.warn('?? Moralis discovery fallback failed, keeping blockchain-only result', moralisFallbackError);
@@ -571,12 +708,14 @@ export const GET = apiHandler(async (request: NextRequest) => {
                 }
             }
             else if (source === 'alchemy') {
-                alchemyNFTs = await fetchFromAlchemy(walletAddress);
-                devLog.info(`? Found ${alchemyNFTs.length} NFTs via Alchemy`);
+                const discovered = await discoverNFTsViaAlchemy(walletAddress);
+                alchemyNFTs = mapDiscoveredToFallbackNFTs(discovered);
+                devLog.info(`? Found ${alchemyNFTs.length} NFT identifiers via Alchemy discovery`);
             }
             else if (source === 'moralis') {
-                alchemyNFTs = await fetchFromMoralis(walletAddress);
-                devLog.info(`? Found ${alchemyNFTs.length} NFTs via Moralis`);
+                const discovered = await discoverNFTsViaMoralis(walletAddress);
+                alchemyNFTs = mapDiscoveredToFallbackNFTs(discovered);
+                devLog.info(`? Found ${alchemyNFTs.length} NFT identifiers via Moralis discovery`);
             }
 
             // SIMPLE MERGE: Combine both lists (no deduplication needed now)
@@ -599,6 +738,13 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
             devLog.info(`🧾 [Wallet NFTs API] Final source=${usedSource}, total=${nfts.length}`);
             devLog.info('   ↳ Final identifier sample:', nfts.slice(0, 10).map((nft) => `${nft.contractAddress}:${nft.tokenId}`));
+
+            if (!skipPersist) {
+                // Hard requirement: immediately persist discovered NFTs and enrich missing fields.
+                await persistWalletNFTsToDatabase(walletAddress, nfts);
+            } else {
+                devLog.info('⏭️ [Wallet NFTs API] skipPersist=true - skipping DB persistence/enrichment side effects');
+            }
 
             // Empty result is OK (wallet might be empty)
 

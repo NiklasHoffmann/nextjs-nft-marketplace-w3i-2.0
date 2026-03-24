@@ -3,6 +3,7 @@ import { getCollection } from '@/lib/mongodb';
 import { devLog } from '@/utils';
 import { buildNFTImageVariants } from '@/utils/nft/image-variants';
 import { extractIpfsInfoFromUrl } from '@/utils/nft/image-url';
+import { ipfsMetadataLazySync } from './ipfs-metadata-lazy-sync';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -58,6 +59,43 @@ const buildMissingImageEnrichmentQuery = () => ({
                 { 'metadata.imageOriginal': { $exists: true, $nin: [null, ''] } },
             ],
         },
+    ],
+});
+
+const buildMissingMetadataBackfillQuery = () => ({
+    $and: [
+        {
+            $or: [
+                { metadata: { $exists: false } },
+                {
+                    $and: [
+                        {
+                            $or: [
+                                { 'metadata.name': { $exists: false } },
+                                { 'metadata.name': null },
+                                { 'metadata.name': '' },
+                            ],
+                        },
+                        {
+                            $or: [
+                                { 'metadata.image': { $exists: false } },
+                                { 'metadata.image': null },
+                                { 'metadata.image': '' },
+                            ],
+                        },
+                        {
+                            $or: [
+                                { 'metadata.imageOriginal': { $exists: false } },
+                                { 'metadata.imageOriginal': null },
+                                { 'metadata.imageOriginal': '' },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
+        { contractAddress: { $exists: true, $nin: [null, ''] } },
+        { tokenId: { $exists: true, $nin: [null, ''] } },
     ],
 });
 
@@ -329,6 +367,37 @@ export class NFTImageEnrichmentSync {
             const batchSize = Number(process.env.IMAGE_ENRICH_BATCH_SIZE || DEFAULT_BATCH_SIZE);
             const concurrency = Number(process.env.IMAGE_ENRICH_CONCURRENCY || DEFAULT_CONCURRENCY);
             const maxBatchesPerRun = Math.max(1, Number(process.env.IMAGE_ENRICH_MAX_BATCHES_PER_RUN || DEFAULT_MAX_BATCHES_PER_RUN));
+
+            // Phase 0: Repair skeleton docs that have no usable metadata yet.
+            const metadataBackfillCandidates = await collection.find(
+                buildMissingMetadataBackfillQuery(),
+                {
+                    projection: {
+                        contractAddress: 1,
+                        tokenId: 1,
+                    },
+                },
+            )
+                .limit(Math.max(batchSize, concurrency * 2))
+                .toArray();
+
+            if (metadataBackfillCandidates.length > 0) {
+                devLog.info(`🧩 [ImageEnrichment] Metadata backfill candidates: ${metadataBackfillCandidates.length}`);
+
+                for (let i = 0; i < metadataBackfillCandidates.length; i += concurrency) {
+                    const chunk = metadataBackfillCandidates.slice(i, i + concurrency);
+                    await Promise.allSettled(
+                        chunk.map(async (doc: any) => {
+                            try {
+                                await ipfsMetadataLazySync.ensureMetadata(String(doc.contractAddress), String(doc.tokenId));
+                            } catch (error) {
+                                this.stats.lastErrorAt = new Date();
+                                this.stats.lastErrorMessage = error instanceof Error ? error.message : 'Unknown error';
+                            }
+                        }),
+                    );
+                }
+            }
 
             let processedAnyBatch = false;
             let totalCandidatesThisRun = 0;

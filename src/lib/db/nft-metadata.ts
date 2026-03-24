@@ -78,9 +78,14 @@ export async function getNFTsByOwner(
     ownerAddress: string
 ): Promise<NFTMetadata[]> {
     const collection = await getNFTMetadataCollection();
+    const lowerOwnerAddress = ownerAddress.toLowerCase();
 
     const results = await collection.find({
-        currentOwner: ownerAddress.toLowerCase()
+        $or: [
+            { currentOwner: lowerOwnerAddress },
+            { 'blockchain.owner': lowerOwnerAddress },
+            { [`ownershipBalances.${lowerOwnerAddress}`]: { $gt: 0 } }
+        ]
     }).toArray();
 
     return results as unknown as NFTMetadata[];

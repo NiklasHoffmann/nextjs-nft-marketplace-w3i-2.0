@@ -10,6 +10,7 @@
 
 'use client';
 
+import { useMemo } from 'react';
 import { useChainId } from 'wagmi';
 import { getMarketplaceAddress } from '@/services/blockchain/contracts';
 import { devLog } from '@/utils';
@@ -22,10 +23,19 @@ interface ContractInfoSectionProps {
         tokenURI: string | null;
         owner: string | null;
         ownerBalance: number | null;
+        ownershipBalances?: Record<string, number> | null;
+        holderCount?: number | null;
         approved: string | null;
     };
     tokenStandard?: string;
     isApprovedForAll?: boolean; // Operator-level approval (separate prop!)
+    marketplaceListing?: {
+        isListed?: boolean;
+        status?: string | null;
+        seller?: string | null;
+        listingId?: string | null;
+        connectedAddress?: string | null;
+    };
 }
 
 function InfoRow({ label, value, subtitle }: { label: string; value: React.ReactNode; subtitle?: string }) {
@@ -38,7 +48,7 @@ function InfoRow({ label, value, subtitle }: { label: string; value: React.React
     );
 }
 
-export function ContractInfoSection({ contract, tokenStandard, isApprovedForAll }: ContractInfoSectionProps) {
+export function ContractInfoSection({ contract, tokenStandard, isApprovedForAll, marketplaceListing }: ContractInfoSectionProps) {
     // Get current chain ID from wagmi
     const chainId = useChainId();
 
@@ -61,6 +71,39 @@ export function ContractInfoSection({ contract, tokenStandard, isApprovedForAll 
 
     const isNoApproval = !isErc1155 && contract.approved === '0x0000000000000000000000000000000000000000';
     const hasOtherApproval = contract.approved && !hasTokenApproval && !isNoApproval;
+    const ownershipEntries = useMemo(() => {
+        if (!contract.ownershipBalances || typeof contract.ownershipBalances !== 'object') {
+            return [] as Array<{ address: string; amount: number }>;
+        }
+
+        return Object.entries(contract.ownershipBalances)
+            .map(([address, amount]) => ({
+                address,
+                amount: Number(amount),
+            }))
+            .filter((entry) => /^0x[a-f0-9]{40}$/i.test(entry.address) && Number.isFinite(entry.amount) && entry.amount > 0)
+            .sort((a, b) => b.amount - a.amount);
+    }, [contract.ownershipBalances]);
+
+    const derivedHolderCount = contract.holderCount ?? ownershipEntries.length;
+    const totalKnownUnits = ownershipEntries.reduce((sum, entry) => sum + entry.amount, 0);
+    const untrackedUnits = contract.totalSupply !== null
+        ? Math.max(contract.totalSupply - totalKnownUnits, 0)
+        : 0;
+    const shouldShowHoldersSection = isErc1155 && (ownershipEntries.length > 1 || untrackedUnits > 0);
+    const listingStatus = marketplaceListing?.status ?? null;
+    const isActiveListing = Boolean(
+        marketplaceListing?.isListed &&
+        (!listingStatus || listingStatus === 'LISTED' || listingStatus === 'PARTIALLY_FILLED')
+    );
+    const listingSeller = marketplaceListing?.seller ?? null;
+    const connectedAddress = marketplaceListing?.connectedAddress ?? null;
+    const isListingSeller = Boolean(
+        isActiveListing &&
+        listingSeller &&
+        connectedAddress &&
+        listingSeller.toLowerCase() === connectedAddress.toLowerCase()
+    );
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -100,8 +143,82 @@ export function ContractInfoSection({ contract, tokenStandard, isApprovedForAll 
                             </div>
                         ) : 'Unknown'
                     }
-                    subtitle={contract.ownerBalance !== null ? `Owns ${contract.ownerBalance} NFTs from this collection` : undefined}
+                    subtitle={contract.ownerBalance !== null
+                        ? (isErc1155
+                            ? `Owns ${contract.ownerBalance} units of this token (ERC1155)`
+                            : `Owns ${contract.ownerBalance} NFTs from this collection`)
+                        : undefined}
                 />
+
+                <InfoRow
+                    label="Marketplace Listing"
+                    value={
+                        isActiveListing && listingSeller ? (
+                            <div className="space-y-1.5">
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        Active Listing
+                                    </span>
+                                    {listingStatus && (
+                                        <span className="text-xs text-gray-500">Status: {listingStatus}</span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-500">Seller:</span>
+                                    <code className="bg-gray-100 px-2 py-1 rounded text-xs">
+                                        {listingSeller}
+                                    </code>
+                                    <button
+                                        onClick={() => navigator.clipboard.writeText(listingSeller)}
+                                        className="text-blue-600 hover:text-blue-800 text-xs"
+                                        title="Copy seller address"
+                                    >
+                                        📋
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <span className="text-gray-500 text-xs">Not currently listed</span>
+                        )
+                    }
+                    subtitle={
+                        isActiveListing
+                            ? (isListingSeller
+                                ? 'This listing belongs to your connected wallet.'
+                                : 'This listing belongs to another wallet holder.')
+                            : 'No active marketplace listing for this token at the moment.'
+                    }
+                />
+
+                {shouldShowHoldersSection && (
+                    <InfoRow
+                        label="ERC1155 Holders"
+                        value={
+                            ownershipEntries.length > 0 || untrackedUnits > 0 ? (
+                                <div className="space-y-2">
+                                    <div className="text-xs text-gray-500">Known holders: {derivedHolderCount}</div>
+                                    <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                                        {ownershipEntries.slice(0, 20).map((entry) => (
+                                            <div key={entry.address} className="flex items-center justify-between gap-3 bg-gray-50 rounded px-2 py-1.5">
+                                                <code className="text-xs bg-white px-2 py-1 rounded">{entry.address}</code>
+                                                <span className="text-xs font-semibold text-gray-700">Qty: {entry.amount}</span>
+                                            </div>
+                                        ))}
+                                        {untrackedUnits > 0 && (
+                                            <div className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+                                                <span className="text-xs font-medium text-amber-800">Untracked holders (estimated)</span>
+                                                <span className="text-xs font-semibold text-amber-900">Qty: {untrackedUnits}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <span className="text-gray-500 text-xs">No holder balances cached yet</span>
+                            )
+                        }
+                        subtitle="ERC1155 can have multiple owners for the same tokenId"
+                    />
+                )}
 
                 <InfoRow
                     label="Approval Status"

@@ -48,7 +48,7 @@ const inFlightImageJobs = new Map<string, Promise<{
     originalSize: number;
     compressedSize: number;
 } | null>>();
-const FAILED_HASH_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
+const FAILED_HASH_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
 
 // Cache Metadata Interface
 interface CacheMetadata {

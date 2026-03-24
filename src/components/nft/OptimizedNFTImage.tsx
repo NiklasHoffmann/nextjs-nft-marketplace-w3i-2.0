@@ -201,20 +201,21 @@ const OptimizedNFTImage = memo(({
     // which can under-select a too-small variant and look pixelated after lazy load.
     const resolvedVariant = variant || (fill ? 'card' : inferVariantFromSize(width, height));
     const selectedVariantSource = useMemo(
-        () => resolveNFTImageByVariant(normalizedImageUrl, resolvedVariant, imageVariants),
-        [normalizedImageUrl, resolvedVariant, imageVariants],
+        () => resolveNFTImageByVariant(normalizedImageUrl, resolvedVariant, imageVariants, tokenId),
+        [normalizedImageUrl, resolvedVariant, imageVariants, tokenId],
     );
+    const hasAnyImageSource = Boolean((selectedVariantSource || normalizedImageUrl).trim());
     const variantWidth = getNFTVariantWidth(resolvedVariant);
 
     // Get all possible URLs for this image (memoized to keep effect dependencies stable)
     const imageUrls = useMemo(() => {
-        const urls = resolveNftImageCandidates(selectedVariantSource, { width: variantWidth });
+        const urls = resolveNftImageCandidates(selectedVariantSource, { width: variantWidth, tokenId });
         if (urls.length > 0) {
             return urls;
         }
 
-        return resolveNftImageCandidates(normalizedImageUrl, { width: variantWidth });
-    }, [selectedVariantSource, normalizedImageUrl, variantWidth]);
+        return resolveNftImageCandidates(normalizedImageUrl, { width: variantWidth, tokenId });
+    }, [selectedVariantSource, normalizedImageUrl, variantWidth, tokenId]);
 
     // Check if image is likely cached BEFORE setting initial loading state ⚡
     const isCachedInitially = useMemo(() => {
@@ -234,6 +235,7 @@ const OptimizedNFTImage = memo(({
     const [hasBeenVisible, setHasBeenVisible] = useState(isCachedInitially);
     const [retryAttempt, setRetryAttempt] = useState(0);
     const imgRef = useRef<HTMLDivElement>(null);
+    const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // New state for smooth glitter fade-out
     const [displayGlitter, setDisplayGlitter] = useState(false);
@@ -289,7 +291,7 @@ const OptimizedNFTImage = memo(({
 
     // Update current image URL when imageUrl prop changes - OPTIMIZED FOR CACHE
     useEffect(() => {
-        const newUrls = resolveNftImageCandidates(selectedVariantSource, { width: variantWidth });
+        const newUrls = resolveNftImageCandidates(selectedVariantSource, { width: variantWidth, tokenId });
 
         if (newUrls.length === 0) {
             setCurrentImageUrl('');
@@ -308,12 +310,17 @@ const OptimizedNFTImage = memo(({
         setHasError(false);
         // Keep loading state in sync with the selected URL to avoid stale overlays.
         setIsLoading(!isCached);
-    }, [selectedVariantSource, normalizedImageUrl, variantWidth]);
+    }, [selectedVariantSource, normalizedImageUrl, variantWidth, tokenId]);
 
     const handleImageLoad = useCallback((_e: React.SyntheticEvent<HTMLImageElement>) => {
         // const _img = e.currentTarget; // No longer needed, aspect ratio state removed
         imageLoadCache.set(currentImageUrl, true);
         // setAspectRatio has been removed - aspect ratio state no longer exists
+        if (retryTimerRef.current) {
+            clearTimeout(retryTimerRef.current);
+            retryTimerRef.current = null;
+        }
+        setRetryAttempt(0);
         setIsLoading(false);
     }, [currentImageUrl]);
 
@@ -326,7 +333,11 @@ const OptimizedNFTImage = memo(({
             return;
         }
 
-        imageLoadCache.set(currentImageUrl, false);
+        const isProxyImage = currentImageUrl.startsWith('/api/nft/image/');
+
+        if (!isProxyImage) {
+            imageLoadCache.set(currentImageUrl, false);
+        }
 
         // Try next fallback URL if available and not already known as failed.
         for (let nextIndex = fallbackIndex + 1; nextIndex < imageUrls.length; nextIndex++) {
@@ -340,12 +351,38 @@ const OptimizedNFTImage = memo(({
             return;
         }
 
-        // All fallbacks failed - cache primary as failed and stop retries.
-        imageLoadCache.set(imageUrls[0] || currentImageUrl, false);
+        // All fallbacks failed. For proxy images, allow quick retries because
+        // gateway issues are often transient and should not remain a sticky failure.
+        if (isProxyImage && retryAttempt < 2) {
+            const retryDelayMs = 1200 * (retryAttempt + 1);
+            if (retryTimerRef.current) {
+                clearTimeout(retryTimerRef.current);
+            }
+            retryTimerRef.current = setTimeout(() => {
+                imageLoadCache.delete(currentImageUrl);
+                setHasError(false);
+                setIsLoading(true);
+                setRetryAttempt((prev) => prev + 1);
+            }, retryDelayMs);
+            return;
+        }
+
+        if (!isProxyImage) {
+            imageLoadCache.set(imageUrls[0] || currentImageUrl, false);
+        }
         setCurrentImageUrl('');
         setHasError(true);
         setIsLoading(false);
-    }, [fallbackIndex, imageUrls, currentImageUrl]);
+    }, [fallbackIndex, imageUrls, currentImageUrl, retryAttempt]);
+
+    useEffect(() => {
+        return () => {
+            if (retryTimerRef.current) {
+                clearTimeout(retryTimerRef.current);
+                retryTimerRef.current = null;
+            }
+        };
+    }, []);
 
     // Recover images after returning to a previously hidden tab.
     useEffect(() => {
@@ -457,7 +494,7 @@ const OptimizedNFTImage = memo(({
     }, [isSharpImage, glitterOpacity, tiltRotation.rotateX, tiltRotation.rotateY]);
 
     // Render skeleton if no valid image URL
-    if (!normalizedImageUrl) {
+    if (!hasAnyImageSource) {
         return (
             <ImageSkeleton
                 className={className}

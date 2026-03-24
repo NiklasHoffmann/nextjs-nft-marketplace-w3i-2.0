@@ -262,16 +262,43 @@ export const GET = apiHandler(async (request: NextRequest) => {
                     projection: {
                         contractAddress: 1,
                         tokenId: 1,
-                        'metadata.image': 1
+                        'metadata.image': 1,
+                        'metadata.imageOriginal': 1,
+                        'metadata.images.thumb': 1,
+                        'metadata.images.small': 1,
+                        'metadata.images.card': 1,
+                        'metadata.images.detail': 1,
+                        'metadata.images.original': 1,
                     }
                 }
             ).toArray();
 
             const previewDocLookup = new Map<string, Map<string, string>>();
+
+            const pickPreviewImage = (metadata: any): string | null => {
+                const candidates = [
+                    metadata?.images?.card,
+                    metadata?.images?.detail,
+                    metadata?.images?.small,
+                    metadata?.images?.original,
+                    metadata?.imageOriginal,
+                    metadata?.image,
+                    metadata?.images?.thumb,
+                ];
+
+                for (const candidate of candidates) {
+                    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+                        return candidate;
+                    }
+                }
+
+                return null;
+            };
+
             for (const doc of previewDocs) {
                 const normalizedContractAddress = String((doc as any).contractAddress || '').toLowerCase();
                 const tokenId = String((doc as any).tokenId || '');
-                const image = (doc as any).metadata?.image;
+                const image = pickPreviewImage((doc as any).metadata);
 
                 if (!normalizedContractAddress || !tokenId || !image || typeof image !== 'string') {
                     continue;

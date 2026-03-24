@@ -90,8 +90,95 @@ export interface WalletNFT extends ExternalNFT {
 
 export class WalletNFTsService {
     private static readonly BACKGROUND_SYNC_COOLDOWN_MS = 120_000;
+    private static readonly SNAPSHOT_CACHE_TTL_MS = 45_000;
+    private static readonly COMPLETENESS_FORCE_SYNC_COOLDOWN_MS = 180_000;
+    private static readonly DISCOVERY_GAP_CHECK_COOLDOWN_MS = 90_000;
     private static readonly lastBackgroundSyncByWallet = new Map<string, number>();
+    private static readonly lastCompletenessForceSyncByWallet = new Map<string, number>();
+    private static readonly lastDiscoveryGapCheckByWallet = new Map<string, number>();
+    private static readonly walletSnapshotCache = new Map<string, { expiresAt: number; nfts: WalletNFT[] }>();
+    private static readonly walletFetchInFlight = new Map<string, Promise<WalletNFT[]>>();
     private static readonly backgroundSyncInFlight = new Map<string, Promise<void>>();
+
+    private static getCachedWalletSnapshot(walletAddress: string): WalletNFT[] | null {
+        const normalizedWallet = walletAddress.toLowerCase();
+        const cached = this.walletSnapshotCache.get(normalizedWallet);
+        if (!cached) {
+            return null;
+        }
+
+        if (cached.expiresAt <= Date.now()) {
+            this.walletSnapshotCache.delete(normalizedWallet);
+            return null;
+        }
+
+        return cached.nfts;
+    }
+
+    private static setCachedWalletSnapshot(walletAddress: string, nfts: WalletNFT[]): void {
+        const normalizedWallet = walletAddress.toLowerCase();
+        this.walletSnapshotCache.set(normalizedWallet, {
+            expiresAt: Date.now() + this.SNAPSHOT_CACHE_TTL_MS,
+            nfts,
+        });
+    }
+
+    private static shouldRunCompletenessForceSync(walletAddress: string): boolean {
+        const normalizedWallet = walletAddress.toLowerCase();
+        const lastForcedAt = this.lastCompletenessForceSyncByWallet.get(normalizedWallet) || 0;
+        return Date.now() - lastForcedAt >= this.COMPLETENESS_FORCE_SYNC_COOLDOWN_MS;
+    }
+
+    private static markCompletenessForceSync(walletAddress: string): void {
+        this.lastCompletenessForceSyncByWallet.set(walletAddress.toLowerCase(), Date.now());
+    }
+
+    private static shouldRunDiscoveryGapCheck(walletAddress: string): boolean {
+        const normalizedWallet = walletAddress.toLowerCase();
+        const lastCheckedAt = this.lastDiscoveryGapCheckByWallet.get(normalizedWallet) || 0;
+        return Date.now() - lastCheckedAt >= this.DISCOVERY_GAP_CHECK_COOLDOWN_MS;
+    }
+
+    private static markDiscoveryGapCheck(walletAddress: string): void {
+        this.lastDiscoveryGapCheckByWallet.set(walletAddress.toLowerCase(), Date.now());
+    }
+
+    private static async fetchDiscoveredWalletNFTCount(walletAddress: string): Promise<number | null> {
+        try {
+            const response = await fetch(
+                `/api/wallet/nfts?address=${walletAddress}&source=alchemy&skipPersist=true`
+            );
+            if (!response.ok) {
+                return null;
+            }
+
+            const body = await response.json();
+            const payload = body?.data ?? body;
+            const nestedPayload = payload?.data ?? payload?.nfts ?? null;
+
+            const discoveredNFTs: unknown[] = Array.isArray(payload)
+                ? payload
+                : Array.isArray(payload?.nfts)
+                    ? payload.nfts
+                    : Array.isArray(payload?.data)
+                        ? payload.data
+                        : Array.isArray(payload?.data?.nfts)
+                            ? payload.data.nfts
+                            : Array.isArray(nestedPayload)
+                                ? nestedPayload
+                                : [];
+
+            const explicitTotal = typeof payload?.total === 'number'
+                ? payload.total
+                : typeof body?.total === 'number'
+                    ? body.total
+                    : null;
+
+            return explicitTotal ?? discoveredNFTs.length;
+        } catch {
+            return null;
+        }
+    }
 
     private static async performSync(walletAddress: string, force: boolean = false): Promise<void> {
         const syncUrl = force ? '/api/user/nfts/sync?force=true' : '/api/user/nfts/sync';
@@ -137,6 +224,99 @@ export class WalletNFTsService {
         this.backgroundSyncInFlight.set(normalizedWallet, syncPromise);
     }
 
+    private static mapDbNftToWalletNft(nft: any): WalletNFT {
+        return {
+            contractAddress: nft.contractAddress,
+            tokenId: nft.tokenId,
+            name: nft.metadata?.name,
+            description: nft.metadata?.description,
+            image: nft.metadata?.image,
+            imageOriginal: nft.metadata?.imageOriginal,
+            images: nft.metadata?.images,
+            imageMeta: nft.metadata?.imageMeta,
+            blurDataURL: nft.metadata?.blurDataURL,
+            animationUrl: nft.metadata?.animationUrl,
+            attributes: nft.metadata?.attributes,
+            contractName: nft.contract?.name,
+            contractSymbol: nft.contract?.symbol,
+            tokenType: nft.contract?.contractType || 'ERC721',
+            totalSupply: nft.contract?.totalSupply,
+            owner: nft.contract?.owner || nft.currentOwner,
+            tokenURI: nft.contract?.tokenURI,
+            approved: nft.contract?.approved,
+            ownerBalance: nft.contract?.ownerBalance,
+            isListed: nft.isListed || false,
+            listingPrice: nft.price ?? nft.listings?.[0]?.price,
+            listingId: nft.listingId ?? nft.listings?.[0]?.listingId,
+            seller: nft.seller ?? nft.listings?.[0]?.seller,
+            currency: nft.currency ?? nft.listings?.[0]?.currency,
+            listingType: nft.listingType ?? nft.listings?.[0]?.listingType,
+            listingStatus: nft.listingStatus ?? nft.listings?.[0]?.status ?? null,
+            listingTokenStandard: nft.listingTokenStandard ?? nft.listings?.[0]?.tokenStandard ?? null,
+            erc1155QuantityListed: nft.erc1155QuantityListed ?? nft.listings?.[0]?.erc1155QuantityListed ?? null,
+            remainingQuantity: nft.remainingQuantity ?? nft.listings?.[0]?.remainingQuantity ?? null,
+            unitPrice: nft.unitPrice ?? nft.listings?.[0]?.unitPrice ?? null,
+            partialBuyEnabled: nft.partialBuyEnabled ?? nft.listings?.[0]?.partialBuyEnabled ?? false,
+            desiredContractAddress: nft.desiredContractAddress ?? nft.desiredTokenAddress ?? nft.listings?.[0]?.desiredContractAddress ?? nft.listings?.[0]?.desiredTokenAddress,
+            desiredTokenAddress: nft.desiredTokenAddress ?? nft.desiredContractAddress ?? nft.listings?.[0]?.desiredTokenAddress ?? nft.listings?.[0]?.desiredContractAddress,
+            desiredTokenId: nft.desiredTokenId ?? nft.listings?.[0]?.desiredTokenId,
+            hasMarketplaceData: !!nft.listings?.length,
+            hasInsightsData: !!nft.insights,
+            insights: nft.insights,
+            stats: nft.stats ? {
+                likeCount: nft.stats.likeCount,
+                viewCount: nft.stats.viewCount,
+                averageRating: nft.stats.averageRating,
+                watchlistCount: nft.stats.watchlistCount,
+                ratingCount: nft.stats.ratingCount
+            } : undefined
+        };
+    }
+
+    private static async fetchWalletNFTsFromDb(walletAddress: string): Promise<WalletNFT[]> {
+        const dbResponse = await fetch(`/api/user/nfts?walletAddress=${walletAddress}`);
+        if (!dbResponse.ok) {
+            return [];
+        }
+
+        const dbResult = await dbResponse.json();
+        if (!dbResult?.success || !Array.isArray(dbResult?.data?.nfts)) {
+            return [];
+        }
+
+        return dbResult.data.nfts.map((nft: any) => this.mapDbNftToWalletNft(nft));
+    }
+
+    private static hasMeaningfulName(value: unknown): boolean {
+        if (typeof value !== 'string') return false;
+        const normalized = value.trim();
+        if (!normalized) return false;
+        if (/^unknown( nft)?$/i.test(normalized)) return false;
+        if (/^0x[a-f0-9]{40}$/i.test(normalized)) return false;
+        return true;
+    }
+
+    private static hasImageData(nft: WalletNFT): boolean {
+        const candidates = [
+            nft.image,
+            nft.imageOriginal,
+            nft.images?.thumb,
+            nft.images?.small,
+            nft.images?.card,
+            nft.images?.detail,
+            nft.images?.original,
+        ];
+
+        return candidates.some((value) => typeof value === 'string' && value.trim().length > 0);
+    }
+
+    private static isMetadataComplete(nft: WalletNFT): boolean {
+        const hasName = this.hasMeaningfulName(nft.name);
+        const hasImage = this.hasImageData(nft);
+        const hasTokenURI = typeof nft.tokenURI === 'string' && nft.tokenURI.trim().length > 0;
+        return hasName && hasImage && hasTokenURI;
+    }
+
     /**
      * Fetch NFTs for the connected wallet from DB-first approach
      */
@@ -144,211 +324,213 @@ export class WalletNFTsService {
         devLog.info('\n🔵 [WalletNFTsService] ========== START (DB-First) ==========');
         devLog.info(`📍 Wallet: ${walletAddress}`);
 
-        if (options.forceSync) {
-            devLog.info('🔄 Force sync requested - syncing first and bypassing cooldown/cache...');
+        const normalizedWallet = walletAddress.toLowerCase();
+
+        if (!options.forceSync) {
+            const cachedSnapshot = this.getCachedWalletSnapshot(normalizedWallet);
+            if (cachedSnapshot) {
+                devLog.info(`⚡ Returning in-memory snapshot (${cachedSnapshot.length} NFTs)`);
+                this.triggerBackgroundSync(walletAddress);
+                return cachedSnapshot;
+            }
+
+            const existingInFlight = this.walletFetchInFlight.get(normalizedWallet);
+            if (existingInFlight) {
+                devLog.info('⏳ Reusing in-flight wallet fetch request');
+                return existingInFlight;
+            }
+        }
+
+        const fetchPromise = (async (): Promise<WalletNFT[]> => {
+
+            if (options.forceSync) {
+                devLog.info('🔄 Force sync requested - syncing first and bypassing cooldown/cache...');
+                try {
+                    await this.performSync(walletAddress, true);
+                } catch (syncError) {
+                    devLog.warn('wallet-nfts', '⚠️ Force sync failed, falling back to DB snapshot', syncError);
+                }
+            }
+
+            // Step 1: Fast load from DB (instant)
+            devLog.info('⚡ Step 1/2: Loading from database (instant)...');
+            const walletNFTsFromDb = await this.fetchWalletNFTsFromDb(walletAddress);
+
+            if (walletNFTsFromDb.length > 0) {
+                const incompleteCount = walletNFTsFromDb.filter((nft) => !this.isMetadataComplete(nft)).length;
+
+                if (incompleteCount > 0) {
+                    if (this.shouldRunCompletenessForceSync(normalizedWallet)) {
+                        devLog.warn('wallet-nfts', `⚠️ Detected ${incompleteCount}/${walletNFTsFromDb.length} incomplete DB NFTs, forcing sync before returning data`);
+                        this.markCompletenessForceSync(normalizedWallet);
+                        try {
+                            await this.performSync(walletAddress, true);
+                            const refreshedWalletNFTs = await this.fetchWalletNFTsFromDb(walletAddress);
+                            if (refreshedWalletNFTs.length > 0) {
+                                this.setCachedWalletSnapshot(normalizedWallet, refreshedWalletNFTs);
+                                devLog.success(`Step 1/2 Complete: ${refreshedWalletNFTs.length} NFTs from refreshed database`);
+                                devLog.info('🔄 Step 2/2: Background sync starting...');
+                                this.triggerBackgroundSync(walletAddress);
+                                devLog.success('[WalletNFTsService] ========== SUCCESS (DB Refreshed) ==========\n');
+                                return refreshedWalletNFTs;
+                            }
+                        } catch (syncError) {
+                            devLog.warn('wallet-nfts', '⚠️ Forced completeness sync failed, returning best available DB snapshot', syncError);
+                        }
+                    } else {
+                        devLog.info('wallet-nfts', '⏱️ Skipping repeated completeness force-sync (cooldown active)');
+                    }
+                }
+
+                if (!options.forceSync && this.shouldRunDiscoveryGapCheck(normalizedWallet)) {
+                    this.markDiscoveryGapCheck(normalizedWallet);
+                    const discoveredCount = await this.fetchDiscoveredWalletNFTCount(walletAddress);
+
+                    devLog.info(
+                        'wallet-nfts',
+                        `🔎 Wallet gap check: wallet=${normalizedWallet.slice(0, 10)}... db=${walletNFTsFromDb.length} discovered=${discoveredCount ?? 'n/a'}`
+                    );
+
+                    if (typeof discoveredCount === 'number' && discoveredCount > walletNFTsFromDb.length) {
+                        devLog.warn(
+                            'wallet-nfts',
+                            `⚠️ Discovery gap detected (DB=${walletNFTsFromDb.length}, discovered=${discoveredCount}), forcing sync`
+                        );
+
+                        try {
+                            await this.performSync(walletAddress, true);
+                            const refreshedWalletNFTs = await this.fetchWalletNFTsFromDb(walletAddress);
+                            if (refreshedWalletNFTs.length > walletNFTsFromDb.length) {
+                                this.setCachedWalletSnapshot(normalizedWallet, refreshedWalletNFTs);
+                                devLog.success(`✅ Gap sync recovered ${refreshedWalletNFTs.length - walletNFTsFromDb.length} missing NFTs`);
+                                devLog.info(
+                                    'wallet-nfts',
+                                    `📈 Gap recovery result: wallet=${normalizedWallet.slice(0, 10)}... before=${walletNFTsFromDb.length} after=${refreshedWalletNFTs.length}`
+                                );
+                                this.triggerBackgroundSync(walletAddress);
+                                return refreshedWalletNFTs;
+                            }
+
+                            devLog.info(
+                                'wallet-nfts',
+                                `ℹ️ Gap recovery sync finished without count increase (before=${walletNFTsFromDb.length}, after=${refreshedWalletNFTs.length})`
+                            );
+                        } catch (syncError) {
+                            devLog.warn('wallet-nfts', '⚠️ Gap recovery sync failed, using existing DB snapshot', syncError);
+                        }
+                    } else if (typeof discoveredCount === 'number') {
+                        devLog.info(
+                            'wallet-nfts',
+                            `✅ No wallet gap detected (DB=${walletNFTsFromDb.length}, discovered=${discoveredCount})`
+                        );
+                    }
+                }
+
+                this.setCachedWalletSnapshot(normalizedWallet, walletNFTsFromDb);
+                devLog.success(`Step 1/2 Complete: ${walletNFTsFromDb.length} NFTs from database`);
+                devLog.info('🔄 Step 2/2: Background sync starting...');
+                this.triggerBackgroundSync(walletAddress);
+                devLog.success('[WalletNFTsService] ========== SUCCESS (DB Cache) ==========\n');
+                return walletNFTsFromDb;
+            }
+
+            // Fallback: No DB data yet - run discovery and force DB enrichment via worker.
+            devLog.warn('No DB data found, running discovery + forced DB enrichment...');
+            devLog.info('⏳ Step 1/3: Fetching from /api/wallet/nfts...');
+            const response = await fetch(`/api/wallet/nfts?address=${walletAddress}`);
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch wallet NFTs: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to fetch wallet NFTs');
+            }
+
+            const externalNFTsRaw = result.data;
+            const nestedPayload = externalNFTsRaw && typeof externalNFTsRaw === 'object'
+                ? ((externalNFTsRaw as any).data ?? (externalNFTsRaw as any).nfts)
+                : null;
+
+            const externalNFTs: ExternalNFT[] = Array.isArray(externalNFTsRaw)
+                ? externalNFTsRaw
+                : Array.isArray((externalNFTsRaw as any)?.nfts)
+                    ? (externalNFTsRaw as any).nfts
+                    : Array.isArray((externalNFTsRaw as any)?.data)
+                        ? (externalNFTsRaw as any).data
+                        : Array.isArray((externalNFTsRaw as any)?.data?.nfts)
+                            ? (externalNFTsRaw as any).data.nfts
+                            : Array.isArray(nestedPayload)
+                                ? nestedPayload
+                                : [];
+
+            if (
+                !Array.isArray(externalNFTsRaw)
+                && !Array.isArray((externalNFTsRaw as any)?.nfts)
+                && !Array.isArray((externalNFTsRaw as any)?.data)
+                && !Array.isArray((externalNFTsRaw as any)?.data?.nfts)
+                && !Array.isArray(nestedPayload)
+            ) {
+                devLog.warn('Unexpected /api/wallet/nfts payload shape, defaulting to empty array', {
+                    type: typeof externalNFTsRaw,
+                    keys: externalNFTsRaw && typeof externalNFTsRaw === 'object' ? Object.keys(externalNFTsRaw) : []
+                });
+            }
+
+            devLog.success(`Step 1/3 Complete: ${externalNFTs.length} NFTs from ${result.source || 'external API'}`);
+
+            if (externalNFTs.length === 0) {
+                this.setCachedWalletSnapshot(normalizedWallet, []);
+                return [];
+            }
+
+            devLog.info('⏳ Step 2/3: Running forced sync worker...');
             try {
                 await this.performSync(walletAddress, true);
             } catch (syncError) {
-                devLog.warn('wallet-nfts', '⚠️ Force sync failed, falling back to DB snapshot', syncError);
+                devLog.warn('wallet-nfts', 'Forced sync failed after discovery', syncError);
             }
-        }
 
-        // Step 1: Fast load from DB (instant)
-        devLog.info('⚡ Step 1/2: Loading from database (instant)...');
-        const dbResponse = await fetch(`/api/user/nfts?walletAddress=${walletAddress}`);
+            devLog.info('⏳ Step 3/3: Waiting for DB-enriched wallet snapshot...');
+            const DB_POLL_ATTEMPTS = 15;
+            const DB_POLL_DELAY_MS = 800;
 
-        if (dbResponse.ok) {
-            const dbResult = await dbResponse.json();
-
-            if (dbResult.success && dbResult.data.nfts && dbResult.data.nfts.length > 0) {
-                devLog.success(`Step 1/2 Complete: ${dbResult.data.nfts.length} NFTs from database`);
-
-                // Convert to WalletNFT format
-                const walletNFTs: WalletNFT[] = dbResult.data.nfts.map((nft: any, index: number) => {
-                    // DEBUG: Log first listed NFT
-                    if (nft.isListed && index === 0) {
-                        devLog.debug('🔍 [WalletNFTsService] First listed NFT from API:', {
-                            tokenId: nft.tokenId,
-                            price: nft.price,
-                            currency: nft.currency,
-                            listingType: nft.listingType,
-                            listingsPriceFromArray: nft.listings?.[0]?.price,
-                            listingsCurrencyFromArray: nft.listings?.[0]?.currency
-                        });
-                    }
-                    
-                    return {
-                        contractAddress: nft.contractAddress,
-                        tokenId: nft.tokenId,
-                        name: nft.metadata?.name,
-                        description: nft.metadata?.description,
-                        image: nft.metadata?.image,
-                        imageOriginal: nft.metadata?.imageOriginal,
-                        images: nft.metadata?.images,
-                        imageMeta: nft.metadata?.imageMeta,
-                        blurDataURL: nft.metadata?.blurDataURL,
-                        animationUrl: nft.metadata?.animationUrl,
-                        attributes: nft.metadata?.attributes,
-                        contractName: nft.contract?.name,
-                        contractSymbol: nft.contract?.symbol,
-                        tokenType: nft.contract?.contractType || 'ERC721',
-                        totalSupply: nft.contract?.totalSupply,
-                        owner: nft.contract?.owner || nft.currentOwner,
-                        tokenURI: nft.contract?.tokenURI,
-                        approved: nft.contract?.approved,
-                        ownerBalance: nft.contract?.ownerBalance,
-                        isListed: nft.isListed || false,
-                        // Use flattened fields from API (from $addFields), fallback to listings array
-                        listingPrice: nft.price ?? nft.listings?.[0]?.price,
-                        listingId: nft.listingId ?? nft.listings?.[0]?.listingId,
-                        seller: nft.seller ?? nft.listings?.[0]?.seller,
-                        currency: nft.currency ?? nft.listings?.[0]?.currency,
-                        listingType: nft.listingType ?? nft.listings?.[0]?.listingType,
-                        listingStatus: nft.listingStatus ?? nft.listings?.[0]?.status ?? null,
-                        listingTokenStandard: nft.listingTokenStandard ?? nft.listings?.[0]?.tokenStandard ?? null,
-                        erc1155QuantityListed: nft.erc1155QuantityListed ?? nft.listings?.[0]?.erc1155QuantityListed ?? null,
-                        remainingQuantity: nft.remainingQuantity ?? nft.listings?.[0]?.remainingQuantity ?? null,
-                        unitPrice: nft.unitPrice ?? nft.listings?.[0]?.unitPrice ?? null,
-                        partialBuyEnabled: nft.partialBuyEnabled ?? nft.listings?.[0]?.partialBuyEnabled ?? false,
-                        desiredContractAddress: nft.desiredContractAddress ?? nft.desiredTokenAddress ?? nft.listings?.[0]?.desiredContractAddress ?? nft.listings?.[0]?.desiredTokenAddress,
-                        desiredTokenAddress: nft.desiredTokenAddress ?? nft.desiredContractAddress ?? nft.listings?.[0]?.desiredTokenAddress ?? nft.listings?.[0]?.desiredContractAddress,
-                        desiredTokenId: nft.desiredTokenId ?? nft.listings?.[0]?.desiredTokenId,
-                        hasMarketplaceData: !!nft.listings?.length,
-                        hasInsightsData: !!nft.insights,
-                        insights: nft.insights,
-                        // Stats from API response (loaded via $lookup in /api/user/nfts)
-                        stats: nft.stats ? {
-                            likeCount: nft.stats.likeCount,
-                            viewCount: nft.stats.viewCount,
-                            averageRating: nft.stats.averageRating,
-                            watchlistCount: nft.stats.watchlistCount,
-                            ratingCount: nft.stats.ratingCount
-                        } : undefined
-                    };
-                });
-
-                // DEBUG: Log first mapped listed NFT
-                const firstMappedListed = walletNFTs.find(n => n.isListed);
-                if (firstMappedListed) {
-                    devLog.debug('🔍 [WalletNFTsService] First mapped listed NFT:', {
-                        tokenId: firstMappedListed.tokenId,
-                        listingPrice: firstMappedListed.listingPrice,
-                        currency: firstMappedListed.currency,
-                        listingType: firstMappedListed.listingType
-                    });
+            for (let attempt = 1; attempt <= DB_POLL_ATTEMPTS; attempt++) {
+                const refreshedFromDb = await this.fetchWalletNFTsFromDb(walletAddress);
+                if (refreshedFromDb.length > 0) {
+                    this.setCachedWalletSnapshot(normalizedWallet, refreshedFromDb);
+                    devLog.success(`Step 3/3 Complete: DB enrichment ready on attempt ${attempt}/${DB_POLL_ATTEMPTS}`);
+                    devLog.success('[WalletNFTsService] ========== SUCCESS (DB Enriched) ==========\n');
+                    return refreshedFromDb;
                 }
 
-                // Step 2: Background sync (verify ownership)
-                devLog.info('🔄 Step 2/2: Background sync starting...');
-                this.triggerBackgroundSync(walletAddress);
-
-                devLog.success('[WalletNFTsService] ========== SUCCESS (DB Cache) ==========\n');
-                return walletNFTs;
+                if (attempt < DB_POLL_ATTEMPTS) {
+                    await new Promise((resolve) => setTimeout(resolve, DB_POLL_DELAY_MS));
+                }
             }
-        }
 
-        // Fallback: No DB data, fetch from Alchemy + save
-        devLog.warn('No DB data found, falling back to full fetch...');
-        devLog.info('⏳ Step 1/3: Fetching from /api/wallet/nfts...');
-        const response = await fetch(`/api/wallet/nfts?address=${walletAddress}`);
-
-        if (!response.ok) {
-            throw new Error(`Failed to fetch wallet NFTs: ${response.status}`);
-        }
-
-        const result = await response.json();
-
-        if (!result.success) {
-            throw new Error(result.error || 'Failed to fetch wallet NFTs');
-        }
-
-        const externalNFTsRaw = result.data;
-        const nestedPayload = externalNFTsRaw && typeof externalNFTsRaw === 'object'
-            ? ((externalNFTsRaw as any).data ?? (externalNFTsRaw as any).nfts)
-            : null;
-
-        const externalNFTs: ExternalNFT[] = Array.isArray(externalNFTsRaw)
-            ? externalNFTsRaw
-            : Array.isArray((externalNFTsRaw as any)?.nfts)
-                ? (externalNFTsRaw as any).nfts
-                : Array.isArray((externalNFTsRaw as any)?.data)
-                    ? (externalNFTsRaw as any).data
-                    : Array.isArray((externalNFTsRaw as any)?.data?.nfts)
-                        ? (externalNFTsRaw as any).data.nfts
-                        : Array.isArray(nestedPayload)
-                            ? nestedPayload
-                            : [];
-
-        if (
-            !Array.isArray(externalNFTsRaw)
-            && !Array.isArray((externalNFTsRaw as any)?.nfts)
-            && !Array.isArray((externalNFTsRaw as any)?.data)
-            && !Array.isArray((externalNFTsRaw as any)?.data?.nfts)
-            && !Array.isArray(nestedPayload)
-        ) {
-            devLog.warn('Unexpected /api/wallet/nfts payload shape, defaulting to empty array', {
-                type: typeof externalNFTsRaw,
-                keys: externalNFTsRaw && typeof externalNFTsRaw === 'object' ? Object.keys(externalNFTsRaw) : []
-            });
-        }
-
-        devLog.success(`Step 1/3 Complete: ${externalNFTs.length} NFTs from ${result.source || 'external API'}`);
-
-        if (externalNFTs.length === 0) {
-            return [];
-        }
-
-        // Step 2: Parallel enrichment (marketplace + insights)
-        devLog.info('⏳ Step 2/3: Enriching with marketplace + insights (parallel)...');
-        const enrichStartTime = Date.now();
-
-        const [marketplaceResult, insightsResult] = await Promise.allSettled([
-            this.enrichWithMarketplaceData(externalNFTs),
-            this.fetchInsightsData(externalNFTs)
-        ]);
-
-        // Merge marketplace data
-        let enrichedNFTs: WalletNFT[] = [];
-        if (marketplaceResult.status === 'fulfilled') {
-            enrichedNFTs = marketplaceResult.value;
-        } else {
-            devLog.warn('Marketplace enrichment failed:', marketplaceResult.reason);
-            enrichedNFTs = externalNFTs.map(nft => ({
+            devLog.warn('DB enrichment not ready in time; returning temporary discovery fallback to avoid false empty wallet state');
+            const fallback = externalNFTs.map((nft) => ({
                 ...nft,
                 hasMarketplaceData: false,
-                hasInsightsData: false
+                hasInsightsData: false,
             }));
+            this.setCachedWalletSnapshot(normalizedWallet, fallback);
+            return fallback;
+        })();
+
+        if (options.forceSync) {
+            return fetchPromise;
         }
 
-        // Merge insights data
-        if (insightsResult.status === 'fulfilled') {
-            enrichedNFTs = this.applyInsights(enrichedNFTs, insightsResult.value);
-        } else {
-            devLog.warn('Insights enrichment failed:', insightsResult.reason);
+        this.walletFetchInFlight.set(normalizedWallet, fetchPromise);
+        try {
+            return await fetchPromise;
+        } finally {
+            this.walletFetchInFlight.delete(normalizedWallet);
         }
-
-        const enrichDuration = Date.now() - enrichStartTime;
-        const listedCount = enrichedNFTs.filter(n => n.isListed).length;
-        const insightsCount = enrichedNFTs.filter(n => n.category || n.rarity).length;
-        devLog.success(`Step 2/3 Complete: ${listedCount} listed, ${insightsCount} with insights (${enrichDuration}ms)`);
-
-        // Step 3: Save to DB + cache
-        devLog.info('⏳ Step 3/3: Saving to DB and caching...');
-
-        // Trigger sync to save to DB
-        this.triggerBackgroundSync(walletAddress);
-
-        const totalDuration = Date.now();
-        devLog.success('Step 3/3 Complete: Data cached & saved to DB');
-        devLog.info('\n📊 Final Stats:');
-        devLog.info(`   • Total NFTs: ${enrichedNFTs.length}`);
-        devLog.info(`   • Listed: ${enrichedNFTs.filter(n => n.isListed).length}`);
-        devLog.info(`   • Unlisted: ${enrichedNFTs.filter(n => !n.isListed).length}`);
-        devLog.info(`   • With Insights: ${enrichedNFTs.filter(n => n.category || n.rarity).length}`);
-        devLog.info(`   • Total Time: ${totalDuration}ms`);
-        devLog.success('[WalletNFTsService] ========== SUCCESS ==========\n');
-
-        return enrichedNFTs;
     }
 
     /**

@@ -62,19 +62,22 @@ export const resolveNFTImageByVariant = (
     sourceUrl: string,
     variant: NFTImageVariant,
     variants?: NFTImageVariants | null,
+    tokenId?: string | number | bigint,
 ): string => {
     const fromVariants = variants?.[variant] || (variant !== 'original' ? variants?.original : null);
     if (fromVariants) {
         return resolveNftImageUrl(fromVariants, fromVariants, {
             width: getNFTVariantWidth(variant),
+            tokenId,
         });
     }
 
     if (variant === 'original') {
-        return resolveNftImageUrl(sourceUrl, sourceUrl);
+        return resolveNftImageUrl(sourceUrl, sourceUrl, { tokenId });
     }
 
     return resolveNftImageUrl(sourceUrl, sourceUrl, {
         width: getNFTVariantWidth(variant),
+        tokenId,
     });
 };

@@ -23,6 +23,7 @@ function NFTPriceCard({
     listingId,
     currentOwner,
     connectedAddress,
+    ownerBalance,
     nftName,
     nftImage,
     desiredContractAddress,
@@ -111,6 +112,17 @@ function NFTPriceCard({
         return connectedAddress.toLowerCase() === currentOwner.toLowerCase();
     }, [connectedAddress, currentOwner]);
 
+    const isListingSeller = useMemo(() => {
+        if (!connectedAddress || !seller) return false;
+        return connectedAddress.toLowerCase() === seller.toLowerCase();
+    }, [connectedAddress, seller]);
+
+    const hasOwnedErc1155Units = useMemo(() => {
+        if (!isErc1155) return false;
+        const parsed = typeof ownerBalance === 'number' ? ownerBalance : 0;
+        return Number.isFinite(parsed) && parsed > 0;
+    }, [isErc1155, ownerBalance]);
+
 
     // Memoize status styling with v2 status support
     const statusConfig = useMemo(() => {
@@ -167,6 +179,16 @@ function NFTPriceCard({
         if (!status) return true;
         return status === 'LISTED' || status === 'PARTIALLY_FILLED';
     }, [isListed, status]);
+
+    const canManageListing = useMemo(() => {
+        if (!isActiveListing) return false;
+        return isListingSeller;
+    }, [isActiveListing, isListingSeller]);
+
+    const canCreateListing = useMemo(() => {
+        if (!connectedAddress) return false;
+        return isErc1155 ? hasOwnedErc1155Units : isOwner;
+    }, [connectedAddress, isErc1155, hasOwnedErc1155Units, isOwner]);
 
     // Create ActiveItem for cart
     const cartItem: ActiveItem | null = useMemo(() => {
@@ -234,6 +256,13 @@ function NFTPriceCard({
                         {formattedPrice} {currencySymbol}
                     </span>
                 </div>
+                {isActiveListing && seller && (
+                    <p className="text-xs text-gray-600">
+                        {isListingSeller
+                            ? 'Listed by you'
+                            : `Listed by ${seller.slice(0, 6)}...${seller.slice(-4)}`}
+                    </p>
+                )}
                 {!priceLoading && (!isErc1155 || !unitPrice) && (
                     <p className="text-xl text-gray-600">
                         ≈ {convertedPrice}
@@ -250,7 +279,7 @@ function NFTPriceCard({
             </div>
             <div className="mt-6 space-y-3">
                 {/* Buy Now & Add to Cart - only visible if LISTED and NOT owner */}
-                {isActiveListing && !isOwner && (
+                {isActiveListing && !isListingSeller && (
                     <div className="flex gap-3">
                         <button
                             onClick={handleBuyNow}
@@ -267,9 +296,9 @@ function NFTPriceCard({
                 )}
 
                 {/* Owner-only buttons */}
-                {isOwner && (
+                {canCreateListing && (
                     <div className="flex gap-3">
-                        {isActiveListing ? (
+                        {canManageListing ? (
                             // NFT is listed - show Update & Cancel
                             <>
                                 <button
@@ -291,16 +320,22 @@ function NFTPriceCard({
                                 onClick={() => window.location.href = `/sell?contract=${contractAddress}&tokenId=${tokenId}`}
                                 className="w-full bg-green-600 text-white py-3 rounded-xl font-semibold hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
                             >
-                                List NFT for Sale
+                                {isErc1155 ? 'List Your ERC1155 Quantity' : 'List NFT for Sale'}
                             </button>
                         )}
                     </div>
                 )}
 
                 {/* Not owner and not listed - show informational message */}
-                {!isOwner && !isActiveListing && (
+                {!canCreateListing && !isActiveListing && (
                     <div className="text-center text-gray-500 py-4">
                         This NFT is not currently listed for sale
+                    </div>
+                )}
+
+                {isErc1155 && isActiveListing && !isListingSeller && hasOwnedErc1155Units && (
+                    <div className="text-center text-xs text-gray-600 py-2 border border-dashed border-gray-300 rounded-lg">
+                        You own {ownerBalance} units and can create your own separate listing.
                     </div>
                 )}
             </div>

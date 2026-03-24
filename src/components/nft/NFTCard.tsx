@@ -65,6 +65,20 @@ interface LegacyNFTCardProps {
     name?: string | null;
     description?: string | null;
     image?: string | null;
+    imageOriginal?: string | null;
+    images?: {
+      thumb?: string | null;
+      small?: string | null;
+      card?: string | null;
+      detail?: string | null;
+      original?: string | null;
+    };
+    imageMeta?: {
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+    };
+    blurDataURL?: string | null;
     animationUrl?: string | null;
     externalUrl?: string | null;
     attributes?: Array<{ trait_type: string; value: string | number }>;
@@ -153,6 +167,10 @@ function buildLegacyAggregatedNFT(props: LegacyNFTCardProps): AggregatedNFT {
       name: props.metadata.name || undefined,
       description: props.metadata.description || undefined,
       image: props.metadata.image || undefined,
+      imageOriginal: props.metadata.imageOriginal || undefined,
+      images: props.metadata.images || undefined,
+      imageMeta: props.metadata.imageMeta || undefined,
+      blurDataURL: props.metadata.blurDataURL || undefined,
       animationUrl: props.metadata.animationUrl || undefined,
       externalUrl: props.metadata.externalUrl || undefined,
       attributes: props.metadata.attributes || []
@@ -251,6 +269,41 @@ function normalizeTokenStandard(value?: string | null): 'ERC721' | 'ERC1155' | n
   return null;
 }
 
+function extractImageUrl(candidate: unknown): string | null {
+  if (typeof candidate === 'string') {
+    const trimmed = candidate.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (Array.isArray(candidate)) {
+    for (const entry of candidate) {
+      const resolved = extractImageUrl(entry);
+      if (resolved) return resolved;
+    }
+    return null;
+  }
+
+  if (candidate && typeof candidate === 'object') {
+    const obj = candidate as Record<string, unknown>;
+    const objectCandidates = [
+      obj.url,
+      obj.image,
+      obj.original,
+      obj.originalUrl,
+      obj.cachedUrl,
+      obj.thumbnailUrl,
+      obj.pngUrl,
+    ];
+
+    for (const entry of objectCandidates) {
+      const resolved = extractImageUrl(entry);
+      if (resolved) return resolved;
+    }
+  }
+
+  return null;
+}
+
 /**
  * Optimized NFT Card Component
  * Supports both new AggregatedNFT interface and legacy props
@@ -316,7 +369,16 @@ export function NFTCard(props: NFTCardAllProps) {
   // ===== COMPUTED VALUES =====
 
   // Extract display data
-  const imageUrl = nft.meta?.image || null;
+  const imageUrl =
+    extractImageUrl(nft.meta?.image)
+    || extractImageUrl(nft.meta?.imageOriginal)
+    || extractImageUrl(nft.meta?.images?.card)
+    || extractImageUrl(nft.meta?.images?.detail)
+    || extractImageUrl(nft.meta?.images?.small)
+    || extractImageUrl(nft.meta?.images?.thumb)
+    || extractImageUrl(nft.meta?.images?.original)
+    || null;
+  const imageVariants = nft.meta?.images || null;
   const customTitle = nft.insight?.customTitle || null;
   const nftName = nft.meta?.name || null;
   const contractSymbol = nft.core.symbol || null;
@@ -430,6 +492,7 @@ export function NFTCard(props: NFTCardAllProps) {
             <div className="flex-1 flex gap-1 min-h-0">
               <NFTCardImage
                 imageUrl={imageUrl}
+                imageVariants={imageVariants}
                 tokenId={tokenId}
                 descriptions={descriptions}
                 priority={priority}

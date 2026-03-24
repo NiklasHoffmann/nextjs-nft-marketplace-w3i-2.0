@@ -40,6 +40,107 @@ interface SyncCacheEntry {
     expiresAt: number;
 }
 
+const METADATA_REFRESH_COOLDOWN_MS = 15 * 60 * 1000;
+const METADATA_PERIODIC_REVALIDATION_MS = 24 * 60 * 60 * 1000;
+const MAX_PERIODIC_METADATA_REFRESH_PER_SYNC = 15;
+
+function getTimestampMs(value: unknown): number | null {
+    if (!value) return null;
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+    if (typeof value === 'string') {
+        const parsed = Date.parse(value);
+        return Number.isNaN(parsed) ? null : parsed;
+    }
+    if (value instanceof Date) {
+        return value.getTime();
+    }
+    return null;
+}
+
+function hasMeaningfulName(value: unknown): boolean {
+    if (typeof value !== 'string') return false;
+    const normalized = value.trim();
+    if (!normalized) return false;
+    if (/^0x[a-f0-9]{40}$/i.test(normalized)) return false;
+    if (/^unknown( nft)?$/i.test(normalized)) return false;
+    return true;
+}
+
+function hasUsableMetadata(existingNft: any): boolean {
+    const metadata = existingNft?.metadata || {};
+    const hasName = hasMeaningfulName(metadata?.name);
+    const hasImage =
+        (typeof metadata?.image === 'string' && metadata.image.trim().length > 0)
+        || (typeof metadata?.imageOriginal === 'string' && metadata.imageOriginal.trim().length > 0)
+        || (typeof metadata?.images?.thumb === 'string' && metadata.images.thumb.trim().length > 0)
+        || (typeof metadata?.images?.small === 'string' && metadata.images.small.trim().length > 0)
+        || (typeof metadata?.images?.card === 'string' && metadata.images.card.trim().length > 0)
+        || (typeof metadata?.images?.detail === 'string' && metadata.images.detail.trim().length > 0)
+        || (typeof metadata?.images?.original === 'string' && metadata.images.original.trim().length > 0);
+
+    // Critical completeness baseline: name + image must both be present.
+    return hasName && hasImage;
+}
+
+function hasFetchedMetadataPayload(metadata: {
+    name: string | null;
+    description: string | null;
+    image: string | null;
+    attributes: Array<{ trait_type: string; value: string | number }>;
+}): boolean {
+    const hasName = typeof metadata.name === 'string' && metadata.name.trim().length > 0;
+    const hasDescription = typeof metadata.description === 'string' && metadata.description.trim().length > 0;
+    const hasImage = typeof metadata.image === 'string' && metadata.image.trim().length > 0;
+    const hasAttributes = Array.isArray(metadata.attributes) && metadata.attributes.length > 0;
+
+    return hasName || hasDescription || hasImage || hasAttributes;
+}
+
+function shouldPeriodicMetadataRevalidation(existingNft: any): boolean {
+    const now = Date.now();
+    const lastMetadataUpdateMs =
+        getTimestampMs(existingNft?.lastMetadataUpdate)
+        ?? getTimestampMs(existingNft?.metadataLastUpdated)
+        ?? getTimestampMs(existingNft?.updatedAt)
+        ?? getTimestampMs(existingNft?.createdAt);
+
+    if (!lastMetadataUpdateMs) return true;
+    return now - lastMetadataUpdateMs >= METADATA_PERIODIC_REVALIDATION_MS;
+}
+
+function canAttemptMetadataRefresh(existingNft: any, forceSync: boolean): boolean {
+    if (forceSync) return true;
+
+    const now = Date.now();
+    const lastMetadataUpdateMs =
+        getTimestampMs(existingNft?.lastMetadataUpdate)
+        ?? getTimestampMs(existingNft?.metadataLastUpdated);
+
+    if (!lastMetadataUpdateMs) return true;
+    return now - lastMetadataUpdateMs >= METADATA_REFRESH_COOLDOWN_MS;
+}
+
+function normalizeMetadataUri(tokenURI: string, tokenId: string): string {
+    let normalized = tokenURI.trim();
+
+    try {
+        const hexTokenId = BigInt(tokenId).toString(16).padStart(64, '0').toLowerCase();
+        normalized = normalized
+            .replace(/\{id\}/gi, hexTokenId)
+            .replace(/%7Bid%7D/gi, hexTokenId);
+    } catch {
+        // Keep original URI when tokenId cannot be parsed.
+    }
+
+    if (normalized.startsWith('ipfs://')) {
+        return normalized.replace('ipfs://', 'https://ipfs.io/ipfs/');
+    }
+
+    return normalized;
+}
+
 const syncInFlight = new Map<string, Promise<NFTMetadataSyncResult>>();
 const syncResultCache = new Map<string, SyncCacheEntry>();
 
@@ -257,17 +358,29 @@ export const POST = apiHandler(async (request: NextRequest) => {
         // STEP 3: Categorize NFTs
         const newNFTs: Array<{ contractAddress: string; tokenId: string }> = [];
         const existingToUpdate: Array<{ contractAddress: string; tokenId: string }> = [];
+        const existingToRefreshMetadata: Array<{ contractAddress: string; tokenId: string }> = [];
+        const existingToPeriodicRevalidate: Array<{ contractAddress: string; tokenId: string }> = [];
         const currentNFTKeys = new Set<string>();
 
         for (const discoveredNFT of discoveredNFTs) {
             const key = `${discoveredNFT.contractAddress.toLowerCase()}-${discoveredNFT.tokenId}`;
             currentNFTKeys.add(key);
 
-            if (existingMap.has(key)) {
-                existingToUpdate.push({
+            const existing = existingMap.get(key);
+            if (existing) {
+                const normalized = {
                     contractAddress: discoveredNFT.contractAddress.toLowerCase(),
                     tokenId: discoveredNFT.tokenId
-                });
+                };
+
+                if (!hasUsableMetadata(existing)) {
+                    // Safety net: incomplete metadata is always eligible for refresh.
+                    existingToRefreshMetadata.push(normalized);
+                } else if (shouldPeriodicMetadataRevalidation(existing)) {
+                    existingToPeriodicRevalidate.push(normalized);
+                } else {
+                    existingToUpdate.push(normalized);
+                }
             } else {
                 newNFTs.push({
                     contractAddress: discoveredNFT.contractAddress.toLowerCase(),
@@ -284,6 +397,8 @@ export const POST = apiHandler(async (request: NextRequest) => {
         devLog.debug(`📈 [NFT Sync] Analysis:
   - New NFTs: ${newNFTs.length}
   - Existing to verify: ${existingToUpdate.length}
+    - Existing missing metadata: ${existingToRefreshMetadata.length}
+    - Existing periodic revalidation candidates: ${existingToPeriodicRevalidate.length}
   - Transferred out: ${transferredNFTs.length}`);
 
         const result: NFTMetadataSyncResult = {
@@ -296,18 +411,36 @@ export const POST = apiHandler(async (request: NextRequest) => {
             duration: 0
         };
 
-        // STEP 4: Process new NFTs (fetch full metadata)
-        if (newNFTs.length > 0) {
-            devLog.debug(`🆕 [NFT Sync] Fetching metadata for ${newNFTs.length} new NFTs...`);
+        // STEP 4: Process NFTs that require metadata enrichment
+        const periodicRevalidationTargets = existingToPeriodicRevalidate
+            .slice(0, MAX_PERIODIC_METADATA_REFRESH_PER_SYNC)
+            .map((nft) => ({ ...nft, isNew: false }));
+
+        const metadataTargetMap = new Map<string, { contractAddress: string; tokenId: string; isNew: boolean }>();
+        [...newNFTs.map((nft) => ({ ...nft, isNew: true })),
+         ...existingToRefreshMetadata.map((nft) => ({ ...nft, isNew: false })),
+         ...periodicRevalidationTargets].forEach((target) => {
+            const dedupeKey = `${target.contractAddress}-${target.tokenId}`;
+            const existing = metadataTargetMap.get(dedupeKey);
+            if (!existing || (target.isNew && !existing.isNew)) {
+                metadataTargetMap.set(dedupeKey, target);
+            }
+        });
+
+        const metadataTargets = Array.from(metadataTargetMap.values());
+
+        if (metadataTargets.length > 0) {
+            devLog.debug(`🆕 [NFT Sync] Fetching metadata for ${metadataTargets.length} NFTs (${newNFTs.length} new + ${existingToRefreshMetadata.length} missing + ${periodicRevalidationTargets.length} periodic)...`);
 
             // Process in batches of 3 to avoid rate limits
             const batchSize = 3;
-            for (let i = 0; i < newNFTs.length; i += batchSize) {
-                const batch = newNFTs.slice(i, i + batchSize);
-                devLog.debug(`  📦 Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(newNFTs.length / batchSize)} (${batch.length} NFTs)`);
+            for (let i = 0; i < metadataTargets.length; i += batchSize) {
+                const batch = metadataTargets.slice(i, i + batchSize);
+                devLog.debug(`  📦 Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(metadataTargets.length / batchSize)} (${batch.length} NFTs)`);
 
                 // Process batch concurrently
-                const batchPromises = batch.map(async (nft) => {
+                const batchPromises = batch.map(async (target) => {
+                    const nft = { contractAddress: target.contractAddress, tokenId: target.tokenId };
                     try {
                         devLog.debug(`    📥 Fetching: ${nft.contractAddress}/${nft.tokenId}`);
 
@@ -337,11 +470,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
 
                         if (blockchainData.tokenURI) {
                             try {
-                                // Resolve IPFS URLs
-                                let metadataURL = blockchainData.tokenURI;
-                                if (metadataURL.startsWith('ipfs://')) {
-                                    metadataURL = metadataURL.replace('ipfs://', 'https://ipfs.io/ipfs/');
-                                }
+                                const metadataURL = normalizeMetadataUri(blockchainData.tokenURI, nft.tokenId);
 
                                 const metadataResponse = await fetch(metadataURL, {
                                     signal: AbortSignal.timeout(5000)
@@ -361,9 +490,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
                             }
                         }
 
-                        // Upsert to nft_metadata
-                        await upsertNFTMetadata(nft.contractAddress, nft.tokenId, {
-                            metadata,
+                        const updatePayload: any = {
                             contract: {
                                 name: blockchainData.contractName || null,
                                 symbol: blockchainData.contractSymbol || null,
@@ -374,17 +501,45 @@ export const POST = apiHandler(async (request: NextRequest) => {
                                 ownerBalance: blockchainData.ownerBalance ? parseInt(blockchainData.ownerBalance) : null,
                                 approved: blockchainData.approvedAddress || null
                             },
-                            currentOwner: walletAddress,
                             ownerHistory: [{
                                 owner: walletAddress,
                                 acquiredAt: new Date().toISOString(),
                                 source: 'unknown'
                             }],
                             lastVerified: new Date().toISOString(),
-                            lastMetadataUpdate: new Date().toISOString()
-                        } as any);
+                        };
 
-                        result.new++;
+                        if (blockchainData.tokenStandard === 'ERC1155') {
+                            const existingDoc = existingMap.get(`${nft.contractAddress}-${nft.tokenId}`) as any;
+                            const existingOwnedQuantity = typeof existingDoc?.ownershipBalances?.[walletAddress] === 'number'
+                                ? existingDoc.ownershipBalances[walletAddress]
+                                : 0;
+                            const parsedBalance = blockchainData.ownerBalance
+                                ? parseInt(blockchainData.ownerBalance)
+                                : 1;
+                            const safeBalance = Number.isFinite(parsedBalance) ? Math.max(parsedBalance, 0) : 1;
+                            updatePayload[`ownershipBalances.${walletAddress}`] = Math.max(existingOwnedQuantity, safeBalance);
+                        } else {
+                            updatePayload.currentOwner = walletAddress;
+                            updatePayload['blockchain.owner'] = blockchainData.owner || walletAddress;
+                        }
+
+                        // Safety net: never overwrite existing metadata with an empty fetch result.
+                        if (hasFetchedMetadataPayload(metadata)) {
+                            updatePayload.metadata = metadata;
+                            const metadataUpdateTimestamp = new Date().toISOString();
+                            updatePayload.lastMetadataUpdate = metadataUpdateTimestamp;
+                            // Keep legacy field in sync until migration is complete.
+                            updatePayload.metadataLastUpdated = metadataUpdateTimestamp;
+                        }
+
+                        await upsertNFTMetadata(nft.contractAddress, nft.tokenId, updatePayload as any);
+
+                        if (target.isNew) {
+                            result.new++;
+                        } else {
+                            result.updated++;
+                        }
                         devLog.debug(`    ✅ Saved: ${nft.contractAddress}/${nft.tokenId}`);
 
                     } catch (error) {
@@ -401,7 +556,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
                 await Promise.all(batchPromises);
 
                 // Small delay between batches to be rate-limit friendly
-                if (i + batchSize < newNFTs.length) {
+                if (i + batchSize < metadataTargets.length) {
                     devLog.debug('  ⏳ Rate limit pause...');
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
@@ -414,6 +569,27 @@ export const POST = apiHandler(async (request: NextRequest) => {
 
             for (const nft of existingToUpdate) {
                 try {
+                    const key = `${nft.contractAddress}-${nft.tokenId}`;
+                    const existingDoc = existingMap.get(key);
+                    const tokenStandard = existingDoc?.contract?.contractType;
+
+                    if (tokenStandard === 'ERC1155') {
+                        const existingOwnedQuantity = typeof (existingDoc as any)?.ownershipBalances?.[walletAddress] === 'number'
+                            ? (existingDoc as any).ownershipBalances[walletAddress]
+                            : 0;
+                        // Keep wallet membership alive for ERC1155 without forcing single-owner semantics.
+                        await upsertNFTMetadata(
+                            nft.contractAddress,
+                            nft.tokenId,
+                            {
+                                [`ownershipBalances.${walletAddress}`]: Math.max(existingOwnedQuantity, 1),
+                                lastVerified: new Date().toISOString(),
+                            } as any
+                        );
+                        result.unchanged++;
+                        continue;
+                    }
+
                     await updateNFTOwnership(
                         nft.contractAddress, nft.tokenId,
                         walletAddress,
@@ -437,6 +613,21 @@ export const POST = apiHandler(async (request: NextRequest) => {
 
             for (const nft of transferredNFTs) {
                 try {
+                    const tokenStandard = nft.contract?.contractType;
+
+                    if (tokenStandard === 'ERC1155') {
+                        await upsertNFTMetadata(
+                            nft.contractAddress,
+                            nft.tokenId,
+                            {
+                                [`ownershipBalances.${walletAddress}`]: 0,
+                                lastVerified: new Date().toISOString(),
+                            } as any
+                        );
+                        result.transferred++;
+                        continue;
+                    }
+
                     await updateNFTOwnership(
                         nft.contractAddress, nft.tokenId,
                         '', // Empty owner = transferred

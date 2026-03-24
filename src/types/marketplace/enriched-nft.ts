@@ -106,6 +106,8 @@ export interface EnrichedNFTDocument {
         totalSupply: number | null;
         contractType?: 'ERC721' | 'ERC1155' | null;
         ownerBalance: number | null;
+        ownershipBalances?: Record<string, number> | null;
+        holderCount?: number | null;
         approvedAddress: string | null;
         approved?: string | null; // Alias for approvedAddress (API compatibility)
     };

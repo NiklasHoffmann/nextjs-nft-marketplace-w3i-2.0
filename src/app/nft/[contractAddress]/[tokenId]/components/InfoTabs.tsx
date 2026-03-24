@@ -42,9 +42,12 @@ interface NewNFTInfoTabsProps extends NFTInfoTabsProps {
     invalidReasons?: string[] | null;
     invalidatedAt?: Date | null;
     ownerBalance?: number | null;
+    ownershipBalances?: Record<string, number> | null;
+    holderCount?: number | null;
     approved?: string | null;
     isApprovedForAll?: boolean;
     tokenURI?: string | null;
+    connectedAddress?: string | null;
 }
 
 function NewNFTInfoTabs({
@@ -87,9 +90,12 @@ function NewNFTInfoTabs({
     invalidReasons,
     invalidatedAt,
     ownerBalance,
+    ownershipBalances,
+    holderCount,
     approved,
     isApprovedForAll,
-    tokenURI
+    tokenURI,
+    connectedAddress
 }: NewNFTInfoTabsProps) {
     const effectivePublicInsights = publicInsights || (adminInsights as any);
     const effectiveInsightsLoading = insightsLoading || adminInsightsLoading;
@@ -141,9 +147,16 @@ function NewNFTInfoTabs({
                         rarityRank={rarityRank}
                         rarityScore={rarityScore}
                         ownerBalance={ownerBalance}
+                        ownershipBalances={ownershipBalances}
+                        holderCount={holderCount}
                         approved={approved}
                         isApprovedForAll={isApprovedForAll}
                         tokenURI={tokenURI}
+                        isListed={nftDetails.isListed}
+                        listingStatus={nftDetails.status ?? null}
+                        listingSeller={nftDetails.seller || null}
+                        listingId={nftDetails.listingId || null}
+                        connectedAddress={connectedAddress || null}
                     />
                 );
             case 'market-insights':
@@ -272,9 +285,12 @@ function NewNFTInfoTabs({
         invalidReasons,
         invalidatedAt,
         ownerBalance,
+        ownershipBalances,
+        holderCount,
         approved,
         isApprovedForAll,
-        tokenURI
+        tokenURI,
+        connectedAddress
     ]);
 
     return (

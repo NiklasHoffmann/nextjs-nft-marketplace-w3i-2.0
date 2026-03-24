@@ -32,6 +32,13 @@ const ERC721_ABI = [
         outputs: [{ name: '', type: 'address' }],
     },
     {
+        name: 'tokenURI',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [{ name: 'tokenId', type: 'uint256' }],
+        outputs: [{ name: '', type: 'string' }],
+    },
+    {
         name: 'isApprovedForAll',
         type: 'function',
         stateMutability: 'view',
@@ -99,6 +106,14 @@ export interface BlockchainState {
     contractName?: string | null;
     contractSymbol?: string | null;
     totalSupply?: number | null;
+    tokenURI?: string | null;
+}
+
+function normalizeErc1155TokenUri(tokenUri: string, tokenId: string): string {
+    const hexTokenId = BigInt(tokenId).toString(16).padStart(64, '0').toLowerCase();
+    return tokenUri
+        .replace(/\{id\}/gi, hexTokenId)
+        .replace(/%7Bid%7D/gi, hexTokenId);
 }
 
 interface ContractMetadataCacheEntry {
@@ -250,6 +265,7 @@ export class BlockchainStateSync {
             let owner = '';
             let approved = '';
             let tokenStandard: 'ERC721' | 'ERC1155' = 'ERC721';
+            let resolvedTokenURI: string | null = null;
 
             // Determine token standard conservatively:
             // only mark as ERC1155 when uri(tokenId) succeeds.
@@ -263,6 +279,14 @@ export class BlockchainStateSync {
             if (ownerResult) {
                 tokenStandard = 'ERC721';
                 owner = ownerResult;
+
+                const tokenUriResult = await this.safeReadContract<string>({
+                    address: contractAddress as `0x${string}`,
+                    abi: ERC721_ABI,
+                    functionName: 'tokenURI',
+                    args: [BigInt(tokenId)]
+                });
+                resolvedTokenURI = tokenUriResult || null;
 
                 const approvedResult = await this.safeReadContract<string>({
                     address: contractAddress as `0x${string}`,
@@ -282,6 +306,7 @@ export class BlockchainStateSync {
 
                 if (uriResult) {
                     tokenStandard = 'ERC1155';
+                    resolvedTokenURI = normalizeErc1155TokenUri(uriResult, tokenId);
                 } else {
                     devLog.warn('  ⚠️ Could not confirm token standard via ownerOf or uri; defaulting to ERC721 handling');
                 }
@@ -388,6 +413,7 @@ export class BlockchainStateSync {
             state.contractName = contractName;
             state.contractSymbol = contractSymbol;
             state.totalSupply = totalSupply;
+            state.tokenURI = resolvedTokenURI;
 
             // Update both collections
             await this.updateCollections(contractAddress, tokenId, state);
@@ -480,7 +506,7 @@ export class BlockchainStateSync {
             $setOnInsert: {
                 // Only set these on new document creation
                 createdAt: now,
-                metadataLastUpdated: now,
+                lastMetadataUpdate: null,
                 ownershipHistory: [] // Initialize history array
             }
         };
@@ -501,8 +527,13 @@ export class BlockchainStateSync {
             updateOps.$set['contract.totalSupply'] = state.totalSupply;
         }
 
-        if (state.owner) {
+        if (state.owner && state.tokenStandard !== 'ERC1155') {
             updateOps.$set['blockchain.owner'] = state.owner;
+            updateOps.$set['currentOwner'] = state.owner.toLowerCase();
+        }
+
+        if (state.tokenURI) {
+            updateOps.$set['contract.tokenURI'] = state.tokenURI;
         }
         
         // If owner changed, add to ownership history
@@ -529,6 +560,18 @@ export class BlockchainStateSync {
             updateOps,
             { upsert: true }
         );
+
+        const metadataMissing = !existingNFT?.metadata
+            || (!existingNFT?.metadata?.name && !existingNFT?.metadata?.image && !existingNFT?.metadata?.imageOriginal);
+
+        if (metadataMissing) {
+            try {
+                const { ipfsMetadataLazySync } = await import('@/services/nft-sync');
+                await ipfsMetadataLazySync.ensureMetadata(contractAddress, tokenId);
+            } catch (error) {
+                devLog.warn(`  ⚠️ Failed to trigger metadata backfill for ${contractAddress}/${tokenId}`, error);
+            }
+        }
     }
 
     /**

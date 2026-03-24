@@ -228,6 +228,7 @@ function NFTDetailPage() {
         listingId: nftDetails?.listingId,
         currentOwner: nftData?.blockchain?.owner || nftData?.contract?.owner || undefined,
         connectedAddress: userAddress || undefined,
+        ownerBalance: nftData?.contract?.ownerBalance ?? null,
         nftName: finalName,
         nftImage: finalImageUrl || undefined,
         desiredContractAddress: nftDetails?.desiredContractAddress,
@@ -249,7 +250,7 @@ function NFTDetailPage() {
         nftDetails?.desiredErc1155Quantity, nftDetails?.erc1155QuantityListed, nftDetails?.remainingQuantity,
         nftDetails?.unitPrice, nftDetails?.partialBuyEnabled,
         priceData.convertedPrice, priceData.priceLoading, priceData.selectedCurrencySymbol,
-        contractAddress, tokenId, nftData?.contract?.owner, nftData?.blockchain?.owner, userAddress, finalName, finalImageUrl
+        contractAddress, tokenId, nftData?.contract?.owner, nftData?.contract?.ownerBalance, nftData?.blockchain?.owner, userAddress, finalName, finalImageUrl
     ]);
 
     const infoTabsProps = useMemo(() => {
@@ -298,9 +299,12 @@ function NFTDetailPage() {
             invalidReasons: nftData?.marketplace?.invalidReasons ?? null,
             invalidatedAt: nftData?.marketplace?.invalidatedAt ? new Date(nftData.marketplace.invalidatedAt) : null,
             ownerBalance: nftData?.contract?.ownerBalance ?? null,
+            ownershipBalances: nftData?.contract?.ownershipBalances ?? null,
+            holderCount: nftData?.contract?.holderCount ?? null,
             approved: nftData?.blockchain?.approved || null,
             isApprovedForAll: nftData?.blockchain?.isApprovedForAll ?? false,
-            tokenURI: nftData?.contract?.tokenURI ?? null
+            tokenURI: nftData?.contract?.tokenURI ?? null,
+            connectedAddress: userAddress || null
         };
     }, [
         activeTab, handleTabChange, contractAddress, tokenId, contractInfo, metadata, nftDetails,

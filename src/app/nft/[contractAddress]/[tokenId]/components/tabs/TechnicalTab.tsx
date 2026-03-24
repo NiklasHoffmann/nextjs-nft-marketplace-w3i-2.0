@@ -20,9 +20,16 @@ interface TechnicalTabProps {
     rarityScore?: number | null;
     // Enhanced contract fields
     ownerBalance?: number | null;
+    ownershipBalances?: Record<string, number> | null;
+    holderCount?: number | null;
     approved?: string | null;
     isApprovedForAll?: boolean;
     tokenURI?: string | null;
+    isListed?: boolean;
+    listingStatus?: string | null;
+    listingSeller?: string | null;
+    listingId?: string | null;
+    connectedAddress?: string | null;
 }
 
 export default function TechnicalTab({ contractAddress,
@@ -40,9 +47,16 @@ export default function TechnicalTab({ contractAddress,
     rarityRank,
     rarityScore,
     ownerBalance,
+    ownershipBalances,
+    holderCount,
     approved,
     isApprovedForAll,
-    tokenURI
+    tokenURI,
+    isListed,
+    listingStatus,
+    listingSeller,
+    listingId,
+    connectedAddress
 }: TechnicalTabProps) {
 
     return (
@@ -56,10 +70,19 @@ export default function TechnicalTab({ contractAddress,
                     tokenURI: tokenURI ?? null,
                     owner: currentOwner ?? null,
                     ownerBalance: ownerBalance ?? null,
+                    ownershipBalances: ownershipBalances ?? null,
+                    holderCount: holderCount ?? null,
                     approved: approved ?? null
                 }}
                 tokenStandard={tokenStandard}
                 isApprovedForAll={isApprovedForAll}
+                marketplaceListing={{
+                    isListed,
+                    status: listingStatus,
+                    seller: listingSeller,
+                    listingId,
+                    connectedAddress
+                }}
             />
 
             {/* Basic NFT Details */}

@@ -74,7 +74,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
     const matchQuery: any = {
         $or: [
             { currentOwner: lowerWalletAddress },
-            { 'blockchain.owner': lowerWalletAddress }
+            { 'blockchain.owner': lowerWalletAddress },
+            { [`ownershipBalances.${lowerWalletAddress}`]: { $gt: 0 } }
         ]
     };
 

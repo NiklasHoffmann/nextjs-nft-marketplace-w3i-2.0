@@ -35,6 +35,7 @@ export interface NFTDetailsPageData {
     desiredContractAddress: string;
     desiredTokenId: string;
     metadata?: NftMeta;
+    status?: 'LISTED' | 'PARTIALLY_FILLED' | 'SOLD_OUT' | 'CANCELED' | 'INVALIDATED' | null;
 }
 
 export interface NFTMetadataExtended extends NftMeta {
@@ -116,6 +117,7 @@ export interface NFTPriceCardProps {
     // For owner-only actions
     currentOwner?: string;
     connectedAddress?: string;
+    ownerBalance?: number | null;
     nftName?: string;
     nftImage?: string;
     // For swap/trade functionality
