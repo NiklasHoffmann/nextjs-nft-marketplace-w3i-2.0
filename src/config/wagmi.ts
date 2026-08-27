@@ -11,17 +11,17 @@ import { devLog } from '@/utils'
 
 export const appName = 'Next.js NFT Marketplace W3i 2.0'
 
-// WebSocket URL für Sepolia
-const SEPOLIA_WSS = process.env.NEXT_PUBLIC_WSS_SEPOLIA || "wss://sepolia.infura.io/ws/v3/2c8fdbbe1b46451fa44c97b461ccb3c5"
+// WebSocket URL für Sepolia (kein Fallback mit hartkodiertem API-Key!)
+const SEPOLIA_WSS = process.env.NEXT_PUBLIC_WSS_SEPOLIA
 const SEPOLIA_HTTP = process.env.NEXT_PUBLIC_RPC_SEPOLIA || "https://ethereum-sepolia-rpc.publicnode.com"
 
 // Viem Public Client für direkte Blockchain-Interaktionen
 // Verwendet fallback: WebSocket im Browser, HTTP auf Server
 export const publicClient = createPublicClient({
     chain: sepolia,
-    transport: typeof window !== 'undefined' 
+    transport: typeof window !== 'undefined' && SEPOLIA_WSS
         ? webSocket(SEPOLIA_WSS) // Browser: Real-time WebSocket
-        : http(SEPOLIA_HTTP) // Server: HTTP (WebSocket funktioniert nicht in Node.js)
+        : http(SEPOLIA_HTTP) // Server bzw. kein WSS konfiguriert: HTTP
 })
 
 // Project ID für WalletConnect - WICHTIG: Muss eine echte ID von https://cloud.walletconnect.com sein

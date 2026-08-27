@@ -45,7 +45,7 @@ This document explains all environment variables used in the NFT Marketplace app
 - **Type:** Secret
 - **Required:** Yes
 - **Format:** `mongodb+srv://user:pass@cluster.mongodb.net/db?options`
-- **Example:** `mongodb+srv://user:HxuTAfFm7n9Dr7bF@cluster.mongodb.net/Ideationmarket_v2?retryWrites=true&w=majority`
+- **Example:** `mongodb+srv://<USERNAME>:<PASSWORD>@<CLUSTER>.mongodb.net/<DB_NAME>?retryWrites=true&w=majority`
 - **Notes:**
   - Contains credentials - NEVER expose to client!
   - Use connection pooling for production
@@ -120,7 +120,7 @@ This document explains all environment variables used in the NFT Marketplace app
 - **Type:** Secret (contains API key)
 - **Required:** Yes
 - **Providers:** Alchemy, Infura, QuickNode
-- **Example:** `https://eth-sepolia.g.alchemy.com/v2/NRN9Si87yQRdB-Y2n-yRG8mDkOq7-Dnz`
+- **Example:** `https://eth-sepolia.g.alchemy.com/v2/<ALCHEMY_API_KEY>`
 
 ##### `ALCHEMY_URL` / `ALCHEMY_URL_WSS`
 
@@ -160,7 +160,7 @@ This document explains all environment variables used in the NFT Marketplace app
 - **Purpose:** Direct API access from client
 - **Type:** Public (rate-limited)
 - **Security:** MUST have rate limits configured
-- **Example:** `NRN9Si87yQRdB-Y2n-yRG8mDkOq7-Dnz`
+- **Example:** `<PUBLIC_ALCHEMY_API_KEY>`
 
 **⚠️ RPC Security Notes:**
 
@@ -181,7 +181,7 @@ This document explains all environment variables used in the NFT Marketplace app
 - **Type:** Public
 - **Required:** Yes (for mobile wallet connections)
 - **Get From:** https://cloud.walletconnect.com
-- **Example:** `af5638b1e99696d4c7a886fcb719fdc6`
+- **Example:** `<WALLETCONNECT_PROJECT_ID>`
 - **Notes:**
   - Both variables used for compatibility
   - Configure allowed domains in WalletConnect dashboard
@@ -238,7 +238,7 @@ This document explains all environment variables used in the NFT Marketplace app
 - **Purpose:** Deploy key for subgraph updates
 - **Type:** Secret
 - **Required:** Only for CI/CD deployment
-- **Example:** `11585e35f5b3f29c372e173002aca887`
+- **Example:** `<SUBGRAPH_DEPLOY_KEY>`
 - **Security:** Never commit! Use in CI/CD secrets only
 
 #### `USE_GRAPH_SUBSCRIPTIONS`
@@ -362,7 +362,7 @@ This document explains all environment variables used in the NFT Marketplace app
 - **Purpose:** Google Cloud API access (Maps, Analytics, etc.)
 - **Type:** Secret
 - **Required:** No (optional features)
-- **Example:** `AIzaSyAK2GoyhLdWxkbk3Cf3OzKpnQMVuZ1i4IQ`
+- **Example:** `<GOOGLE_API_KEY>`
 - **Services:**
   - Google Maps (location-based features)
   - Google Analytics (usage tracking)
