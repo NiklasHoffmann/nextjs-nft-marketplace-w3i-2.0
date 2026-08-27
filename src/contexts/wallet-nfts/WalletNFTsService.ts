@@ -89,16 +89,31 @@ export interface WalletNFT extends ExternalNFT {
 }
 
 export class WalletNFTsService {
-    private static readonly BACKGROUND_SYNC_COOLDOWN_MS = 120_000;
+    private static readonly BACKGROUND_SYNC_COOLDOWN_MS = 75_000;
     private static readonly SNAPSHOT_CACHE_TTL_MS = 45_000;
     private static readonly COMPLETENESS_FORCE_SYNC_COOLDOWN_MS = 180_000;
-    private static readonly DISCOVERY_GAP_CHECK_COOLDOWN_MS = 90_000;
+    private static readonly DISCOVERY_GAP_CHECK_COOLDOWN_MS = 180_000;
+    private static readonly DB_OUTAGE_COOLDOWN_MS = 60_000;
     private static readonly lastBackgroundSyncByWallet = new Map<string, number>();
     private static readonly lastCompletenessForceSyncByWallet = new Map<string, number>();
     private static readonly lastDiscoveryGapCheckByWallet = new Map<string, number>();
     private static readonly walletSnapshotCache = new Map<string, { expiresAt: number; nfts: WalletNFT[] }>();
     private static readonly walletFetchInFlight = new Map<string, Promise<WalletNFT[]>>();
     private static readonly backgroundSyncInFlight = new Map<string, Promise<void>>();
+    private static readonly discoveryPersistInFlight = new Map<string, Promise<void>>();
+    private static dbUnavailableUntil = 0;
+
+    private static isDbLikelyUnavailable(): boolean {
+        return Date.now() < this.dbUnavailableUntil;
+    }
+
+    private static markDbUnavailable(): void {
+        this.dbUnavailableUntil = Date.now() + this.DB_OUTAGE_COOLDOWN_MS;
+    }
+
+    private static markDbAvailable(): void {
+        this.dbUnavailableUntil = 0;
+    }
 
     private static getCachedWalletSnapshot(walletAddress: string): WalletNFT[] | null {
         const normalizedWallet = walletAddress.toLowerCase();
@@ -143,41 +158,103 @@ export class WalletNFTsService {
         this.lastDiscoveryGapCheckByWallet.set(walletAddress.toLowerCase(), Date.now());
     }
 
-    private static async fetchDiscoveredWalletNFTCount(walletAddress: string): Promise<number | null> {
+    private static parseWalletNftsPayload(rawPayload: any): ExternalNFT[] {
+        const payload = rawPayload?.data ?? rawPayload;
+        const nestedPayload = payload?.data ?? payload?.nfts ?? null;
+
+        const extracted: unknown[] = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.nfts)
+                ? payload.nfts
+                : Array.isArray(payload?.data)
+                    ? payload.data
+                    : Array.isArray(payload?.data?.nfts)
+                        ? payload.data.nfts
+                        : Array.isArray(nestedPayload)
+                            ? nestedPayload
+                            : [];
+
+        return extracted
+            .filter((nft): nft is ExternalNFT => Boolean(
+                nft
+                && typeof nft === 'object'
+                && (nft as any).contractAddress
+                && (nft as any).tokenId !== undefined
+                && (nft as any).tokenId !== null
+            ))
+            .map((nft) => ({
+                ...(nft as ExternalNFT),
+                contractAddress: String((nft as any).contractAddress).toLowerCase(),
+                tokenId: String((nft as any).tokenId),
+            }));
+    }
+
+    private static async fetchDiscoveredWalletNFTs(walletAddress: string): Promise<ExternalNFT[] | null> {
         try {
-            const response = await fetch(
-                `/api/wallet/nfts?address=${walletAddress}&source=alchemy&skipPersist=true`
-            );
+            const response = await fetch(`/api/wallet/nfts?address=${walletAddress}&skipPersist=true`);
             if (!response.ok) {
                 return null;
             }
 
             const body = await response.json();
-            const payload = body?.data ?? body;
-            const nestedPayload = payload?.data ?? payload?.nfts ?? null;
-
-            const discoveredNFTs: unknown[] = Array.isArray(payload)
-                ? payload
-                : Array.isArray(payload?.nfts)
-                    ? payload.nfts
-                    : Array.isArray(payload?.data)
-                        ? payload.data
-                        : Array.isArray(payload?.data?.nfts)
-                            ? payload.data.nfts
-                            : Array.isArray(nestedPayload)
-                                ? nestedPayload
-                                : [];
-
-            const explicitTotal = typeof payload?.total === 'number'
-                ? payload.total
-                : typeof body?.total === 'number'
-                    ? body.total
-                    : null;
-
-            return explicitTotal ?? discoveredNFTs.length;
+            return this.parseWalletNftsPayload(body);
         } catch {
             return null;
         }
+    }
+
+    private static triggerDiscoveryPersistence(walletAddress: string): void {
+        const normalizedWallet = walletAddress.toLowerCase();
+
+        if (this.isDbLikelyUnavailable()) {
+            return;
+        }
+
+        if (this.discoveryPersistInFlight.has(normalizedWallet)) {
+            return;
+        }
+
+        const persistPromise = fetch(`/api/wallet/nfts?address=${walletAddress}`)
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error(`Discovery persistence failed (${response.status})`);
+                }
+            })
+            .catch((error) => {
+                devLog.warn('wallet-nfts', '⚠️ Background discovery persistence failed', error);
+            })
+            .finally(() => {
+                this.discoveryPersistInFlight.delete(normalizedWallet);
+            });
+
+        this.discoveryPersistInFlight.set(normalizedWallet, persistPromise);
+    }
+
+    private static mergeDbSnapshotWithDiscoveredIdentifiers(
+        dbNFTs: WalletNFT[],
+        discoveredNFTs: ExternalNFT[]
+    ): WalletNFT[] {
+        const existingKeys = new Set(
+            dbNFTs.map((nft) => `${nft.contractAddress.toLowerCase()}-${nft.tokenId}`)
+        );
+
+        const missingIdentifiers = discoveredNFTs.filter((nft) => {
+            const key = `${nft.contractAddress.toLowerCase()}-${nft.tokenId}`;
+            return !existingKeys.has(key);
+        });
+
+        if (missingIdentifiers.length === 0) {
+            return dbNFTs;
+        }
+
+        const placeholders: WalletNFT[] = missingIdentifiers.map((nft) => ({
+            contractAddress: nft.contractAddress,
+            tokenId: nft.tokenId,
+            hasMarketplaceData: false,
+            hasInsightsData: false,
+        }));
+
+        return [...dbNFTs, ...placeholders];
     }
 
     private static async performSync(walletAddress: string, force: boolean = false): Promise<void> {
@@ -274,10 +351,20 @@ export class WalletNFTsService {
     }
 
     private static async fetchWalletNFTsFromDb(walletAddress: string): Promise<WalletNFT[]> {
-        const dbResponse = await fetch(`/api/user/nfts?walletAddress=${walletAddress}`);
-        if (!dbResponse.ok) {
+        if (this.isDbLikelyUnavailable()) {
             return [];
         }
+
+        const dbResponse = await fetch(`/api/user/nfts?walletAddress=${walletAddress}`);
+        if (!dbResponse.ok) {
+            if (dbResponse.status >= 500) {
+                this.markDbUnavailable();
+                devLog.warn('wallet-nfts', `⚠️ DB endpoint unavailable (${dbResponse.status}), temporarily switching to discovery-only mode`);
+            }
+            return [];
+        }
+
+        this.markDbAvailable();
 
         const dbResult = await dbResponse.json();
         if (!dbResult?.success || !Array.isArray(dbResult?.data?.nfts)) {
@@ -384,45 +471,27 @@ export class WalletNFTsService {
 
                 if (!options.forceSync && this.shouldRunDiscoveryGapCheck(normalizedWallet)) {
                     this.markDiscoveryGapCheck(normalizedWallet);
-                    const discoveredCount = await this.fetchDiscoveredWalletNFTCount(walletAddress);
+                    const discoveredNFTs = await this.fetchDiscoveredWalletNFTs(walletAddress);
 
-                    devLog.info(
-                        'wallet-nfts',
-                        `🔎 Wallet gap check: wallet=${normalizedWallet.slice(0, 10)}... db=${walletNFTsFromDb.length} discovered=${discoveredCount ?? 'n/a'}`
-                    );
-
-                    if (typeof discoveredCount === 'number' && discoveredCount > walletNFTsFromDb.length) {
-                        devLog.warn(
-                            'wallet-nfts',
-                            `⚠️ Discovery gap detected (DB=${walletNFTsFromDb.length}, discovered=${discoveredCount}), forcing sync`
+                    if (discoveredNFTs && discoveredNFTs.length > 0) {
+                        const mergedWalletNFTs = this.mergeDbSnapshotWithDiscoveredIdentifiers(
+                            walletNFTsFromDb,
+                            discoveredNFTs
                         );
 
-                        try {
-                            await this.performSync(walletAddress, true);
-                            const refreshedWalletNFTs = await this.fetchWalletNFTsFromDb(walletAddress);
-                            if (refreshedWalletNFTs.length > walletNFTsFromDb.length) {
-                                this.setCachedWalletSnapshot(normalizedWallet, refreshedWalletNFTs);
-                                devLog.success(`✅ Gap sync recovered ${refreshedWalletNFTs.length - walletNFTsFromDb.length} missing NFTs`);
-                                devLog.info(
-                                    'wallet-nfts',
-                                    `📈 Gap recovery result: wallet=${normalizedWallet.slice(0, 10)}... before=${walletNFTsFromDb.length} after=${refreshedWalletNFTs.length}`
-                                );
-                                this.triggerBackgroundSync(walletAddress);
-                                return refreshedWalletNFTs;
-                            }
-
-                            devLog.info(
+                        if (mergedWalletNFTs.length > walletNFTsFromDb.length) {
+                            devLog.warn(
                                 'wallet-nfts',
-                                `ℹ️ Gap recovery sync finished without count increase (before=${walletNFTsFromDb.length}, after=${refreshedWalletNFTs.length})`
+                                `⚠️ Discovery gap detected: db=${walletNFTsFromDb.length}, discovered=${discoveredNFTs.length}, merged=${mergedWalletNFTs.length}`
                             );
-                        } catch (syncError) {
-                            devLog.warn('wallet-nfts', '⚠️ Gap recovery sync failed, using existing DB snapshot', syncError);
+
+                            // Persist/enrich discovered gap NFTs in background so next loads are DB-fast.
+                            this.triggerDiscoveryPersistence(walletAddress);
+
+                            this.setCachedWalletSnapshot(normalizedWallet, mergedWalletNFTs);
+                            this.triggerBackgroundSync(walletAddress);
+                            return mergedWalletNFTs;
                         }
-                    } else if (typeof discoveredCount === 'number') {
-                        devLog.info(
-                            'wallet-nfts',
-                            `✅ No wallet gap detected (DB=${walletNFTsFromDb.length}, discovered=${discoveredCount})`
-                        );
                     }
                 }
 
@@ -437,7 +506,17 @@ export class WalletNFTsService {
             // Fallback: No DB data yet - run discovery and force DB enrichment via worker.
             devLog.warn('No DB data found, running discovery + forced DB enrichment...');
             devLog.info('⏳ Step 1/3: Fetching from /api/wallet/nfts...');
-            const response = await fetch(`/api/wallet/nfts?address=${walletAddress}`);
+            const shouldSkipPersist = this.isDbLikelyUnavailable();
+            const fallbackUrl = shouldSkipPersist
+                ? `/api/wallet/nfts?address=${walletAddress}&skipPersist=true`
+                : `/api/wallet/nfts?address=${walletAddress}`;
+
+            let response = await fetch(fallbackUrl);
+
+            if (!response.ok && !shouldSkipPersist) {
+                // If DB persistence path fails, retry with side effects disabled.
+                response = await fetch(`/api/wallet/nfts?address=${walletAddress}&skipPersist=true`);
+            }
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch wallet NFTs: ${response.status}`);

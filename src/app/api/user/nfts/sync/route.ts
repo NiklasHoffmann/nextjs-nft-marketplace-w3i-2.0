@@ -26,13 +26,35 @@ import { fetchComprehensiveNFTDataNew } from '@/services/blockchain/nft-fetcher'
 import type { Address } from 'viem';
 import { devLog } from '@/utils';
 
+const METADATA_FETCH_VERSION = 2;
+
 // Lightweight NFT discovery from Alchemy
 interface NFTIdentifier {
     contractAddress: string;
     tokenId: string;
 }
 
-const SYNC_RESULT_TTL_MS = 120_000;
+const DISCOVERY_PAGE_SIZE = 100;
+const DISCOVERY_MAX_PAGES = Number.parseInt(process.env.WALLET_DISCOVERY_MAX_PAGES || '10', 10);
+
+function normalizeTokenId(tokenId: unknown): string {
+    if (tokenId === undefined || tokenId === null) {
+        return '';
+    }
+
+    const raw = String(tokenId).trim();
+    if (!raw) {
+        return '';
+    }
+
+    try {
+        return BigInt(raw).toString();
+    } catch {
+        return raw;
+    }
+}
+
+const SYNC_RESULT_TTL_MS = 45_000;
 const SYNC_RESULT_SHARED_CACHE_TTL_SECONDS = Math.ceil(SYNC_RESULT_TTL_MS / 1000);
 
 interface SyncCacheEntry {
@@ -43,6 +65,20 @@ interface SyncCacheEntry {
 const METADATA_REFRESH_COOLDOWN_MS = 15 * 60 * 1000;
 const METADATA_PERIODIC_REVALIDATION_MS = 24 * 60 * 60 * 1000;
 const MAX_PERIODIC_METADATA_REFRESH_PER_SYNC = 15;
+
+type MetadataAttribute = {
+    trait_type: string;
+    value: string | number;
+    display_type?: string;
+};
+
+type TokenMetadataPayload = {
+    name: string | null;
+    description: string | null;
+    image: string | null;
+    attributes: MetadataAttribute[];
+    [key: string]: any;
+};
 
 function getTimestampMs(value: unknown): number | null {
     if (!value) return null;
@@ -84,18 +120,162 @@ function hasUsableMetadata(existingNft: any): boolean {
     return hasName && hasImage;
 }
 
-function hasFetchedMetadataPayload(metadata: {
-    name: string | null;
-    description: string | null;
-    image: string | null;
-    attributes: Array<{ trait_type: string; value: string | number }>;
-}): boolean {
+function normalizeMetadataAssetUrl(value: unknown): string | null {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    if (trimmed.startsWith('ipfs://')) {
+        return trimmed.replace('ipfs://', 'https://ipfs.io/ipfs/');
+    }
+
+    if (trimmed.startsWith('ipfs/')) {
+        return `https://ipfs.io/ipfs/${trimmed.slice(5)}`;
+    }
+
+    return trimmed;
+}
+
+function normalizeMetadataAttributes(value: unknown): MetadataAttribute[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map((entry) => {
+            if (!entry || typeof entry !== 'object') {
+                return null;
+            }
+
+            const raw = entry as Record<string, unknown>;
+            const trait = typeof raw.trait_type === 'string'
+                ? raw.trait_type
+                : typeof raw.traitType === 'string'
+                    ? raw.traitType
+                    : '';
+
+            if (!trait) {
+                return null;
+            }
+
+            const valueRaw = raw.value;
+            const normalizedValue = typeof valueRaw === 'number' || typeof valueRaw === 'string'
+                ? valueRaw
+                : JSON.stringify(valueRaw);
+
+            const normalized: MetadataAttribute = {
+                trait_type: trait,
+                value: normalizedValue,
+            };
+
+            if (typeof raw.display_type === 'string') {
+                normalized.display_type = raw.display_type;
+            }
+
+            return normalized;
+        })
+        .filter((entry): entry is MetadataAttribute => entry !== null);
+}
+
+function normalizeFetchedMetadataPayload(metadataJson: unknown): TokenMetadataPayload {
+    const raw = metadataJson && typeof metadataJson === 'object'
+        ? { ...(metadataJson as Record<string, unknown>) }
+        : {};
+
+    const image = normalizeMetadataAssetUrl(raw.image ?? raw.image_url ?? raw.imageUrl);
+    const animationUrl = normalizeMetadataAssetUrl(raw.animationUrl ?? raw.animation_url);
+    const externalUrl = typeof raw.externalUrl === 'string'
+        ? raw.externalUrl.trim()
+        : typeof raw.external_url === 'string'
+            ? raw.external_url.trim()
+            : null;
+
+    const normalized: TokenMetadataPayload = {
+        ...(raw as Record<string, any>),
+        name: typeof raw.name === 'string'
+            ? raw.name
+            : (typeof raw.title === 'string' ? raw.title : null),
+        description: typeof raw.description === 'string' ? raw.description : null,
+        image,
+        attributes: normalizeMetadataAttributes(raw.attributes),
+    };
+
+    if (image && !normalized.imageOriginal) {
+        normalized.imageOriginal = image;
+    }
+
+    if (animationUrl) {
+        normalized.animationUrl = animationUrl;
+        if (!normalized.animation_url) {
+            normalized.animation_url = animationUrl;
+        }
+    }
+
+    if (externalUrl) {
+        normalized.externalUrl = externalUrl;
+        if (!normalized.external_url) {
+            normalized.external_url = externalUrl;
+        }
+    }
+
+    return normalized;
+}
+
+function hasFetchedMetadataPayload(metadata: TokenMetadataPayload): boolean {
     const hasName = typeof metadata.name === 'string' && metadata.name.trim().length > 0;
     const hasDescription = typeof metadata.description === 'string' && metadata.description.trim().length > 0;
     const hasImage = typeof metadata.image === 'string' && metadata.image.trim().length > 0;
     const hasAttributes = Array.isArray(metadata.attributes) && metadata.attributes.length > 0;
 
-    return hasName || hasDescription || hasImage || hasAttributes;
+    const knownKeys = new Set([
+        'name',
+        'title',
+        'description',
+        'image',
+        'image_url',
+        'imageUrl',
+        'imageOriginal',
+        'images',
+        'imageMeta',
+        'blurDataURL',
+        'attributes',
+        'animationUrl',
+        'animation_url',
+        'externalUrl',
+        'external_url',
+        'background_color',
+    ]);
+    const hasAdditionalFields = Object.keys(metadata).some((key) => {
+        if (knownKeys.has(key)) {
+            return false;
+        }
+
+        const value = metadata[key];
+        if (value === null || value === undefined) {
+            return false;
+        }
+
+        if (typeof value === 'string') {
+            return value.trim().length > 0;
+        }
+
+        if (Array.isArray(value)) {
+            return value.length > 0;
+        }
+
+        if (typeof value === 'object') {
+            return Object.keys(value as Record<string, unknown>).length > 0;
+        }
+
+        return true;
+    });
+
+    return hasName || hasDescription || hasImage || hasAttributes || hasAdditionalFields;
 }
 
 function shouldPeriodicMetadataRevalidation(existingNft: any): boolean {
@@ -168,37 +348,70 @@ async function discoverNFTsViaAlchemy(walletAddress: string): Promise<NFTIdentif
 
         const baseURL = `https://eth-sepolia.g.alchemy.com/nft/v3/${apiKey}`;
 
-        const response = await fetch(
-            `${baseURL}/getNFTsForOwner?owner=${walletAddress}&withMetadata=false&pageSize=100`,
-            {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' }
-            }
-        );
+        const maxPages = Number.isFinite(DISCOVERY_MAX_PAGES) && DISCOVERY_MAX_PAGES > 0
+            ? DISCOVERY_MAX_PAGES
+            : 10;
+        let pageKey: string | undefined;
+        const discovered: NFTIdentifier[] = [];
+        const dedupe = new Set<string>();
 
-        if (!response.ok) {
-            incrementRequestCounter('alchemy.discovery.user_sync.error');
-            throw new Error(`Alchemy API error: ${response.status}`);
+        for (let page = 1; page <= maxPages; page++) {
+            const query = new URLSearchParams({
+                owner: walletAddress,
+                withMetadata: 'false',
+                pageSize: String(DISCOVERY_PAGE_SIZE),
+            });
+
+            if (pageKey) {
+                query.set('pageKey', pageKey);
+            }
+
+            const response = await fetch(`${baseURL}/getNFTsForOwner?${query.toString()}`, {
+                method: 'GET',
+                headers: { Accept: 'application/json' }
+            });
+
+            if (!response.ok) {
+                incrementRequestCounter('alchemy.discovery.user_sync.error');
+                throw new Error(`Alchemy API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            const items = Array.isArray(data?.ownedNfts) ? data.ownedNfts : [];
+
+            for (const nft of items) {
+                const contractAddress = nft?.contract?.address || nft?.contractAddress;
+                const tokenId = normalizeTokenId(nft?.tokenId || nft?.id?.tokenId);
+
+                if (!contractAddress || !tokenId) {
+                    continue;
+                }
+
+                const normalizedAddress = String(contractAddress).toLowerCase();
+                const key = `${normalizedAddress}-${tokenId}`;
+                if (dedupe.has(key)) {
+                    continue;
+                }
+
+                dedupe.add(key);
+                discovered.push({
+                    contractAddress: normalizedAddress,
+                    tokenId,
+                });
+            }
+
+            const nextPageKey = typeof data?.pageKey === 'string' && data.pageKey.trim().length > 0
+                ? data.pageKey
+                : undefined;
+            if (!nextPageKey) {
+                break;
+            }
+
+            pageKey = nextPageKey;
         }
 
         incrementRequestCounter('alchemy.discovery.user_sync.success');
-
-        const data = await response.json();
-
-        return data.ownedNfts?.map((nft: any) => {
-            const contractAddress = nft.contract?.address || nft.contractAddress;
-            const tokenId = nft.tokenId || nft.id?.tokenId;
-
-            if (!contractAddress || tokenId === undefined) {
-                devLog.warn(`⚠️ [Sync] Skipping NFT with missing data`);
-                return null;
-            }
-
-            return {
-                contractAddress,
-                tokenId: tokenId.toString(),
-            };
-        }).filter(Boolean) || [];
+        return discovered;
     } catch (error) {
         devLog.error('❌ [Sync Alchemy Discovery] Error:', error);
         throw error;
@@ -214,40 +427,78 @@ async function discoverNFTsViaMoralis(walletAddress: string): Promise<NFTIdentif
     }
 
     const chain = process.env.MORALIS_CHAIN || 'sepolia';
-    const response = await fetch(
-        `https://deep-index.moralis.io/api/v2.2/${walletAddress}/nft?chain=${chain}&format=decimal&media_items=false`,
-        {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'X-API-Key': apiKey
-            }
-        }
-    );
+    const maxPages = Number.isFinite(DISCOVERY_MAX_PAGES) && DISCOVERY_MAX_PAGES > 0
+        ? DISCOVERY_MAX_PAGES
+        : 10;
+    let cursor: string | undefined;
+    const discovered: NFTIdentifier[] = [];
+    const dedupe = new Set<string>();
 
-    if (!response.ok) {
-        incrementRequestCounter('moralis.discovery.user_sync.error');
-        throw new Error(`Moralis API error: ${response.status}`);
+    for (let page = 1; page <= maxPages; page++) {
+        const query = new URLSearchParams({
+            chain,
+            format: 'decimal',
+            media_items: 'false',
+            limit: String(DISCOVERY_PAGE_SIZE),
+        });
+
+        if (cursor) {
+            query.set('cursor', cursor);
+        }
+
+        const response = await fetch(
+            `https://deep-index.moralis.io/api/v2.2/${walletAddress}/nft?${query.toString()}`,
+            {
+                method: 'GET',
+                headers: {
+                    Accept: 'application/json',
+                    'X-API-Key': apiKey
+                }
+            }
+        );
+
+        if (!response.ok) {
+            incrementRequestCounter('moralis.discovery.user_sync.error');
+            throw new Error(`Moralis API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const result = Array.isArray(data?.result) ? data.result : [];
+
+        for (const nft of result) {
+            const contractAddress = nft?.token_address;
+            const tokenId = normalizeTokenId(nft?.token_id);
+
+            if (!contractAddress || !tokenId) {
+                continue;
+            }
+
+            const normalizedAddress = String(contractAddress).toLowerCase();
+            const key = `${normalizedAddress}-${tokenId}`;
+            if (dedupe.has(key)) {
+                continue;
+            }
+
+            dedupe.add(key);
+            discovered.push({
+                contractAddress: normalizedAddress,
+                tokenId,
+            });
+        }
+
+        const nextCursor = typeof data?.cursor === 'string' && data.cursor.trim().length > 0
+            ? data.cursor
+            : undefined;
+
+        if (!nextCursor) {
+            break;
+        }
+
+        cursor = nextCursor;
     }
 
     incrementRequestCounter('moralis.discovery.user_sync.success');
-
-    const data = await response.json();
-    const result = Array.isArray(data?.result) ? data.result : [];
-
-    return result.map((nft: any) => {
-        const contractAddress = nft?.token_address;
-        const tokenId = nft?.token_id;
-
-        if (!contractAddress || tokenId === undefined || tokenId === null) {
-            return null;
-        }
-
-        return {
-            contractAddress: String(contractAddress).toLowerCase(),
-            tokenId: String(tokenId),
-        };
-    }).filter(Boolean) as NFTIdentifier[];
+    return discovered;
 }
 
 async function discoverNFTsViaKnownContracts(walletAddress: string): Promise<NFTIdentifier[]> {
@@ -256,7 +507,11 @@ async function discoverNFTsViaKnownContracts(walletAddress: string): Promise<NFT
         return [];
     }
 
-    const nfts = await getWalletNFTsFromBlockchain(walletAddress as Address, knownContracts as Address[]);
+    const nfts = await getWalletNFTsFromBlockchain(
+        walletAddress as Address,
+        knownContracts as Address[],
+        { identifiersOnly: true }
+    );
 
     return nfts
         .map((nft) => {
@@ -266,10 +521,10 @@ async function discoverNFTsViaKnownContracts(walletAddress: string): Promise<NFT
 
             return {
                 contractAddress: String(nft.contractAddress).toLowerCase(),
-                tokenId: String(nft.tokenId),
+                tokenId: normalizeTokenId(nft.tokenId),
             };
         })
-        .filter(Boolean) as NFTIdentifier[];
+        .filter((item): item is NFTIdentifier => Boolean(item && item.tokenId));
 }
 
 async function discoverNFTsWithFallback(walletAddress: string): Promise<{ nfts: NFTIdentifier[]; source: 'alchemy' | 'moralis' | 'blockchain'; }> {
@@ -373,10 +628,13 @@ export const POST = apiHandler(async (request: NextRequest) => {
                     tokenId: discoveredNFT.tokenId
                 };
 
-                if (!hasUsableMetadata(existing)) {
+                if (forceSync && canAttemptMetadataRefresh(existing, forceSync)) {
+                    // Force mode must re-fetch metadata for existing NFTs to backfill newly supported fields.
+                    existingToRefreshMetadata.push(normalized);
+                } else if (!hasUsableMetadata(existing) && canAttemptMetadataRefresh(existing, forceSync)) {
                     // Safety net: incomplete metadata is always eligible for refresh.
                     existingToRefreshMetadata.push(normalized);
-                } else if (shouldPeriodicMetadataRevalidation(existing)) {
+                } else if (shouldPeriodicMetadataRevalidation(existing) && canAttemptMetadataRefresh(existing, forceSync)) {
                     existingToPeriodicRevalidate.push(normalized);
                 } else {
                     existingToUpdate.push(normalized);
@@ -461,7 +719,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
                         }
 
                         // Fetch metadata from tokenURI if available
-                        let metadata = {
+                        let metadata: TokenMetadataPayload = {
                             name: null,
                             description: null,
                             image: null,
@@ -478,12 +736,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
 
                                 if (metadataResponse.ok) {
                                     const metadataJson = await metadataResponse.json();
-                                    metadata = {
-                                        name: metadataJson.name || null,
-                                        description: metadataJson.description || null,
-                                        image: metadataJson.image || null,
-                                        attributes: metadataJson.attributes || []
-                                    };
+                                    metadata = normalizeFetchedMetadataPayload(metadataJson);
                                 }
                             } catch (metaError) {
                                 devLog.warn(`    ⚠️  Failed to fetch metadata: ${metaError}`);
@@ -527,6 +780,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
                         // Safety net: never overwrite existing metadata with an empty fetch result.
                         if (hasFetchedMetadataPayload(metadata)) {
                             updatePayload.metadata = metadata;
+                            updatePayload.metadataFetchVersion = METADATA_FETCH_VERSION;
                             const metadataUpdateTimestamp = new Date().toISOString();
                             updatePayload.lastMetadataUpdate = metadataUpdateTimestamp;
                             // Keep legacy field in sync until migration is complete.

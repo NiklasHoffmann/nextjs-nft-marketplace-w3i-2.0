@@ -95,6 +95,7 @@ export interface EnrichedNFTDocument {
             value: any;
             display_type?: string;
         }>;
+        [key: string]: any;
     };
 
     // ===== CONTRACT DATA =====

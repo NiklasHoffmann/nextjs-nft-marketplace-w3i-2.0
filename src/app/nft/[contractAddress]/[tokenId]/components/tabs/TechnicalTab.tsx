@@ -3,6 +3,194 @@ import { NFTAttribute } from '@/types/features/nft-detail';
 import { RoyaltyInfo } from '@/types';
 import { ContractInfoSection } from '@/app/nft/[contractAddress]/[tokenId]/components/ContractInfoSection';
 
+type MetadataPair = {
+    label: string;
+    value: unknown;
+};
+
+const MAX_METADATA_RENDER_DEPTH = 4;
+
+function isNonEmptyMetadataValue(value: unknown): boolean {
+    if (value === null || value === undefined) {
+        return false;
+    }
+
+    if (typeof value === 'string') {
+        return value.trim().length > 0;
+    }
+
+    if (Array.isArray(value)) {
+        return value.length > 0;
+    }
+
+    if (typeof value === 'object') {
+        return Object.keys(value).length > 0;
+    }
+
+    return true;
+}
+
+function toHumanReadableKey(key: string): string {
+    return key
+        .replace(/[_-]+/g, ' ')
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/^\w/, (char) => char.toUpperCase());
+}
+
+function isLikelyUrl(value: string): boolean {
+    if (!value || value.length < 8) {
+        return false;
+    }
+
+    try {
+        const parsed = new URL(value);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'ipfs:';
+    } catch {
+        return false;
+    }
+}
+
+function tryStringify(value: unknown): string {
+    try {
+        return JSON.stringify(value, null, 2);
+    } catch {
+        return String(value);
+    }
+}
+
+function isTraitLikeObject(value: unknown): value is Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return false;
+    }
+
+    const obj = value as Record<string, unknown>;
+    return (
+        (typeof obj.trait_type === 'string' && obj.value !== undefined) ||
+        (typeof obj.name === 'string' && obj.value !== undefined)
+    );
+}
+
+function normalizeMetadataPairs(value: unknown): MetadataPair[] {
+    if (!value) {
+        return [];
+    }
+
+    if (Array.isArray(value)) {
+        return value
+            .map((entry, index) => {
+                if (isTraitLikeObject(entry)) {
+                    const label = typeof entry.trait_type === 'string' ? entry.trait_type : String(entry.name);
+                    return { label, value: entry.value };
+                }
+
+                if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+                    const obj = entry as Record<string, unknown>;
+                    const label = typeof obj.key === 'string'
+                        ? obj.key
+                        : typeof obj.name === 'string'
+                            ? obj.name
+                            : `Item ${index + 1}`;
+                    const entryValue = obj.value !== undefined ? obj.value : obj;
+                    return { label, value: entryValue };
+                }
+
+                return { label: `Item ${index + 1}`, value: entry };
+            })
+            .filter((pair) => isNonEmptyMetadataValue(pair.value));
+    }
+
+    if (typeof value === 'object') {
+        return Object.entries(value as Record<string, unknown>)
+            .map(([label, entryValue]) => ({ label, value: entryValue }))
+            .filter((pair) => isNonEmptyMetadataValue(pair.value));
+    }
+
+    return [];
+}
+
+function MetadataValueRenderer({ value, depth = 0 }: { value: unknown; depth?: number }) {
+    if (!isNonEmptyMetadataValue(value)) {
+        return <span className="text-sm text-gray-500">N/A</span>;
+    }
+
+    if (depth >= MAX_METADATA_RENDER_DEPTH) {
+        return (
+            <pre className="text-xs text-gray-700 whitespace-pre-wrap break-all font-mono">
+                {tryStringify(value)}
+            </pre>
+        );
+    }
+
+    if (typeof value === 'string') {
+        if (isLikelyUrl(value)) {
+            return (
+                <a
+                    href={value}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-700 hover:text-blue-800 underline break-all"
+                >
+                    {value}
+                </a>
+            );
+        }
+
+        return <span className="text-sm text-gray-900 break-all">{value}</span>;
+    }
+
+    if (typeof value === 'number' || typeof value === 'boolean') {
+        return <span className="text-sm text-gray-900">{String(value)}</span>;
+    }
+
+    if (Array.isArray(value) || typeof value === 'object') {
+        const pairs = normalizeMetadataPairs(value);
+
+        if (pairs.length === 0) {
+            return (
+                <pre className="text-xs text-gray-700 whitespace-pre-wrap break-all font-mono">
+                    {tryStringify(value)}
+                </pre>
+            );
+        }
+
+        return (
+            <div className="space-y-2">
+                {pairs.map((pair, index) => (
+                    <div key={`${pair.label}-${index}`} className="rounded-md border border-gray-200 bg-white p-3">
+                        <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1 break-all">
+                            {toHumanReadableKey(pair.label)}
+                        </div>
+                        <MetadataValueRenderer value={pair.value} depth={depth + 1} />
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    return <span className="text-sm text-gray-900">{String(value)}</span>;
+}
+
+const EXTRA_METADATA_EXCLUDED_KEYS = new Set([
+    'name',
+    'title',
+    'description',
+    'image',
+    'image_url',
+    'imageUrl',
+    'imageOriginal',
+    'images',
+    'imageMeta',
+    'blurDataURL',
+    'attributes',
+    'animationUrl',
+    'animation_url',
+    'externalUrl',
+    'external_url',
+    'background_color',
+]);
+
 interface TechnicalTabProps {
     contractAddress: string;
     tokenId: string;
@@ -18,6 +206,7 @@ interface TechnicalTabProps {
     royaltyInfo?: RoyaltyInfo | null;
     rarityRank?: number | null;
     rarityScore?: number | null;
+    metadata?: Record<string, any> | null;
     // Enhanced contract fields
     ownerBalance?: number | null;
     ownershipBalances?: Record<string, number> | null;
@@ -46,6 +235,7 @@ export default function TechnicalTab({ contractAddress,
     royaltyInfo,
     rarityRank,
     rarityScore,
+    metadata,
     ownerBalance,
     ownershipBalances,
     holderCount,
@@ -58,6 +248,15 @@ export default function TechnicalTab({ contractAddress,
     listingId,
     connectedAddress
 }: TechnicalTabProps) {
+    const additionalMetadataEntries = Object.entries(metadata || {})
+        .filter(([key, value]) => {
+            if (EXTRA_METADATA_EXCLUDED_KEYS.has(key)) {
+                return false;
+            }
+
+            return isNonEmptyMetadataValue(value);
+        })
+        .sort(([a], [b]) => a.localeCompare(b));
 
     return (
         <div className="space-y-6">
@@ -312,6 +511,29 @@ export default function TechnicalTab({ contractAddress,
                                         Display Type: {attr.display_type}
                                     </div>
                                 )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Additional Metadata (collection-specific fields) */}
+            {additionalMetadataEntries.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                        <svg className="w-5 h-5 mr-2 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m-2.599-1A3.98 3.98 0 017 14m10 0a3.98 3.98 0 01-2.401 1" />
+                        </svg>
+                        Extended Metadata ({additionalMetadataEntries.length})
+                    </h3>
+
+                    <div className="space-y-3">
+                        {additionalMetadataEntries.map(([key, value], index) => (
+                            <div key={`${key}-${index}`} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 break-all">
+                                    {toHumanReadableKey(key)}
+                                </div>
+                                <MetadataValueRenderer value={value} />
                             </div>
                         ))}
                     </div>

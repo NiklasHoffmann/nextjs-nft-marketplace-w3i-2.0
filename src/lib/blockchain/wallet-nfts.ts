@@ -80,6 +80,10 @@ interface BlockchainNFT {
     contractSymbol?: string;
 }
 
+interface WalletNFTDiscoveryOptions {
+    identifiersOnly?: boolean;
+}
+
 interface NFTMetadata {
     name?: string;
     description?: string;
@@ -196,13 +200,18 @@ async function fetchMetadata(tokenURI: string): Promise<NFTMetadata | null> {
  */
 export async function getWalletNFTsFromBlockchain(
     walletAddress: Address,
-    knownContracts: Address[]
+    knownContracts: Address[],
+    options: WalletNFTDiscoveryOptions = {}
 ): Promise<BlockchainNFT[]> {
     const client = createClient();
     const nfts: BlockchainNFT[] = [];
     const startTime = Date.now();
+    const identifiersOnly = options.identifiersOnly === true;
 
-    devLog.info(`🔗 [Blockchain] Fetching NFTs for ${walletAddress} from ${knownContracts.length} contracts`);
+    devLog.info(
+        `🔗 [Blockchain] Fetching NFTs for ${walletAddress} from ${knownContracts.length} contracts` +
+        `${identifiersOnly ? ' (identifiers only)' : ''}`
+    );
 
     // Process contracts in parallel (up to 3 at once to avoid rate limits)
     const CONCURRENT_CONTRACTS = 3;
@@ -210,7 +219,7 @@ export async function getWalletNFTsFromBlockchain(
         const batch = knownContracts.slice(i, i + CONCURRENT_CONTRACTS);
 
         const batchResults = await Promise.allSettled(
-            batch.map(contractAddress => processContract(client, contractAddress, walletAddress))
+            batch.map(contractAddress => processContract(client, contractAddress, walletAddress, { identifiersOnly }))
         );
 
         batchResults.forEach((result, index) => {
@@ -233,9 +242,11 @@ export async function getWalletNFTsFromBlockchain(
 async function processContract(
     client: ReturnType<typeof createClient>,
     contractAddress: Address,
-    walletAddress: Address
+    walletAddress: Address,
+    options: WalletNFTDiscoveryOptions = {}
 ): Promise<BlockchainNFT[]> {
     const nfts: BlockchainNFT[] = [];
+    const identifiersOnly = options.identifiersOnly === true;
 
     // Step 1: Get balance (fast check if wallet owns any NFTs)
     const balance = await client.readContract({
@@ -252,21 +263,7 @@ async function processContract(
 
     devLog.info(`  ↳ ${contractAddress}: ${balance} NFTs`);
 
-    // Step 2: Get contract info in parallel
-    const [contractName, contractSymbol] = await Promise.all([
-        client.readContract({
-            address: contractAddress,
-            abi: ERC721_ABI,
-            functionName: 'name',
-        }).catch(() => 'Unknown'),
-        client.readContract({
-            address: contractAddress,
-            abi: ERC721_ABI,
-            functionName: 'symbol',
-        }).catch(() => 'UNKNOWN'),
-    ]);
-
-    // Step 3: Get token IDs (try enumerable first, fallback to events)
+    // Step 2: Get token IDs (try enumerable first, fallback to events)
     let tokenIds: bigint[] = [];
     try {
         // Attempt ERC721Enumerable (parallel queries)
@@ -288,6 +285,27 @@ async function processContract(
         devLog.warn(`    ⚠️ Not enumerable, using Transfer events for ${contractAddress}`);
         tokenIds = await getTokenIdsFromEvents(client, contractAddress, walletAddress, balance);
     }
+
+    if (identifiersOnly) {
+        return tokenIds.map((tokenId) => ({
+            contractAddress: contractAddress.toLowerCase(),
+            tokenId: tokenId.toString(),
+        }));
+    }
+
+    // Step 3: Get contract info in parallel
+    const [contractName, contractSymbol] = await Promise.all([
+        client.readContract({
+            address: contractAddress,
+            abi: ERC721_ABI,
+            functionName: 'name',
+        }).catch(() => 'Unknown'),
+        client.readContract({
+            address: contractAddress,
+            abi: ERC721_ABI,
+            functionName: 'symbol',
+        }).catch(() => 'UNKNOWN'),
+    ]);
 
     // Step 4: Fetch metadata in optimized batches
     const BATCH_SIZE = 5; // Process 5 NFTs at once

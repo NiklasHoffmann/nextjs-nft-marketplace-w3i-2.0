@@ -6,6 +6,7 @@ if (!process.env.MONGODB_URI) {
 }
 
 const uri = process.env.MONGODB_URI;
+const directUri = process.env.MONGODB_URI_DIRECT;
 const options: MongoClientOptions = {
     retryWrites: true,
     retryReads: true,
@@ -19,6 +20,32 @@ const options: MongoClientOptions = {
 let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
 
+async function connectClientWithOptionalFallback(primaryUri: string): Promise<MongoClient> {
+    const primaryClient = new MongoClient(primaryUri, options);
+
+    try {
+        await primaryClient.connect();
+        return primaryClient;
+    } catch (primaryError: any) {
+        const primaryMessage = String(primaryError?.message || primaryError || '');
+        const isSrvResolutionFailure =
+            primaryMessage.includes('querySrv')
+            || primaryMessage.includes('ECONNREFUSED')
+            || primaryMessage.includes('ENOTFOUND');
+
+        if (!directUri || !isSrvResolutionFailure) {
+            throw primaryError;
+        }
+
+        devLog.warn('⚠️ [MongoDB] SRV connection failed, retrying with MONGODB_URI_DIRECT fallback...');
+
+        const fallbackClient = new MongoClient(directUri, options);
+        await fallbackClient.connect();
+        devLog.info('✅ [MongoDB] Connected via MONGODB_URI_DIRECT fallback');
+        return fallbackClient;
+    }
+}
+
 declare global {
     var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
@@ -27,14 +54,12 @@ if (process.env.NODE_ENV === 'development') {
     // In development mode, use a global variable so that the value
     // is preserved across module reloads caused by HMR (Hot Module Replacement).
     if (!global._mongoClientPromise) {
-        client = new MongoClient(uri, options);
-        global._mongoClientPromise = client.connect();
+        global._mongoClientPromise = connectClientWithOptionalFallback(uri);
     }
     clientPromise = global._mongoClientPromise;
 } else {
     // In production mode, it's best to not use a global variable.
-    client = new MongoClient(uri, options);
-    clientPromise = client.connect();
+    clientPromise = connectClientWithOptionalFallback(uri);
 }
 
 // Export a module-scoped MongoClient promise. By doing this in a

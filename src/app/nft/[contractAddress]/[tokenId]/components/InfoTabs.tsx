@@ -68,6 +68,7 @@ function NewNFTInfoTabs({
     rarityRank,
     rarityScore,
     attributes,
+    metadata,
     supportsRoyalty,
     royaltyInfo,
     publicInsights,
@@ -149,6 +150,7 @@ function NewNFTInfoTabs({
                         ownerBalance={ownerBalance}
                         ownershipBalances={ownershipBalances}
                         holderCount={holderCount}
+                        metadata={metadata || null}
                         approved={approved}
                         isApprovedForAll={isApprovedForAll}
                         tokenURI={tokenURI}
@@ -267,6 +269,7 @@ function NewNFTInfoTabs({
         rarityRank,
         rarityScore,
         attributes,
+        metadata,
         supportsRoyalty,
         royaltyInfo,
         effectivePublicInsights,

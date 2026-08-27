@@ -193,7 +193,7 @@ function NFTDetailPage() {
     const categoryPillsProps = useMemo(() => ({
         categories: [],
         tags: [],
-        externalUrl: metadata?.externalUrl,
+        externalUrl: metadata?.externalUrl || (metadata as any)?.external_url || null,
         websiteUrl: null,
         twitterUrl: null,
         insights: publicInsights as any,
@@ -201,19 +201,19 @@ function NFTDetailPage() {
         contractAddress: contractAddress,
         tokenId
     }), [
-        metadata?.externalUrl, contractAddress, tokenId,
+        metadata?.externalUrl, (metadata as any)?.external_url, contractAddress, tokenId,
         publicInsights, isLoading
     ]);
 
     const mediaSectionProps = useMemo(() => ({
         imageUrl: finalImageUrl,
-        animationUrl: metadata?.animationUrl,
+        animationUrl: metadata?.animationUrl || (metadata as any)?.animation_url || null,
         videoUrl: null,
         audioUrl: null,
         name: finalName,
         tokenId
     }), [
-        finalImageUrl, metadata?.animationUrl, finalName, tokenId
+        finalImageUrl, metadata?.animationUrl, (metadata as any)?.animation_url, finalName, tokenId
     ]);
 
     const priceCardProps = useMemo(() => ({
@@ -279,6 +279,7 @@ function NFTDetailPage() {
                 trait_type: attr.trait_type || '',
                 value: attr.value || ''
             })) || undefined,
+            metadata: (metadata as any) || null,
             supportsRoyalty: false,
             royaltyInfo: null,
             publicInsights: publicInsights as any,

@@ -13,9 +13,21 @@ function WalletConnectionSync() {
     const { isConnected, isConnecting } = useAccount();
     const { reconnect } = useReconnect();
     const isReconnectingRef = useRef(false);
+    const [hydrated, setHydrated] = useState(false);
 
     useEffect(() => {
-        if (isConnected) return;
+        // Defer reconnect side effects until after initial hydration commit.
+        const timeoutId = window.setTimeout(() => {
+            setHydrated(true);
+        }, 0);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!hydrated || isConnected) return;
 
         const safeReconnect = async () => {
             if (isConnected || isConnecting || isReconnectingRef.current) return;
@@ -46,6 +58,7 @@ function WalletConnectionSync() {
         window.addEventListener('focus', onFocus);
         document.addEventListener('visibilitychange', onVisibility);
 
+        // Run once after listeners are attached.
         void safeReconnect();
 
         return () => {
@@ -53,7 +66,7 @@ function WalletConnectionSync() {
             window.removeEventListener('focus', onFocus);
             document.removeEventListener('visibilitychange', onVisibility);
         };
-    }, [isConnected, isConnecting, reconnect]);
+    }, [hydrated, isConnected, isConnecting, reconnect]);
 
     return null;
 }

@@ -1,6 +1,6 @@
 // ===== CORE NFT TYPES =====
 
-import type { NFTProjectDescriptions, NFTFunctionalitiesDescriptions } from '../features/nft-insights';
+import type { NFTProjectDescriptions, NFTFunctionalitiesDescriptions } from '@/types/features/nft-insights';
 
 // Quellen
 export type ActiveItem = {
@@ -56,6 +56,7 @@ export type NftMeta = {
     attributes?: Array<{ trait_type?: string; value?: any }>
     animationUrl?: string
     externalUrl?: string
+    [key: string]: any
 }
 
 export type SocialStats = {

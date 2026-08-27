@@ -37,6 +37,18 @@ export async function setupMongoDBIndexes() {
         devLog.info('  ✅ nft_metadata: owner_lookup index');
 
         await nftMetadata.createIndex(
+            { currentOwner: 1 },
+            { name: 'current_owner_lookup', background: true }
+        );
+        devLog.info('  ✅ nft_metadata: current_owner_lookup index');
+
+        await nftMetadata.createIndex(
+            { 'ownershipBalances.$**': 1 },
+            { name: 'ownership_balances_wildcard', background: true, sparse: true }
+        );
+        devLog.info('  ✅ nft_metadata: ownership_balances_wildcard index');
+
+        await nftMetadata.createIndex(
             { isListed: 1 },
             { name: 'is_listed', background: true }
         );

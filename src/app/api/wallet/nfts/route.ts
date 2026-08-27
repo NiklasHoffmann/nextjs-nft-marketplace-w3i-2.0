@@ -8,6 +8,8 @@ import { fetchComprehensiveNFTDataNew } from '@/services/blockchain/nft-fetcher'
 import type { Address } from 'viem';
 import { devLog } from '@/utils';
 
+const METADATA_FETCH_VERSION = 2;
+
 // Interface for NFT response from external APIs
 interface ExternalNFT {
     contractAddress: string;
@@ -39,12 +41,46 @@ interface WalletNFTsCacheEntry {
     payload: WalletNFTsResponse;
 }
 
+type MetadataAttribute = {
+    trait_type: string;
+    value: string | number;
+    display_type?: string;
+};
+
+type TokenMetadataPayload = {
+    name: string | null;
+    description: string | null;
+    image: string | null;
+    attributes: MetadataAttribute[];
+    [key: string]: any;
+};
+
 
 
 // Lightweight NFT discovery interface
 interface NFTIdentifier {
     contractAddress: string;
     tokenId: string;
+}
+
+const DISCOVERY_PAGE_SIZE = 100;
+const DISCOVERY_MAX_PAGES = Number.parseInt(process.env.WALLET_DISCOVERY_MAX_PAGES || '10', 10);
+
+function normalizeTokenId(tokenId: unknown): string {
+    if (tokenId === undefined || tokenId === null) {
+        return '';
+    }
+
+    const raw = String(tokenId).trim();
+    if (!raw) {
+        return '';
+    }
+
+    try {
+        return BigInt(raw).toString();
+    } catch {
+        return raw;
+    }
 }
 
 function normalizeMetadataUri(tokenURI: string, tokenId: string): string {
@@ -66,26 +102,165 @@ function normalizeMetadataUri(tokenURI: string, tokenId: string): string {
     return normalized;
 }
 
-function hasFetchedMetadataPayload(metadata: {
-    name: string | null;
-    description: string | null;
-    image: string | null;
-    attributes: Array<{ trait_type: string; value: string | number }>;
-}): boolean {
+function normalizeMetadataAssetUrl(value: unknown): string | null {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    if (trimmed.startsWith('ipfs://')) {
+        return trimmed.replace('ipfs://', 'https://ipfs.io/ipfs/');
+    }
+
+    if (trimmed.startsWith('ipfs/')) {
+        return `https://ipfs.io/ipfs/${trimmed.slice(5)}`;
+    }
+
+    return trimmed;
+}
+
+function normalizeMetadataAttributes(value: unknown): MetadataAttribute[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map((entry) => {
+            if (!entry || typeof entry !== 'object') {
+                return null;
+            }
+
+            const raw = entry as Record<string, unknown>;
+            const trait = typeof raw.trait_type === 'string'
+                ? raw.trait_type
+                : typeof raw.traitType === 'string'
+                    ? raw.traitType
+                    : '';
+
+            if (!trait) {
+                return null;
+            }
+
+            const valueRaw = raw.value;
+            const normalizedValue = typeof valueRaw === 'number' || typeof valueRaw === 'string'
+                ? valueRaw
+                : JSON.stringify(valueRaw);
+
+            const normalized: MetadataAttribute = {
+                trait_type: trait,
+                value: normalizedValue,
+            };
+
+            if (typeof raw.display_type === 'string') {
+                normalized.display_type = raw.display_type;
+            }
+
+            return normalized;
+        })
+        .filter((entry): entry is MetadataAttribute => entry !== null);
+}
+
+function normalizeFetchedMetadataPayload(metadataJson: unknown): TokenMetadataPayload {
+    const raw = metadataJson && typeof metadataJson === 'object'
+        ? { ...(metadataJson as Record<string, unknown>) }
+        : {};
+
+    const image = normalizeMetadataAssetUrl(raw.image ?? raw.image_url ?? raw.imageUrl);
+    const animationUrl = normalizeMetadataAssetUrl(raw.animationUrl ?? raw.animation_url);
+    const externalUrl = typeof raw.externalUrl === 'string'
+        ? raw.externalUrl.trim()
+        : typeof raw.external_url === 'string'
+            ? raw.external_url.trim()
+            : null;
+
+    const normalized: TokenMetadataPayload = {
+        ...(raw as Record<string, any>),
+        name: typeof raw.name === 'string'
+            ? raw.name
+            : (typeof raw.title === 'string' ? raw.title : null),
+        description: typeof raw.description === 'string' ? raw.description : null,
+        image,
+        attributes: normalizeMetadataAttributes(raw.attributes),
+    };
+
+    if (image && !normalized.imageOriginal) {
+        normalized.imageOriginal = image;
+    }
+
+    if (animationUrl) {
+        normalized.animationUrl = animationUrl;
+        if (!normalized.animation_url) {
+            normalized.animation_url = animationUrl;
+        }
+    }
+
+    if (externalUrl) {
+        normalized.externalUrl = externalUrl;
+        if (!normalized.external_url) {
+            normalized.external_url = externalUrl;
+        }
+    }
+
+    return normalized;
+}
+
+function hasFetchedMetadataPayload(metadata: TokenMetadataPayload): boolean {
     const hasName = typeof metadata.name === 'string' && metadata.name.trim().length > 0;
     const hasDescription = typeof metadata.description === 'string' && metadata.description.trim().length > 0;
     const hasImage = typeof metadata.image === 'string' && metadata.image.trim().length > 0;
     const hasAttributes = Array.isArray(metadata.attributes) && metadata.attributes.length > 0;
 
-    return hasName || hasDescription || hasImage || hasAttributes;
+    const knownKeys = new Set([
+        'name',
+        'title',
+        'description',
+        'image',
+        'image_url',
+        'imageUrl',
+        'imageOriginal',
+        'images',
+        'imageMeta',
+        'blurDataURL',
+        'attributes',
+        'animationUrl',
+        'animation_url',
+        'externalUrl',
+        'external_url',
+        'background_color',
+    ]);
+    const hasAdditionalFields = Object.keys(metadata).some((key) => {
+        if (knownKeys.has(key)) {
+            return false;
+        }
+
+        const value = metadata[key];
+        if (value === null || value === undefined) {
+            return false;
+        }
+
+        if (typeof value === 'string') {
+            return value.trim().length > 0;
+        }
+
+        if (Array.isArray(value)) {
+            return value.length > 0;
+        }
+
+        if (typeof value === 'object') {
+            return Object.keys(value as Record<string, unknown>).length > 0;
+        }
+
+        return true;
+    });
+
+    return hasName || hasDescription || hasImage || hasAttributes || hasAdditionalFields;
 }
 
-async function fetchMetadataFromTokenURI(tokenURI: string | null, tokenId: string): Promise<{
-    name: string | null;
-    description: string | null;
-    image: string | null;
-    attributes: Array<{ trait_type: string; value: string | number }>;
-}> {
+async function fetchMetadataFromTokenURI(tokenURI: string | null, tokenId: string): Promise<TokenMetadataPayload> {
     if (!tokenURI || typeof tokenURI !== 'string' || tokenURI.trim().length === 0) {
         return {
             name: null,
@@ -111,12 +286,7 @@ async function fetchMetadataFromTokenURI(tokenURI: string | null, tokenId: strin
         }
 
         const metadataJson = await metadataResponse.json();
-        return {
-            name: metadataJson?.name || null,
-            description: metadataJson?.description || null,
-            image: metadataJson?.image || null,
-            attributes: Array.isArray(metadataJson?.attributes) ? metadataJson.attributes : []
-        };
+        return normalizeFetchedMetadataPayload(metadataJson);
     } catch {
         return {
             name: null,
@@ -213,6 +383,7 @@ async function persistWalletNFTsToDatabase(walletAddress: string, nfts: External
 
                     if (hasFetchedMetadataPayload(metadata)) {
                         updatePayload.metadata = metadata;
+                        updatePayload.metadataFetchVersion = METADATA_FETCH_VERSION;
                         const metadataUpdateTimestamp = new Date().toISOString();
                         updatePayload.lastMetadataUpdate = metadataUpdateTimestamp;
                         updatePayload.metadataLastUpdated = metadataUpdateTimestamp;
@@ -240,11 +411,12 @@ function normalizeIdentifiers(rawItems: unknown[], source: 'alchemy' | 'moralis'
             const contractAddress = source === 'alchemy'
                 ? (item?.contract?.address || item?.contractAddress)
                 : item?.token_address;
-            const tokenId = source === 'alchemy'
+            const rawTokenId = source === 'alchemy'
                 ? (item?.tokenId || item?.id?.tokenId)
                 : item?.token_id;
+            const tokenId = normalizeTokenId(rawTokenId);
 
-            if (!contractAddress || tokenId === undefined || tokenId === null) {
+            if (!contractAddress || !tokenId) {
                 return null;
             }
 
@@ -327,47 +499,66 @@ async function discoverNFTsViaAlchemy(walletAddress: string): Promise<NFTIdentif
 
         const baseURL = `https://eth-sepolia.g.alchemy.com/nft/v3/${apiKey}`;
 
-        // IMPORTANT: withMetadata=false to save rate limit!
-        const response = await fetch(
-            `${baseURL}/getNFTsForOwner?owner=${walletAddress}&withMetadata=false&pageSize=100`,
-            {
+        const maxPages = Number.isFinite(DISCOVERY_MAX_PAGES) && DISCOVERY_MAX_PAGES > 0
+            ? DISCOVERY_MAX_PAGES
+            : 10;
+        let pageKey: string | undefined;
+        const allDiscovered: NFTIdentifier[] = [];
+        const dedupe = new Set<string>();
+
+        for (let page = 1; page <= maxPages; page++) {
+            const query = new URLSearchParams({
+                owner: walletAddress,
+                withMetadata: 'false',
+                pageSize: String(DISCOVERY_PAGE_SIZE),
+            });
+
+            if (pageKey) {
+                query.set('pageKey', pageKey);
+            }
+
+            // IMPORTANT: withMetadata=false to save rate limit!
+            const response = await fetch(`${baseURL}/getNFTsForOwner?${query.toString()}`, {
                 method: 'GET',
                 headers: {
-                    'Accept': 'application/json',
+                    Accept: 'application/json',
+                }
+            });
+
+            if (!response.ok) {
+                incrementRequestCounter('alchemy.discovery.wallet_nfts.error');
+                const errorText = await response.text();
+                devLog.error('? Alchemy API error:', response.status, errorText);
+                throw new Error(`Alchemy API error: ${response.status} - ${errorText}`);
+            }
+
+            const data = await response.json();
+            const pageItems = normalizeIdentifiers(Array.isArray(data?.ownedNfts) ? data.ownedNfts : [], 'alchemy');
+
+            for (const nft of pageItems) {
+                const key = `${nft.contractAddress}-${nft.tokenId}`;
+                if (!dedupe.has(key)) {
+                    dedupe.add(key);
+                    allDiscovered.push(nft);
                 }
             }
-        );
 
-        if (!response.ok) {
-            incrementRequestCounter('alchemy.discovery.wallet_nfts.error');
-            const errorText = await response.text();
-            devLog.error('? Alchemy API error:', response.status, errorText);
-            throw new Error(`Alchemy API error: ${response.status} - ${errorText}`);
+            const nextPageKey = typeof data?.pageKey === 'string' && data.pageKey.trim().length > 0
+                ? data.pageKey
+                : undefined;
+
+            devLog.info(`? [Alchemy Discovery] Page ${page}: +${pageItems.length} NFTs, total=${allDiscovered.length}, hasNext=${!!nextPageKey}`);
+
+            if (!nextPageKey) {
+                break;
+            }
+
+            pageKey = nextPageKey;
         }
 
         incrementRequestCounter('alchemy.discovery.wallet_nfts.success');
-
-        const data = await response.json();
-
-        // Debug: Log Alchemy response
-        devLog.info(`\n?? [Alchemy Discovery] Response for ${walletAddress}:`);
-        devLog.info(`  - Total NFTs: ${data.ownedNfts?.length || 0}`);
-        devLog.info(`  - Page Key: ${data.pageKey || 'none'}`);
-        if (data.ownedNfts && data.ownedNfts.length > 0) {
-            const firstNFT = data.ownedNfts[0];
-            devLog.info(`  - First NFT contract:`, firstNFT.contract);
-            devLog.info(`  - First NFT contract.address:`, firstNFT.contract?.address);
-            devLog.info(`  - First NFT tokenId:`, firstNFT.tokenId);
-            devLog.info(`  - First NFT id:`, firstNFT.id);
-            devLog.info(`  - Full first NFT structure:`, JSON.stringify(firstNFT, null, 2));
-        }
-        devLog.info('');
-
-        // Only extract contract + tokenId (minimal data)
-        const nfts = normalizeIdentifiers(Array.isArray(data.ownedNfts) ? data.ownedNfts : [], 'alchemy');
-
-        devLog.info(`? [Alchemy Discovery] Mapped ${nfts.length} NFTs`);
-        return nfts as NFTIdentifier[];
+        devLog.info(`? [Alchemy Discovery] Mapped ${allDiscovered.length} NFTs (paginated)`);
+        return allDiscovered;
     } catch (error) {
         devLog.error('? [Alchemy Discovery] Error:', error);
         throw error;
@@ -386,28 +577,66 @@ async function discoverNFTsViaMoralis(walletAddress: string): Promise<NFTIdentif
     }
 
     const chain = process.env.MORALIS_CHAIN || 'sepolia';
-    const response = await fetch(
-        `https://deep-index.moralis.io/api/v2.2/${walletAddress}/nft?chain=${chain}&format=decimal&media_items=false`,
-        {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'X-API-Key': apiKey
+    const maxPages = Number.isFinite(DISCOVERY_MAX_PAGES) && DISCOVERY_MAX_PAGES > 0
+        ? DISCOVERY_MAX_PAGES
+        : 10;
+    let cursor: string | undefined;
+    const allDiscovered: NFTIdentifier[] = [];
+    const dedupe = new Set<string>();
+
+    for (let page = 1; page <= maxPages; page++) {
+        const query = new URLSearchParams({
+            chain,
+            format: 'decimal',
+            media_items: 'false',
+            limit: String(DISCOVERY_PAGE_SIZE),
+        });
+
+        if (cursor) {
+            query.set('cursor', cursor);
+        }
+
+        const response = await fetch(
+            `https://deep-index.moralis.io/api/v2.2/${walletAddress}/nft?${query.toString()}`,
+            {
+                method: 'GET',
+                headers: {
+                    Accept: 'application/json',
+                    'X-API-Key': apiKey
+                }
+            }
+        );
+
+        if (!response.ok) {
+            incrementRequestCounter('moralis.discovery.wallet_nfts.error');
+            const errorText = await response.text();
+            throw new Error(`Moralis API error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        const pageItems = normalizeIdentifiers(Array.isArray(data?.result) ? data.result : [], 'moralis');
+
+        for (const nft of pageItems) {
+            const key = `${nft.contractAddress}-${nft.tokenId}`;
+            if (!dedupe.has(key)) {
+                dedupe.add(key);
+                allDiscovered.push(nft);
             }
         }
-    );
 
-    if (!response.ok) {
-        incrementRequestCounter('moralis.discovery.wallet_nfts.error');
-        const errorText = await response.text();
-        throw new Error(`Moralis API error: ${response.status} - ${errorText}`);
+        const nextCursor = typeof data?.cursor === 'string' && data.cursor.trim().length > 0
+            ? data.cursor
+            : undefined;
+
+        if (!nextCursor) {
+            break;
+        }
+
+        cursor = nextCursor;
     }
 
     incrementRequestCounter('moralis.discovery.wallet_nfts.success');
-
-    const data = await response.json();
-    const result = Array.isArray(data?.result) ? data.result : [];
-    return normalizeIdentifiers(result, 'moralis');
+    return allDiscovered;
 }
 
 /**
@@ -595,7 +824,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
                 devLog.info('?? [Hybrid] Starting parallel fetch: Blockchain + Alchemy Discovery');
 
                 const [blockchainResult, alchemyDiscoveryResult] = await Promise.allSettled([
-                    // Step 1: Blockchain query (known contracts with full metadata)
+                    // Step 1: Blockchain query (known contracts, identifiers only)
                     (async () => {
                         const contracts = await getKnownContractAddresses();
                         devLog.info(`  ? Found ${contracts.length} known contracts in marketplace`);
@@ -603,20 +832,10 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
                         const bcNFTs = await getWalletNFTsFromBlockchain(
                             walletAddress as Address,
-                            contracts
+                            contracts,
+                            { identifiersOnly: true }
                         );
-                        return bcNFTs.map(nft => ({
-                            contractAddress: nft.contractAddress,
-                            tokenId: nft.tokenId,
-                            name: nft.name,
-                            description: nft.description,
-                            image: nft.image,
-                            animationUrl: undefined,
-                            attributes: [],
-                            contractName: nft.contractName,
-                            contractSymbol: nft.contractSymbol,
-                            tokenType: 'ERC721' as const,
-                        }));
+                        return mapDiscoveredToFallbackNFTs(bcNFTs);
                     })(),
                     // Step 2: Alchemy discovery (lightweight - only contract+tokenId)
                     discoverNFTsViaAlchemy(walletAddress)
@@ -690,20 +909,10 @@ export const GET = apiHandler(async (request: NextRequest) => {
                 if (contracts.length > 0) {
                     const bcNFTs = await getWalletNFTsFromBlockchain(
                         walletAddress as Address,
-                        contracts
+                        contracts,
+                        { identifiersOnly: true }
                     );
-                    blockchainNFTs = bcNFTs.map(nft => ({
-                        contractAddress: nft.contractAddress,
-                        tokenId: nft.tokenId,
-                        name: nft.name,
-                        description: nft.description,
-                        image: nft.image,
-                        animationUrl: undefined,
-                        attributes: [],
-                        contractName: nft.contractName,
-                        contractSymbol: nft.contractSymbol,
-                        tokenType: 'ERC721' as const,
-                    }));
+                    blockchainNFTs = mapDiscoveredToFallbackNFTs(bcNFTs);
                     devLog.info(`? Found ${blockchainNFTs.length} NFTs via blockchain`);
                 }
             }
@@ -740,8 +949,15 @@ export const GET = apiHandler(async (request: NextRequest) => {
             devLog.info('   ↳ Final identifier sample:', nfts.slice(0, 10).map((nft) => `${nft.contractAddress}:${nft.tokenId}`));
 
             if (!skipPersist) {
-                // Hard requirement: immediately persist discovered NFTs and enrich missing fields.
-                await persistWalletNFTsToDatabase(walletAddress, nfts);
+                // Persist opportunistically. If DB is unavailable, still return discovery response.
+                try {
+                    await persistWalletNFTsToDatabase(walletAddress, nfts);
+                } catch (persistError) {
+                    devLog.warn(
+                        '⚠️ [Wallet NFTs API] Persistence unavailable, returning discovery-only payload',
+                        persistError
+                    );
+                }
             } else {
                 devLog.info('⏭️ [Wallet NFTs API] skipPersist=true - skipping DB persistence/enrichment side effects');
             }

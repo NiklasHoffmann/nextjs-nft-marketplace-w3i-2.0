@@ -26,6 +26,8 @@ import { buildNFTImageVariants } from '@/utils/nft/image-variants';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const REQUIRED_METADATA_FETCH_VERSION = 2;
+
 export const GET = apiHandler(async (request: NextRequest) => {
     const startTime = Date.now();
 
@@ -77,9 +79,17 @@ export const GET = apiHandler(async (request: NextRequest) => {
         devLog.info(`   IsApprovedForAll: ${nft.blockchain.isApprovedForAll || false}`);
     }
 
-    // Step 3: Lazy-load IPFS metadata if missing
-    if (!nft?.metadata?.name) {
+    // Step 3: Lazy-load or refresh IPFS metadata when missing/legacy
+    const metadataFetchVersion = typeof (nft as any)?.metadataFetchVersion === 'number'
+        ? (nft as any).metadataFetchVersion
+        : 0;
+    const needsMetadataRefresh = !nft?.metadata?.name || metadataFetchVersion < REQUIRED_METADATA_FETCH_VERSION;
+
+    if (needsMetadataRefresh) {
         devLog.info(`📡 [NFT Detail] IPFS metadata missing, lazy-loading...`);
+        if (metadataFetchVersion < REQUIRED_METADATA_FETCH_VERSION) {
+            devLog.info(`   Reason: Legacy metadata version ${metadataFetchVersion} < ${REQUIRED_METADATA_FETCH_VERSION}`);
+        }
         await ipfsMetadataLazySync.ensureMetadata(contractAddress, tokenId);
         // Refetch after metadata fetch
         nft = await nftMetadata.findOne({ contractAddress: normalizedAddress, tokenId });
@@ -196,6 +206,12 @@ export const GET = apiHandler(async (request: NextRequest) => {
     const resolvedOwnerBalance = tokenStandard === 'ERC1155'
         ? (ownerBalanceFromMap ?? displayOwnerBalance ?? nft?.contract?.ownerBalance ?? null)
         : (nft?.contract?.ownerBalance ?? null);
+    const metadataExternalUrl = typeof (nft?.metadata as any)?.externalUrl === 'string'
+        ? (nft?.metadata as any)?.externalUrl
+        : (typeof (nft?.metadata as any)?.external_url === 'string' ? (nft?.metadata as any)?.external_url : null);
+    const metadataAnimationUrl = typeof (nft?.metadata as any)?.animationUrl === 'string'
+        ? (nft?.metadata as any)?.animationUrl
+        : (typeof (nft?.metadata as any)?.animation_url === 'string' ? (nft?.metadata as any)?.animation_url : null);
     const resolvedMetadata = nft?.metadata ? {
         ...nft.metadata,
         imageOriginal: nft.metadata.imageOriginal || metadataImageSource || null,
@@ -206,6 +222,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
             mimeType: null,
         },
         blurDataURL: nft.metadata.blurDataURL || null,
+        externalUrl: metadataExternalUrl,
+        animationUrl: metadataAnimationUrl,
     } : {
         name: `NFT #${tokenId}`,
         description: '',

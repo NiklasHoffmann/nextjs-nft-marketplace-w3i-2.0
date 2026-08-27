@@ -13,6 +13,8 @@ import { getCollection } from '@/lib/mongodb';
 import { devLog } from '@/utils';
 import { buildNFTImageVariants } from '@/utils/nft/image-variants';
 
+const METADATA_FETCH_VERSION = 2;
+
 export interface IPFSMetadata {
     name?: string;
     description?: string;
@@ -104,7 +106,12 @@ export class IPFSMetadataLazySync {
 
             if (existing?.metadata) {
                 const needsImageBackfill = !existing.metadata?.images || !existing.metadata?.imageOriginal;
-                if (needsImageBackfill) {
+                const metadataFetchVersion = typeof (existing as any)?.metadataFetchVersion === 'number'
+                    ? (existing as any).metadataFetchVersion
+                    : 0;
+                const needsMetadataRefetch = metadataFetchVersion < METADATA_FETCH_VERSION;
+
+                if (!needsMetadataRefetch && needsImageBackfill) {
                     const enrichedExistingMetadata = enrichMetadataWithImageSet(
                         existing.metadata as IPFSMetadata,
                         contractAddress,
@@ -116,6 +123,7 @@ export class IPFSMetadataLazySync {
                         {
                             $set: {
                                 metadata: enrichedExistingMetadata,
+                                metadataFetchVersion: METADATA_FETCH_VERSION,
                                 updatedAt: new Date(),
                             },
                         },
@@ -124,8 +132,12 @@ export class IPFSMetadataLazySync {
                     return enrichedExistingMetadata;
                 }
 
-                devLog.info(`  ✅ Metadata already cached for ${contractAddress}/${tokenId}`);
-                return existing.metadata as IPFSMetadata;
+                if (!needsMetadataRefetch) {
+                    devLog.info(`  ✅ Metadata already cached for ${contractAddress}/${tokenId}`);
+                    return existing.metadata as IPFSMetadata;
+                }
+
+                devLog.info(`  🔄 Refreshing legacy metadata cache for ${contractAddress}/${tokenId} (version ${metadataFetchVersion} -> ${METADATA_FETCH_VERSION})`);
             }
 
             devLog.info(`  📡 Fetching IPFS metadata for ${contractAddress}/${tokenId}...`);
@@ -158,6 +170,7 @@ export class IPFSMetadataLazySync {
                         contractAddress,
                         tokenId,
                         metadata: enrichedMetadata,
+                        metadataFetchVersion: METADATA_FETCH_VERSION,
                         metadataFetchedAt: new Date(),
                         'contract.tokenURI': tokenURI,
                         'contract.contractType': tokenUriResult?.tokenStandard || null,

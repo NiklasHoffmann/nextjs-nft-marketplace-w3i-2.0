@@ -3,10 +3,10 @@
  */
 
 // Modern imports from core types
-import { NftMeta } from '../core/core-nft-modern';
-import { NFTInsights } from '../insights/insights-main';
-import { PublicNFTInsights } from '../insights/insights-public';
-import { AdminNFTInsight, AdminCollectionInsight } from '../api/api-responses';
+import type { AdminCollectionInsight, AdminNFTInsight } from '@/types/api/api-responses';
+import type { NftMeta } from '@/types/core/core-nft-modern';
+import type { NFTInsights } from '@/types/insights/insights-main';
+import type { PublicNFTInsights } from '@/types/insights/insights-public';
 
 export type TabType = 'overview' | 'technical' | 'investment' | 'insights' | 'market-insights' | 'personal' | 'project' | 'functionalities' | 'tokenomics';
 
@@ -160,6 +160,7 @@ export interface NFTInfoTabsProps {
     rarityRank?: number | null;
     rarityScore?: number | null;
     attributes?: NFTAttribute[];
+    metadata?: Record<string, any> | null;
     supportsRoyalty: boolean;
     royaltyInfo?: RoyaltyInfo | null;
 }

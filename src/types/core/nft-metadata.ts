@@ -41,6 +41,8 @@ export interface NFTMetadata {
         // Raw IPFS hash for cache invalidation
         imageHash?: string | null;
         metadataHash?: string | null;
+        // Collection-specific metadata (e.g. genes, properties, breeding data)
+        [key: string]: any;
     };
 
     // Contract information (mostly static)

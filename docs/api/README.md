@@ -4,6 +4,16 @@ Complete API reference and authentication guides.
 
 ## Contents
 
+### [NFT Data Platform Marketplace Migration](./nft-data-platform-marketplace-migration.md)
+Implementation guide for migrating marketplace NFT reads to the NFT Data Platform while keeping listing data on TheGraph.
+
+**Topics:**
+- Hybrid target architecture
+- Remaining implementation work
+- Route-by-route migration plan
+- File-level checklist
+- Risks and rollout order
+
 ### [API Routes Reference](./routes.md)
 Complete documentation of all API endpoints, request/response formats, and usage examples.
 
