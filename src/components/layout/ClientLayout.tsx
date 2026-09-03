@@ -10,7 +10,7 @@ import { WalletNFTsProvider } from "@/contexts/wallet-nfts";
 import { CollectionsProvider } from "@/contexts/collections";
 import { CartProvider } from "@/contexts/CartContext";
 import { NotificationProvider, NotificationContainer } from "@/contexts/notifications";
-import { AdminGuard } from "@/components/auth";
+import { AdminGuard, UserSessionProvider } from "@/components/auth";
 import { APP_LOCK_ENABLED } from '@/config/admin';
 import { MarketplaceEventsProvider, EventConnectionStatus } from "@/providers/MarketplaceEventsProvider";
 import AdminNavbar from '@/app/admin/components/AdminNavbar';
@@ -190,15 +190,17 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     >
       <NotificationProvider>
         <Web3Provider>
-          <NFTStatsProvider>
-            {/* Real-time WebSocket event listener for marketplace */}
-            <MarketplaceEventsProvider 
-              autoStart={true}
-              debug={isDevelopment}
-            >
-              {withMarketplaceItems}
-            </MarketplaceEventsProvider>
-          </NFTStatsProvider>
+          <UserSessionProvider>
+            <NFTStatsProvider>
+              {/* Real-time WebSocket event listener for marketplace */}
+              <MarketplaceEventsProvider 
+                autoStart={true}
+                debug={isDevelopment}
+              >
+                {withMarketplaceItems}
+              </MarketplaceEventsProvider>
+            </NFTStatsProvider>
+          </UserSessionProvider>
         </Web3Provider>
       </NotificationProvider>
     </ErrorBoundary>

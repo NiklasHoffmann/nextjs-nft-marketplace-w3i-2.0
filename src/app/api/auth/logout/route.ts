@@ -1,16 +1,17 @@
 ﻿import { NextRequest } from 'next/server';
 import { apiHandler, apiSuccess } from '@/lib/api';
 import { cookies } from 'next/headers';
-import { getAdminSessionCookieOptions, verifyAdminSessionToken } from '@/lib/auth/admin-session';
+import { getAdminSessionCookieOptions, verifyAdminSessionToken, ADMIN_SESSION_COOKIE } from '@/lib/auth/admin-session';
+import { getUserSessionCookieOptions, USER_SESSION_COOKIE } from '@/lib/auth/user-session';
 import { revokeAdminSessionByJti } from '@/lib/auth/admin-session-registry';
 
 /**
  * POST /api/auth/logout
- * Löscht die Admin-Session
+ * Löscht Admin- und User-Session
  */
 export const POST = apiHandler(async (request: NextRequest) => {
     const cookieStore = await cookies();
-    const token = cookieStore.get('admin-session')?.value;
+    const token = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
 
     if (token) {
         const payload = verifyAdminSessionToken(token);
@@ -19,7 +20,8 @@ export const POST = apiHandler(async (request: NextRequest) => {
         }
     }
 
-    cookieStore.set('admin-session', '', getAdminSessionCookieOptions(0));
+    cookieStore.set(ADMIN_SESSION_COOKIE, '', getAdminSessionCookieOptions(0));
+    cookieStore.set(USER_SESSION_COOKIE, '', getUserSessionCookieOptions(0));
 
     return apiSuccess({
         message: 'Logged out successfully'

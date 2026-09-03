@@ -4,6 +4,9 @@ System architecture, features, and design patterns.
 
 ## Contents
 
+### [Roles & Permissions](./ROLES_AND_PERMISSIONS.md)
+Alle Akteure, Session-Scopes und die Permission-Matrix (App- und Chain-Ebene).
+
 ### [Architecture Overview](./overview.md)
 Complete system architecture and design patterns.
 

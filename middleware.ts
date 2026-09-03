@@ -44,7 +44,12 @@ async function verifyAdminSessionToken(token: string): Promise<boolean> {
     }
 
     const payloadJson = new TextDecoder().decode(base64UrlToUint8Array(payload));
-    const data = JSON.parse(payloadJson) as { exp?: number; isAdmin?: boolean; address?: string };
+    const data = JSON.parse(payloadJson) as { exp?: number; isAdmin?: boolean; address?: string; scope?: string };
+
+    // Tokens issued before scopes existed are admin sessions.
+    if (data?.scope && data.scope !== 'admin') {
+      return false;
+    }
 
     if (!data?.isAdmin || typeof data.address !== 'string') {
       return false;

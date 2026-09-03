@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
 import { devLog } from '@/utils';
+import { authFetch } from '@/lib/auth/user-session-client';
 import {
     CombinedUserInteractionData,
     CombinedUserInteractionsResponse
@@ -65,7 +66,7 @@ export function useUserInteractions(options: UseUserInteractionsOptions = {}): U
                 userId: userWalletAddress
             });
 
-            const response = await fetch(`/api/user/interactions?${params}`, {
+            const response = await authFetch(`/api/user/interactions?${params}`, {
                 headers: {
                     'Cache-Control': 'no-cache',
                     'Pragma': 'no-cache'
@@ -105,7 +106,7 @@ export function useUserInteractions(options: UseUserInteractionsOptions = {}): U
             userId: userWalletAddress,
         };
 
-        const response = await fetch('/api/user/interactions', {
+        const response = await authFetch('/api/user/interactions', {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -147,7 +148,7 @@ export function useUserInteractions(options: UseUserInteractionsOptions = {}): U
             userId: userWalletAddress,
         };
 
-        const response = await fetch('/api/user/interactions', {
+        const response = await authFetch('/api/user/interactions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

@@ -104,6 +104,7 @@ describe('GET /api/auth/session', () => {
     expect(body.success).toBe(true);
     expect(body.data).toEqual({
       isAuthenticated: true,
+      scope: 'admin',
       jti,
       address: '0xabc',
       isAdmin: true,

@@ -1,14 +1,15 @@
 /**
  * Authentication Middleware
- * 
- * Middleware for protecting API routes with authentication.
- * Supports session-based auth (via cookies) and wallet-based authentication.
+ *
+ * Middleware for protecting API routes. Identity always comes from a
+ * signature-backed session cookie — never from a client-supplied header.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { UnauthorizedError, ForbiddenError } from '../api/errors';
 import { isAdminAddress } from '@/config/admin';
-import { verifyAdminSessionToken } from '@/lib/auth/admin-session';
+import { verifyAdminSessionToken, ADMIN_SESSION_COOKIE } from '@/lib/auth/admin-session';
+import { verifyUserSessionToken, USER_SESSION_COOKIE } from '@/lib/auth/user-session';
 import { isAdminSessionRevoked } from '@/lib/auth/admin-session-registry';
 import { hasAdminAccess } from '@/lib/auth/admin-access';
 
@@ -22,60 +23,42 @@ function parseCookies(header: string | null): Record<string, string> {
     );
 }
 
-function getAdminSessionToken(req: NextRequest): string | null {
-    const cookieFromApi = req.cookies?.get?.('admin-session')?.value;
+function getCookie(req: NextRequest, name: string): string | null {
+    const cookieFromApi = req.cookies?.get?.(name)?.value;
     if (cookieFromApi) {
         return cookieFromApi;
     }
 
-    const cookieHeader = req.headers.get('cookie');
-    const cookies = parseCookies(cookieHeader);
-    return cookies['admin-session'] || null;
+    const cookies = parseCookies(req.headers.get('cookie'));
+    return cookies[name] || null;
+}
+
+function getAdminSessionToken(req: NextRequest): string | null {
+    return getCookie(req, ADMIN_SESSION_COOKIE);
 }
 
 /**
- * Extract wallet address from request (session cookie or header)
+ * Resolve the authenticated wallet address from a verified session cookie.
+ * An admin session also counts as a user session.
  */
-function extractWalletAddress(
-    req: NextRequest,
-    options: { preferExplicitWallet?: boolean } = {}
-): string | null {
-    const { preferExplicitWallet = false } = options;
-
-    const resolveFromExplicitWallet = (): string | null => {
-        const walletHeader = req.headers.get('x-wallet-address');
-        if (walletHeader && /^0x[a-fA-F0-9]{40}$/.test(walletHeader)) {
-            return walletHeader.toLowerCase();
+async function resolveSessionAddress(req: NextRequest): Promise<{ address: string; isAdmin: boolean } | null> {
+    const userToken = getCookie(req, USER_SESSION_COOKIE);
+    if (userToken) {
+        const payload = verifyUserSessionToken(userToken);
+        if (payload) {
+            return { address: payload.address, isAdmin: false };
         }
-
-        const walletAddress = req.nextUrl.searchParams.get('walletAddress');
-        if (walletAddress && /^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
-            return walletAddress.toLowerCase();
-        }
-
-        const userId = req.nextUrl.searchParams.get('userId');
-        if (userId && /^0x[a-fA-F0-9]{40}$/.test(userId)) {
-            return userId.toLowerCase();
-        }
-
-        return null;
-    };
-
-    const resolveFromSession = (): string | null => {
-        const authToken = getAdminSessionToken(req);
-        if (!authToken) return null;
-
-        const verified = verifyAdminSessionToken(authToken);
-        if (!verified) return null;
-
-        return verified.address.toLowerCase();
-    };
-
-    if (preferExplicitWallet) {
-        return resolveFromExplicitWallet() || resolveFromSession();
     }
 
-    return resolveFromSession() || resolveFromExplicitWallet();
+    const adminToken = getAdminSessionToken(req);
+    if (adminToken) {
+        const payload = verifyAdminSessionToken(adminToken);
+        if (payload && !(await isAdminSessionRevoked(payload.jti))) {
+            return { address: payload.address, isAdmin: payload.isAdmin };
+        }
+    }
+
+    return null;
 }
 
 /**
@@ -89,14 +72,17 @@ export function isAdmin(address: string): boolean {
  * Middleware: Require any authenticated user
  */
 export async function withAuth(req: NextRequest): Promise<void> {
-    const address = extractWalletAddress(req, { preferExplicitWallet: true });
+    const session = await resolveSessionAddress(req);
 
-    if (!address) {
-        throw new UnauthorizedError('Authentication required. Please connect your wallet.');
+    if (!session) {
+        throw new UnauthorizedError('Authentication required. Please sign in with your wallet.');
     }
 
     // Store address in request for later use
-    req.userAddress = address;
+    req.userAddress = session.address;
+    if (session.isAdmin) {
+        req.isAdmin = true;
+    }
 }
 
 /**
@@ -131,10 +117,13 @@ export async function withAdmin(req: NextRequest): Promise<void> {
  * Middleware: Optional authentication (sets user if available, but doesn't require it)
  */
 export async function withOptionalAuth(req: NextRequest): Promise<void> {
-    const address = extractWalletAddress(req);
+    const session = await resolveSessionAddress(req);
 
-    if (address) {
-        req.userAddress = address;
+    if (session) {
+        req.userAddress = session.address;
+        if (session.isAdmin) {
+            req.isAdmin = true;
+        }
     }
 }
 

@@ -14,6 +14,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { devLog } from '@/utils';
+import { authFetch } from '@/lib/auth/user-session-client';
 
 // ===== TYPES =====
 export interface NFTStats {
@@ -256,11 +257,7 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
 
         const requestPromise = (async () => {
             try {
-                const res = await fetch(`/api/user/interactions?contractAddress=${contractAddress}&tokenId=${tokenId}&userId=${userAddress}`, {
-                    headers: {
-                        'x-wallet-address': userAddress // Add wallet address to header for auth
-                    }
-                });
+                const res = await authFetch(`/api/user/interactions?contractAddress=${contractAddress}&tokenId=${tokenId}&userId=${userAddress}`);
                 if (res.ok) {
                     const result = await res.json();
                     const data = result.data || result;
@@ -355,11 +352,10 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
         devLog.info('[NFTStatsContext] toggleFavorite called for:', { contractAddress, tokenId, userAddress });
 
         try {
-            const res = await fetch('/api/user/interactions', {
+            const res = await authFetch('/api/user/interactions', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'x-wallet-address': userAddress // Add wallet address to header for auth
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ contractAddress, tokenId, isFavorite: true })
             });
@@ -417,11 +413,10 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
         if (!userAddress) return;
 
         try {
-            const res = await fetch('/api/user/interactions', {
+            const res = await authFetch('/api/user/interactions', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'x-wallet-address': userAddress // Add wallet address to header for auth
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ contractAddress, tokenId, isWatchlisted: true })
             });
@@ -481,11 +476,10 @@ export function useNFTStats(contractAddress: string, tokenId: string, userAddres
         if (!userAddress) return;
 
         try {
-            const res = await fetch('/api/user/interactions', {
+            const res = await authFetch('/api/user/interactions', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'x-wallet-address': userAddress // Add wallet address to header for auth
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ contractAddress, tokenId, rating })
             });

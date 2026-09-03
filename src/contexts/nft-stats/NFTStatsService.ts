@@ -9,6 +9,7 @@
 
 import type { NFTStatsWithMeta } from '@/types';
 import { devLog } from '@/utils';
+import { authFetch } from '@/lib/auth/user-session-client';
 
 // Re-export the stats type with metadata
 export type NFTStats = NFTStatsWithMeta;
@@ -149,7 +150,7 @@ export class NFTStatsService {
         userAddress: string
     ): Promise<NFTStatsApiResponse> {
         try {
-            const response = await fetch(
+            const response = await authFetch(
                 `/api/user/interactions?userId=${userAddress}&contractAddress=${contractAddress}&tokenId=${tokenId}`
             );
             const result = await response.json();
@@ -189,7 +190,7 @@ export class NFTStatsService {
 
         try {
             // Call API to persist state
-            const response = await fetch('/api/user/interactions', {
+            const response = await authFetch('/api/user/interactions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -260,7 +261,7 @@ export class NFTStatsService {
 
         try {
             // Call API to persist rating
-            const response = await fetch('/api/user/interactions', {
+            const response = await authFetch('/api/user/interactions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

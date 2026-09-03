@@ -8,6 +8,7 @@
  */
 
 import { devLog } from '@/utils';
+import { authFetch } from '@/lib/auth/user-session-client';
 import type { EnrichedNFTDocument } from '@/types/marketplace/enriched-nft';
 
 // External NFT data from Alchemy/Moralis
@@ -259,7 +260,7 @@ export class WalletNFTsService {
 
     private static async performSync(walletAddress: string, force: boolean = false): Promise<void> {
         const syncUrl = force ? '/api/user/nfts/sync?force=true' : '/api/user/nfts/sync';
-        const response = await fetch(syncUrl, {
+        const response = await authFetch(syncUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
@@ -355,7 +356,7 @@ export class WalletNFTsService {
             return [];
         }
 
-        const dbResponse = await fetch(`/api/user/nfts?walletAddress=${walletAddress}`);
+        const dbResponse = await authFetch(`/api/user/nfts?walletAddress=${walletAddress}`);
         if (!dbResponse.ok) {
             if (dbResponse.status >= 500) {
                 this.markDbUnavailable();

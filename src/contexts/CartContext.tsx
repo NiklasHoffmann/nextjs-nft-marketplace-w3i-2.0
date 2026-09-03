@@ -13,6 +13,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAccount, useChainId } from 'wagmi';
 import { devLog } from '@/utils';
+import { authFetch } from '@/lib/auth/user-session-client';
 import { SyncQueue } from '@/utils/SyncQueue';
 import { useContextDevtools } from '@/hooks/useContextDevtools';
 import type { ActiveItem } from '@/types';
@@ -118,11 +119,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!syncQueueRef.current) {
         syncQueueRef.current = new SyncQueue(
             async (payload) => {
-                const response = await fetch('/api/cart', {
+                const response = await authFetch('/api/cart', {
                     method: 'POST',
                     headers: { 
-                        'Content-Type': 'application/json',
-                        'X-Wallet-Address': payload.walletAddress
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(payload)
                 });
@@ -202,7 +202,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 // Load from MongoDB
                 try {
                     devLog.info('cart', '📡 Loading cart from MongoDB for:', address);
-                    const response = await fetch(`/api/cart?walletAddress=${address}`);
+                    const response = await authFetch(`/api/cart?walletAddress=${address}`);
 
                     if (response.status === 401 || response.status === 403) {
                         devLog.warn('cart', '🔒 Cart DB load unauthorized, using localStorage cache');
@@ -393,11 +393,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             if (!remoteSyncEnabled) return;
 
             try {
-                await fetch(`/api/cart?walletAddress=${address}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'X-Wallet-Address': address
-                    }
+                await authFetch(`/api/cart?walletAddress=${address}`, {
+                    method: 'DELETE'
                 });
                 devLog.info('cart', '🗑️ Cleared cart in DB for:', address);
             } catch (error) {

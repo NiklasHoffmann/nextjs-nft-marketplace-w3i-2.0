@@ -1,11 +1,33 @@
-# Admin Authentication System - Complete Guide
-**Updated:** December 18, 2025
+# Authentication System - Complete Guide
+**Updated:** August 28, 2026
 
 ## 🔐 Overview
 
-Das NFT Marketplace Admin-System verwendet **signaturbasierte Authentifizierung** mit Session-Management für maximale Sicherheit. Admin-Aktionen erfordern eine verifizierte Wallet-Signatur.
+Der NFT Marketplace verwendet **signaturbasierte Authentifizierung** mit Session-Management für maximale Sicherheit. Es gibt zwei Scopes:
 
-## 🎯 Sicherheitskonzept
+- **User-Session** (`user-session` Cookie) — jede Wallet, die eine Challenge signiert. Schützt die eigenen Nutzerdaten (Cart, Likes, Ratings, Watchlist, eigene NFTs).
+- **Admin-Session** (`admin-session` Cookie) — zusätzlich Adress-Whitelist erforderlich. Schützt `/admin/*` und `/api/admin/**`.
+
+Beide Tokens sind HMAC-SHA256-signiert (`JWT_SECRET`) und tragen einen `scope`-Claim, sodass ein User-Token nicht als Admin-Token wiederverwendbar ist. Die vollständige Rechteübersicht steht in [ROLES_AND_PERMISSIONS.md](../architecture/ROLES_AND_PERMISSIONS.md).
+
+> Wallet-Adressen aus Request-Headern oder Query-Parametern werden **nie** als Identität akzeptiert — `withAuth` liest die Adresse ausschließlich aus dem verifizierten Session-Token.
+
+## 👤 User-Session Flow
+
+```
+1. Wallet verbindet → UserSessionProvider registriert den Signer
+2. GET /api/auth/session?scope=user → bereits authentifiziert?
+3. Falls nein:
+   GET  /api/auth/challenge?scope=user   → { message, nonce, timestamp }
+   User signiert die Nachricht
+   POST /api/auth/verify { ..., scope: 'user' } → setzt user-session Cookie (24h)
+4. authFetch() aus @/lib/auth/user-session-client hängt Cookies an und
+   wiederholt einen 401-Request einmalig nach erfolgreichem Sign-in
+```
+
+Lehnt der Nutzer die Signatur ab, wird für dieselbe Adresse nicht erneut gefragt; betroffene Features degradieren (z. B. Cart läuft weiter über localStorage).
+
+## 🎯 Sicherheitskonzept (Admin)
 
 ### 3-Stufen-Authentifizierung
 

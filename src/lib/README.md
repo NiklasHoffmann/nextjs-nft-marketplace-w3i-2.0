@@ -91,8 +91,8 @@ import { withAuth, withAdmin, withValidation, rateLimit } from '@/lib';
 import { z } from 'zod';
 
 // Authentication Middleware
-await withAuth(request);           // Requires user wallet
-await withAdmin(request);          // Requires admin wallet
+await withAuth(request);           // Requires a signed user- or admin-session cookie
+await withAdmin(request);          // Requires a signed admin-session cookie
 await withOptionalAuth(request);   // Optional user wallet
 
 // Validation Middleware
@@ -104,10 +104,12 @@ await rateLimit(request, { max: 10, window: 60 }); // 10 req/min
 ```
 
 **Authentication Flow:**
-1. Verify session cookie (JWT)
-2. Extract wallet address
+1. Verify session cookie (`user-session` or `admin-session`, HMAC-signed)
+2. Take the wallet address from the verified token — never from a request header
 3. Check admin status (if needed)
 4. Inject `request.userAddress` & `request.isAdmin`
+
+See [docs/architecture/ROLES_AND_PERMISSIONS.md](../../docs/architecture/ROLES_AND_PERMISSIONS.md) for the full permission matrix.
 
 **Exported Functions:**
 - `withAuth()` - Require authentication

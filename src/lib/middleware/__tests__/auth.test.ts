@@ -63,17 +63,62 @@ describe('auth middleware', () => {
     });
   });
 
-  it('withAuth sets userAddress from header', async () => {
+  it('withAuth rejects a spoofed wallet header without a session', async () => {
     const { withAuth } = await loadAuthModule();
     const req = createRequest({
       headers: {
         'x-wallet-address': USER_ADDRESS,
+      },
+      url: `http://localhost/api/test?walletAddress=${USER_ADDRESS}`,
+    });
+
+    await expect(withAuth(req)).rejects.toMatchObject({
+      name: 'UnauthorizedError',
+      statusCode: 401,
+    });
+    expect(req.userAddress).toBeUndefined();
+  });
+
+  it('withAuth sets userAddress from a signed user session cookie', async () => {
+    const { withAuth } = await loadAuthModule();
+    const token = createSignedToken({
+      jti: 'user-jti',
+      address: USER_ADDRESS,
+      scope: 'user',
+      isAdmin: false,
+      exp: Date.now() + 60_000,
+    });
+    const req = createRequest({
+      headers: {
+        cookie: `user-session=${token}`,
       },
     });
 
     await withAuth(req);
 
     expect(req.userAddress).toBe(USER_ADDRESS.toLowerCase());
+    expect(req.isAdmin).toBeUndefined();
+  });
+
+  it('withAdmin rejects a user-scoped token in the admin cookie', async () => {
+    const { withAdmin } = await loadAuthModule();
+    const token = createSignedToken({
+      jti: 'user-jti',
+      address: ADMIN_ADDRESS,
+      scope: 'user',
+      isAdmin: true,
+      exp: Date.now() + 60_000,
+    });
+    const req = createRequest({
+      headers: {
+        cookie: `admin-session=${token}`,
+      },
+    });
+
+    await expect(withAdmin(req)).rejects.toMatchObject({
+      name: 'UnauthorizedError',
+      statusCode: 401,
+    });
   });
 
   it('withAdmin rejects non-admin session token', async () => {
