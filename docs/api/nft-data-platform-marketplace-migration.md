@@ -2,7 +2,12 @@
 
 ## Repository Status At A Glance
 
-Confirmed against the current repository state on 2026-08-27.
+Marketplace-side file status confirmed against the marketplace repository on 2026-08-27.
+
+Platform-side API contracts re-verified against a running NFT Data Platform instance on
+2026-09-03. Everything below that describes `/api/v1/*` was checked against real responses, not
+against an earlier draft of the platform docs. See `nft-api.md` and `wallet-api.md` in the platform
+repository for the authoritative endpoint reference.
 
 Status meaning:
 
@@ -49,7 +54,7 @@ Important: the NFT Data Platform is **not** just a thin live on-chain RPC layer.
 | Marketplace listings | TheGraph | Active listings, price, seller, listing status, listing type |
 | NFT token detail | NFT Data Platform | `/api/v1/tokens/:chainId/:contractAddress/:tokenId` |
 | NFT token lists | NFT Data Platform | `/api/v1/tokens` |
-| Collections | NFT Data Platform | `/api/v1/collections/:chainId/:contractAddress` |
+| Collections | NFT Data Platform | `/api/v1/collections/:chainId/:contractAddress` for one, `/api/v1/collections` to browse |
 | Search | NFT Data Platform | `/api/v1/search` |
 | Wallet inventory | NFT Data Platform | `/api/v1/owners/wallets/:ownerAddress` |
 | Wallet discovery fallback | NFT Data Platform | `/api/v1/owners/wallets/discover` |
@@ -142,13 +147,36 @@ export interface PlatformTokenSummary {
   animationUrl: string | null;
   externalUrl: string | null;
   attributes: Array<{ trait_type: string; value: unknown; display_type?: string }>;
-  ownerAddress: string | null;
-  ownerBalance: number | null;
-  tokenUri: string | null;
+  /**
+   * Resolved metadata URI. Comes from `metadataUriResolved` on the platform token, with
+   * `metadataUriRaw` as the unresolved original. There is no `tokenUri` field on the platform.
+   */
+  metadataUri: string | null;
+  /**
+   * ERC-1155 supply for this token id. Not the caller's balance.
+   */
+  supplyQuantity: string | null;
   collection: PlatformCollectionSummary | null;
-  metadataState: 'ready' | 'partial' | 'missing';
-  mediaState: 'ready' | 'partial' | 'missing';
+  metadataState: PlatformMetadataState;
+  mediaState: PlatformMediaState;
 }
+
+/**
+ * Ownership is NOT part of a token read. The platform keeps ownership in separate read models and
+ * exposes it through its own endpoints, so it has to be requested and merged deliberately.
+ */
+export interface PlatformTokenOwnership {
+  chainId: number;
+  contractAddress: string;
+  tokenId: string;
+  ownerAddress: string;
+  /** Present for ERC-1155 holdings only. */
+  balance: string | null;
+}
+
+/** Platform values, kept verbatim so no information is lost in normalization. */
+export type PlatformMetadataState = 'pending' | 'ok' | 'failed' | 'stale';
+export type PlatformMediaState = 'pending' | 'processing' | 'ready' | 'partial' | 'failed';
 
 export interface PlatformWalletHolding {
   chainId: number;
@@ -160,9 +188,27 @@ export interface PlatformWalletHolding {
   collection: PlatformCollectionSummary | null;
 }
 
+/**
+ * The platform reports data age itself, so this does not need to be inferred. It maps directly
+ * from the `freshness` block on a token detail response.
+ */
+export interface PlatformTokenFreshness {
+  lastMetadataFetchAt: string | null;
+  ageSeconds: number | null;
+  isStale: boolean;
+  /** True when reading the token caused the platform to queue its own refresh. */
+  revalidationQueued: boolean;
+}
+
 export interface PlatformTokenDetail extends PlatformTokenSummary {
-  refreshSuggested: boolean;
-  lastIndexedAt: string | null;
+  freshness: PlatformTokenFreshness;
+}
+
+/** Cursor pagination envelope. The cursor is opaque and must not be parsed. */
+export interface PlatformPage<T> {
+  items: T[];
+  hasMore: boolean;
+  nextCursor: string | null;
 }
 ```
 
@@ -182,6 +228,8 @@ The app currently has no dedicated client abstraction for the HMAC-authenticated
 
 - `getTokenList()`
 - `getTokenDetail()`
+- `getTokenOwners()`
+- `listCollections()`
 - `getCollectionDetail()`
 - `searchEntities()`
 - `getWalletInventory()`
@@ -194,48 +242,101 @@ The app currently has no dedicated client abstraction for the HMAC-authenticated
 
 All `/api/v1/*` routes require secrets and HMAC signing, so browser components must never call the platform directly.
 
+### Signing rules the client must respect
+
+The platform does more than check a signature, and two of these will break a naive client.
+
+- **Every request is single-use.** Signatures are held in a replay guard for the accepted skew
+  window. Replaying an identical signed request returns `409 replayed_request`. A retry must
+  therefore re-sign with a fresh timestamp; retrying the same prepared request object always fails.
+- **Clock skew is enforced.** Requests outside the configured window (300 seconds by default) are
+  rejected with `401 stale_timestamp`. The marketplace host's clock must be in sync.
+- **Rate limits are per API client, not per route.** Responses carry `x-ratelimit-limit` and
+  `x-ratelimit-remaining`; exceeding the limit returns `429`. This matters because a single
+  marketplace detail page under this plan makes several platform calls (token detail, owners,
+  collection). Budget the limit against page views, and make the client surface remaining quota so
+  throttling is observable.
+
 ### Implementation contract for the client
 
 The client should expose a narrow interface like this:
 
 ```ts
+export type PlatformDiscoveryStatus = 'ready' | 'queued' | 'failed';
+
+export interface PlatformDiscoveryResult {
+  chainId: number;
+  contractAddress: string;
+  tokenId: string;
+  status: PlatformDiscoveryStatus;
+  queuedJobId: string | null;
+  jobId: string | null;
+  /** Populated when status is `ready`, so an already-indexed NFT needs no follow-up read. */
+  token: PlatformTokenSummary | null;
+  collection: PlatformCollectionSummary | null;
+  /** Populated when status is `failed`. */
+  message?: string;
+}
+
 export interface NftDataPlatformClient {
   getTokenList(input: {
-    chainIds?: number[];
-    contractAddresses?: string[];
-    tokenIds?: string[];
-    page?: number;
+    chainId?: number;
+    contractAddress?: string;
+    metadataStatus?: PlatformMetadataState;
+    mediaStatus?: PlatformMediaState;
+    traitType?: string;
+    traitValue?: string | number | boolean;
     limit?: number;
-    search?: string;
-  }): Promise<PlatformTokenSummary[]>;
+    cursor?: string;
+  }): Promise<PlatformPage<PlatformTokenSummary>>;
   getTokenDetail(input: {
     chainId: number;
     contractAddress: string;
     tokenId: string;
   }): Promise<PlatformTokenDetail>;
+  /** Ownership for one token. Required because token detail carries no owner. */
+  getTokenOwners(input: {
+    chainId: number;
+    contractAddress: string;
+    tokenId: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<PlatformPage<PlatformTokenOwnership>>;
+  listCollections(input: {
+    limit?: number;
+    cursor?: string;
+  }): Promise<PlatformPage<PlatformCollectionSummary>>;
   getCollectionDetail(input: {
     chainId: number;
     contractAddress: string;
   }): Promise<PlatformCollectionSummary>;
   searchEntities(input: {
     query: string;
-    chainIds?: number[];
-    page?: number;
+    entity?: 'tokens' | 'collections' | 'all';
+    chainId?: number;
+    contractAddress?: string;
     limit?: number;
-  }): Promise<PlatformTokenSummary[]>;
+    cursor?: string;
+  }): Promise<PlatformPage<PlatformTokenSummary | PlatformCollectionSummary>>;
   getWalletInventory(input: {
     ownerAddress: string;
     chainIds?: number[];
-  }): Promise<PlatformWalletHolding[]>;
+    limit?: number;
+    cursor?: string;
+  }): Promise<PlatformPage<PlatformWalletHolding>>;
   discoverWalletHoldings(input: {
     ownerAddress: string;
-    chainIds?: number[];
-    knownTokens?: Array<{ chainId: number; contractAddress: string; tokenId: string }>;
-  }): Promise<{ accepted: boolean; jobId?: string | null }>;
+    items: Array<{ chainId: number; contractAddress: string; tokenId: string }>;
+  }): Promise<PlatformDiscoveryResult[]>;
+  discoverTokens(input: {
+    items: Array<{ chainId: number; contractAddress: string; tokenId: string }>;
+  }): Promise<PlatformDiscoveryResult[]>;
   queueTokenRefresh(input: {
     chainId: number;
     contractAddress: string;
     tokenId: string;
+    forceMetadata?: boolean;
+    forceOwnership?: boolean;
   }): Promise<{ accepted: boolean; jobId?: string | null }>;
   queueCollectionRefresh(input: {
     chainId: number;
@@ -245,6 +346,28 @@ export interface NftDataPlatformClient {
 ```
 
 This is the repo-level contract another developer should code against. If upstream DTOs change, only the client and its normalization layer should move.
+
+### Platform constraints this interface reflects
+
+These were verified against a running platform instance and are the reason the interface looks the
+way it does. Getting them wrong produces code that appears to work and silently returns wrong data.
+
+1. **Pagination is cursor-based, never page-based.** Every list and search endpoint returns
+   `pageInfo.nextCursor` and accepts `?cursor=`. There is no `page` parameter.
+2. **Unknown query parameters are ignored, not rejected.** `GET /api/v1/tokens?page=2&search=foo`
+   answers `200` with an unfiltered first page. A client written against a `page`/`search`
+   interface therefore looks healthy while always serving page one. This is the single most
+   dangerous mismatch in this migration.
+3. **Filters are single-valued.** `chainId` and `contractAddress` take one value each, not arrays.
+   The multi-chain wallet endpoint is the exception: it accepts `chainIds=1,11155111` or a repeated
+   `chainId` parameter.
+4. **Free-text search lives only on `/api/v1/search`** via `q`. `/api/v1/tokens` filters
+   structurally (chain, contract, status, trait) and has no text search.
+5. **Token detail carries no ownership.** No `ownerAddress`, `owner`, `ownerBalance`, or `tokenUri`
+   field exists on the token. Ownership comes from
+   `GET /api/v1/owners/:chainId/:contractAddress/:tokenId`, and the metadata URI is
+   `metadataUriResolved`.
+6. **A collection list endpoint does exist**: `GET /api/v1/collections?limit=&cursor=`.
 
 ## 2. Add marketplace-owned proxy routes for the new platform
 
@@ -265,7 +388,7 @@ That is a good pattern and should be kept.
 | `/api/wallet/nfts` | Alchemy/Moralis + MongoDB | NFT Data Platform wallet endpoint |
 | `/api/user/nfts/sync` | Alchemy/Moralis + blockchain + MongoDB | NFT Data Platform discover endpoint |
 | `/api/nft/detail` | MongoDB + blockchain refresh + IPFS | NFT Data Platform token detail |
-| `/api/collections` | MongoDB aggregation | NFT Data Platform token list or collection detail API |
+| `/api/collections` | MongoDB aggregation | NFT Data Platform collection list or collection detail API |
 | `/api/marketplace/items` | MongoDB materialized listings | stays TheGraph-backed or local read model backed by TheGraph |
 
 ### Route stability rule
@@ -333,9 +456,9 @@ The mapper in `src/lib/nft-data-platform/mappers/wallet.ts` should implement the
 | `contractSymbol` | `holding.collection?.symbol ?? holding.token?.collection?.symbol ?? null` |
 | `tokenType` | `holding.token?.standard ?? null` |
 | `balance` | `holding.balance ?? (holding.token?.standard === 'ERC1155' ? '0' : '1')` |
-| `owner` | `holding.token?.ownerAddress ?? holding.ownerAddress` |
-| `ownerBalance` | `holding.token?.ownerBalance ?? null` |
-| `tokenURI` | `holding.token?.tokenUri ?? null` |
+| `owner` | `holding.ownerAddress` — the holding row, not the token; a token carries no owner |
+| `ownerBalance` | `holding.balance` for ERC-1155, otherwise `null` |
+| `tokenURI` | `holding.token?.metadataUri ?? null` |
 | `isListed` and listing fields | joined from `marketplace_items` only |
 | `stats` | joined from `nft_stats` only |
 | `hasMarketplaceData` | `Boolean(listing)` |
@@ -388,7 +511,7 @@ The current detail route still relies on local MongoDB plus on-demand blockchain
 - map NFT Data Platform response fields into the existing `EnrichedNFTDocument`-oriented frontend contract
 - preserve current UI assumptions for metadata, media, attributes, owner, and collection context
 - keep stats sourcing separate from token sourcing
-- replace ad hoc refresh logic with `POST /api/v1/refresh/token` when detail reads return `404` or stale/missing metadata states
+- replace ad hoc refresh logic with `POST /api/v1/refresh/token` **only** when detail reads return `404`. Stale data no longer needs a marketplace-side trigger: reading a token that has aged past its TTL makes the platform queue its own refresh behind the response, debounced platform-side. The `freshness` block reports whether that happened.
 
 ### Concrete implementation contract for `/api/nft/detail`
 
@@ -399,8 +522,12 @@ Keep the route path and query parameters. Change the behavior as follows:
 3. Join listing state from `marketplace_items`.
 4. Join stats from `nft_stats`.
 5. Join admin insights from `admin_nft_insights`.
-6. Map the normalized platform token into the existing `EnrichedNFTDocument`-oriented response contract.
-7. If token detail is missing or partial, optionally queue `client.queueTokenRefresh()` once per cooldown window.
+6. Fetch ownership with `client.getTokenOwners()` when the UI shows owner or balance. Token detail does not include it.
+7. Map the normalized platform token into the existing `EnrichedNFTDocument`-oriented response contract.
+8. Do not add a marketplace-side refresh cooldown for stale tokens. The platform already debounces
+   its own revalidation, and a second cooldown here would only queue redundant jobs. Queue
+   `client.queueTokenRefresh()` explicitly for the `404` case, where nothing is indexed yet and the
+   platform has nothing to revalidate.
 
 ### Detail mapping table
 
@@ -416,16 +543,18 @@ The mapper in `src/lib/nft-data-platform/mappers/token-detail.ts` should apply t
 | `metadata.animationUrl` | `token.animationUrl ?? null` |
 | `metadata.externalUrl` | `token.externalUrl ?? null` |
 | `metadata.attributes` | `token.attributes ?? []` |
-| `contract.owner` | `token.ownerAddress ?? null` |
-| `contract.ownerBalance` | `token.ownerBalance ?? null` |
-| `contract.tokenURI` | `token.tokenUri ?? null` |
+| `contract.owner` | separate `client.getTokenOwners()` call; token detail has no owner field |
+| `contract.ownerBalance` | `balance` from the same ownership call, ERC-1155 only |
+| `contract.tokenURI` | `token.metadataUri` (platform field `metadataUriResolved`) |
 | `contract.name` | `token.collection?.name ?? null` |
 | `contract.symbol` | `token.collection?.symbol ?? null` |
 | `contract.contractType` | `token.standard ?? null` |
 | `blockchain` | no direct chain read here; fill only from platform detail if the platform exposes that state, otherwise leave conservative nulls |
 | `marketplace.*` | `marketplace_items` join only |
 | `insights.*` | `admin_nft_insights` join only |
-| `dataQuality.hasMetadata` | `token.metadataState === 'ready' || token.metadataState === 'partial'` |
+| `dataQuality.hasMetadata` | `token.metadataState === 'ok'` — the metadata enum is `pending`, `ok`, `failed`, `stale`; there is no `partial` state for metadata |
+| `dataQuality.hasMedia` | `token.mediaState === 'ready' || token.mediaState === 'partial'` — the media enum is `pending`, `processing`, `ready`, `partial`, `failed` |
+| `freshness.*` | `token.freshness` straight from the platform; do not recompute data age locally |
 | `dataQuality.metadataSource` | `'cache'` when coming from indexed platform data, `'none'` when token metadata is absent |
 
 ### Required `404` behavior
@@ -461,17 +590,20 @@ This applies to token and collection discovery data, not to local social stats. 
 
 - define whether the current collections page needs a list endpoint, a search endpoint, or a collection-detail lookup pattern
 - if the page is contract-driven, proxy to `GET /api/v1/collections/:chainId/:contractAddress`
-- if the page is browse-driven, proxy to `GET /api/v1/tokens` or `GET /api/v1/search` and aggregate only the UI-specific view model locally
+- if the page is browse-driven, proxy to `GET /api/v1/collections` (cursor-paginated) or `GET /api/v1/search?entity=collections`, and aggregate only the UI-specific view model locally
 - preserve filters that are still needed by the existing collections UX
 
-### Open design question
+### Resolved: collection browsing exists
 
-The NFT Data Platform docs shared so far define **collection detail**, but not a dedicated **collection list/browse** endpoint.
+An earlier draft of this document treated collection browsing as an open gap. It is not: the
+platform exposes `GET /api/v1/collections?limit=&cursor=`, cursor-paginated like every other list
+endpoint. No local derived collections view and no temporary local aggregation is needed as a
+workaround for a missing endpoint.
 
-If no such endpoint exists, this repository must either:
-
-- keep a local derived collections view based on token search results, or
-- keep the current local aggregation until the platform exposes collection browsing directly
+That does not change the decision below, which is a product choice rather than a technical
+constraint: this marketplace shows *listed* collections, so the relevant contracts still come from
+active listings. `listCollections()` is the right tool only if a global collection directory is
+ever wanted.
 
 ### Implementation decision for this repository
 
@@ -480,7 +612,11 @@ For the current marketplace UI, this question is now resolved as follows:
 1. `/api/collections` remains a listed-collections route, not a global browse route.
 2. The set of relevant collection contracts continues to come from active `marketplace_items`.
 3. Collection metadata must come from `client.getCollectionDetail()`.
-4. Preview images should come from NFT Data Platform token summaries for the listed token IDs of each contract.
+4. Preview images do not need to be assembled from token summaries. A collection response already
+   carries `preview` (the token the platform picked to represent the collection, with its media),
+   `recentTokens` (most recently updated tokens with thumbnails), and `coverImageSource` telling
+   you where the cover came from. It also carries `indexedTokenCount` and `holderCount`, both
+   maintained by the platform's worker rather than counted per request.
 5. Local social totals may still be aggregated locally if the UI displays them.
 
 That means the migrated route should no longer treat `nft_metadata` as the primary metadata source for collections, even though the list of displayed contracts is still marketplace-driven.
@@ -683,8 +819,10 @@ This is the recommended change sequence for another developer implementing the m
 ## Phase 5: Collections and search
 
 1. Replace `/api/collections` where possible.
-2. Add NFT Data Platform backed search paths.
-3. Keep temporary local aggregation only if the platform lacks collection browse support.
+2. Add NFT Data Platform backed search paths, using `q` on `/api/v1/search` rather than a `search`
+   parameter on the token list.
+3. Use the collection response's own `preview`, `recentTokens`, `indexedTokenCount`, and
+   `holderCount` instead of rebuilding them from token queries.
 
 ## Phase 6: Cleanup
 
@@ -732,6 +870,8 @@ Use route-level integration tests and mapper contract tests. At minimum add the 
 | Test file suggestion | Purpose |
 | --- | --- |
 | `tests/unit/nft-data-platform/wallet-mapper.test.ts` | normalized holding -> `WalletNFT` mapping including `token: null` |
+| `tests/unit/nft-data-platform/pagination.test.ts` | cursor is passed through and a second page differs from the first, so a silently ignored parameter cannot pass |
+| `tests/unit/nft-data-platform/signing.test.ts` | a retry re-signs with a fresh timestamp instead of replaying, and `409` is not treated as a permanent failure |
 | `tests/unit/nft-data-platform/token-detail-mapper.test.ts` | normalized token detail -> current detail response mapping |
 | `tests/integration/api/wallet-nfts.test.ts` | `/api/wallet/nfts` platform-backed happy path, `token: null`, listing join, stats join |
 | `tests/integration/api/user-nfts-sync.test.ts` | `/api/user/nfts/sync` discover queued and upstream failure handling |
@@ -770,9 +910,12 @@ The UI must tolerate cases where:
 - collection metadata lags behind listing visibility
 - local stats exist even when token enrichment is still incomplete
 
-## 3. Collection browse gap
+## 3. Pagination and parameter mismatch
 
-If the platform does not expose collection browsing, the current collections UX cannot be migrated completely without a temporary local derived view.
+The platform ignores unknown query parameters instead of rejecting them. Code written against a
+page-based or array-based interface returns `200` with plausible-looking data while silently
+serving an unfiltered first page. Contract tests for the client layer should assert that a second
+page differs from the first, not merely that a request succeeded.
 
 ## 4. Response-shape drift
 
@@ -791,6 +934,9 @@ This migration is complete when all of the following are true:
 - the UI handles `token: null`, `collection: null`, and `404 not indexed yet` correctly
 - NFT Data Platform credentials are fully server-side and validated at startup
 - the migrated routes have automated coverage
+- pagination uses platform cursors end to end, with no `page` parameter anywhere in the client
+- owner and balance come from the ownership endpoint, never from token detail
+- retries re-sign requests rather than replaying them, and `429` plus `409` are handled distinctly
 
 ## Recommended Next Step
 
