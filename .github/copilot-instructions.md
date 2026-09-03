@@ -5,7 +5,7 @@
 - [x] NFT Sync Service funktioniert (61 items in MongoDB).
 - [x] WalletNFTsContext integriert (auto-loading, enrichment, caching).
 - [x] CollectionsContext integriert (MongoDB aggregation, insights enrichment).
-- [x] **Hybrid NFT Fetching optimiert (60-70% faster, production-ready)**.
+- [x] **Hybrid NFT Fetching optimiert (production-ready)**.
 - [x] **Alchemy API optimiert (rate-limit friendly, nur Discovery)**.
 - [x] **Admin Authentication System (signaturbasiert mit Session-Management)**.
 - [x] **API Infrastructure Complete** - apiHandler, middleware, type-safe errors.
@@ -21,8 +21,8 @@
 
 ### Active Systems
 - **TheGraph → MongoDB sync**: 61 NFT listings, auto-start on server boot
-- **WalletNFTsContext**: DB-first loading (instant ~50ms)
-- **CollectionsContext**: MongoDB aggregation (60x faster)
+- **WalletNFTsContext**: DB-first loading (~56ms p50, measured)
+- **CollectionsContext**: MongoDB aggregation (~104ms p50, measured)
 - **Hybrid API**: Alchemy discovery + Blockchain metadata (rate limit friendly)
 - **Admin Auth**: Wallet signature verification + 24h sessions
 - **API Infrastructure**: Standardized error handling, middleware, validation
@@ -32,15 +32,15 @@
 - **nft_metadata collection**: Central source of truth for ALL NFT data
 - **marketplace_items**: ONLY listing data (price, seller, status)
 - **nft_stats**: User interactions (views, likes, ratings, watchlist)
-- **Smart sync**: Discovery-only from Alchemy (90%+ API savings)
-- **Instant loading**: ~50ms from DB vs ~5000ms from Alchemy
+- **Smart sync**: Discovery-only from Alchemy (`withMetadata=false`)
+- **Instant loading**: ~56ms p50 from DB vs ~497ms cold Alchemy discovery (`npm run bench:api`)
 - **Ownership tracking**: Full history with transfer detection
 
 ## Context Architecture
 - **MarketplaceCacheContext**: Listed marketplace items (MongoDB marketplace_items)
 - **WalletNFTsContext**: User-owned NFTs (DB-first: nft_metadata → Alchemy fallback)
-  - **Optimization**: Instant load (~50ms), background sync, smart filtering
-  - **Performance**: 100x improvement (50ms vs 5000ms)
+  - **Optimization**: DB-first load, background sync, smart filtering
+  - **Performance**: ~56ms p50 vs ~497ms cold discovery (measured 2026-09-03)
   - **Alchemy**: Only discovery (withMetadata=false) - 90% rate limit savings
 - **CollectionsContext**: Collections aggregation (MongoDB marketplace_items + insights)
 - **NFTContext**: Metadata/insights caching, performance monitoring (kept for compatibility)

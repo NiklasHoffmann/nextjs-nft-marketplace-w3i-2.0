@@ -71,9 +71,9 @@ Utility functions audit and documentation.
 ## Architecture Highlights
 
 ### **Hybrid Metadata System**
-- **DB-first loading** - Instant ~50ms response
+- **DB-first loading** - ~56ms p50, measured via `npm run bench:api`
 - **Blockchain fallback** - Direct contract + IPFS
-- **Smart sync** - Discovery-only from Alchemy (90% cost reduction)
+- **Smart sync** - Discovery-only from Alchemy (`withMetadata=false`)
 - **Ownership tracking** - Full transfer history
 
 ### **API Infrastructure**

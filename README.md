@@ -12,11 +12,11 @@ A modern, full-stack NFT marketplace built with Next.js 15, TypeScript, and Web3
 
 ### **Architecture Complete**
 
-- ✅ **Hybrid Metadata System** - DB-first loading (~50ms) with blockchain fallback
+- ✅ **Hybrid Metadata System** - DB-first loading (~56ms p50, measured) with blockchain fallback
 - ✅ **Modular Components** - BaseCard, BaseModal, LoadingState, FormField
 - ✅ **Standardized API** - 42+ handlers with apiHandler, middleware, validation
 - ✅ **Type-Safe Infrastructure** - Comprehensive TypeScript coverage
-- ✅ **Performance Optimized** - 60-70% faster NFT fetching with parallel execution
+- ✅ **Performance Optimized** - Parallel execution, smart filtering, shared caches
 
 ### **Security & Authentication**
 
@@ -30,7 +30,7 @@ A modern, full-stack NFT marketplace built with Next.js 15, TypeScript, and Web3
 - ✅ **Real-Time Sync** - TheGraph → MongoDB polling (30s interval)
 - ✅ **Smart Caching** - Multi-layer caching with automatic invalidation
 - ✅ **Ownership Tracking** - Full NFT transfer history
-- ✅ **Alchemy Optimization** - Discovery-only mode (90% API cost reduction)
+- ✅ **Alchemy Optimization** - Discovery-only mode (`withMetadata=false`)
 
 ## ✨ Features
 
@@ -60,7 +60,7 @@ A modern, full-stack NFT marketplace built with Next.js 15, TypeScript, and Web3
   - Contract info (name, symbol, totalSupply)
   - Ownership tracking with full history
   - Insights (category, rarity, tags)
-  - **Instant wallet loading** (~50ms vs ~5000ms)
+  - **Instant wallet loading** (~56ms p50 vs ~497ms cold discovery, measured)
 - **`marketplace_items` Collection:** Listing-specific data only
   - Price, seller, buyer, listing status
   - References `nft_metadata` via $lookup
@@ -73,7 +73,7 @@ A modern, full-stack NFT marketplace built with Next.js 15, TypeScript, and Web3
 
 - **Alchemy Discovery:** withMetadata=false (cheap API calls)
 - **Blockchain Metadata:** Direct from contract + IPFS (free)
-- **90%+ API Cost Reduction:** Only fetch metadata for NEW NFTs
+- **Fewer Metadata Calls:** Only fetch metadata for NEW NFTs (not quantified)
 - **Background Verification:** Auto-sync on wallet connect (doesn't block UI)
 - **Transfer Detection:** Automatic ownership updates
 
@@ -567,16 +567,15 @@ See [docs/api/routes.md](docs/api/routes.md) for complete API reference.
 - ❌ Duplicate code across components
 - ❌ Hard to maintain and test
 - ❌ Poor performance with unnecessary re-renders
-- ❌ Slow NFT loading (5000ms from Alchemy)
+- ❌ Slow NFT loading (full metadata fetched from Alchemy on every wallet load)
 
 ### **After Refactoring:**
 
 - ✅ **Standardized API Infrastructure** - 42+ handlers with consistent patterns
 - ✅ **Security Complete** - Signature-based auth, automatic middleware
 - ✅ **Modular Components** - BaseCard, BaseModal, LoadingState, FormField
-- ✅ **60-70% Faster NFT Fetching** - Parallel execution, smart filtering
-- ✅ **Instant Wallet Loading** - ~50ms from DB vs ~5000ms from API
-- ✅ **90% API Cost Reduction** - Discovery-only mode for Alchemy
+- ✅ **Instant Wallet Loading** - ~56ms p50 from DB vs ~497ms cold discovery (measured)
+- ✅ **Reduced API Cost** - Discovery-only mode for Alchemy (`withMetadata=false`)
 - ✅ **Type-Safe** - Comprehensive TypeScript coverage
 - ✅ **Production Ready** - Real-time sync, monitoring, error handling
 
@@ -609,25 +608,28 @@ We welcome contributions! Please follow these steps:
 
 ## 📈 Performance Metrics
 
-### **API Performance:**
+Reproduce with `npm run bench:api -- 0xYourWallet` against a running dev server
+([scripts/dev/benchmark-api.ts](scripts/dev/benchmark-api.ts)).
 
-- **API Handler Overhead**: < 1ms
-- **Authentication**: < 5ms per request
-- **Validation**: < 2ms per request
-- **Error Handling**: Automatic with proper status codes
+### **Measured** (local dev, 20 iterations after 3 warmups, 2026-09-03)
 
-### **Data Loading:**
+| Endpoint | cold | p50 | p95 |
+|---|---|---|---|
+| `GET /api/marketplace/items?pageSize=20` | 341ms | **17ms** | 20ms |
+| `GET /api/collections` | 126ms | **104ms** | 122ms |
+| `GET /api/user/nfts` (DB-first) | 90ms | **56ms** | 69ms |
+| `GET /api/wallet/nfts` (Alchemy discovery) | **497ms** | 17ms¹ | 19ms¹ |
 
-- **Wallet NFTs (DB-first)**: ~50ms (100x improvement)
-- **Marketplace Items**: ~100-200ms from MongoDB
-- **Collections Aggregation**: 60x faster vs client-side
-- **Cache Hit Rate**: 99.5% (10ms vs 2000ms)
+¹ Warm discovery requests are served from the shared cache and do not reflect
+Alchemy latency — only the cold value is meaningful.
 
-### **NFT Fetching:**
+**DB-first vs. cold discovery: 56ms vs 497ms ≈ 9x.** Numbers are from a local
+machine against MongoDB Atlas; production latency will differ.
 
-- **Before**: ~12s (sequential, full metadata)
-- **After**: ~5s (parallel, discovery-only)
-- **Improvement**: 60-70% faster
+### **Not measured**
+
+Bundle size, cache hit rate, sync throughput and Alchemy cost savings have no
+benchmark yet — treat any figure for those as an estimate.
 
 ### **Build & Development:**
 

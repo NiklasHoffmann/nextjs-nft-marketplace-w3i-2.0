@@ -47,7 +47,7 @@ Decentralized blockchain data indexing:
 ### **Alchemy**
 Web3 infrastructure provider:
 - ✅ NFT discovery (withMetadata=false)
-- ✅ 90% API cost reduction
+- ✅ Metadata fetched from contract + IPFS instead (not quantified)
 - ✅ Rate-limit friendly
 - ✅ Fallback for blockchain metadata
 

@@ -49,7 +49,7 @@ Do not assume every server-side module runs in every request — code under `src
 
 Three collections (`nft_metadata`, `marketplace_items`, `nft_stats`) — full field breakdown and sync strategy in `docs/database/README.md`.
 
-When adding a feature that reads NFT data, prefer reading from `nft_metadata` (via `src/lib/db/nft-metadata.ts`) over calling Alchemy or the chain directly — that's what makes wallet loading instant (~50ms) instead of hitting Alchemy (~5000ms).
+When adding a feature that reads NFT data, prefer reading from `nft_metadata` (via `src/lib/db/nft-metadata.ts`) over calling Alchemy or the chain directly — measured with `npm run bench:api`, that is ~56ms p50 versus ~497ms for a cold Alchemy discovery call.
 
 ### API layer: `apiHandler` + middleware, always
 
